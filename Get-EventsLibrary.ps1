@@ -19,6 +19,9 @@
     - DirectoryPattern                = $true # adds to reports path Hourly \ Monthly \ Quarterly \ Custom ("C:\Support\Reports\Hourly")
     - Fixes for reports
 
+    ChangeLog 0.9 (not released, to be updated)
+        Basic
+        - Fixes to the Get-Events function to be more useful alone
     Changelog 0.8 - 15.04.2018
         Basic
         - Rebuilt config file (again, sorry for that)
@@ -795,11 +798,25 @@ function ConvertFrom-SID ($Sid) {
 
 }
 
-function Get-Events($ADDomainControllers, [DateTime] $DateFrom, [DateTime] $DateTo, $EventIds, $LogType = 'Security', $ProviderName = "") {
+function Get-Events {
+    param (
+        [alias ("ADDomainControllers", "DomainController", "Server", "Computer", "Computers")] [string[]]$Servers,
+        [alias ("From")][DateTime] $DateFrom,
+        [alias ("To")][DateTime] $DateTo,
+        [alias ("ID", "Ids", "EventID")] [int[]] $EventIds,
+        [alias ("LogName", "Log")] [string] $LogType = 'Security',
+        [alias ("Provider")][string] $ProviderName = ""
+    )
+    <#
+    .EXAMPLE 1
+        $DateFrom = (get-date).AddHours(-5)
+        $DateTo = (get-date).AddHours(1)
+        get-events -Computer "Evo1" -DateFrom $DateFrom -DateTo $DateTo -EventId 916 -LogType "Application"
+    #>
     $Allevents = @()
 
-    foreach ($AdServer in $ADDomainControllers) {
-        Write-Color @script:WriteParameters "[i] Processing domain controller ", "$($AdServer)", " for events ", "$EventIds" -Color White, Yellow, White, Green
+    foreach ($Server in $Servers) {
+        Write-Color @script:WriteParameters "[i] Processing domain controller ", "$($Server)", " for events ", "$EventIds" -Color White, Yellow, White, Green
         if ($ProviderName -eq "") {
             $EventFilter = @{Logname = $LogType; Id = $EventIds; StartTime = $DateFrom; EndTime = $DateTo  }
         } else {
@@ -807,17 +824,17 @@ function Get-Events($ADDomainControllers, [DateTime] $DateFrom, [DateTime] $Date
         }
         $Events = @()
         try {
-            $Events = Get-WinEvent -FilterHashtable $EventFilter -ComputerName $AdServer -ErrorAction Stop
+            $Events = Get-WinEvent -FilterHashtable $EventFilter -ComputerName $Server -ErrorAction Stop
             $EventsCount = ($Events | Measure-Object).Count
             Write-Color "[i] Events processed: ", "$EventsCount" -Color White, Yellow
         } catch {
             if ($_.Exception -match "No events were found that match the specified selection criteria") {
                 Write-Color @script:WriteParameters "[i] No events found"
             } elseif ($_.Exception -match "There are no more endpoints available from the endpoint") {
-                Write-Color @script:WriteParameters "[i] Error connecting to domain controller ", "$($AdServer)", ". Server will be skipped..." -Color White, Red, White
+                Write-Color @script:WriteParameters "[i] Error connecting to domain controller ", "$($Server)", ". Server will be skipped..." -Color White, Red, White
                 Write-Color @script:WriteParameters "[i] Error: ", "$($_.Exception.Message)" -Color White, Red
             } else {
-                Write-Color @script:WriteParameters "[i] Error reported when checking domain controller ", "$($AdServer)", " for events. Server will be skipped..." -Color White, Red, White
+                Write-Color @script:WriteParameters "[i] Error reported when checking domain controller ", "$($Server)", " for events. Server will be skipped..." -Color White, Red, White
                 Write-Color @script:WriteParameters "[i] Error: ", "$($_.Exception.Message)" -Color White, Red
             }
             continue
@@ -855,7 +872,6 @@ function Get-Events($ADDomainControllers, [DateTime] $DateFrom, [DateTime] $Date
             }
         }
         $Allevents += $events
-
     }
     $EventsProcessed = ($Allevents | Measure-Object).Count
     Write-Color @script:WriteParameters "[i] Events processed in total for the report: ", "$EventsProcessed" -Color White, Yellow
