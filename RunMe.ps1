@@ -1,29 +1,29 @@
 Clear-Host
 
 # OPTIONS TO FILL IN
-$GetEventsLibraryPath = "C:\Support\GitHub\PSEventViewer\Get-EventsLibrary.ps1" # THIS IS REQUIRED!!
- 
+$GetEventsLibraryPath = "$PSScriptRoot\Get-EventsLibrary.ps1" # THIS IS REQUIRED!!
+
 $EmailParameters = @{
     EmailFrom            = "notifications@domain.com"
     EmailTo              = "przemyslaw.klys@domain.com, admin@domain.com"
     EmailCC              = ""
     EmailBCC             = ""
-    EmailServer          = "smtp.office365.com" 
+    EmailServer          = "smtp.office365.com"
     EmailServerPassword  = "YourPassword"
     EmailServerPort      = "587"
     EmailServerLogin     = "notifications@domain.com"
     EmailServerEnableSSL = 1
-    EmailEncoding        = "Unicode" 
+    EmailEncoding        = "Unicode"
     EmailSubject         = "[Reporting] Event Changes for period <<DateFrom>> to <<DateTo>>"
     EmailPriority        = "Low" # Normal, High
 }
 $FormattingParameters = @{
     CompanyBranding   = @{
-        Logo = "https://evotec.xyz/wp-content/uploads/2015/05/Logo-evotec-012.png"
-        Width = "200"
+        Logo   = "https://evotec.xyz/wp-content/uploads/2015/05/Logo-evotec-012.png"
+        Width  = "200"
         Height = ""
-        Link = "https://evotec.xyz"
-    }     
+        Link   = "https://evotec.xyz"
+    }
     FontFamily        = "Calibri Light"
     FontSize          = "9pt"
     FontHeadingFamily = "Calibri Light"
@@ -33,12 +33,12 @@ $ReportOptions = @{
     JustTestPrerequisite            = $false # runs testing without actually running script
     OnlyPrimaryDC                   = $false # usually should query all DC's but for testing can query just one (PrimaryDC)
 
-    IncludeDomainControllers        = $true    
-    IncludeGroupEvents              = $true 
+    IncludeDomainControllers        = $true
+    IncludeGroupEvents              = $true
     IncludeUserEvents               = $true
     IncludeUserStatuses             = $true
     IncludeUserLockouts             = $true
-    IncludeDomainControllersReboots = $false 
+    IncludeDomainControllersReboots = $false
     IncludeLogonEvents              = $false # DO NOT USE - NOT FINISHED
     IncludeGroupPolicyChanges       = $false # DO NOT USE - NOT FINISHED
     IncludeClearedLogs              = $false # DO NOT USE - NOT FINISHED
@@ -46,7 +46,7 @@ $ReportOptions = @{
         Use    = $true
         Logs   = "Security"#, "Application"
         SortBy = ""
-    } 
+    }
 
     # Report Per Hour
     ReportPastHour                  = $false # if it's 23:22 it will report 22:00 till 23:00
@@ -54,16 +54,16 @@ $ReportOptions = @{
     # Report Per Day
     ReportPastDay                   = $false # if it's 1.04.2018 it will report 31.03.2018 00:00:00 till 01.04.2018 00:00:00
     ReportCurrentDay                = $false # if it's 1.04.2018 05:22 it will report 1.04.2018 00:00:00 till 01.04.2018 00:00:00
-    # Report Per Week 
+    # Report Per Week
     ReportOnDay                     = @{
         Use  = $true
         Days = "Monday"#, "Tuesday"
-    } 
+    }
     # Report Per Month
     ReportPastMonth                 = @{
         Use   = $true # checks for 1st day of the month - won't run on any other day unless used force
-        Force = $false  # if true - runs always ... 
-    } 
+        Force = $false  # if true - runs always ...
+    }
     ReportCurrentMonth              = $false
 
     # Report Per Quarter
@@ -76,11 +76,11 @@ $ReportOptions = @{
     ReportCurrentDayMinusDayX       = @{
         Use  = $false
         Days = 7    # goes back X days and shows just 1 day
-    } 
+    }
     ReportCurrentDayMinuxDaysX      = @{
         Use  = $false
         Days = 3 # goes back X days and shows X number of days till Today
-    }     
+    }
     ReportCustomDate                = @{
         Use      = $false
         DateFrom = get-date -Year 2018 -Month 03 -Day 19
@@ -107,11 +107,10 @@ $ReportOptions = @{
 ### DO NOT EDIT ANYTHING BELOW ###
 if (Test-Path $GetEventsLibraryPath) {
     .$GetEventsLibraryPath
-}
-else {
+} else {
     Write-Warning "Get-EventsLibrary.ps1 not available. Please make sure to edit path to that library in global includes above - variable GetEventsLibraryPath."
     Write-Warning "In case you don't have the library you can always download it at https://evotec.xyz/hub/scripts/get-eventslibrary-ps1/"
-    Exit    
+    Exit
 }
 
 Start-Reporting $EmailParameters $ReportOptions $FormattingParameters
