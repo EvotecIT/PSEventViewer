@@ -22,6 +22,7 @@
     ChangeLog 0.9 (not released, to be updated)
         Basic
         - Fixes to the Get-Events function to be more useful alone
+        - Fix for too many tags (Body/Head opening/closing all the time) when attaching tables
     Changelog 0.8 - 15.04.2018
         Basic
         - Rebuilt config file (again, sorry for that)
