@@ -1427,7 +1427,7 @@ function Set-EmailHead($FormattingOptions) {
 function Set-EmailBody($TableData, $TableWelcomeMessage) {
     $body = "<p><i>$TableWelcomeMessage</i>"
     if ($($TableData | Measure-Object).Count -gt 0) {
-        $body += $TableData | ConvertTo-Html | Out-String
+        $body += $TableData | ConvertTo-Html -Fragment | Out-String
         $body = $body -replace " Added", "<font color=`"green`"><b> Added</b></font>"
         $body = $body -replace " Removed", "<font color=`"red`"><b> Removed</b></font>"
         $body = $body -replace " Deleted", "<font color=`"red`"><b> Deleted</b></font>"
