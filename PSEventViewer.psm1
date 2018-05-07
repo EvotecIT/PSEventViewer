@@ -152,6 +152,7 @@ function Test-Configuration ($EmailParameters, $ReportOptions, $FormattingParame
     $ConfigurationEmail += Test-Key $EmailParameters "EmailParameters" "EmailEncoding" -DisplayProgress $true
     $ConfigurationEmail += Test-Key $EmailParameters "EmailParameters" "EmailSubject" -DisplayProgress $true
     $ConfigurationEmail += Test-Key $EmailParameters "EmailParameters" "EmailPriority" -DisplayProgress $true
+    $ConfigurationEmail += Test-Key $EmailParameters "EmailParameters" "EmailReplyTo" -DisplayProgress $true
     #endregion EmailParameters
     #region FormattingParameters
     #  Write-Color @Global:WriteParameters -Text "[t] ", "Testing for missing parameters in configuration of ", "FormattingParameters", "..." -Color White, White, Yellow
@@ -1164,6 +1165,12 @@ function Send-Email ([hashtable] $EmailParameters, [string] $Body = "", $Attachm
     if ($EmailParameters.EmailBCC -ne "") {
         foreach ($BCC in $EmailParameters.EmailBCC) { $MailMessage.BCC.add($($BCC)) }
     }
+    $Exists = Test-Key $EmailParameters "EmailParameters" "EmailReplyTo" -DisplayProgress $false
+    if ($Exists -eq $true) {
+        if ($EmailParameters.EmailReplyTo -ne "") {
+            $MailMessage.ReplyTo = $EmailParameters.EmailReplyTo
+        }
+    }
     $MailMessage.IsBodyHtml = 1
     if ($Subject -eq "") {
         $MailMessage.Subject = $EmailParameters.EmailSubject
@@ -1766,3 +1773,5 @@ function Start-Reporting ($EmailParameters, $ReportOptions, $FormattingOptions, 
     }
 
 }
+
+Export-ModuleMember -function 'Get-Events', 'Start-Reporting'

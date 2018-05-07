@@ -1,7 +1,6 @@
-Clear-Host
+Import-Module PSEventViewer
 
-# OPTIONS TO FILL IN
-$GetEventsLibraryPath = "$PSScriptRoot\Get-EventsLibrary.ps1" # THIS IS REQUIRED!!
+Clear-Host
 
 $EmailParameters = @{
     EmailFrom            = "notifications@domain.com"
@@ -102,15 +101,6 @@ $ReportOptions = @{
         LogFile    = ""
         TimeFormat = "yyyy-MM-dd HH:mm:ss"
     }
-}
-
-### DO NOT EDIT ANYTHING BELOW ###
-if (Test-Path $GetEventsLibraryPath) {
-    .$GetEventsLibraryPath
-} else {
-    Write-Warning "Get-EventsLibrary.ps1 not available. Please make sure to edit path to that library in global includes above - variable GetEventsLibraryPath."
-    Write-Warning "In case you don't have the library you can always download it at https://evotec.xyz/hub/scripts/get-eventslibrary-ps1/"
-    Exit
 }
 
 Start-Reporting $EmailParameters $ReportOptions $FormattingParameters
