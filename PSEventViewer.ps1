@@ -96,6 +96,7 @@ $script:WriteParameters = @{
     TimeFormat = "yyyy-MM-dd HH:mm:ss"
 }
 
+
 Function Get-ModulesAvailability ([string]$Name) {
     if (-not(Get-Module -name $name)) {
         if (Get-Module -ListAvailable | Where-Object { $_.name -eq $name }) {
@@ -828,7 +829,7 @@ function Get-Events {
         try {
             $Events = Get-WinEvent -FilterHashtable $EventFilter -ComputerName $Server -ErrorAction Stop
             $EventsCount = ($Events | Measure-Object).Count
-            Write-Color "[i] Events processed: ", "$EventsCount" -Color White, Yellow
+            Write-Color @script:WriteParameters "[i] Events processed: ", "$EventsCount" -Color White, Yellow
         } catch {
             if ($_.Exception -match "No events were found that match the specified selection criteria") {
                 Write-Color @script:WriteParameters "[i] No events found"
@@ -1476,11 +1477,23 @@ function Set-EmailReportDetails($FormattingOptions, $Dates) {
     $Report = "<p style=`"background-color:white;font-family:$($FormattingOptions.FontFamily);font-size:$($FormattingOptions.FontSize)`">" +
     "<strong>Report Time:</strong> $DateReport <br>" +
     "<strong>Report Period:</strong> $($Dates.DateFrom) to $($Dates.DateTo) <br>" +
-    "<strong>Account Executing Report :</strong> $env:userdomain\$($env:username.toupper()) on $($env:ComputerName.toUpper())" +
+    "<strong>Account Executing Report :</strong> $env:userdomain\$($env:username.toupper()) on $($env:ComputerName.toUpper()) <br>" +
+    "<strong>Time to generate:</strong> **TimeToGenerateDays** days, **TimeToGenerateHours** hours, **TimeToGenerateMinutes** minutes, **TimeToGenerateSeconds** seconds, **TimeToGenerateMilliseconds** milliseconds"
     "</p>"
     return $Report
 }
+
+function Set-EmailWordReplacements($Body, $Replace, $ReplaceWith, [switch] $RegEx) {
+    if ($RegEx) {
+        $Body = $Body -Replace $Replace, $ReplaceWith
+    } else {
+        $Body = $Body.Replace($Replace, $ReplaceWith)
+    }
+    return $Body
+}
+
 function Start-Report([hashtable] $Dates, [hashtable] $EmailParameters, [hashtable] $ReportOptions, [hashtable] $FormattingOptions, $Servers) {
+    $time = [System.Diagnostics.Stopwatch]::StartNew() # Timer Start
     # Declare variables
     $EventLogTable = @()
     $GroupsEventsTable = @()
@@ -1610,6 +1623,14 @@ function Start-Report([hashtable] $Dates, [hashtable] $EmailParameters, [hashtab
     }
     $Reports = $Reports |  Where-Object { $_ } | Sort-Object -Uniq
 
+    # Do Cleanup of Emails
+    $EmailBody = Set-EmailWordReplacements -Body $EmailBody -Replace '**TimeToGenerateDays**' -ReplaceWith $time.Elapsed.Days
+    $EmailBody = Set-EmailWordReplacements -Body $EmailBody -Replace '**TimeToGenerateHours**' -ReplaceWith $time.Elapsed.Hours
+    $EmailBody = Set-EmailWordReplacements -Body $EmailBody -Replace '**TimeToGenerateMinutes**' -ReplaceWith $time.Elapsed.Minutes
+    $EmailBody = Set-EmailWordReplacements -Body $EmailBody -Replace '**TimeToGenerateSeconds**' -ReplaceWith $time.Elapsed.Seconds
+    $EmailBody = Set-EmailWordReplacements -Body $EmailBody -Replace '**TimeToGenerateMilliseconds**' -ReplaceWith $time.Elapsed.Milliseconds
+    $Time.Stop()
+
     # Sending email - finalizing package
     if ($ReportOptions.SendMail -eq $true) {
         $TemporarySubject = $EmailParameters.EmailSubject -replace "<<DateFrom>>", "$($Dates.DateFrom)" -replace "<<DateTo>>", "$($Dates.DateTo)"
@@ -1626,6 +1647,28 @@ function Start-Report([hashtable] $Dates, [hashtable] $EmailParameters, [hashtab
     }
 
     Remove-ReportsFiles -KeepReports $ReportOptions.KeepReports -AsExcel $ReportOptions.AsExcel -AsCSV $ReportOptions.AsCSV -ReportFiles $Reports
+}
+
+function Get-TimeZoneLegacy () {
+    return ([System.TimeZone]::CurrentTimeZone).StandardName
+}
+
+function Get-TimeZoneAdvanced {
+    param(
+        [string[]]$ComputerName = $Env:COMPUTERNAME,
+        [System.Management.Automation.PSCredential] $Credential = [System.Management.Automation.PSCredential]::Empty
+    )
+    foreach ($computer in $computerName) {
+        $TimeZone = Get-WmiObject -Class win32_timezone -ComputerName $computer -Credential $Credential
+        $LocalTime = Get-WmiObject -Class win32_localtime -ComputerName $computer -Credential $Credential
+        $Output = @{
+            'ComputerName' = $localTime.__SERVER;
+            'TimeZone' = $timeZone.Caption;
+            'CurrentTime' = (Get-Date -Day $localTime.Day -Month $localTime.Month);
+        }
+        $Object = New-Object -TypeName PSObject -Property $Output
+        Write-Output $Object
+    }
 }
 
 function Remove-ReportsFiles ($KeepReports, $AsExcel, $AsCSV, $ReportFiles) {
@@ -1676,6 +1719,7 @@ function Get-Servers($ReportOptions) {
     return $Servers
 }
 function Start-Reporting ($EmailParameters, $ReportOptions, $FormattingOptions, $ScriptParameters) {
+
     $Test1 = Test-Key -ConfigurationTable $ScriptParameters -ConfigurationSection "" -ConfigurationKey "ShowTime" -DisplayProgress $false
     $Test2 = Test-Key -ConfigurationTable $ScriptParameters -ConfigurationSection "" -ConfigurationKey "LogFile" -DisplayProgress $false
     $Test3 = Test-Key -ConfigurationTable $ScriptParameters -ConfigurationSection "" -ConfigurationKey "TimeFormat" -DisplayProgress $false
@@ -1774,4 +1818,4 @@ function Start-Reporting ($EmailParameters, $ReportOptions, $FormattingOptions, 
 
 }
 
-Export-ModuleMember -function 'Get-Events', 'Start-Reporting'
+#Export-ModuleMember -function 'Get-Events', 'Start-Reporting'
