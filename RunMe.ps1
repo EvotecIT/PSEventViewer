@@ -7,6 +7,7 @@ $EmailParameters = @{
     EmailTo              = "przemyslaw.klys@domain.com, admin@domain.com"
     EmailCC              = ""
     EmailBCC             = ""
+    EmailReplyTo         = ""
     EmailServer          = "smtp.office365.com"
     EmailServerPassword  = "YourPassword"
     EmailServerPort      = "587"
