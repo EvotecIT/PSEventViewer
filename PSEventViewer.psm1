@@ -97,7 +97,36 @@ $script:WriteParameters = @{
 }
 $script:TimeToGenerateReports = @{
     Reports = @{
-
+        IncludeDomainControllers = @{
+            Total = $null
+        }
+        IncludeGroupEvents = @{
+            Total = $null
+        }
+        IncludeUserEvents = @{
+            Total = $null
+        }
+        IncludeUserStatuses = @{
+            Total = $null
+        }
+        IncludeUserLockouts = @{
+            Total = $null
+        }
+        IncludeDomainControllersReboots = @{
+            Total = $null
+        }
+        IncludeLogonEvents = @{
+            Total = $null
+        }
+        IncludeGroupPolicyChanges = @{
+            Total = $null
+        }
+        IncludeClearedLogs = @{
+            Total = $null
+        }
+        IncludeEventLogSize = @{
+            Total = $null
+        }
     }
 }
 
@@ -879,31 +908,13 @@ function Get-Events {
             }
         }
         $Allevents += $events
-        Write-Color @script:WriteParameters '[i] Time to generate', "$($Measure.Hours)", ' hours,', "$($Measure.Minutes)", ' minutes,', "$($Measure.Seconds)", ' seconds,', "$($Measure.Milliseconds)", ' milliseconds'
+        Write-Color @script:WriteParameters '[i] Time to generate', "$($Measure.Elapsed.Hours)", ' hours,', "$($Measure.Elapsed.Minutes)", ' minutes,', "$($Measure.Elapsed.Seconds)", ' seconds,', "$($Measure.Elapsed.Milliseconds)", ' milliseconds'
         $Measure.Stop()
     }
     $EventsProcessed = ($Allevents | Measure-Object).Count
     Write-Color @script:WriteParameters "[i] Events processed in total for the report: ", "$EventsProcessed" -Color White, Yellow
     return $Allevents
 }
-function Get-CustomReport($Servers, $Dates, $ReportOptions, $EventIDs, $LogType) {
-    $TimeMe = [System.Diagnostics.Stopwatch]::StartNew() # Timer Start
-
-    $Events = Get-Events -ADDomainControllers $Servers -DateFrom $Dates.DateFrom -DateTo $Dates.DateTo -EventID $EventIDs -ReportOptions $ReportOptions -LogType $LogType
-    $EventsOutput = $Events | Select-Object @{label = 'Domain Controller'; expression = { $_.Computer}} ,
-    @{label = 'Action'; expression = { ($_.Message -split '\n')[0] }},
-    @{label = 'Group Name'; expression = { $_.TargetUserName }},
-    @{label = 'Member Name'; expression = {$_.MemberName -replace '^CN=|,.*$' }},
-    @{label = 'Who'; expression = { "$($_.SubjectDomainName)\$($_.SubjectUserName)" }},
-    @{label = 'When'; expression = { $_.Date }},
-    @{label = 'Event ID'; expression = { $_.ID }},
-    @{label = 'Record ID'; expression = { $_.RecordId }}
-    $EventsOutput = $EventsOutput | Sort-Object When
-    return $EventsOutput
-
-    Write-Color @script:WriteParameters '[i] Time to generate', "$($TimeMe.Hours)", ' hours,', "$($TimeMe.Minutes)", ' minutes,', "$($TimeMe.Seconds)", ' seconds,', "$($TimeMe.Milliseconds)", ' milliseconds'
-}
-
 function Get-EventLogClearedLogs($Servers, $Dates) {
     $EventID = 1102
     $Events = Get-Events -ADDomainControllers $Servers -DateFrom $Dates.DateFrom -DateTo $Dates.DateTo -EventID $EventID -LogType "Security" -ProviderName "Microsoft-Windows-Eventlog"
@@ -915,7 +926,6 @@ function Get-EventLogClearedLogs($Servers, $Dates) {
     @{label = 'Record ID'; expression = { $_.RecordId }}
     return $EventsOutput
 }
-
 function Get-GroupPolicyChanges ($Servers, $Dates) {
     $EventID = 5136, 5137, 5141
     # 5136 Group Policy changes, value changes, links, unlinks.
@@ -940,11 +950,6 @@ function Get-GroupPolicyChanges ($Servers, $Dates) {
     #>
     Write-Color @script:WriteParameters "[i] Ending ", "Group Policy Changes Report", " for dates from: ", "$($Dates.DateFrom)", " to: ", "$($Dates.DateTo)", "." -Color White, Green, White, Green, White, Green, White
     return $GroupMembershipChangesOutput
-}
-function Get-GroupChanges($Servers, $Dates, $ReportOptions) {
-    # 4755: A security-enabled universal group was changed                https://www.ultimatewindowssecurity.com/securitylog/encyclopedia/event.aspx?eventID=4755
-    $GroupChangesEventID = 4755
-    return Get-CustomReport $Servers $Dates -ReportOptions $ReportOptions $GroupChangesEventID -LogType "System"
 }
 function Get-LogonEvents($Servers, $Dates, $ReportOptions) {
 
@@ -1048,7 +1053,6 @@ function Get-UserStatuses($Servers, $Dates, $ReportOptions) {
     Write-Color @script:WriteParameters "[i] Ending ", "User Statues Report", " for dates from: ", "$($Dates.DateFrom)", " to: ", "$($Dates.DateTo)", "." -Color White, Green, White, Green, White, Green, White
     return $UserChangesOutput
 }
-
 function Get-UserLockouts($Servers, $Dates, $ReportOptions) {
 
     Write-Color @script:WriteParameters "[i] Running ", "User Lockouts Report", " for dates from: ", "$($Dates.DateFrom)", " to: ", "$($Dates.DateTo)", "." -Color White, Green, White, Green, White, Green, White
@@ -1222,7 +1226,6 @@ function Send-Email ([hashtable] $EmailParameters, [string] $Body = "", $Attachm
     }
 
 }
-
 function Find-DatesQuarterLast ([bool] $Force) {
     #https://blogs.technet.microsoft.com/dsheehan/2017/09/21/use-powershell-to-determine-the-first-day-of-the-current-calendar-quarter/
     $Today = (Get-Date).AddDays(-90)
@@ -1309,7 +1312,6 @@ function Find-DatesPastHour () {
     }
     return $DateParameters
 }
-
 function Find-DatesCurrentHour () {
     $DateTodayStart = (Get-Date -Minute 0 -Second 0 -Millisecond 0)
     $DateTodayEnd = $DateTodayStart.AddHours(1)
@@ -1320,7 +1322,6 @@ function Find-DatesCurrentHour () {
     }
     return $DateParameters
 }
-
 function Find-DatesCurrentDayMinusDayX ($days) {
     $DateTodayStart = (Get-Date -Hour 0 -Minute 0 -Second 0 -Millisecond 0).AddDays( - $Days)
     $DateTodayEnd = (Get-Date -Hour 0 -Minute 0 -Second 0 -Millisecond 0).AddDays(1).AddDays( - $Days).AddMilliseconds(-1)
@@ -1341,7 +1342,6 @@ function Find-DatesCurrentDayMinuxDaysX ($days) {
     }
     return $DateParameters
 }
-
 function Find-DatesPastWeek($DayName) {
     $DateTodayStart = Get-Date -Hour 0 -Minute 0 -Second 0 -Millisecond 0
     if ($DateTodayStart.DayOfWeek -ne $DayName) {
@@ -1355,7 +1355,6 @@ function Find-DatesPastWeek($DayName) {
     return $DateParameters
 
 }
-
 function Set-ReportFileName($ReportOptions, $ReportExtension, $ReportName = "") {
     $ReportTime = $(get-date -f $ReportOptions.FilePatternDateFormat)
     if ($ReportOptions.KeepReportsPath -ne "") { $Path = $ReportOptions.KeepReportsPath} else { $Path = $env:TEMP }
@@ -1368,7 +1367,6 @@ function Set-ReportFileName($ReportOptions, $ReportExtension, $ReportName = "") 
     }
     return $ReportPath
 }
-
 function Convert-Size {
     # Original - https://techibee.com/powershell/convert-from-any-to-any-bytes-kb-mb-gb-tb-using-powershell/2376
     #
@@ -1408,7 +1406,6 @@ function Convert-Size {
     }
 
 }
-
 function Get-EventLogSize ($Servers, $LogName = "Security") {
 
     $results = @()
@@ -1492,7 +1489,6 @@ function Set-EmailReportDetails($FormattingOptions, $Dates) {
     "</p>"
     return $Report
 }
-
 function Set-EmailWordReplacements($Body, $Replace, $ReplaceWith, [switch] $RegEx) {
     if ($RegEx) {
         $Body = $Body -Replace $Replace, $ReplaceWith
@@ -1501,7 +1497,6 @@ function Set-EmailWordReplacements($Body, $Replace, $ReplaceWith, [switch] $RegE
     }
     return $Body
 }
-
 function Start-Report([hashtable] $Dates, [hashtable] $EmailParameters, [hashtable] $ReportOptions, [hashtable] $FormattingOptions, $Servers) {
     $time = [System.Diagnostics.Stopwatch]::StartNew() # Timer Start
     # Declare variables
@@ -1538,38 +1533,65 @@ function Start-Report([hashtable] $Dates, [hashtable] $EmailParameters, [hashtab
     $Servers = $Servers.Hostname
 
     If ($ReportOptions.IncludeClearedLogs -eq $true) {
+        $ExecutionTime = [System.Diagnostics.Stopwatch]::StartNew() # Timer Start
         Write-Color @script:WriteParameters "[i] Running ", "Who Cleared Logs Report", " for dates from: ", "$($Dates.DateFrom)", " to: ", "$($Dates.DateTo)", "." -Color White, Green, White, Green, White, Green, White
         $TableEventLogClearedLogs = Get-EventLogClearedLogs -Servers $Servers -Dates $Dates
         Write-Color @script:WriteParameters "[i] Ending ", "Who Cleared Logs Report", " for dates from: ", "$($Dates.DateFrom)", " to: ", "$($Dates.DateTo)", "." -Color White, Green, White, Green, White, Green, White
+        $script:TimeToGenerateReports.Reports.IncludeClearedLogs.Total = $ExecutionTime.Elapsed
+        $ExecutionTime.Stop()
     }
     If ($ReportOptions.IncludeEventLogSize.Use -eq $true) {
+        $ExecutionTime = [System.Diagnostics.Stopwatch]::StartNew() # Timer St
         foreach ($LogName in $ReportOptions.IncludeEventLogSize.Logs) {
             Write-Color @script:WriteParameters "[i] Running ", "Event Log Size Report", " for event log ", "$LogName" -Color White, Green, White, Yellow
             $EventLogTable += Get-EventLogSize -Servers $Servers -LogName $LogName
             Write-Color @script:WriteParameters "[i] Ending ", "Event Log Size Report for event log ", "$LogName" -Color White, White, Yellow
         }
         if ($ReportOptions.IncludeEventLogSize.SortBy -ne "") { $EventLogTable = $EventLogTable | Sort-Object $ReportOptions.IncludeEventLogSize.SortBy }
+        $script:TimeToGenerateReports.Reports.IncludeEventLogSize.Total = $ExecutionTime.Elapsed
+        $ExecutionTime.Stop()
     }
     if ($ReportOptions.IncludeGroupEvents -eq $true) {
+        $ExecutionTime = [System.Diagnostics.Stopwatch]::StartNew() # Timer St
         $GroupsEventsTable = Get-GroupMembershipChanges -Servers $Servers -Dates $Dates -ReportOptions $ReportOptions
+        $script:TimeToGenerateReports.Reports.IncludeGroupEvents.Total = $ExecutionTime.Elapsed
+        $ExecutionTime.Stop()
     }
     if ($ReportOptions.IncludeUserEvents -eq $true) {
+        $ExecutionTime = [System.Diagnostics.Stopwatch]::StartNew() # Timer
         $UsersEventsTable = Get-UserChanges -Servers $Servers -Dates $Dates -ReportOptions $ReportOptions
+        $script:TimeToGenerateReports.Reports.IncludeUserEvents.Total = $ExecutionTime.Elapsed
+        $ExecutionTime.Stop()
     }
     if ($ReportOptions.IncludeUserStatuses -eq $true) {
+        $ExecutionTime = [System.Diagnostics.Stopwatch]::StartNew() # Timer
         $UsersEventsStatusesTable = Get-UserStatuses -Servers $Servers -Dates $Dates -ReportOptions $ReportOptions
+        $script:TimeToGenerateReports.Reports.IncludeUserStatuses.Total = $ExecutionTime.Elapsed
+        $ExecutionTime.Stop()
     }
     If ($ReportOptions.IncludeUserLockouts -eq $true) {
+        $ExecutionTime = [System.Diagnostics.Stopwatch]::StartNew() # Timer
         $UsersLockoutsTable = Get-UserLockouts -Servers $Servers -Dates $Dates -ReportOptions $ReportOptions
+        $script:TimeToGenerateReports.Reports.IncludeUserLockouts.Total = $ExecutionTime.Elapsed
+        $ExecutionTime.Stop()
     }
     if ($ReportOptions.IncludeLogonEvents -eq $true) {
+        $ExecutionTime = [System.Diagnostics.Stopwatch]::StartNew() # Timer
         $LogonEvents = Get-LogonEvents -Servers $Servers -Dates $Dates -ReportOptions $ReportOptions
+        $script:TimeToGenerateReports.Reports.IncludeLogonEvents.Total = $ExecutionTime.Elapsed
+        $ExecutionTime.Stop()
     }
     if ($ReportOptions.IncludeDomainControllersReboots -eq $true) {
+        $ExecutionTime = [System.Diagnostics.Stopwatch]::StartNew() # Timer
         $RebootEventsTable = Get-RebootEvents -Servers $Servers -Dates $Dates -ReportOptions $ReportOptions
+        $script:TimeToGenerateReports.Reports.IncludeDomainControllersReboots.Total = $ExecutionTime.Elapsed
+        $ExecutionTime.Stop()
     }
     if ($ReportOptions.IncludeGroupPolicyChanges -eq $true) {
+        $ExecutionTime = [System.Diagnostics.Stopwatch]::StartNew() # Timer
         $TableGroupPolicyChanges = Get-GroupPolicyChanges -Servers $Servers -Dates $Dates -ReportOptions $ReportOptions
+        $script:TimeToGenerateReports.Reports.IncludeGroupPolicyChanges.Total = $ExecutionTime.Elapsed
+        $ExecutionTime.Stop()
     }
     # prepare body with HTML
     if ($ReportOptions.AsHTML) {
@@ -1658,11 +1680,9 @@ function Start-Report([hashtable] $Dates, [hashtable] $EmailParameters, [hashtab
 
     Remove-ReportsFiles -KeepReports $ReportOptions.KeepReports -AsExcel $ReportOptions.AsExcel -AsCSV $ReportOptions.AsCSV -ReportFiles $Reports
 }
-
 function Get-TimeZoneLegacy () {
     return ([System.TimeZone]::CurrentTimeZone).StandardName
 }
-
 function Get-TimeZoneAdvanced {
     param(
         [string[]]$ComputerName = $Env:COMPUTERNAME,
@@ -1680,7 +1700,6 @@ function Get-TimeZoneAdvanced {
         Write-Output $Object
     }
 }
-
 function Remove-ReportsFiles ($KeepReports, $AsExcel, $AsCSV, $ReportFiles) {
     if ($KeepReports -eq $false -and ($AsExcel -eq $true -or $AsCSV -eq $true)) {
         foreach ($report in $ReportFiles) {
