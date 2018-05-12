@@ -12,7 +12,7 @@
     RootModule        = 'PSEventViewer.psm1'
 
     # Version number of this module.
-    ModuleVersion     = '0.1'
+    ModuleVersion     = '0.2'
 
     # Supported PSEditions
     # CompatiblePSEditions = @()
@@ -30,7 +30,7 @@
     Copyright         = 'Evotec (c) 2018. All rights reserved.'
 
     # Description of the functionality provided by this module
-    # Description = ''
+    Description       = 'Simple module allowing parsing of event logs. Has its own quirks...'
 
     # Minimum version of the Windows PowerShell engine required by this module
     # PowerShellVersion = ''
@@ -101,7 +101,7 @@
             # LicenseUri = ''
 
             # A URL to the main website for this project.
-            # ProjectUri = ''
+            ProjectUri = 'https://github.com/EvotecIT/PSEventViewer'
 
             # A URL to an icon representing this module.
             # IconUri = ''
