@@ -37,6 +37,7 @@ function Get-Events {
         [switch] $Oldest
 
     )
+    $MeasureTotal = [System.Diagnostics.Stopwatch]::StartNew() # Timer Start
     $AllEvents = @()
     $EventFilter = @{}
     Add-ToHashTable -Hashtable $EventFilter -Key "LogName" -Value $LogName # Accepts Wildcard
@@ -53,27 +54,32 @@ function Get-Events {
     #$EventFilter | ForEach-Object { new-object PSObject -Property $_} | Format-List # Format-Table -AutoSize
 
     foreach ($Comp in $Machine) {
-        Write-Verbose "Processing computer $Comp for Events ID $Id"
-        Write-Verbose "Processing computer $Comp for Events LogName $LogName"
-        Write-Verbose "Processing computer $Comp for Events ProviderName $ProviderName"
-        Write-Verbose "Processing computer $Comp for Events Keywords $Keywords"
-        Write-Verbose "Processing computer $Comp for Events DateFrom $DateFrom"
-        Write-Verbose "Processing computer $Comp for Events DateTo $DateTo"
-
         $Measure = [System.Diagnostics.Stopwatch]::StartNew() # Timer Start
-        $Events = @()
 
-        if ($MaxEvents -ne $null) {
-            $Events = Get-WinEvent -FilterHashtable $EventFilter -ComputerName $Comp -ErrorAction Stop -MaxEvents $MaxEvents
-        } else {
-            $Events = Get-WinEvent -FilterHashtable $EventFilter -ComputerName $Comp -ErrorAction Stop
-        }
-        $EventsCount = ($Events | Measure-Object).Count
-        Write-Verbose -Message "Events processed $EventsCount"
+        Write-Verbose "Processing computer $Comp for Events ID: $Id"
+        Write-Verbose "Processing computer $Comp for Events LogName: $LogName"
+        Write-Verbose "Processing computer $Comp for Events ProviderName: $ProviderName"
+        Write-Verbose "Processing computer $Comp for Events Keywords: $Keywords"
+        Write-Verbose "Processing computer $Comp for Events StartTime: $DateFrom"
+        Write-Verbose "Processing computer $Comp for Events EndTime: $DateTo"
+        Write-Verbose "Processing computer $Comp for Events Path: $Path"
+        Write-Verbose "Processing computer $Comp for Events Level: $Level"
+        Write-Verbose "Processing computer $Comp for Events DateTo: $DateTo"
+        Write-Verbose "Processing computer $Comp for Events UserID: $UserID"
+        Write-Verbose "Processing computer $Comp for Events Data: $Data"
+
+        $Events = @()
         try {
+            if ($MaxEvents -ne $null) {
+                $Events = Get-WinEvent -FilterHashtable $EventFilter -ComputerName $Comp -ErrorAction Stop -MaxEvents $MaxEvents
+            } else {
+                $Events = Get-WinEvent -FilterHashtable $EventFilter -ComputerName $Comp -ErrorAction Stop
+            }
+            $EventsCount = ($Events | Measure-Object).Count
+            Write-Verbose -Message "Events processed $EventsCount on computer $comp"
         } catch {
             if ($_.Exception -match "No events were found that match the specified selection criteria") {
-                Write-Verbose -Message 'No events found'
+                Write-Verbose -Message "No events found on computer: $comp"
             } elseif ($_.Exception -match "There are no more endpoints available from the endpoint") {
                 Write-Verbose -Message "Error connecting to computer $($Comp)"
                 Write-Verbose -Message "Error $($_.Exception.Message)"
@@ -81,6 +87,8 @@ function Get-Events {
                 Write-Verbose -Message "Error connecting to computer $($Comp)"
                 Write-Verbose -Message "Error $($_.Exception.Message)"
             }
+            Write-Verbose "Time to generate $($Measure.Elapsed.Hours) hours, $($Measure.Elapsed.Minutes) minutes, $($Measure.Elapsed.Seconds) seconds, $($Measure.Elapsed.Milliseconds) milliseconds"
+            $Measure.Stop()
             continue
         }
         # Parse out the event message data
@@ -120,7 +128,9 @@ function Get-Events {
         $Measure.Stop()
     }
     $EventsProcessed = ($Allevents | Measure-Object).Count
-    Write-Verbose "Total events Events processed in total for the report: $EventsProcessed"
+    Write-Verbose "Total events processed in total for the report: $EventsProcessed"
+    Write-Verbose "Total time to generate $($MeasureTotal.Elapsed.Hours) hours, $($MeasureTotal.Elapsed.Minutes) minutes, $($MeasureTotal.Elapsed.Seconds) seconds, $($MeasureTotal.Elapsed.Milliseconds) milliseconds"
+    $MeasureTotal.Stop()
     return $Allevents
 }
 
