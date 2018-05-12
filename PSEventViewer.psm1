@@ -1930,15 +1930,14 @@ function Start-EventsReporting ($EmailParameters, $ReportOptions, $FormattingOpt
     $Test2 = Test-Key -ConfigurationTable $ScriptParameters -ConfigurationSection "" -ConfigurationKey "LogFile" -DisplayProgress $false
     $Test3 = Test-Key -ConfigurationTable $ScriptParameters -ConfigurationSection "" -ConfigurationKey "TimeFormat" -DisplayProgress $false
     if ($Test1 -and $Test2 -and $Test3) { $script:WriteParameters = $ScriptParameters }
-    #Test-Prerequisite $EmailParameters $ReportOptions $FormattingOptions
-    #if ($ReportOptions.JustTestPrerequisite -ne $null -and $ReportOptions.JustTestPrerequisite -eq $true) {
-    #    Exit
-    #}
+    Test-Prerequisite $EmailParameters $ReportOptions $FormattingOptions
+    if ($ReportOptions.JustTestPrerequisite -ne $null -and $ReportOptions.JustTestPrerequisite -eq $true) {
+        Exit
+    }
     $Servers = Get-Servers $ReportOptions
     # Report Per Hour
     if ($ReportOptions.ReportPastHour -eq $true) {
         $DatesPastHour = Find-DatesPastHour
-
         if ($DatesPastHour -ne $null) {
             Start-Report -Dates $DatesPastHour $EmailParameters $ReportOptions $FormattingOptions $Servers
         }
@@ -1952,7 +1951,6 @@ function Start-EventsReporting ($EmailParameters, $ReportOptions, $FormattingOpt
     # Report Per Day
     if ($ReportOptions.ReportPastDay -eq $true) {
         $DatesDayPrevious = Find-DatesDayPrevious
-
         if ($DatesDayPrevious -ne $null) {
             Start-Report -Dates $DatesDayPrevious $EmailParameters $ReportOptions $FormattingOptions $Servers
         }
@@ -1980,7 +1978,6 @@ function Start-EventsReporting ($EmailParameters, $ReportOptions, $FormattingOpt
         }
     }
     if ($ReportOptions.ReportCurrentMonth -eq $true) {
-
         $DatesMonthCurrent = Find-DatesMonthCurrent
         if ($DatesMonthCurrent -ne $null) {
             Start-Report -Dates $DatesMonthCurrent $EmailParameters $ReportOptions $FormattingOptions $Servers
