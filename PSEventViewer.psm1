@@ -1039,7 +1039,7 @@ function Get-GroupCreateDelete($Servers, $Dates, $ReportOptions) {
         $ExecutionTime = [System.Diagnostics.Stopwatch]::StartNew()
         $GroupMembershipChanges = Get-Events -Server $Server -DateFrom $Dates.DateFrom -DateTo $Dates.DateTo -EventID $GroupMembershipChangesEventID -ReportOptions $ReportOptions
 
-        $script:TimeToGenerateReports.Reports.IncludeGroupCreateDelete.$($server) = = Set-TimeLog -Time $ExecutionTime
+        $script:TimeToGenerateReports.Reports.IncludeGroupCreateDelete.$($server) = Set-TimeLog -Time $ExecutionTime
     }
     $GroupMembershipChangesOutput = $GroupMembershipChanges | Select-Object @{label = 'Domain Controller'; expression = { $_.Computer}} ,
     @{label = 'Action'; expression = { ($_.Message -split '\n')[0] }},
