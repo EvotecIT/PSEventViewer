@@ -5,7 +5,7 @@
     This PowerShell module simplifies parsing Windows Event Log, has some problems thou... that will be addressed later
 
     .NOTES
-    Version:        0.1
+    Version:        0.28
     Author:         Przemyslaw Klys <przemyslaw.klys at evotec.pl>
 
     .EXAMPLE
@@ -90,34 +90,34 @@ function Get-Events {
     Write-Verbose "Get-Events - Overall events processing start"
     $MeasureTotal = [System.Diagnostics.Stopwatch]::StartNew() # Timer Start
     $AllEvents = @()
-    $EventFilter = @{}
 
-
-    Add-ToHashTable -Hashtable $EventFilter -Key "LogName" -Value $LogName # Accepts Wildcard
-    Add-ToHashTable -Hashtable $EventFilter -Key "ProviderName" -Value $ProviderName # Accepts Wildcard
-    Add-ToHashTable -Hashtable $EventFilter -Key "Path" -Value $Path # https://blogs.technet.microsoft.com/heyscriptingguy/2011/01/25/use-powershell-to-parse-saved-event-logs-for-errors/
-    Add-ToHashTable -Hashtable $EventFilter -Key "Keywords" -Value $Keywords
-    Add-ToHashTable -Hashtable $EventFilter -Key "Id" -Value $ID
-    Add-ToHashTable -Hashtable $EventFilter -Key "Level" -Value $Level
-    Add-ToHashTable -Hashtable $EventFilter -Key "StartTime" -Value $DateFrom
-    Add-ToHashTable -Hashtable $EventFilter -Key "EndTime" -Value $DateTo
-    Add-ToHashTable -Hashtable $EventFilter -Key "UserID" -Value $UserSID
-    Add-ToHashTable -Hashtable $EventFilter -Key "Data" -Value $Data
-
-    #$EventFilter | ForEach-Object { new-object PSObject -Property $_} | Format-List # Format-Table -AutoSize
     if ($ID -ne $null) {
         $ID = $ID | Sort-Object -Unique
-        Write-Verbose "Get-Events - Events to process $($Id.Count)"
-        if ($Id.Count -gt 23) { Write-Verbose "Get-Events - There are more events to process then 23, split will be required." }
+        Write-Verbose "Get-Events - Events to process in Total: $($Id.Count)"
+        Write-Verbose "Get-Events - Events to process in Total ID: $ID"
+        if ($Id.Count -gt 22) {
+            Write-Verbose "Get-Events - There are more events to process then 22, split will be required."
+            Write-Verbose "Get-Events - This means it will take twice the time to make a scan."
+        }
     }
-    $SplitArrayID = Split-Array -inArray $ID -size 23  # Support for more ID's then 23 (limitation of Get-WinEvent)
+    $SplitArrayID = Split-Array -inArray $ID -size 22  # Support for more ID's then 22 (limitation of Get-WinEvent)
     foreach ($ID in $SplitArrayID) {
-        #$split = Split-Every $ID 23
+        $EventFilter = @{}
+        Add-ToHashTable -Hashtable $EventFilter -Key "LogName" -Value $LogName # Accepts Wildcard
+        Add-ToHashTable -Hashtable $EventFilter -Key "ProviderName" -Value $ProviderName # Accepts Wildcard
+        Add-ToHashTable -Hashtable $EventFilter -Key "Path" -Value $Path # https://blogs.technet.microsoft.com/heyscriptingguy/2011/01/25/use-powershell-to-parse-saved-event-logs-for-errors/
+        Add-ToHashTable -Hashtable $EventFilter -Key "Keywords" -Value $Keywords
+        Add-ToHashTable -Hashtable $EventFilter -Key "Id" -Value $ID
+        Add-ToHashTable -Hashtable $EventFilter -Key "Level" -Value $Level
+        Add-ToHashTable -Hashtable $EventFilter -Key "StartTime" -Value $DateFrom
+        Add-ToHashTable -Hashtable $EventFilter -Key "EndTime" -Value $DateTo
+        Add-ToHashTable -Hashtable $EventFilter -Key "UserID" -Value $UserSID
+        Add-ToHashTable -Hashtable $EventFilter -Key "Data" -Value $Data
 
         foreach ($Comp in $Machine) {
             $Measure = [System.Diagnostics.Stopwatch]::StartNew() # Timer Start
-
             Write-Verbose "Get-Events - Processing computer $Comp for Events ID: $ID"
+            Write-Verbose "Get-Events - Processing computer $Comp for Events ID Count: $($ID.Count)"
             Write-Verbose "Get-Events - Processing computer $Comp for Events LogName: $LogName"
             Write-Verbose "Get-Events - Processing computer $Comp for Events ProviderName: $ProviderName"
             Write-Verbose "Get-Events - Processing computer $Comp for Events Keywords: $Keywords"
@@ -127,6 +127,10 @@ function Get-Events {
             Write-Verbose "Get-Events - Processing computer $Comp for Events Level: $Level"
             Write-Verbose "Get-Events - Processing computer $Comp for Events UserID: $UserID"
             Write-Verbose "Get-Events - Processing computer $Comp for Events Data: $Data"
+            Write-Verbose "Get-Events - Processing computer $Comp for Events NaxEvents: $MaxEvents"
+            Write-Verbose "Get-Events - Processing computer $Comp for Events Path: $Path"
+            Write-Verbose "Get-Events - Processing computer $Comp for Events UserSID: $UserSID"
+            Write-Verbose "Get-Events - Processing computer $Comp for Events Oldest: $Oldest"
 
             $Events = @()
             try {
