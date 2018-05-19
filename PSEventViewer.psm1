@@ -100,6 +100,7 @@ function Get-Events {
             Write-Verbose "Get-Events - This means it will take twice the time to make a scan."
         }
     }
+
     $SplitArrayID = Split-Array -inArray $ID -size 22  # Support for more ID's then 22 (limitation of Get-WinEvent)
     foreach ($ID in $SplitArrayID) {
         $EventFilter = @{}
@@ -115,81 +116,7 @@ function Get-Events {
         Add-ToHashTable -Hashtable $EventFilter -Key "Data" -Value $Data
 
         foreach ($Comp in $Machine) {
-            $Measure = [System.Diagnostics.Stopwatch]::StartNew() # Timer Start
-            Write-Verbose "Get-Events - Processing computer $Comp for Events ID: $ID"
-            Write-Verbose "Get-Events - Processing computer $Comp for Events ID Count: $($ID.Count)"
-            Write-Verbose "Get-Events - Processing computer $Comp for Events LogName: $LogName"
-            Write-Verbose "Get-Events - Processing computer $Comp for Events ProviderName: $ProviderName"
-            Write-Verbose "Get-Events - Processing computer $Comp for Events Keywords: $Keywords"
-            Write-Verbose "Get-Events - Processing computer $Comp for Events StartTime: $DateFrom"
-            Write-Verbose "Get-Events - Processing computer $Comp for Events EndTime: $DateTo"
-            Write-Verbose "Get-Events - Processing computer $Comp for Events Path: $Path"
-            Write-Verbose "Get-Events - Processing computer $Comp for Events Level: $Level"
-            Write-Verbose "Get-Events - Processing computer $Comp for Events UserID: $UserID"
-            Write-Verbose "Get-Events - Processing computer $Comp for Events Data: $Data"
-            Write-Verbose "Get-Events - Processing computer $Comp for Events NaxEvents: $MaxEvents"
-            Write-Verbose "Get-Events - Processing computer $Comp for Events Path: $Path"
-            Write-Verbose "Get-Events - Processing computer $Comp for Events UserSID: $UserSID"
-            Write-Verbose "Get-Events - Processing computer $Comp for Events Oldest: $Oldest"
-
-            $Events = @()
-            try {
-                if ($MaxEvents -ne $null) {
-                    $Events = Get-WinEvent -FilterHashtable $EventFilter -ComputerName $Comp -ErrorAction Stop -MaxEvents $MaxEvents
-                } else {
-                    $Events = Get-WinEvent -FilterHashtable $EventFilter -ComputerName $Comp -ErrorAction Stop
-                }
-                $EventsCount = ($Events | Measure-Object).Count
-                Write-Verbose -Message "Get-Events - Events processed $EventsCount on computer $comp"
-            } catch {
-                if ($_.Exception -match "No events were found that match the specified selection criteria") {
-                    Write-Verbose -Message "Get-Events - Processing computer $Comp - No events found."
-                } elseif ($_.Exception -match "There are no more endpoints available from the endpoint") {
-                    Write-Verbose -Message "Get-Events - Processing computer $Comp - Error connecting."
-                    Write-Verbose -Message "Get-Events - Processing computer $Comp - Error $($_.Exception.Message)"
-                } else {
-                    Write-Verbose -Message "Get-Events - Processing computer $Comp - Error connecting."
-                    Write-Verbose -Message "Get-Events - Processing computer $Comp - Error $($_.Exception.Message)"
-                }
-                Write-Verbose "Get-Events - Processing computer $Comp - Time to generate $($Measure.Elapsed.Hours) hours, $($Measure.Elapsed.Minutes) minutes, $($Measure.Elapsed.Seconds) seconds, $($Measure.Elapsed.Milliseconds) milliseconds"
-                $Measure.Stop()
-                continue
-            }
-            # Parse out the event message data
-            ForEach ($Event in $Events) {
-                # Convert the event to XML
-                $eventXML = [xml]$Event.ToXml()
-                # Iterate through each one of the XML message properties
-                Add-Member -InputObject $Event -MemberType NoteProperty -Name "Computer" -Value $event.MachineName.ToString() -Force
-                Add-Member -InputObject $Event -MemberType NoteProperty -Name "Date" -Value $Event.TimeCreated -Force
-
-                # Get-Member -inputobject $eventXML.Event
-
-                if (Get-Member -inputobject $eventXML.Event.EventData -name "Data" -Membertype Properties) {
-                    if (Get-Member -inputobject $eventXML.Event.EventData.Data -name "Count" -Membertype Properties) {
-                        For ($i = 0; $i -lt $eventXML.Event.EventData.Data.Count; $i++) {
-                            if (Get-Member -inputobject $eventXML.Event.EventData.Data[$i] -name "Name" -Membertype Properties) {
-                                $fieldName = $eventXML.Event.EventData.Data[$i].Name
-                            } else {
-                                $fieldName = ""
-                            }
-                            if (Get-Member -inputobject $eventXML.Event.EventData.Data[$i] -name "#text" -Membertype Properties) {
-                                $fieldValue = $eventXML.Event.EventData.Data[$i]."#text"
-                                if ($fieldValue -eq "-".Trim()) { $fieldValue = $fieldValue -replace "-" }
-                            } else {
-                                $fieldValue = ""
-                            }
-                            # Append these as object properties
-                            if ($fieldName -ne "") {
-                                Add-Member -InputObject $Event -MemberType NoteProperty -Name $fieldName -Value $fieldValue -Force
-                            }
-                        }
-                    }
-                }
-            }
-            $Allevents += $events
-            Write-Verbose "Get-Events - Processing computer $Comp - Time to generate $($Measure.Elapsed.Hours) hours, $($Measure.Elapsed.Minutes) minutes, $($Measure.Elapsed.Seconds) seconds, $($Measure.Elapsed.Milliseconds) milliseconds"
-            $Measure.Stop()
+            $Allevents += Get-EventsInternal $Comp $EventFilter $MaxEvents
         }
     }
     $EventsProcessed = ($Allevents | Measure-Object).Count
@@ -198,6 +125,85 @@ function Get-Events {
     $MeasureTotal.Stop()
     return $Allevents
 }
+
+function Get-EventsInternal ($Comp, $EventFilter, $MaxEvents) {
+    $Measure = [System.Diagnostics.Stopwatch]::StartNew() # Timer Start
+    Write-Verbose "Get-Events - Processing computer $Comp for Events ID: $ID"
+    Write-Verbose "Get-Events - Processing computer $Comp for Events ID Count: $($ID.Count)"
+    Write-Verbose "Get-Events - Processing computer $Comp for Events LogName: $LogName"
+    Write-Verbose "Get-Events - Processing computer $Comp for Events ProviderName: $ProviderName"
+    Write-Verbose "Get-Events - Processing computer $Comp for Events Keywords: $Keywords"
+    Write-Verbose "Get-Events - Processing computer $Comp for Events StartTime: $DateFrom"
+    Write-Verbose "Get-Events - Processing computer $Comp for Events EndTime: $DateTo"
+    Write-Verbose "Get-Events - Processing computer $Comp for Events Path: $Path"
+    Write-Verbose "Get-Events - Processing computer $Comp for Events Level: $Level"
+    Write-Verbose "Get-Events - Processing computer $Comp for Events UserID: $UserID"
+    Write-Verbose "Get-Events - Processing computer $Comp for Events Data: $Data"
+    Write-Verbose "Get-Events - Processing computer $Comp for Events NaxEvents: $MaxEvents"
+    Write-Verbose "Get-Events - Processing computer $Comp for Events Path: $Path"
+    Write-Verbose "Get-Events - Processing computer $Comp for Events UserSID: $UserSID"
+    Write-Verbose "Get-Events - Processing computer $Comp for Events Oldest: $Oldest"
+
+    $Events = @()
+    try {
+        if ($MaxEvents -ne $null) {
+            $Events = Get-WinEvent -FilterHashtable $EventFilter -ComputerName $Comp -ErrorAction Stop -MaxEvents $MaxEvents
+        } else {
+            $Events = Get-WinEvent -FilterHashtable $EventFilter -ComputerName $Comp -ErrorAction Stop
+        }
+        $EventsCount = ($Events | Measure-Object).Count
+        Write-Verbose -Message "Get-Events - Events processed $EventsCount on computer $comp"
+    } catch {
+        if ($_.Exception -match "No events were found that match the specified selection criteria") {
+            Write-Verbose -Message "Get-Events - Processing computer $Comp - No events found."
+        } elseif ($_.Exception -match "There are no more endpoints available from the endpoint") {
+            Write-Verbose -Message "Get-Events - Processing computer $Comp - Error connecting."
+            Write-Verbose -Message "Get-Events - Processing computer $Comp - Error $($_.Exception.Message)"
+        } else {
+            Write-Verbose -Message "Get-Events - Processing computer $Comp - Error connecting."
+            Write-Verbose -Message "Get-Events - Processing computer $Comp - Error $($_.Exception.Message)"
+        }
+        Write-Verbose "Get-Events - Processing computer $Comp - Time to generate $($Measure.Elapsed.Hours) hours, $($Measure.Elapsed.Minutes) minutes, $($Measure.Elapsed.Seconds) seconds, $($Measure.Elapsed.Milliseconds) milliseconds"
+        $Measure.Stop()
+        continue
+    }
+    # Parse out the event message data
+    ForEach ($Event in $Events) {
+        # Convert the event to XML
+        $eventXML = [xml]$Event.ToXml()
+        # Iterate through each one of the XML message properties
+        Add-Member -InputObject $Event -MemberType NoteProperty -Name "Computer" -Value $event.MachineName.ToString() -Force
+        Add-Member -InputObject $Event -MemberType NoteProperty -Name "Date" -Value $Event.TimeCreated -Force
+
+        # Get-Member -inputobject $eventXML.Event
+
+        if (Get-Member -inputobject $eventXML.Event.EventData -name "Data" -Membertype Properties) {
+            if (Get-Member -inputobject $eventXML.Event.EventData.Data -name "Count" -Membertype Properties) {
+                For ($i = 0; $i -lt $eventXML.Event.EventData.Data.Count; $i++) {
+                    if (Get-Member -inputobject $eventXML.Event.EventData.Data[$i] -name "Name" -Membertype Properties) {
+                        $fieldName = $eventXML.Event.EventData.Data[$i].Name
+                    } else {
+                        $fieldName = ""
+                    }
+                    if (Get-Member -inputobject $eventXML.Event.EventData.Data[$i] -name "#text" -Membertype Properties) {
+                        $fieldValue = $eventXML.Event.EventData.Data[$i]."#text"
+                        if ($fieldValue -eq "-".Trim()) { $fieldValue = $fieldValue -replace "-" }
+                    } else {
+                        $fieldValue = ""
+                    }
+                    # Append these as object properties
+                    if ($fieldName -ne "") {
+                        Add-Member -InputObject $Event -MemberType NoteProperty -Name $fieldName -Value $fieldValue -Force
+                    }
+                }
+            }
+        }
+    }
+    Write-Verbose "Get-Events - Processing computer $Comp - Time to generate $($Measure.Elapsed.Hours) hours, $($Measure.Elapsed.Minutes) minutes, $($Measure.Elapsed.Seconds) seconds, $($Measure.Elapsed.Milliseconds) milliseconds"
+    $Measure.Stop()
+    return $Events
+}
+
 Function ConvertTo-FlatObject {
     <#
       .SYNOPSIS
