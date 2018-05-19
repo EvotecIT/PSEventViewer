@@ -8,6 +8,10 @@
     Version:        0.29
     Author:         Przemyslaw Klys <przemyslaw.klys at evotec.pl>
 
+
+    Get-WinEvent Help:
+    - https://docs.microsoft.com/en-us/powershell/module/microsoft.powershell.diagnostics/get-winevent?view=powershell-6
+
     .EXAMPLE
         $DateFrom = (get-date).AddHours(-5)
         $DateTo = (get-date).AddHours(1)
@@ -69,8 +73,6 @@ function Split-Array {
 }
 
 function Get-Events {
-    # https://docs.microsoft.com/en-us/powershell/module/microsoft.powershell.diagnostics/get-winevent?view=powershell-6
-
     [cmdletbinding()]
     param (
         [alias ("ADDomainControllers", "DomainController", "Server", "Servers", "Computer", "Computers")] [string[]] $Machine = $Env:COMPUTERNAME,
@@ -259,8 +261,8 @@ function Get-Events {
     $EventsProcessed = ($AllEvents | Measure-Object).Count
     Write-Verbose "Get-Events - Overall events processed in total for the report: $EventsProcessed"
     Write-Verbose "Get-Events - Overall time to generate $($MeasureTotal.Elapsed.Hours) hours, $($MeasureTotal.Elapsed.Minutes) minutes, $($MeasureTotal.Elapsed.Seconds) seconds, $($MeasureTotal.Elapsed.Milliseconds) milliseconds"
-
     $MeasureTotal.Stop()
+    Write-Verbose "Get-Events - Overall events processing end"
     return $AllEvents
 }
 
