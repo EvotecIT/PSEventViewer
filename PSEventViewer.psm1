@@ -88,7 +88,8 @@ function Get-Events {
         $Credentials = $null,
         $Path = $null,
         [long[]] $Keywords = $null,
-        [switch] $Oldest
+        [switch] $Oldest,
+        [switch] $DisableParallel
     )
 
     Write-Verbose "Get-Events - Overall events processing start"
@@ -153,7 +154,6 @@ function Get-Events {
                     [int]$MaxEvents,
                     [bool] $Oldest
                 )
-
                 function Get-EventsInternal () {
                     [cmdletbinding()]
                     param (
@@ -244,14 +244,20 @@ function Get-Events {
                 return Invoke-Command -ScriptBlock $ScriptBlock -ArgumentList $Comp, $EventFilter, $MaxEvents, Oldest
                 # Write-Output "Test $Comp"
             }
-            $runspace = [PowerShell]::Create()
-            $null = $runspace.AddScript($ScriptBlock)
-            $null = $runspace.AddArgument($Comp)
-            $null = $runspace.AddArgument($EventFilter)
-            $null = $runspace.AddArgument($MaxEvents)
-            $null = $runspace.AddArgument($Oldest)
-            $runspace.RunspacePool = $pool
-            $runspaces += [PSCustomObject]@{ Pipe = $runspace; Status = $runspace.BeginInvoke() }
+            if ($DisableParallel) {
+                Write-Verbose 'Get-Events - Running query with parallel disabled...'
+                Invoke-Command -ScriptBlock $ScriptBlock -ArgumentList $Comp, $EventFilter, $MaxEvents, Oldest
+            } else {
+                Write-Verbose 'Get-Events - Running query with parallel enabled...'
+                $runspace = [PowerShell]::Create()
+                $null = $runspace.AddScript($ScriptBlock)
+                $null = $runspace.AddArgument($Comp)
+                $null = $runspace.AddArgument($EventFilter)
+                $null = $runspace.AddArgument($MaxEvents)
+                $null = $runspace.AddArgument($Oldest)
+                $runspace.RunspacePool = $pool
+                $runspaces += [PSCustomObject]@{ Pipe = $runspace; Status = $runspace.BeginInvoke() }
+            }
         }
     }
     ### End Runspaces
