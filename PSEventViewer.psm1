@@ -144,6 +144,7 @@ function Get-Events {
             Write-Verbose "Get-Events - Processing computer $Comp for Events UserSID: $UserSID"
             Write-Verbose "Get-Events - Processing computer $Comp for Events Oldest: $Oldest"
 
+
             $ScriptBlock = {
                 [cmdletbinding()]
                 Param (
@@ -231,8 +232,18 @@ function Get-Events {
                 return Get-EventsInternal -Comp $Comp -EventFilter $EventFilter -MaxEvents $MaxEvents -Oldest:$Oldest
 
             }
-            #Invoke-Command -ScriptBlock $scriptblock -ArgumentList $comp, $EventFilter, $MaxEvents
+            $sb = {
+                [cmdletbinding()]
+                Param (
+                    [string]$Comp,
+                    [hashtable]$EventFilter,
+                    [int]$MaxEvents,
+                    [bool] $Oldest
+                )
 
+                return Invoke-Command -ScriptBlock $ScriptBlock -ArgumentList $Comp, $EventFilter, $MaxEvents, Oldest
+                # Write-Output "Test $Comp"
+            }
             $runspace = [PowerShell]::Create()
             $null = $runspace.AddScript($ScriptBlock)
             $null = $runspace.AddArgument($Comp)
@@ -248,7 +259,9 @@ function Get-Events {
         $completed = $runspaces | Where-Object { $_.Status.IsCompleted -eq $true }
         foreach ($runspace in $completed) {
             #$runspace.Status
-            #$runspace.Pipe.Streams
+            # $runspace.Pipe.Streams.Error
+            Write-Verbose "Get-Events - Error from runspace: $($runspace.Pipe.Streams.Error)"
+            Write-Verbose "Get-Events - Verbose from runspace: $($runspace.Pipe.Streams.Verbose)"
             $AllEvents += $runspace.Pipe.EndInvoke($runspace.Status)
             $runspace.Status = $null
         }
