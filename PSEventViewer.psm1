@@ -95,6 +95,8 @@ function Get-Events {
     Write-Verbose "Get-Events - Overall events processing start"
     $MeasureTotal = [System.Diagnostics.Stopwatch]::StartNew() # Timer Start
 
+    if ($PSCmdlet.MyInvocation.BoundParameters["Verbose"].IsPresent) { $isVerbose = $true } else { $isVerbose = $false }
+
     ### Define Runspace
     $pool = [RunspaceFactory]::CreateRunspacePool(1, [int]$env:NUMBER_OF_PROCESSORS + 1)
     $pool.ApartmentState = "MTA"
@@ -146,13 +148,15 @@ function Get-Events {
             Write-Verbose "Get-Events - Processing computer $Comp for Events Oldest: $Oldest"
 
 
+
             $ScriptBlock = {
                 [cmdletbinding()]
                 Param (
                     [string]$Comp,
                     [hashtable]$EventFilter,
                     [int]$MaxEvents,
-                    [bool] $Oldest
+                    [bool] $Oldest,
+                    [bool] $IsVerbose
                 )
                 function Get-EventsInternal () {
                     [cmdletbinding()]
@@ -162,6 +166,9 @@ function Get-Events {
                         [int]$MaxEvents,
                         [switch] $Oldest
                     )
+                    if ($isVerbose) {
+                        $verbosepreference = 'continue'
+                    }
                     $Measure = [System.Diagnostics.Stopwatch]::StartNew() # Timer Start
                     $Events = @()
                     try {
@@ -232,18 +239,6 @@ function Get-Events {
                 return Get-EventsInternal -Comp $Comp -EventFilter $EventFilter -MaxEvents $MaxEvents -Oldest:$Oldest
 
             }
-            $sb = {
-                [cmdletbinding()]
-                Param (
-                    [string]$Comp,
-                    [hashtable]$EventFilter,
-                    [int]$MaxEvents,
-                    [bool] $Oldest
-                )
-
-                return Invoke-Command -ScriptBlock $ScriptBlock -ArgumentList $Comp, $EventFilter, $MaxEvents, Oldest
-                # Write-Output "Test $Comp"
-            }
             if ($DisableParallel) {
                 Write-Verbose 'Get-Events - Running query with parallel disabled...'
                 Invoke-Command -ScriptBlock $ScriptBlock -ArgumentList $Comp, $EventFilter, $MaxEvents, Oldest
@@ -255,6 +250,7 @@ function Get-Events {
                 $null = $runspace.AddArgument($EventFilter)
                 $null = $runspace.AddArgument($MaxEvents)
                 $null = $runspace.AddArgument($Oldest)
+                $null = $runspace.AddArgument($isVerbose)
                 $runspace.RunspacePool = $pool
                 $runspaces += [PSCustomObject]@{ Pipe = $runspace; Status = $runspace.BeginInvoke() }
             }
@@ -264,10 +260,12 @@ function Get-Events {
     while ($runspaces.Status -ne $null) {
         $completed = $runspaces | Where-Object { $_.Status.IsCompleted -eq $true }
         foreach ($runspace in $completed) {
-            #$runspace.Status
-            # $runspace.Pipe.Streams.Error
-            Write-Verbose "Get-Events - Error from runspace: $($runspace.Pipe.Streams.Error)"
-            Write-Verbose "Get-Events - Verbose from runspace: $($runspace.Pipe.Streams.Verbose)"
+            foreach ($e in $($runspace.Pipe.Streams.Error)) {
+                Write-Verbose "Get-Events - Error from runspace: $e"
+            }
+            foreach ($v in $($runspace.Pipe.Streams.Verbose)) {
+                Write-Verbose "Get-Events - Verbose from runspace: $v"
+            }
             $AllEvents += $runspace.Pipe.EndInvoke($runspace.Status)
             $runspace.Status = $null
         }
