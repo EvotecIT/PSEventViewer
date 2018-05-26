@@ -219,17 +219,12 @@ function Get-Events {
                         $EventTopNodes = Get-Member -inputobject $eventXML.Event -MemberType Properties | Where-Object { $_.Name -ne 'System' -and $_.Name -ne 'xmlns'}
                         foreach ($EventTopNode in $EventTopNodes) {
                             $TopNode = $EventTopNode.Name
-                            #$TopNode
 
                             $EventSubsSubs = Get-Member -inputobject $eventXML.Event.$TopNode -Membertype Properties
-
+                            $h = 0
                             foreach ($EventSubSub in $EventSubsSubs) {
                                 $SubNode = $EventSubSub.Name
-                                #$SubNode
 
-
-                                # Get-Member -inputobject $eventXML.Event.$TopNode.$SubNode | ft -AutoSize
-                                #$SubNode
                                 if ($EventSubSub.Definition -like "System.Object*") {
                                     if (Get-Member -inputobject $eventXML.Event.$TopNode -name "$SubNode" -Membertype Properties) {
 
@@ -241,8 +236,6 @@ function Get-Events {
                                             Add-Member -InputObject $Event -MemberType NoteProperty -Name $fieldName -Value $fieldValue -Force
                                         }
                                         # Case 1
-
-
 
                                         For ($i = 0; $i -lt $eventXML.Event.$TopNode.$SubNode.Count; $i++) {
                                             if (Get-Member -inputobject $eventXML.Event.$TopNode.$SubNode[$i] -name "Name" -Membertype Properties) {
@@ -262,7 +255,7 @@ function Get-Events {
                                                 # Case 3
                                                 $Value = $eventXML.Event.$TopNode.$SubNode[$i]
                                                 if ($Value.Name -ne 'Name' -and $Value.Name -ne '#text') {
-                                                    $fieldName = "Param$i"
+                                                    $fieldName = "NoNameA$i"
                                                     $fieldValue = $Value
                                                     Add-Member -InputObject $Event -MemberType NoteProperty -Name $fieldName -Value $fieldValue -Force
                                                 }
@@ -273,14 +266,12 @@ function Get-Events {
                                         # }
                                     }
                                 } else {
-                                    #$eventXML.Event.$TopNode.$SubNode
-                                    #$EventSubSub.Name
-                                    #$Value = $eventXML.Event.$TopNode.$SubNode
-
-                                    #$fieldName = "Param$i"
-                                    #$fieldValue = $Value
-                                    #Add-Member -InputObject $Event -MemberType NoteProperty -Name $fieldName -Value $fieldValue -Force
-
+                                    # Case 4
+                                    $h++
+                                    $fieldName = "NoNameB$h"
+                                    $fieldValue = $eventXML.Event.$TopNode.$SubNode
+                                    Add-Member -InputObject $Event -MemberType NoteProperty -Name $fieldName -Value $fieldValue -Force
+                                    # Case 4
                                 }
                             }
 
