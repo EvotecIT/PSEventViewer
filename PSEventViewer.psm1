@@ -224,7 +224,7 @@ function Get-Events {
                             $h = 0
                             foreach ($EventSubSub in $EventSubsSubs) {
                                 $SubNode = $EventSubSub.Name
-
+                                #$EventSubSub | ft -a
                                 if ($EventSubSub.Definition -like "System.Object*") {
                                     if (Get-Member -inputobject $eventXML.Event.$TopNode -name "$SubNode" -Membertype Properties) {
 
@@ -265,6 +265,15 @@ function Get-Events {
                                         }
                                         # }
                                     }
+                                } elseif ($EventSubSub.Definition -like "System.Xml.XmlElement*") {
+                                    # Case 1
+                                    $SubSubNode = Get-Member -inputobject $eventXML.Event.$TopNode.$SubNode -MemberType Properties | Where-Object { $_.Name -ne 'xmlns' -and $_.Definition -like "string*" }
+                                    foreach ($Name in $SubSubNode.Name) {
+                                        $fieldName = $Name
+                                        $fieldValue = $eventXML.Event.$TopNode.$SubNode.$Name
+                                        Add-Member -InputObject $Event -MemberType NoteProperty -Name $fieldName -Value $fieldValue -Force
+                                    }
+                                    # Case 1
                                 } else {
                                     # Case 4
                                     $h++
