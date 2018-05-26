@@ -214,28 +214,77 @@ function Get-Events {
                         Add-Member -InputObject $Event -MemberType NoteProperty -Name "Computer" -Value $event.MachineName.ToString() -Force
                         Add-Member -InputObject $Event -MemberType NoteProperty -Name "Date" -Value $Event.TimeCreated -Force
 
-                        # Get-Member -inputobject $eventXML.Event
+                        #Get-Member -inputobject $eventXML.Event -MemberType Properties | ft -a
 
-                        if (Get-Member -inputobject $eventXML.Event.EventData -name "Data" -Membertype Properties) {
-                            if (Get-Member -inputobject $eventXML.Event.EventData.Data -name "Count" -Membertype Properties) {
-                                For ($i = 0; $i -lt $eventXML.Event.EventData.Data.Count; $i++) {
-                                    if (Get-Member -inputobject $eventXML.Event.EventData.Data[$i] -name "Name" -Membertype Properties) {
-                                        $fieldName = $eventXML.Event.EventData.Data[$i].Name
-                                    } else {
-                                        $fieldName = ""
+                        $EventTopNodes = Get-Member -inputobject $eventXML.Event -MemberType Properties | Where-Object { $_.Name -ne 'System' -and $_.Name -ne 'xmlns'}
+                        foreach ($EventTopNode in $EventTopNodes) {
+                            $TopNode = $EventTopNode.Name
+                            #$TopNode
+
+                            $EventSubsSubs = Get-Member -inputobject $eventXML.Event.$TopNode -Membertype Properties
+
+                            foreach ($EventSubSub in $EventSubsSubs) {
+                                $SubNode = $EventSubSub.Name
+                                #$SubNode
+
+
+                                # Get-Member -inputobject $eventXML.Event.$TopNode.$SubNode | ft -AutoSize
+                                #$SubNode
+                                if ($EventSubSub.Definition -like "System.Object*") {
+                                    if (Get-Member -inputobject $eventXML.Event.$TopNode -name "$SubNode" -Membertype Properties) {
+
+                                        # Case 1
+                                        $SubSubNode = Get-Member -inputobject $eventXML.Event.$TopNode.$SubNode -MemberType Properties | Where-Object { $_.Name -ne 'xmlns' -and $_.Definition -like "string*" }
+                                        foreach ($Name in $SubSubNode.Name) {
+                                            $fieldName = $Name
+                                            $fieldValue = $eventXML.Event.$TopNode.$SubNode.$Name
+                                            Add-Member -InputObject $Event -MemberType NoteProperty -Name $fieldName -Value $fieldValue -Force
+                                        }
+                                        # Case 1
+
+
+
+                                        For ($i = 0; $i -lt $eventXML.Event.$TopNode.$SubNode.Count; $i++) {
+                                            if (Get-Member -inputobject $eventXML.Event.$TopNode.$SubNode[$i] -name "Name" -Membertype Properties) {
+                                                # Case 2
+                                                $fieldName = $eventXML.Event.$TopNode.$SubNode[$i].Name
+                                                if (Get-Member -inputobject $eventXML.Event.$TopNode.$SubNode[$i] -name "#text" -Membertype Properties) {
+                                                    $fieldValue = $eventXML.Event.$TopNode.$SubNode[$i]."#text"
+                                                    if ($fieldValue -eq "-".Trim()) { $fieldValue = $fieldValue -replace "-" }
+                                                } else {
+                                                    $fieldValue = ""
+                                                }
+                                                if ($fieldName -ne "") {
+                                                    Add-Member -InputObject $Event -MemberType NoteProperty -Name $fieldName -Value $fieldValue -Force
+                                                }
+                                                # Case 2
+                                            } else {
+                                                # Case 3
+                                                $Value = $eventXML.Event.$TopNode.$SubNode[$i]
+                                                if ($Value.Name -ne 'Name' -and $Value.Name -ne '#text') {
+                                                    $fieldName = "Param$i"
+                                                    $fieldValue = $Value
+                                                    Add-Member -InputObject $Event -MemberType NoteProperty -Name $fieldName -Value $fieldValue -Force
+                                                }
+                                                # Case 3
+                                            }
+
+                                        }
+                                        # }
                                     }
-                                    if (Get-Member -inputobject $eventXML.Event.EventData.Data[$i] -name "#text" -Membertype Properties) {
-                                        $fieldValue = $eventXML.Event.EventData.Data[$i]."#text"
-                                        if ($fieldValue -eq "-".Trim()) { $fieldValue = $fieldValue -replace "-" }
-                                    } else {
-                                        $fieldValue = ""
-                                    }
-                                    # Append these as object properties
-                                    if ($fieldName -ne "") {
-                                        Add-Member -InputObject $Event -MemberType NoteProperty -Name $fieldName -Value $fieldValue -Force
-                                    }
+                                } else {
+                                    #$eventXML.Event.$TopNode.$SubNode
+                                    #$EventSubSub.Name
+                                    #$Value = $eventXML.Event.$TopNode.$SubNode
+
+                                    #$fieldName = "Param$i"
+                                    #$fieldValue = $Value
+                                    #Add-Member -InputObject $Event -MemberType NoteProperty -Name $fieldName -Value $fieldValue -Force
+
                                 }
                             }
+
+
                         }
                     }
                     Write-Verbose "Get-Events - Inside $Comp - Time to generate $($Measure.Elapsed.Hours) hours, $($Measure.Elapsed.Minutes) minutes, $($Measure.Elapsed.Seconds) seconds, $($Measure.Elapsed.Milliseconds) milliseconds"
