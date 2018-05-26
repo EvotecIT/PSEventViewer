@@ -196,8 +196,6 @@ function Get-Events {
                         Add-Member -InputObject $Event -MemberType NoteProperty -Name "Computer" -Value $event.MachineName.ToString() -Force
                         Add-Member -InputObject $Event -MemberType NoteProperty -Name "Date" -Value $Event.TimeCreated -Force
 
-                        #Get-Member -inputobject $eventXML.Event -MemberType Properties | ft -a
-
                         $EventTopNodes = Get-Member -inputobject $eventXML.Event -MemberType Properties | Where-Object { $_.Name -ne 'System' -and $_.Name -ne 'xmlns'}
                         foreach ($EventTopNode in $EventTopNodes) {
                             $TopNode = $EventTopNode.Name
@@ -265,8 +263,6 @@ function Get-Events {
                                     # Case 4
                                 }
                             }
-
-
                         }
                     }
                     Write-Verbose "Get-Events - Inside $Comp - Time to generate $($Measure.Elapsed.Hours) hours, $($Measure.Elapsed.Minutes) minutes, $($Measure.Elapsed.Seconds) seconds, $($Measure.Elapsed.Milliseconds) milliseconds"
