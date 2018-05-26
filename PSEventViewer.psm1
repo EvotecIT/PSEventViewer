@@ -95,7 +95,7 @@ function Get-Events {
     Write-Verbose "Get-Events - Overall events processing start"
     $MeasureTotal = [System.Diagnostics.Stopwatch]::StartNew() # Timer Start
 
-    if ($PSCmdlet.MyInvocation.BoundParameters["Verbose"].IsPresent) { $isVerbose = $true } else { $isVerbose = $false }
+    if ($PSCmdlet.MyInvocation.BoundParameters["Verbose"].IsPresent) { $Verbose = $true } else { $Verbose = $false }
 
     ### Define Runspace
     $pool = [RunspaceFactory]::CreateRunspacePool(1, [int]$env:NUMBER_OF_PROCESSORS + 1)
@@ -150,27 +150,40 @@ function Get-Events {
 
 
             $ScriptBlock = {
-                [cmdletbinding()]
+                #[cmdletbinding()]
                 Param (
                     [string]$Comp,
                     [hashtable]$EventFilter,
                     [int]$MaxEvents,
                     [bool] $Oldest,
-                    [bool] $IsVerbose
+                    [bool] $Verbose
                 )
+                if ($Verbose) {
+                    $verbosepreference = 'continue'
+                }
                 function Get-EventsInternal () {
-                    [cmdletbinding()]
+                    #[cmdletbinding()]
                     param (
                         [string]$Comp,
                         [hashtable]$EventFilter,
                         [int]$MaxEvents,
-                        [switch] $Oldest
+                        [bool] $Oldest,
+                        [bool] $Verbose
                     )
-                    if ($isVerbose) {
+
+                    if ($Verbose) {
                         $verbosepreference = 'continue'
                     }
+                    Write-Verbose "Get-Events - Inside $Comp for Events ID: $($EventFilter.ID)"
+                    Write-Verbose "Get-Events - Inside $Comp for Events ID: $($EventFilter.LogName)"
+                    Write-Verbose "Get-Events - Inside $Comp for Events Oldest: $Oldest"
+                    Write-Verbose "Get-Events - Inside $Comp for Events Max Events: $MaxEvents"
+                    Write-Verbose "Get-Events - Inside $Comp for Events Verbose: $Verbose"
+                    Write-Verbose "Get-Events - Inside $Comp ignore: Variable Test EnvComputerName: $($Env:COMPUTERNAME)"
+
                     $Measure = [System.Diagnostics.Stopwatch]::StartNew() # Timer Start
                     $Events = @()
+
                     try {
                         if ($MaxEvents -ne $null -and $MaxEvents -ne 0) {
                             $Events = Get-WinEvent -FilterHashtable $EventFilter -ComputerName $Comp -MaxEvents $MaxEvents -Oldest:$Oldest -ErrorAction Stop
@@ -178,18 +191,18 @@ function Get-Events {
                             $Events = Get-WinEvent -FilterHashtable $EventFilter -ComputerName $Comp -Oldest:$Oldest -ErrorAction Stop
                         }
                         $EventsCount = ($Events | Measure-Object).Count
-                        Write-Verbose -Message "Get-Events - Events processed $EventsCount on computer $comp"
+                        Write-Verbose -Message "Get-Events - Inside $Comp Events founds $EventsCount"
                     } catch {
                         if ($_.Exception -match "No events were found that match the specified selection criteria") {
-                            Write-Verbose -Message "Get-Events - Processing computer $Comp - No events found."
+                            Write-Verbose -Message "Get-Events - Inside $Comp - No events found."
                         } elseif ($_.Exception -match "There are no more endpoints available from the endpoint") {
-                            Write-Verbose -Message "Get-Events - Processing computer $Comp - Error connecting."
-                            Write-Verbose -Message "Get-Events - Processing computer $Comp - Error $($_.Exception.Message)"
+                            Write-Verbose -Message "Get-Events - Inside $Comp - Error connecting."
+                            Write-Verbose -Message "Get-Events - Inside $Comp - Error $($_.Exception.Message)"
                         } else {
-                            Write-Verbose -Message "Get-Events - Processing computer $Comp - Error connecting."
-                            Write-Verbose -Message "Get-Events - Processing computer $Comp - Error $($_.Exception.Message)"
+                            Write-Verbose -Message "Get-Events - Inside $Comp - Error connecting."
+                            Write-Verbose -Message "Get-Events - Inside $Comp - Error $($_.Exception.Message)"
                         }
-                        Write-Verbose "Get-Events - Processing computer $Comp - Time to generate $($Measure.Elapsed.Hours) hours, $($Measure.Elapsed.Minutes) minutes, $($Measure.Elapsed.Seconds) seconds, $($Measure.Elapsed.Milliseconds) milliseconds"
+                        Write-Verbose "Get-Events - Inside $Comp - Time to generate $($Measure.Elapsed.Hours) hours, $($Measure.Elapsed.Minutes) minutes, $($Measure.Elapsed.Seconds) seconds, $($Measure.Elapsed.Milliseconds) milliseconds"
                         $Measure.Stop()
                         continue
                     }
@@ -225,32 +238,24 @@ function Get-Events {
                             }
                         }
                     }
-                    #Write-Output "Test"
-                    Write-Verbose "Get-Events - Processing computer $Comp - Time to generate $($Measure.Elapsed.Hours) hours, $($Measure.Elapsed.Minutes) minutes, $($Measure.Elapsed.Seconds) seconds, $($Measure.Elapsed.Milliseconds) milliseconds"
+                    Write-Verbose "Get-Events - Inside $Comp - Time to generate $($Measure.Elapsed.Hours) hours, $($Measure.Elapsed.Minutes) minutes, $($Measure.Elapsed.Seconds) seconds, $($Measure.Elapsed.Milliseconds) milliseconds"
                     $Measure.Stop()
                     return $Events
                 }
-
-                Write-Verbose "Get-Events - Parallel $Comp for Events ID: $($EventFilter.ID)"
-                Write-Verbose "Get-Events - Parallel $Comp for Events ID: $($EventFilter.LogName)"
-                Write-Verbose "Get-Events - Parallel $Comp for Events Oldest: $Oldest"
-                Write-Verbose "Get-Events - Parallel $Comp for Events Max Events: $MaxEvents"
-
-                return Get-EventsInternal -Comp $Comp -EventFilter $EventFilter -MaxEvents $MaxEvents -Oldest:$Oldest
-
+                return Get-EventsInternal -Comp $Comp -EventFilter $EventFilter -MaxEvents $MaxEvents -Oldest:$Oldest -Verbose $Verbose
             }
             if ($DisableParallel) {
                 Write-Verbose 'Get-Events - Running query with parallel disabled...'
-                Invoke-Command -ScriptBlock $ScriptBlock -ArgumentList $Comp, $EventFilter, $MaxEvents, Oldest
+                Invoke-Command -ScriptBlock $ScriptBlock -ArgumentList $Comp, $EventFilter, $MaxEvents, $Oldest, $Verbose
             } else {
                 Write-Verbose 'Get-Events - Running query with parallel enabled...'
                 $runspace = [PowerShell]::Create()
                 $null = $runspace.AddScript($ScriptBlock)
-                $null = $runspace.AddArgument($Comp)
-                $null = $runspace.AddArgument($EventFilter)
-                $null = $runspace.AddArgument($MaxEvents)
-                $null = $runspace.AddArgument($Oldest)
-                $null = $runspace.AddArgument($isVerbose)
+                $null = $runspace.AddParameter('Comp', $Comp)
+                $null = $runspace.AddParameter('EventFilter', $EventFilter)
+                $null = $runspace.AddParameter('MaxEvents', $MaxEvents)
+                $null = $runspace.AddParameter('Oldest', $Oldest)
+                $null = $runspace.AddParameter('Verbose', $Verbose)
                 $runspace.RunspacePool = $pool
                 $runspaces += [PSCustomObject]@{ Pipe = $runspace; Status = $runspace.BeginInvoke() }
             }
