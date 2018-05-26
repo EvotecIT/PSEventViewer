@@ -1,16 +1,12 @@
 <#
     .SYNOPSIS
-    This PowerShell module simplifies parsing Windows Event Log, has some problems thou... that will be addressed later
+    This PowerShell module simplifies parsing Windows Event Log
     .DESCRIPTION
-    This PowerShell module simplifies parsing Windows Event Log, has some problems thou... that will be addressed later
+    This PowerShell module simplifies parsing Windows Event Log
 
     .NOTES
-    Version:        0.32
+    Version:        0.4
     Author:         Przemyslaw Klys <przemyslaw.klys at evotec.pl>
-
-
-    Get-WinEvent Help:
-    - https://docs.microsoft.com/en-us/powershell/module/microsoft.powershell.diagnostics/get-winevent?view=powershell-6
 
     .EXAMPLE
         $DateFrom = (get-date).AddHours(-5)
