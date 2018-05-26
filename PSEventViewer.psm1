@@ -5,7 +5,7 @@
     This PowerShell module simplifies parsing Windows Event Log, has some problems thou... that will be addressed later
 
     .NOTES
-    Version:        0.30
+    Version:        0.32
     Author:         Przemyslaw Klys <przemyslaw.klys at evotec.pl>
 
 
@@ -174,12 +174,12 @@ function Get-Events {
                     if ($Verbose) {
                         $verbosepreference = 'continue'
                     }
+                    Write-Verbose "Get-Events - Inside $Comp executing on: $($Env:COMPUTERNAME)"
                     Write-Verbose "Get-Events - Inside $Comp for Events ID: $($EventFilter.ID)"
                     Write-Verbose "Get-Events - Inside $Comp for Events ID: $($EventFilter.LogName)"
                     Write-Verbose "Get-Events - Inside $Comp for Events Oldest: $Oldest"
                     Write-Verbose "Get-Events - Inside $Comp for Events Max Events: $MaxEvents"
                     Write-Verbose "Get-Events - Inside $Comp for Events Verbose: $Verbose"
-                    Write-Verbose "Get-Events - Inside $Comp ignore: Variable Test EnvComputerName: $($Env:COMPUTERNAME)"
 
                     $Measure = [System.Diagnostics.Stopwatch]::StartNew() # Timer Start
                     $Events = @()
