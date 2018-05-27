@@ -260,6 +260,9 @@ function Get-Events {
                                 }
                             }
                         }
+                        $MessageSubjact = ($Event.Message -split '\n')[0]
+                        Add-Member -InputObject $Event -MemberType NoteProperty -Name 'MessageSubject' -Value $MessageSubjact -Force
+
                     }
                     Write-Verbose "Get-Events - Inside $Comp - Time to generate $($Measure.Elapsed.Hours) hours, $($Measure.Elapsed.Minutes) minutes, $($Measure.Elapsed.Seconds) seconds, $($Measure.Elapsed.Milliseconds) milliseconds"
                     $Measure.Stop()
