@@ -5,7 +5,7 @@
     This PowerShell module simplifies parsing Windows Event Log
 
     .NOTES
-    Version:        0.5
+    Version:        0.50
     Author:         Przemyslaw Klys <przemyslaw.klys at evotec.pl>
 
     .EXAMPLE
