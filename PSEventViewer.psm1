@@ -53,7 +53,7 @@ function Split-Array {
 function Get-Events {
     [cmdletbinding()]
     param (
-        [alias ("ADDomainControllers", "DomainController", "Server", "Servers", "Computer", "Computers")] [string[]] $Machine = $Env:COMPUTERNAME,
+        [alias ("ADDomainControllers", "DomainController", "Server", "Servers", "Computer", "Computers", "ComputerName")] [string[]] $Machine = $Env:COMPUTERNAME,
         [alias ("From")][nullable[DateTime]] $DateFrom = $null,
         [alias ("To")][nullable[DateTime]] $DateTo = $null,
         [alias ("Ids", "EventID", "EventIds")] [int[]] $ID = $null,
