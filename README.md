@@ -4,4 +4,7 @@ Project was split into 2 parts:
 - PSEventViewer - this module.
 - PSWinReporting - reporting on Active Directory Events, Windows Events... generally reporting
 
-Documentation for later is available at: https://evotec.xyz/hub/scripts/get-eventslibrary-ps1/ (link will be updated when new module will be officially released)
+Documentation for PSEventViewer (overview): https://evotec.xyz/hub/scripts/pseventviewer-powershell-module/
+Documentation for PSEventViewer (examples and how things are different): https://evotec.xyz/working-with-windows-events-with-powershell/
+
+Documentation for PSWinReporting is available at: https://evotec.xyz/hub/scripts/get-eventslibrary-ps1/ (link will be updated when new module will be officially released - as it's heavily out of date now)
