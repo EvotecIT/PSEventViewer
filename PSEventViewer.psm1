@@ -275,6 +275,12 @@ function Get-Events {
                 Invoke-Command -ScriptBlock $ScriptBlock -ArgumentList $Comp, $EventFilter, $MaxEvents, $Oldest, $Verbose
             } else {
                 Write-Verbose 'Get-Events - Running query with parallel enabled...'
+
+                #$Uri = New-Object System.Uri("http://$($Comp):5985/wsman")
+                #$connectionInfo = New-Object System.Management.Automation.Runspaces.WSManConnectionInfo -ArgumentList $Uri
+                #$connectionInfo.AuthenticationMechanism = [System.Management.Automation.Runspaces.AuthenticationMechanism]::Negotiate
+                #$connectionInfo.OpenTimeout = 3000
+
                 $runspace = [PowerShell]::Create()
                 $null = $runspace.AddScript($ScriptBlock)
                 $null = $runspace.AddParameter('Comp', $Comp)
@@ -282,6 +288,7 @@ function Get-Events {
                 $null = $runspace.AddParameter('MaxEvents', $MaxEvents)
                 $null = $runspace.AddParameter('Oldest', $Oldest)
                 $null = $runspace.AddParameter('Verbose', $Verbose)
+                #$runspace | Get-Member
                 $runspace.RunspacePool = $pool
                 $runspaces += [PSCustomObject]@{ Pipe = $runspace; Status = $runspace.BeginInvoke() }
             }
