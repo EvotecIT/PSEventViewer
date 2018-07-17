@@ -64,7 +64,7 @@ function Get-Events {
         [string[]]$Data = $null,
         [int] $MaxEvents = $null,
         $Credentials = $null,
-        $Path = $null,
+        [string] $Path = $null,
         [long[]] $Keywords = $null,
         [int] $RecordID,
         [int] $MaxRunspaces = [int]$env:NUMBER_OF_PROCESSORS + 1,
@@ -130,17 +130,14 @@ function Get-Events {
                 Invoke-Command -ScriptBlock $ScriptBlock -ArgumentList $Comp, $EventFilter, $MaxEvents, $Oldest, $Verbose
             } else {
                 Write-Verbose 'Get-Events - Running query with parallel enabled...'
-
-                $runspace = [PowerShell]::Create()
-                $null = $runspace.AddScript($ScriptBlock)
-                $null = $runspace.AddParameter('Comp', $Comp)
-                $null = $runspace.AddParameter('EventFilter', $EventFilter)
-                $null = $runspace.AddParameter('MaxEvents', $MaxEvents)
-                $null = $runspace.AddParameter('Oldest', $Oldest)
-                $null = $runspace.AddParameter('Verbose', $Verbose)
-                #$runspace | Get-Member
-                $runspace.RunspacePool = $pool
-                $runspaces += [PSCustomObject]@{ Pipe = $runspace; Status = $runspace.BeginInvoke() }
+                $Parameters = @{
+                    Comp        = $Comp
+                    EventFilter = $EventFilter
+                    MaxEvents   = $MaxEvents
+                    Oldest      = $Oldest
+                    Verbose     = $Verbose
+                }
+                $runspaces += Start-Runspace -ScriptBlock $ScriptBlock -Parameters $Parameters -RunspacePool $pool
             }
         }
     }
