@@ -124,6 +124,7 @@ function Get-Events {
             Write-Verbose "Get-Events - Processing computer $Comp for Events Path: $Path"
             Write-Verbose "Get-Events - Processing computer $Comp for Events UserSID: $UserSID"
             Write-Verbose "Get-Events - Processing computer $Comp for Events Oldest: $Oldest"
+            Write-Verbose "Get-Events - Processing computer $Comp for Events RecordID: $RecordID"
 
             if ($DisableParallel) {
                 Write-Verbose 'Get-Events - Running query with parallel disabled...'
@@ -133,10 +134,12 @@ function Get-Events {
                 $Parameters = @{
                     Comp        = $Comp
                     EventFilter = $EventFilter
+                    RecordID    = $RecordID
                     MaxEvents   = $MaxEvents
                     Oldest      = $Oldest
                     Verbose     = $Verbose
                 }
+                $Parameters
                 $runspaces += Start-Runspace -ScriptBlock $ScriptBlock -Parameters $Parameters -RunspacePool $pool
             }
         }
@@ -158,6 +161,7 @@ $ScriptBlock = {
     Param (
         [string]$Comp,
         [hashtable]$EventFilter,
+        [int]$RecordID,
         [int]$MaxEvents,
         [bool] $Oldest,
         [bool] $Verbose
@@ -166,21 +170,22 @@ $ScriptBlock = {
         $verbosepreference = 'continue'
     }
     function Get-EventsInternal () {
-        #[cmdletbinding()]
+        [cmdletbinding()]
         param (
             [string]$Comp,
             [hashtable]$EventFilter,
             [int]$MaxEvents,
-            [bool] $Oldest,
-            [bool] $Verbose
+            [switch] $Oldest #,
+            #[bool] $Verbose
         )
-
-        if ($Verbose) {
-            $verbosepreference = 'continue'
-        }
+        Write-Output "Get-Events - Inside Test"
+        #if ($Verbose) {
+        #    $verbosepreference = 'continue'
+        #}
         Write-Verbose "Get-Events - Inside $Comp executing on: $($Env:COMPUTERNAME)"
         Write-Verbose "Get-Events - Inside $Comp for Events ID: $($EventFilter.ID)"
         Write-Verbose "Get-Events - Inside $Comp for Events ID: $($EventFilter.LogName)"
+        Write-Verbose "Get-Events - Inside $Comp for Events RecordID: $RecordID"
         Write-Verbose "Get-Events - Inside $Comp for Events Oldest: $Oldest"
         Write-Verbose "Get-Events - Inside $Comp for Events Max Events: $MaxEvents"
         Write-Verbose "Get-Events - Inside $Comp for Events Verbose: $Verbose"
@@ -189,10 +194,32 @@ $ScriptBlock = {
         $Events = @()
 
         try {
-            if ($MaxEvents -ne $null -and $MaxEvents -ne 0) {
-                $Events = Get-WinEvent -FilterHashtable $EventFilter -ComputerName $Comp -MaxEvents $MaxEvents -Oldest:$Oldest -ErrorAction Stop
+            if ($RecordID -ne 0) {
+                $FilterXML = @"
+                <QueryList>
+                    <Query Id="0" Path="$($EventFilter.LogName)">
+                        <Select Path="$($EventFilter.LogName)">
+                        *[
+                            (System/EventID=$($EventFilter.ID))
+                            and
+                            (System/EventRecordID=$RecordID)
+                         ]
+                        </Select>
+                    </Query>
+                </QueryList>
+"@
+                #$FilterXML
+                if ($MaxEvents -ne $null -and $MaxEvents -ne 0) {
+                    $Events = Get-WinEvent -FilterXml $FilterXML -ComputerName $Comp -MaxEvents $MaxEvents -Oldest:$Oldest -ErrorAction Stop
+                } else {
+                    $Events = Get-WinEvent -FilterXml $FilterXML -ComputerName $Comp -Oldest:$Oldest -ErrorAction Stop
+                }
             } else {
-                $Events = Get-WinEvent -FilterHashtable $EventFilter -ComputerName $Comp -Oldest:$Oldest -ErrorAction Stop
+                if ($MaxEvents -ne $null -and $MaxEvents -ne 0) {
+                    $Events = Get-WinEvent -FilterHashtable $EventFilter -ComputerName $Comp -MaxEvents $MaxEvents -Oldest:$Oldest -ErrorAction Stop
+                } else {
+                    $Events = Get-WinEvent -FilterHashtable $EventFilter -ComputerName $Comp -Oldest:$Oldest -ErrorAction Stop
+                }
             }
             $EventsCount = ($Events | Measure-Object).Count
             Write-Verbose -Message "Get-Events - Inside $Comp Events founds $EventsCount"
@@ -294,5 +321,8 @@ $ScriptBlock = {
         $Measure.Stop()
         return $Events
     }
-    return Get-EventsInternal -Comp $Comp -EventFilter $EventFilter -MaxEvents $MaxEvents -Oldest:$Oldest -Verbose $Verbose
+
+    $Data = Get-EventsInternal -Comp $Comp -EventFilter $EventFilter -MaxEvents $MaxEvents -Oldest:$Oldest -Verbose:$Verbose
+
+    return $Data
 }
