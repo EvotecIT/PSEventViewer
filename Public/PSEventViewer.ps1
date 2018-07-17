@@ -66,6 +66,8 @@ function Get-Events {
         $Credentials = $null,
         $Path = $null,
         [long[]] $Keywords = $null,
+        [int] $RecordID,
+        [int] $MaxRunspaces = [int]$env:NUMBER_OF_PROCESSORS + 1,
         [switch] $Oldest,
         [switch] $DisableParallel
     )
@@ -75,12 +77,10 @@ function Get-Events {
 
     if ($PSCmdlet.MyInvocation.BoundParameters["Verbose"].IsPresent) { $Verbose = $true } else { $Verbose = $false }
 
-    ### Define Runspace
-    $pool = [RunspaceFactory]::CreateRunspacePool(1, [int]$env:NUMBER_OF_PROCESSORS + 1)
-    $pool.ApartmentState = "MTA"
-    $pool.Open()
+    ### Define Runspace START
     $runspaces = @()
-    ### Define Runspace
+    $pool = New-Runspace -MaxRunspaces $maxRunspaces
+    ### Define Runspace END
 
     $AllEvents = @()
 
@@ -125,161 +125,11 @@ function Get-Events {
             Write-Verbose "Get-Events - Processing computer $Comp for Events UserSID: $UserSID"
             Write-Verbose "Get-Events - Processing computer $Comp for Events Oldest: $Oldest"
 
-
-
-            $ScriptBlock = {
-                #[cmdletbinding()]
-                Param (
-                    [string]$Comp,
-                    [hashtable]$EventFilter,
-                    [int]$MaxEvents,
-                    [bool] $Oldest,
-                    [bool] $Verbose
-                )
-                if ($Verbose) {
-                    $verbosepreference = 'continue'
-                }
-                function Get-EventsInternal () {
-                    #[cmdletbinding()]
-                    param (
-                        [string]$Comp,
-                        [hashtable]$EventFilter,
-                        [int]$MaxEvents,
-                        [bool] $Oldest,
-                        [bool] $Verbose
-                    )
-
-                    if ($Verbose) {
-                        $verbosepreference = 'continue'
-                    }
-                    Write-Verbose "Get-Events - Inside $Comp executing on: $($Env:COMPUTERNAME)"
-                    Write-Verbose "Get-Events - Inside $Comp for Events ID: $($EventFilter.ID)"
-                    Write-Verbose "Get-Events - Inside $Comp for Events ID: $($EventFilter.LogName)"
-                    Write-Verbose "Get-Events - Inside $Comp for Events Oldest: $Oldest"
-                    Write-Verbose "Get-Events - Inside $Comp for Events Max Events: $MaxEvents"
-                    Write-Verbose "Get-Events - Inside $Comp for Events Verbose: $Verbose"
-
-                    $Measure = [System.Diagnostics.Stopwatch]::StartNew() # Timer Start
-                    $Events = @()
-
-                    try {
-                        if ($MaxEvents -ne $null -and $MaxEvents -ne 0) {
-                            $Events = Get-WinEvent -FilterHashtable $EventFilter -ComputerName $Comp -MaxEvents $MaxEvents -Oldest:$Oldest -ErrorAction Stop
-                        } else {
-                            $Events = Get-WinEvent -FilterHashtable $EventFilter -ComputerName $Comp -Oldest:$Oldest -ErrorAction Stop
-                        }
-                        $EventsCount = ($Events | Measure-Object).Count
-                        Write-Verbose -Message "Get-Events - Inside $Comp Events founds $EventsCount"
-                    } catch {
-                        if ($_.Exception -match "No events were found that match the specified selection criteria") {
-                            Write-Verbose -Message "Get-Events - Inside $Comp - No events found."
-                        } elseif ($_.Exception -match "There are no more endpoints available from the endpoint") {
-                            Write-Verbose -Message "Get-Events - Inside $Comp - Error connecting."
-                            Write-Verbose -Message "Get-Events - Inside $Comp - Error $($_.Exception.Message)"
-                        } else {
-                            Write-Verbose -Message "Get-Events - Inside $Comp - Error connecting."
-                            Write-Verbose -Message "Get-Events - Inside $Comp - Error $($_.Exception.Message)"
-                        }
-                        Write-Verbose "Get-Events - Inside $Comp - Time to generate $($Measure.Elapsed.Hours) hours, $($Measure.Elapsed.Minutes) minutes, $($Measure.Elapsed.Seconds) seconds, $($Measure.Elapsed.Milliseconds) milliseconds"
-                        $Measure.Stop()
-                        continue
-                    }
-                    # Parse out the event message data
-                    ForEach ($Event in $Events) {
-                        # Convert the event to XML
-                        $eventXML = [xml]$Event.ToXml()
-                        # Iterate through each one of the XML message properties
-                        Add-Member -InputObject $Event -MemberType NoteProperty -Name "Computer" -Value $event.MachineName.ToString() -Force
-                        Add-Member -InputObject $Event -MemberType NoteProperty -Name "Date" -Value $Event.TimeCreated -Force
-
-                        $EventTopNodes = Get-Member -inputobject $eventXML.Event -MemberType Properties | Where-Object { $_.Name -ne 'System' -and $_.Name -ne 'xmlns'}
-                        foreach ($EventTopNode in $EventTopNodes) {
-                            $TopNode = $EventTopNode.Name
-
-                            $EventSubsSubs = Get-Member -inputobject $eventXML.Event.$TopNode -Membertype Properties
-                            $h = 0
-                            foreach ($EventSubSub in $EventSubsSubs) {
-                                $SubNode = $EventSubSub.Name
-                                #$EventSubSub | ft -a
-                                if ($EventSubSub.Definition -like "System.Object*") {
-                                    if (Get-Member -inputobject $eventXML.Event.$TopNode -name "$SubNode" -Membertype Properties) {
-
-                                        # Case 1
-                                        $SubSubNode = Get-Member -inputobject $eventXML.Event.$TopNode.$SubNode -MemberType Properties | Where-Object { $_.Name -ne 'xmlns' -and $_.Definition -like "string*" }
-                                        foreach ($Name in $SubSubNode.Name) {
-                                            $fieldName = $Name
-                                            $fieldValue = $eventXML.Event.$TopNode.$SubNode.$Name
-                                            Add-Member -InputObject $Event -MemberType NoteProperty -Name $fieldName -Value $fieldValue -Force
-                                        }
-                                        # Case 1
-
-                                        For ($i = 0; $i -lt $eventXML.Event.$TopNode.$SubNode.Count; $i++) {
-                                            if (Get-Member -inputobject $eventXML.Event.$TopNode.$SubNode[$i] -name "Name" -Membertype Properties) {
-                                                # Case 2
-                                                $fieldName = $eventXML.Event.$TopNode.$SubNode[$i].Name
-                                                if (Get-Member -inputobject $eventXML.Event.$TopNode.$SubNode[$i] -name "#text" -Membertype Properties) {
-                                                    $fieldValue = $eventXML.Event.$TopNode.$SubNode[$i]."#text"
-                                                    if ($fieldValue -eq "-".Trim()) { $fieldValue = $fieldValue -replace "-" }
-                                                } else {
-                                                    $fieldValue = ""
-                                                }
-                                                if ($fieldName -ne "") {
-                                                    Add-Member -InputObject $Event -MemberType NoteProperty -Name $fieldName -Value $fieldValue -Force
-                                                }
-                                                # Case 2
-                                            } else {
-                                                # Case 3
-                                                $Value = $eventXML.Event.$TopNode.$SubNode[$i]
-                                                if ($Value.Name -ne 'Name' -and $Value.Name -ne '#text') {
-                                                    $fieldName = "NoNameA$i"
-                                                    $fieldValue = $Value
-                                                    Add-Member -InputObject $Event -MemberType NoteProperty -Name $fieldName -Value $fieldValue -Force
-                                                }
-                                                # Case 3
-                                            }
-
-                                        }
-                                        # }
-                                    }
-                                } elseif ($EventSubSub.Definition -like "System.Xml.XmlElement*") {
-                                    # Case 1
-                                    $SubSubNode = Get-Member -inputobject $eventXML.Event.$TopNode.$SubNode -MemberType Properties | Where-Object { $_.Name -ne 'xmlns' -and $_.Definition -like "string*" }
-                                    foreach ($Name in $SubSubNode.Name) {
-                                        $fieldName = $Name
-                                        $fieldValue = $eventXML.Event.$TopNode.$SubNode.$Name
-                                        Add-Member -InputObject $Event -MemberType NoteProperty -Name $fieldName -Value $fieldValue -Force
-                                    }
-                                    # Case 1
-                                } else {
-                                    # Case 4
-                                    $h++
-                                    $fieldName = "NoNameB$h"
-                                    $fieldValue = $eventXML.Event.$TopNode.$SubNode
-                                    Add-Member -InputObject $Event -MemberType NoteProperty -Name $fieldName -Value $fieldValue -Force
-                                    # Case 4
-                                }
-                            }
-                        }
-                        $MessageSubjact = ($Event.Message -split '\n')[0]
-                        Add-Member -InputObject $Event -MemberType NoteProperty -Name 'MessageSubject' -Value $MessageSubjact -Force
-
-                    }
-                    Write-Verbose "Get-Events - Inside $Comp - Time to generate $($Measure.Elapsed.Hours) hours, $($Measure.Elapsed.Minutes) minutes, $($Measure.Elapsed.Seconds) seconds, $($Measure.Elapsed.Milliseconds) milliseconds"
-                    $Measure.Stop()
-                    return $Events
-                }
-                return Get-EventsInternal -Comp $Comp -EventFilter $EventFilter -MaxEvents $MaxEvents -Oldest:$Oldest -Verbose $Verbose
-            }
             if ($DisableParallel) {
                 Write-Verbose 'Get-Events - Running query with parallel disabled...'
                 Invoke-Command -ScriptBlock $ScriptBlock -ArgumentList $Comp, $EventFilter, $MaxEvents, $Oldest, $Verbose
             } else {
                 Write-Verbose 'Get-Events - Running query with parallel enabled...'
-
-                #$Uri = New-Object System.Uri("http://$($Comp):5985/wsman")
-                #$connectionInfo = New-Object System.Management.Automation.Runspaces.WSManConnectionInfo -ArgumentList $Uri
-                #$connectionInfo.AuthenticationMechanism = [System.Management.Automation.Runspaces.AuthenticationMechanism]::Negotiate
-                #$connectionInfo.OpenTimeout = 3000
 
                 $runspace = [PowerShell]::Create()
                 $null = $runspace.AddScript($ScriptBlock)
@@ -294,24 +144,9 @@ function Get-Events {
             }
         }
     }
-    ### End Runspaces
-    while ($runspaces.Status -ne $null) {
-        $completed = $runspaces | Where-Object { $_.Status.IsCompleted -eq $true }
-        foreach ($runspace in $completed) {
-            foreach ($e in $($runspace.Pipe.Streams.Error)) {
-                Write-Verbose "Get-Events - Error from runspace: $e"
-            }
-            foreach ($v in $($runspace.Pipe.Streams.Verbose)) {
-                Write-Verbose "Get-Events - Verbose from runspace: $v"
-            }
-            $AllEvents += $runspace.Pipe.EndInvoke($runspace.Status)
-            $runspace.Status = $null
-        }
-    }
-    $pool.Close()
-    $pool.Dispose()
-    ### End Runspaces
-
+    ### End Runspaces START
+    $AllEvents = Stop-Runspace -Runspaces $runspaces -FunctionName 'Get-Service' -RunspacePool $pool
+    ### End Runspaces END
 
     $EventsProcessed = ($AllEvents | Measure-Object).Count
     Write-Verbose "Get-Events - Overall events processed in total for the report: $EventsProcessed"
@@ -321,4 +156,146 @@ function Get-Events {
     return $AllEvents
 }
 
-Export-ModuleMember -function "Get-Events"
+$ScriptBlock = {
+    #[cmdletbinding()]
+    Param (
+        [string]$Comp,
+        [hashtable]$EventFilter,
+        [int]$MaxEvents,
+        [bool] $Oldest,
+        [bool] $Verbose
+    )
+    if ($Verbose) {
+        $verbosepreference = 'continue'
+    }
+    function Get-EventsInternal () {
+        #[cmdletbinding()]
+        param (
+            [string]$Comp,
+            [hashtable]$EventFilter,
+            [int]$MaxEvents,
+            [bool] $Oldest,
+            [bool] $Verbose
+        )
+
+        if ($Verbose) {
+            $verbosepreference = 'continue'
+        }
+        Write-Verbose "Get-Events - Inside $Comp executing on: $($Env:COMPUTERNAME)"
+        Write-Verbose "Get-Events - Inside $Comp for Events ID: $($EventFilter.ID)"
+        Write-Verbose "Get-Events - Inside $Comp for Events ID: $($EventFilter.LogName)"
+        Write-Verbose "Get-Events - Inside $Comp for Events Oldest: $Oldest"
+        Write-Verbose "Get-Events - Inside $Comp for Events Max Events: $MaxEvents"
+        Write-Verbose "Get-Events - Inside $Comp for Events Verbose: $Verbose"
+
+        $Measure = [System.Diagnostics.Stopwatch]::StartNew() # Timer Start
+        $Events = @()
+
+        try {
+            if ($MaxEvents -ne $null -and $MaxEvents -ne 0) {
+                $Events = Get-WinEvent -FilterHashtable $EventFilter -ComputerName $Comp -MaxEvents $MaxEvents -Oldest:$Oldest -ErrorAction Stop
+            } else {
+                $Events = Get-WinEvent -FilterHashtable $EventFilter -ComputerName $Comp -Oldest:$Oldest -ErrorAction Stop
+            }
+            $EventsCount = ($Events | Measure-Object).Count
+            Write-Verbose -Message "Get-Events - Inside $Comp Events founds $EventsCount"
+        } catch {
+            if ($_.Exception -match "No events were found that match the specified selection criteria") {
+                Write-Verbose -Message "Get-Events - Inside $Comp - No events found."
+            } elseif ($_.Exception -match "There are no more endpoints available from the endpoint") {
+                Write-Verbose -Message "Get-Events - Inside $Comp - Error connecting."
+                Write-Verbose -Message "Get-Events - Inside $Comp - Error $($_.Exception.Message)"
+            } else {
+                Write-Verbose -Message "Get-Events - Inside $Comp - Error connecting."
+                Write-Verbose -Message "Get-Events - Inside $Comp - Error $($_.Exception.Message)"
+            }
+            Write-Verbose "Get-Events - Inside $Comp - Time to generate $($Measure.Elapsed.Hours) hours, $($Measure.Elapsed.Minutes) minutes, $($Measure.Elapsed.Seconds) seconds, $($Measure.Elapsed.Milliseconds) milliseconds"
+            $Measure.Stop()
+            continue
+        }
+        # Parse out the event message data
+        ForEach ($Event in $Events) {
+            # Convert the event to XML
+            $eventXML = [xml]$Event.ToXml()
+            # Iterate through each one of the XML message properties
+            Add-Member -InputObject $Event -MemberType NoteProperty -Name "Computer" -Value $event.MachineName.ToString() -Force
+            Add-Member -InputObject $Event -MemberType NoteProperty -Name "Date" -Value $Event.TimeCreated -Force
+
+            $EventTopNodes = Get-Member -inputobject $eventXML.Event -MemberType Properties | Where-Object { $_.Name -ne 'System' -and $_.Name -ne 'xmlns'}
+            foreach ($EventTopNode in $EventTopNodes) {
+                $TopNode = $EventTopNode.Name
+
+                $EventSubsSubs = Get-Member -inputobject $eventXML.Event.$TopNode -Membertype Properties
+                $h = 0
+                foreach ($EventSubSub in $EventSubsSubs) {
+                    $SubNode = $EventSubSub.Name
+                    #$EventSubSub | ft -a
+                    if ($EventSubSub.Definition -like "System.Object*") {
+                        if (Get-Member -inputobject $eventXML.Event.$TopNode -name "$SubNode" -Membertype Properties) {
+
+                            # Case 1
+                            $SubSubNode = Get-Member -inputobject $eventXML.Event.$TopNode.$SubNode -MemberType Properties | Where-Object { $_.Name -ne 'xmlns' -and $_.Definition -like "string*" }
+                            foreach ($Name in $SubSubNode.Name) {
+                                $fieldName = $Name
+                                $fieldValue = $eventXML.Event.$TopNode.$SubNode.$Name
+                                Add-Member -InputObject $Event -MemberType NoteProperty -Name $fieldName -Value $fieldValue -Force
+                            }
+                            # Case 1
+
+                            For ($i = 0; $i -lt $eventXML.Event.$TopNode.$SubNode.Count; $i++) {
+                                if (Get-Member -inputobject $eventXML.Event.$TopNode.$SubNode[$i] -name "Name" -Membertype Properties) {
+                                    # Case 2
+                                    $fieldName = $eventXML.Event.$TopNode.$SubNode[$i].Name
+                                    if (Get-Member -inputobject $eventXML.Event.$TopNode.$SubNode[$i] -name "#text" -Membertype Properties) {
+                                        $fieldValue = $eventXML.Event.$TopNode.$SubNode[$i]."#text"
+                                        if ($fieldValue -eq "-".Trim()) { $fieldValue = $fieldValue -replace "-" }
+                                    } else {
+                                        $fieldValue = ""
+                                    }
+                                    if ($fieldName -ne "") {
+                                        Add-Member -InputObject $Event -MemberType NoteProperty -Name $fieldName -Value $fieldValue -Force
+                                    }
+                                    # Case 2
+                                } else {
+                                    # Case 3
+                                    $Value = $eventXML.Event.$TopNode.$SubNode[$i]
+                                    if ($Value.Name -ne 'Name' -and $Value.Name -ne '#text') {
+                                        $fieldName = "NoNameA$i"
+                                        $fieldValue = $Value
+                                        Add-Member -InputObject $Event -MemberType NoteProperty -Name $fieldName -Value $fieldValue -Force
+                                    }
+                                    # Case 3
+                                }
+
+                            }
+                            # }
+                        }
+                    } elseif ($EventSubSub.Definition -like "System.Xml.XmlElement*") {
+                        # Case 1
+                        $SubSubNode = Get-Member -inputobject $eventXML.Event.$TopNode.$SubNode -MemberType Properties | Where-Object { $_.Name -ne 'xmlns' -and $_.Definition -like "string*" }
+                        foreach ($Name in $SubSubNode.Name) {
+                            $fieldName = $Name
+                            $fieldValue = $eventXML.Event.$TopNode.$SubNode.$Name
+                            Add-Member -InputObject $Event -MemberType NoteProperty -Name $fieldName -Value $fieldValue -Force
+                        }
+                        # Case 1
+                    } else {
+                        # Case 4
+                        $h++
+                        $fieldName = "NoNameB$h"
+                        $fieldValue = $eventXML.Event.$TopNode.$SubNode
+                        Add-Member -InputObject $Event -MemberType NoteProperty -Name $fieldName -Value $fieldValue -Force
+                        # Case 4
+                    }
+                }
+            }
+            $MessageSubjact = ($Event.Message -split '\n')[0]
+            Add-Member -InputObject $Event -MemberType NoteProperty -Name 'MessageSubject' -Value $MessageSubjact -Force
+
+        }
+        Write-Verbose "Get-Events - Inside $Comp - Time to generate $($Measure.Elapsed.Hours) hours, $($Measure.Elapsed.Minutes) minutes, $($Measure.Elapsed.Seconds) seconds, $($Measure.Elapsed.Milliseconds) milliseconds"
+        $Measure.Stop()
+        return $Events
+    }
+    return Get-EventsInternal -Comp $Comp -EventFilter $EventFilter -MaxEvents $MaxEvents -Oldest:$Oldest -Verbose $Verbose
+}
