@@ -196,6 +196,7 @@ $ScriptBlock = {
         try {
             if ($RecordID -ne 0) {
                 $FilterXML = @"
+
                 <QueryList>
                     <Query Id="0" Path="$($EventFilter.LogName)">
                         <Select Path="$($EventFilter.LogName)">
@@ -208,6 +209,7 @@ $ScriptBlock = {
                     </Query>
                 </QueryList>
 "@
+                Write-Verbose "Get-Events - Inside $Comp - FilterXML: $FilterXML"
                 #$FilterXML
                 if ($MaxEvents -ne $null -and $MaxEvents -ne 0) {
                     $Events = Get-WinEvent -FilterXml $FilterXML -ComputerName $Comp -MaxEvents $MaxEvents -Oldest:$Oldest -ErrorAction Stop
