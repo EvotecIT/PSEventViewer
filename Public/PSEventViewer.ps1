@@ -79,7 +79,7 @@ function Get-Events {
 
     ### Define Runspace START
     $runspaces = @()
-    $pool = New-Runspace -MaxRunspaces $maxRunspaces
+    $pool = New-Runspace -MaxRunspaces $maxRunspaces -Verbose:$Verbose
     ### Define Runspace END
 
     $AllEvents = @()
@@ -131,7 +131,7 @@ function Get-Events {
                 Invoke-Command -ScriptBlock $ScriptBlock -ArgumentList $Comp, $EventFilter, $MaxEvents, $Oldest, $Verbose
             } else {
                 Write-Verbose 'Get-Events - Running query with parallel enabled...'
-                $Parameters = @{
+                $Parameters = [ordered] @{
                     Comp        = $Comp
                     EventFilter = $EventFilter
                     RecordID    = $RecordID
@@ -139,13 +139,12 @@ function Get-Events {
                     Oldest      = $Oldest
                     Verbose     = $Verbose
                 }
-                $Parameters
-                $runspaces += Start-Runspace -ScriptBlock $ScriptBlock -Parameters $Parameters -RunspacePool $pool
+                $runspaces += Start-Runspace -ScriptBlock $ScriptBlock -Parameters $Parameters -RunspacePool $pool -Verbose:$Verbose
             }
         }
     }
     ### End Runspaces START
-    $AllEvents = Stop-Runspace -Runspaces $runspaces -FunctionName 'Get-Service' -RunspacePool $pool
+    $AllEvents = Stop-Runspace -Runspaces $runspaces -FunctionName 'Get-Events' -RunspacePool $pool -Verbose:$Verbose
     ### End Runspaces END
 
     $EventsProcessed = ($AllEvents | Measure-Object).Count
@@ -157,7 +156,6 @@ function Get-Events {
 }
 
 $ScriptBlock = {
-    #[cmdletbinding()]
     Param (
         [string]$Comp,
         [hashtable]$EventFilter,
@@ -175,21 +173,14 @@ $ScriptBlock = {
             [string]$Comp,
             [hashtable]$EventFilter,
             [int]$MaxEvents,
-            [switch] $Oldest #,
-            #[bool] $Verbose
+            [switch] $Oldest
         )
-        Write-Output "Get-Events - Inside Test"
-        #if ($Verbose) {
-        #    $verbosepreference = 'continue'
-        #}
         Write-Verbose "Get-Events - Inside $Comp executing on: $($Env:COMPUTERNAME)"
         Write-Verbose "Get-Events - Inside $Comp for Events ID: $($EventFilter.ID)"
         Write-Verbose "Get-Events - Inside $Comp for Events ID: $($EventFilter.LogName)"
         Write-Verbose "Get-Events - Inside $Comp for Events RecordID: $RecordID"
         Write-Verbose "Get-Events - Inside $Comp for Events Oldest: $Oldest"
         Write-Verbose "Get-Events - Inside $Comp for Events Max Events: $MaxEvents"
-        Write-Verbose "Get-Events - Inside $Comp for Events Verbose: $Verbose"
-
         $Measure = [System.Diagnostics.Stopwatch]::StartNew() # Timer Start
         $Events = @()
 
@@ -210,17 +201,21 @@ $ScriptBlock = {
                 </QueryList>
 "@
                 Write-Verbose "Get-Events - Inside $Comp - FilterXML: $FilterXML"
-                #$FilterXML
                 if ($MaxEvents -ne $null -and $MaxEvents -ne 0) {
                     $Events = Get-WinEvent -FilterXml $FilterXML -ComputerName $Comp -MaxEvents $MaxEvents -Oldest:$Oldest -ErrorAction Stop
                 } else {
                     $Events = Get-WinEvent -FilterXml $FilterXML -ComputerName $Comp -Oldest:$Oldest -ErrorAction Stop
                 }
             } else {
-                if ($MaxEvents -ne $null -and $MaxEvents -ne 0) {
+                foreach ($k in $EventFilter.Keys) {Write-Verbose "Get-Events - Inside $Comp Data in FilterHashTable $k $($EventFilter[$k])"}
+                if ($MaxEvents -ne 0) {
+                    #Write-Verbose "Get-Events - Inside $Comp - Running (1-1) with MaxEvents: $Maxevents"
                     $Events = Get-WinEvent -FilterHashtable $EventFilter -ComputerName $Comp -MaxEvents $MaxEvents -Oldest:$Oldest -ErrorAction Stop
+                    #Write-Verbose "Get-Events - Inside $Comp - Running (1-2) with MaxEvents: $Maxevents"
                 } else {
+                    #Write-Verbose "Get-Events - Inside $Comp - Running (2-1) with MaxEvents: $Maxevents"
                     $Events = Get-WinEvent -FilterHashtable $EventFilter -ComputerName $Comp -Oldest:$Oldest -ErrorAction Stop
+                    #Write-Verbose "Get-Events - Inside $Comp - Running (2-2) with MaxEvents: $Maxevents"
                 }
             }
             $EventsCount = ($Events | Measure-Object).Count
@@ -239,6 +234,8 @@ $ScriptBlock = {
             $Measure.Stop()
             continue
         }
+        Write-Verbose "Get-Events - Inside $Comp - Processing events..."
+
         # Parse out the event message data
         ForEach ($Event in $Events) {
             # Convert the event to XML
@@ -323,8 +320,8 @@ $ScriptBlock = {
         $Measure.Stop()
         return $Events
     }
-
+    Write-Verbose 'Get-Events - preparing to run'
     $Data = Get-EventsInternal -Comp $Comp -EventFilter $EventFilter -MaxEvents $MaxEvents -Oldest:$Oldest -Verbose:$Verbose
-
+    Write-Verbose 'Get-Events - finished run'
     return $Data
 }
