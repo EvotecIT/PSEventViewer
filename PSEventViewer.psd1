@@ -12,7 +12,7 @@
     RootModule        = 'PSEventViewer.psm1'
 
     # Version number of this module.
-    ModuleVersion     = '0.50'
+    ModuleVersion     = '0.51'
 
     # Supported PSEditions
     # CompatiblePSEditions = @()
