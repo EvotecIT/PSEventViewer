@@ -12,7 +12,7 @@
     RootModule        = 'PSEventViewer.psm1'
 
     # Version number of this module.
-    ModuleVersion     = '0.51'
+    ModuleVersion     = '0.52'
 
     # Supported PSEditions
     # CompatiblePSEditions = @()
@@ -51,7 +51,7 @@
     # ProcessorArchitecture = ''
 
     # Modules that must be imported into the global environment prior to importing this module
-    # RequiredModules = @()
+    RequiredModules   = @('PSSharedGoods')
 
     # Assemblies that must be loaded prior to importing this module
     # RequiredAssemblies = @()
@@ -70,21 +70,6 @@
 
     # Functions to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no functions to export.
     FunctionsToExport = 'Get-Events'
-
-    # Cmdlets to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no cmdlets to export.
-    CmdletsToExport   = @()
-
-    # Variables to export from this module
-    VariablesToExport = @()
-
-    # Aliases to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no aliases to export.
-    AliasesToExport   = @()
-
-    # DSC resources to export from this module
-    # DscResourcesToExport = @()
-
-    # List of all modules packaged with this module
-    # ModuleList = @()
 
     # List of all files packaged with this module
     FileList          = 'PSEventViewer.psm1', 'PSEventViewer.psd1'

@@ -13,43 +13,6 @@
         $DateTo = (get-date).AddHours(1)
         get-events -Computer "Evo1" -DateFrom $DateFrom -DateTo $DateTo -EventId 916 -LogType "Application"
 #>
-function Add-ToHashTable($Hashtable, $Key, $Value) {
-    if ($Value -ne $null -and $Value -ne '') {
-        $Hashtable.Add($Key, $Value)
-    }
-}
-function Split-Array {
-    <#
-        .SYNOPSIS
-        Split an array
-        .NOTES
-        Version : July 2, 2017 - implemented suggestions from ShadowSHarmon for performance
-        .PARAMETER inArray
-        A one dimensional array you want to split
-        .EXAMPLE
-        Split-array -inArray @(1,2,3,4,5,6,7,8,9,10) -parts 3
-        .EXAMPLE
-        Split-array -inArray @(1,2,3,4,5,6,7,8,9,10) -size 3
-    #>
-
-    param($inArray, [int]$parts, [int]$size)
-    if ($parts) {
-        $PartSize = [Math]::Ceiling($inArray.count / $parts)
-    }
-    if ($size) {
-        $PartSize = $size
-        $parts = [Math]::Ceiling($inArray.count / $size)
-    }
-    $outArray = New-Object 'System.Collections.Generic.List[psobject]'
-    for ($i = 1; $i -le $parts; $i++) {
-        $start = (($i - 1) * $PartSize)
-        $end = (($i) * $PartSize) - 1
-        if ($end -ge $inArray.count) {$end = $inArray.count - 1}
-        $outArray.Add(@($inArray[$start..$end]))
-    }
-    return , $outArray
-}
-
 function Get-Events {
     [cmdletbinding()]
     param (
