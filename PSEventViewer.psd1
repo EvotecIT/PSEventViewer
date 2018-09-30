@@ -12,7 +12,7 @@
     RootModule        = 'PSEventViewer.psm1'
 
     # Version number of this module.
-    ModuleVersion     = '0.53'
+    ModuleVersion     = '0.54'
 
     # Supported PSEditions
     # CompatiblePSEditions = @()
@@ -70,9 +70,6 @@
 
     # Functions to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no functions to export.
     FunctionsToExport = 'Get-Events'
-
-    # List of all files packaged with this module
-    FileList          = 'PSEventViewer.psm1', 'PSEventViewer.psd1'
 
     # Private data to pass to the module specified in RootModule/ModuleToProcess. This may also contain a PSData hashtable with additional module metadata used by PowerShell.
     PrivateData       = @{
