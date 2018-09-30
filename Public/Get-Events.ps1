@@ -285,6 +285,12 @@ $ScriptBlock = {
     }
     Write-Verbose 'Get-Events - preparing to run'
     $Data = Get-EventsInternal -Comp $Comp -EventFilter $EventFilter -MaxEvents $MaxEvents -Oldest:$Oldest -Verbose:$Verbose
+    if ($EventFilter.Path) {
+        $Data | Add-Member -MemberType NoteProperty -Name "GatheredFrom" -Value $EventFilter.Path -Force
+    } else {
+        $Data | Add-Member -MemberType NoteProperty -Name "GatheredFrom" -Value $Comp -Force
+    }
+    $Data | Add-Member -MemberType NoteProperty -Name "GatheredLogName" -Value $EventFilter.LogName -Force
     Write-Verbose 'Get-Events - finished run'
     return $Data
 }
