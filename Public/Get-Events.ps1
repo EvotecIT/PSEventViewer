@@ -1,19 +1,16 @@
-<#
+function Get-Events {
+    <#
     .SYNOPSIS
-    This PowerShell module simplifies parsing Windows Event Log
+
     .DESCRIPTION
-    This PowerShell module simplifies parsing Windows Event Log
 
     .NOTES
-    Version:        0.50
-    Author:         Przemyslaw Klys <przemyslaw.klys at evotec.pl>
 
     .EXAMPLE
         $DateFrom = (get-date).AddHours(-5)
         $DateTo = (get-date).AddHours(1)
         get-events -Computer "Evo1" -DateFrom $DateFrom -DateTo $DateTo -EventId 916 -LogType "Application"
-#>
-function Get-Events {
+    #>
     [cmdletbinding()]
     param (
         [alias ("ADDomainControllers", "DomainController", "Server", "Servers", "Computer", "Computers", "ComputerName")] [string[]] $Machine = $Env:COMPUTERNAME,
@@ -275,9 +272,17 @@ $ScriptBlock = {
                     }
                 }
             }
-            $MessageSubjact = ($Event.Message -split '\n')[0]
-            Add-Member -InputObject $Event -MemberType NoteProperty -Name 'MessageSubject' -Value $MessageSubjact -Force
+            # This adds some fields specific to PSWinReporting
+            $MessageSubject = ($Event.Message -split '\n')[0]
+            Add-Member -InputObject $Event -MemberType NoteProperty -Name 'MessageSubject' -Value $MessageSubject -Force
+            Add-Member -InputObject $Event -MemberType NoteProperty -Name 'Action' -Value $MessageSubject -Force
 
+            if ($Event.SubjectDomainName -and $Event.SubjectUserName) {
+                Add-Member -InputObject $Event -MemberType NoteProperty -Name 'Who' -Value "$($Event.SubjectDomainName)\$($Event.SubjectUserName)" -Force
+            }
+            if ($Event.TargetDomainName -and $Event.TargetUserName) {
+                Add-Member -InputObject $Event -MemberType NoteProperty -Name 'ObjectAffected' -Value "$($Event.TargetDomainName)\$($Event.TargetUserName)" -Force
+            }
         }
         Write-Verbose "Get-Events - Inside $Comp - Time to generate $($Measure.Elapsed.Hours) hours, $($Measure.Elapsed.Minutes) minutes, $($Measure.Elapsed.Seconds) seconds, $($Measure.Elapsed.Milliseconds) milliseconds"
         $Measure.Stop()
