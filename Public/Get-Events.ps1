@@ -283,6 +283,10 @@ $ScriptBlock = {
             if ($Event.TargetDomainName -and $Event.TargetUserName) {
                 Add-Member -InputObject $Event -MemberType NoteProperty -Name 'ObjectAffected' -Value "$($Event.TargetDomainName)\$($Event.TargetUserName)" -Force
             }
+            if ($Event.MemberName) {
+                $MemberNameWithoutCN = $Event.MemberName -replace '^CN=|,.*$'
+                Add-Member -InputObject $Event -MemberType NoteProperty -Name 'MemberNameWithoutCN' -Value $MemberNameWithoutCN -Force
+            }
         }
         Write-Verbose "Get-Events - Inside $Comp - Time to generate $($Measure.Elapsed.Hours) hours, $($Measure.Elapsed.Minutes) minutes, $($Measure.Elapsed.Seconds) seconds, $($Measure.Elapsed.Milliseconds) milliseconds"
         $Measure.Stop()
