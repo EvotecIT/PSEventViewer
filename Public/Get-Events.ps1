@@ -301,5 +301,5 @@ $ScriptBlock = {
     }
     $Data | Add-Member -MemberType NoteProperty -Name "GatheredLogName" -Value $EventFilter.LogName -Force
     Write-Verbose 'Get-Events - finished run'
-    return $Data
+    return @($Data)
 }
