@@ -26,7 +26,7 @@ function Get-Events {
         $Credentials = $null,
         [string] $Path = $null,
         [long[]] $Keywords = $null,
-        [int] $RecordID,
+        [int64] $RecordID,
         [int] $MaxRunspaces = [int]$env:NUMBER_OF_PROCESSORS + 1,
         [switch] $Oldest,
         [switch] $DisableParallel
@@ -119,7 +119,7 @@ $ScriptBlock = {
     Param (
         [string]$Comp,
         [hashtable]$EventFilter,
-        [int]$RecordID,
+        [int64]$RecordID,
         [int]$MaxEvents,
         [bool] $Oldest,
         [bool] $Verbose
