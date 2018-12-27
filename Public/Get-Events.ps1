@@ -1,16 +1,77 @@
 function Get-Events {
     <#
     .SYNOPSIS
+    Get-Events is a wrapper function around Get-WinEvent providing additional features and options.
 
     .DESCRIPTION
+    Long description
 
-    .NOTES
+    .PARAMETER Machine
+    Parameter description
+
+    .PARAMETER DateFrom
+    Parameter description
+
+    .PARAMETER DateTo
+    Parameter description
+
+    .PARAMETER ID
+    Parameter description
+
+    .PARAMETER ExcludeID
+    Parameter description
+
+    .PARAMETER LogName
+    Parameter description
+
+    .PARAMETER ProviderName
+    Parameter description
+
+    .PARAMETER NamedDataFilter
+    Parameter description
+
+    .PARAMETER Level
+    Parameter description
+
+    .PARAMETER UserSID
+    Parameter description
+
+    .PARAMETER Data
+    Parameter description
+
+    .PARAMETER MaxEvents
+    Parameter description
+
+    .PARAMETER Credentials
+    Parameter description
+
+    .PARAMETER Path
+    Parameter description
+
+    .PARAMETER Keywords
+    Parameter description
+
+    .PARAMETER RecordID
+    Parameter description
+
+    .PARAMETER MaxRunspaces
+    Parameter description
+
+    .PARAMETER Oldest
+    Parameter description
+
+    .PARAMETER DisableParallel
+    Parameter description
 
     .EXAMPLE
-        $DateFrom = (get-date).AddHours(-5)
-        $DateTo = (get-date).AddHours(1)
-        get-events -Computer "Evo1" -DateFrom $DateFrom -DateTo $DateTo -EventId 916 -LogType "Application"
+    $DateFrom = (get-date).AddHours(-5)
+    $DateTo = (get-date).AddHours(1)
+    get-events -Computer "Evo1" -DateFrom $DateFrom -DateTo $DateTo -EventId 916 -LogType "Application"
+
+    .NOTES
+    General notes
     #>
+
     [CmdLetBinding()]
     param (
         [alias ("ADDomainControllers", "DomainController", "Server", "Servers", "Computer", "Computers", "ComputerName")] [string[]] $Machine = $Env:COMPUTERNAME,
@@ -53,11 +114,8 @@ function Get-Events {
         if ($Id.Count -gt 22) {
             Write-Verbose "Get-Events - There are more events to process then 22, split will be required."
             Write-Verbose "Get-Events - This means it will take twice the time to make a scan."
-            $SplitArrayID = Split-Array -inArray $ID -size 22  # Support for more ID's then 22 (limitation of Get-WinEvent)
-        } else {
-            $SplitArrayID = $ID
         }
-
+        $SplitArrayID = Split-Array -inArray $ID -size 22  # Support for more ID's then 22 (limitation of Get-WinEvent)
         $Runspaces = foreach ($ID in $SplitArrayID) {
             $EventFilter = @{}
             Add-ToHashTable -Hashtable $EventFilter -Key "LogName" -Value $LogName # Accepts Wildcard
@@ -73,9 +131,6 @@ function Get-Events {
             Add-ToHashTable -Hashtable $EventFilter -Key "RecordID" -Value $RecordID
             Add-ToHashTable -Hashtable $EventFilter -Key "NamedDataFilter" -Value $NamedDataFilter
             Add-ToHashTable -Hashtable $EventFilter -Key "ExcludeID" -Value $ExcludeID
-
-
-            #$EventFilter |fs
 
             foreach ($Comp in $Machine) {
                 Write-Verbose "Get-Events - Processing computer $Comp for Events ID: $ID"
@@ -103,7 +158,6 @@ function Get-Events {
                     $Parameters = [ordered] @{
                         Comp        = $Comp
                         EventFilter = $EventFilter
-                        #RecordID    = $RecordID
                         MaxEvents   = $MaxEvents
                         Oldest      = $Oldest
                         Verbose     = $Verbose
@@ -130,11 +184,7 @@ function Get-Events {
         Add-ToHashTable -Hashtable $EventFilter -Key "NamedDataFilter" -Value $NamedDataFilter
         Add-ToHashTable -Hashtable $EventFilter -Key "ExcludeID" -Value $ExcludeID
 
-        #$EventFilter |fs
-
         $Runspaces = foreach ($Comp in $Machine) {
-            #Write-Verbose "Get-Events - Processing computer $Comp for Events ID: $ID"
-            #Write-Verbose "Get-Events - Processing computer $Comp for Events ID Count: $($ID.Count)"
             Write-Verbose "Get-Events - Processing computer $Comp for Events LogName: $LogName"
             Write-Verbose "Get-Events - Processing computer $Comp for Events ProviderName: $ProviderName"
             Write-Verbose "Get-Events - Processing computer $Comp for Events Keywords: $Keywords"
@@ -158,7 +208,6 @@ function Get-Events {
                 $Parameters = [ordered] @{
                     Comp        = $Comp
                     EventFilter = $EventFilter
-                    #RecordID    = $RecordID
                     MaxEvents   = $MaxEvents
                     Oldest      = $Oldest
                     Verbose     = $Verbose

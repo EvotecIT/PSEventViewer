@@ -8,6 +8,7 @@ schema: 2.0.0
 # Get-Events
 
 ## SYNOPSIS
+Get-Events is a wrapper function around Get-WinEvent providing additional features and options.
 
 ## SYNTAX
 
@@ -20,7 +21,7 @@ Get-Events [[-Machine] <String[]>] [[-DateFrom] <DateTime>] [[-DateTo] <DateTime
 ```
 
 ## DESCRIPTION
-{{Fill in the Description}}
+Long description
 
 ## EXAMPLES
 
@@ -35,7 +36,7 @@ get-events -Computer "Evo1" -DateFrom $DateFrom -DateTo $DateTo -EventId 916 -Lo
 ## PARAMETERS
 
 ### -Machine
-{{Fill Machine Description}}
+Parameter description
 
 ```yaml
 Type: String[]
@@ -50,7 +51,7 @@ Accept wildcard characters: False
 ```
 
 ### -DateFrom
-{{Fill DateFrom Description}}
+Parameter description
 
 ```yaml
 Type: DateTime
@@ -65,7 +66,7 @@ Accept wildcard characters: False
 ```
 
 ### -DateTo
-{{Fill DateTo Description}}
+Parameter description
 
 ```yaml
 Type: DateTime
@@ -80,7 +81,7 @@ Accept wildcard characters: False
 ```
 
 ### -ID
-{{Fill ID Description}}
+Parameter description
 
 ```yaml
 Type: Int32[]
@@ -95,7 +96,7 @@ Accept wildcard characters: False
 ```
 
 ### -ExcludeID
-{{Fill ExcludeID Description}}
+Parameter description
 
 ```yaml
 Type: Int32[]
@@ -110,7 +111,7 @@ Accept wildcard characters: False
 ```
 
 ### -LogName
-{{Fill LogName Description}}
+Parameter description
 
 ```yaml
 Type: String
@@ -125,7 +126,7 @@ Accept wildcard characters: False
 ```
 
 ### -ProviderName
-{{Fill ProviderName Description}}
+Parameter description
 
 ```yaml
 Type: String
@@ -140,7 +141,7 @@ Accept wildcard characters: False
 ```
 
 ### -NamedDataFilter
-{{Fill NamedDataFilter Description}}
+Parameter description
 
 ```yaml
 Type: Hashtable
@@ -155,7 +156,7 @@ Accept wildcard characters: False
 ```
 
 ### -Level
-{{Fill Level Description}}
+Parameter description
 
 ```yaml
 Type: Int32
@@ -170,7 +171,7 @@ Accept wildcard characters: False
 ```
 
 ### -UserSID
-{{Fill UserSID Description}}
+Parameter description
 
 ```yaml
 Type: String
@@ -185,7 +186,7 @@ Accept wildcard characters: False
 ```
 
 ### -Data
-{{Fill Data Description}}
+Parameter description
 
 ```yaml
 Type: String[]
@@ -200,7 +201,7 @@ Accept wildcard characters: False
 ```
 
 ### -MaxEvents
-{{Fill MaxEvents Description}}
+Parameter description
 
 ```yaml
 Type: Int32
@@ -215,7 +216,7 @@ Accept wildcard characters: False
 ```
 
 ### -Credentials
-{{Fill Credentials Description}}
+Parameter description
 
 ```yaml
 Type: PSCredential
@@ -230,7 +231,7 @@ Accept wildcard characters: False
 ```
 
 ### -Path
-{{Fill Path Description}}
+Parameter description
 
 ```yaml
 Type: String
@@ -245,7 +246,7 @@ Accept wildcard characters: False
 ```
 
 ### -Keywords
-{{Fill Keywords Description}}
+Parameter description
 
 ```yaml
 Type: Int64[]
@@ -260,7 +261,7 @@ Accept wildcard characters: False
 ```
 
 ### -RecordID
-{{Fill RecordID Description}}
+Parameter description
 
 ```yaml
 Type: Int64
@@ -275,7 +276,7 @@ Accept wildcard characters: False
 ```
 
 ### -MaxRunspaces
-{{Fill MaxRunspaces Description}}
+Parameter description
 
 ```yaml
 Type: Int32
@@ -290,7 +291,7 @@ Accept wildcard characters: False
 ```
 
 ### -Oldest
-{{Fill Oldest Description}}
+Parameter description
 
 ```yaml
 Type: SwitchParameter
@@ -305,7 +306,7 @@ Accept wildcard characters: False
 ```
 
 ### -DisableParallel
-{{Fill DisableParallel Description}}
+Parameter description
 
 ```yaml
 Type: SwitchParameter
@@ -320,13 +321,13 @@ Accept wildcard characters: False
 ```
 
 ### CommonParameters
-This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable, -InformationAction, -InformationVariable, -OutVariable, -OutBuffer, -PipelineVariable, -Verbose, -WarningAction, and -WarningVariable.
-For more information, see about_CommonParameters (http://go.microsoft.com/fwlink/?LinkID=113216).
+This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable, -InformationAction, -InformationVariable, -OutVariable, -OutBuffer, -PipelineVariable, -Verbose, -WarningAction, and -WarningVariable. For more information, see about_CommonParameters (http://go.microsoft.com/fwlink/?LinkID=113216).
 
 ## INPUTS
 
 ## OUTPUTS
 
 ## NOTES
+General notes
 
 ## RELATED LINKS
