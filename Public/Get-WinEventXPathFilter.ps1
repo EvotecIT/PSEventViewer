@@ -18,6 +18,7 @@ Function Get-WinEventXPathFilter {
     .NOTES
     Original Code by https://community.spiceworks.com/scripts/show/3238-powershell-xpath-generator-for-windows-events
     Extended by Justin Grote
+    Extended by Przemyslaw Klys
     .LINK
 
     .PARAMETER ID
@@ -201,7 +202,6 @@ Function Get-WinEventXPathFilter {
 
         [Parameter(Mandatory = $true)][String]
         $LogName
-
     )
 
     #region Function definitions
@@ -320,7 +320,6 @@ Function Get-WinEventXPathFilter {
         $filter = Join-XPathFilter -ExistingFilter $filter -NewFilter (Initialize-XPathFilter @options)
     }
     #endregion EventRecordID filter
-
 
     #region Exclude ID filter
     If ($ExcludeID) {
