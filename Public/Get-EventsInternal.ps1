@@ -10,7 +10,7 @@ $ScriptBlock = {
     if ($Verbose) {
         $VerbosePreference = 'continue'
     }
-    $WarningPreference = 'continue'
+    #$WarningPreference = 'continue'
     function Get-EventsInternal () {
         [CmdLetBinding()]
         param (
@@ -70,16 +70,18 @@ $ScriptBlock = {
             if ($_.Exception -match "No events were found that match the specified selection criteria") {
                 Write-Verbose -Message "Get-Events - Inside $Comp - No events found."
             } elseif ($_.Exception -match "There are no more endpoints available from the endpoint") {
-                Write-Verbose -Message "Get-Events - Inside $Comp - Error connecting."
+                #Write-Verbose -Message "Get-Events - Inside $Comp - Error connecting."
                 Write-Verbose -Message "Get-Events - Inside $Comp - Error $($_.Exception.Message)"
+                Write-Error -Message "(ComputerName: $Comp) $_"
             } else {
-                Write-Verbose -Message "Get-Events - Inside $Comp - Error connecting."
+                #Write-Verbose -Message "Get-Events - Inside $Comp - Error connecting."
                 Write-Verbose -Message "Get-Events - Inside $Comp - Error $($_.Exception.Message)"
+                Write-Error -Message "(ComputerName: $Comp) $_"
             }
             Write-Verbose "Get-Events - Inside $Comp - Time to generate $($Measure.Elapsed.Hours) hours, $($Measure.Elapsed.Minutes) minutes, $($Measure.Elapsed.Seconds) seconds, $($Measure.Elapsed.Milliseconds) milliseconds"
             $Measure.Stop()
-            Write-Error -Message $_.Exception.Message
-            Write-Warning -Message 'My Test'
+
+            #Write-Warning -Message 'My Test'
             continue
         }
         Write-Verbose "Get-Events - Inside $Comp - Processing events..."

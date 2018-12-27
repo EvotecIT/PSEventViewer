@@ -11,7 +11,7 @@ function Get-Events {
         $DateTo = (get-date).AddHours(1)
         get-events -Computer "Evo1" -DateFrom $DateFrom -DateTo $DateTo -EventId 916 -LogType "Application"
     #>
-    [cmdletbinding()]
+    [CmdLetBinding()]
     param (
         [alias ("ADDomainControllers", "DomainController", "Server", "Servers", "Computer", "Computers", "ComputerName")] [string[]] $Machine = $Env:COMPUTERNAME,
         [alias ("From")][nullable[DateTime]] $DateFrom = $null,
@@ -38,13 +38,13 @@ function Get-Events {
     if ($PSCmdlet.MyInvocation.BoundParameters["Verbose"].IsPresent) { $Verbose = $true } else { $Verbose = $false }
 
     ### Define Runspace START
-    $runspaces = @()
     $pool = New-Runspace -MaxRunspaces $maxRunspaces -Verbose:$Verbose
     ### Define Runspace END
 
     $AllEvents = @()
+    $AllErrors = @()
 
-    if ($ID -ne $null) {
+    if ($null -ne $ID) {
         $ID = $ID | Sort-Object -Unique
         Write-Verbose "Get-Events - Events to process in Total: $($Id.Count)"
         Write-Verbose "Get-Events - Events to process in Total ID: $ID"
@@ -55,7 +55,7 @@ function Get-Events {
     }
 
     $SplitArrayID = Split-Array -inArray $ID -size 22  # Support for more ID's then 22 (limitation of Get-WinEvent)
-    foreach ($ID in $SplitArrayID) {
+    $Runspaces = foreach ($ID in $SplitArrayID) {
         $EventFilter = @{}
         Add-ToHashTable -Hashtable $EventFilter -Key "LogName" -Value $LogName # Accepts Wildcard
         Add-ToHashTable -Hashtable $EventFilter -Key "ProviderName" -Value $ProviderName # Accepts Wildcard
@@ -99,15 +99,17 @@ function Get-Events {
                     Oldest      = $Oldest
                     Verbose     = $Verbose
                 }
-                $runspaces += Start-Runspace -ScriptBlock $ScriptBlock -Parameters $Parameters -RunspacePool $pool -Verbose:$Verbose
+                # returns values
+                Start-Runspace -ScriptBlock $ScriptBlock -Parameters $Parameters -RunspacePool $pool -Verbose:$Verbose
             }
         }
     }
     ### End Runspaces START
-    $AllEvents = Stop-Runspace -Runspaces $runspaces -FunctionName 'Get-Events' -RunspacePool $pool -Verbose:$Verbose
+    $AllEvents = Stop-Runspace -Runspaces $Runspaces -FunctionName "Get-Events" -RunspacePool $pool -Verbose:$Verbose -ErrorAction SilentlyContinue -ErrorVariable +AllErrors
     ### End Runspaces END
 
     $EventsProcessed = ($AllEvents | Measure-Object).Count
+    Write-Verbose "Get-Events - Overall errors: $($AllErrors.Count)"
     Write-Verbose "Get-Events - Overall events processed in total for the report: $EventsProcessed"
     Write-Verbose "Get-Events - Overall time to generate $($MeasureTotal.Elapsed.Hours) hours, $($MeasureTotal.Elapsed.Minutes) minutes, $($MeasureTotal.Elapsed.Seconds) seconds, $($MeasureTotal.Elapsed.Milliseconds) milliseconds"
     $MeasureTotal.Stop()
