@@ -1,6 +1,6 @@
 ---
-external help file:
-Module Name:
+external help file: PSEventViewer-help.xml
+Module Name: PSEventViewer
 online version:
 schema: 2.0.0
 ---
