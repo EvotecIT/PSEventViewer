@@ -1,4 +1,4 @@
-Function Get-WinEventXPathFilter {
+function Get-WinEventXPathFilter {
     <#
     .SYNOPSIS
     This function generates an xpath filter that can be used with the -FilterXPath
