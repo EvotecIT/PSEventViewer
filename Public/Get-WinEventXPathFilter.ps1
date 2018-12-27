@@ -103,10 +103,38 @@ Function Get-WinEventXPathFilter {
     and when the filter is used.  StartTime and EndTime simply calculate the number of
     milliseconds and use that for the filter.
     .EXAMPLE
-    Get-WinEventXPathFilter -StartTime (Get-Date).AddDays(-1)
+    Get-WinEventXPathFilter -StartTime (Get-Date).AddDays(-1) -LogName System
 
-    This will return an XPath filter that will get events that occured within the last
-    24 hours.
+    This will return an XPath filter that will get events that occured within the last 24 hours.
+
+    Output:
+    <QueryList>
+        <Query Id="0" Path="System">
+                <Select Path="System">
+
+                    *[System[TimeCreated[timediff(@SystemTime) &lt;= 86404194]]]
+
+            </Select>
+        </Query>
+    </QueryList>
+
+    .EXAMPLE
+    Get-WinEventXPathFilter -ID 1105 -LogName 'ForwardedEvents' -RecordID '3512231','3512232'
+
+    This will return an XPath filter that will get events with EventRecordID 3512231 or 3512232 in Log ForwardedEvents with EventID 1105
+
+    Output:
+    <QueryList>
+        <Query Id="0" Path="ForwardedEvents">
+                <Select Path="ForwardedEvents">
+
+                    (*[System[EventID=1105]]) and (*[System[(EventRecordID=3512231) or (EventRecordID=3512232)]])
+
+            </Select>
+        </Query>
+    </QueryList>
+
+
     #>
 
     [CmdletBinding()]
@@ -114,6 +142,9 @@ Function Get-WinEventXPathFilter {
     (
         [String[]]
         $ID,
+
+        [alias('RecordID')][string[]]
+        $EventRecordID,
 
         [DateTime]
         $StartTime,
@@ -151,7 +182,10 @@ Function Get-WinEventXPathFilter {
         $NamedDataExcludeFilter,
 
         [String[]]
-        $ExcludeID
+        $ExcludeID,
+
+        [Parameter(Mandatory = $true)][String]
+        $LogName
 
     )
 
@@ -261,6 +295,18 @@ Function Get-WinEventXPathFilter {
     }
     #endregion ID filter
 
+    # region EventRecordID filter
+    If ($EventRecordID) {
+        $options = @{
+            'Items'                = $EventRecordID
+            'ForEachFormatString'  = "EventRecordID={0}"
+            'FinalizeFormatString' = "*[System[{0}]]"
+        }
+        $filter = Join-XPathFilter -ExistingFilter $filter -NewFilter (Initialize-XPathFilter @options)
+    }
+    #endregion EventRecordID filter
+
+
     #region Exclude ID filter
     If ($ExcludeID) {
         $options = @{
@@ -281,14 +327,22 @@ Function Get-WinEventXPathFilter {
     #
     # The timediff xpath function is used against the SystemTime
     # attribute of the TimeCreated node.
+
+    ## Special chars needs replacement
+    # <= is &lt;=
+    # <  is &lt;
+    # >  is &gt;
+    # >= is &gt;=
+    #
+
     If ($StartTime) {
         $Diff = [Math]::Round($Now.Subtract($StartTime).TotalMilliseconds)
-        $filter = Join-XPathFilter -NewFilter "*[System[TimeCreated[timediff(@SystemTime) <= $Diff]]]" -ExistingFilter $filter
+        $filter = Join-XPathFilter -NewFilter "*[System[TimeCreated[timediff(@SystemTime) &lt;= $Diff]]]" -ExistingFilter $filter
     }
 
     If ($EndTime) {
         $Diff = [Math]::Round($Now.Subtract($EndTime).TotalMilliseconds)
-        $filter = Join-XPathFilter -NewFilter "*[System[TimeCreated[timediff(@SystemTime) >= $Diff]]]" -ExistingFilter $filter
+        $filter = Join-XPathFilter -NewFilter "*[System[TimeCreated[timediff(@SystemTime) &gt;= $Diff]]]" -ExistingFilter $filter
     }
     #endregion Date filters
 
@@ -496,6 +550,17 @@ Function Get-WinEventXPathFilter {
     }
     #endregion NamedDataExcludeFilter
 
-    Return $filter
+    $FilterXML = @"
+    <QueryList>
+        <Query Id="0" Path="$LogName">
+            <Select Path="$LogName">
+                    $filter
+            </Select>
+        </Query>
+    </QueryList>
+"@
+
+    return $FilterXML
+    # Return $filter
 
 } # Function Get-WinEventXPathFilter
