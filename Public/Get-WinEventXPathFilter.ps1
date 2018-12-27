@@ -90,18 +90,39 @@ Function Get-WinEventXPathFilter {
 
     (@{'SubjectUserName'='john.doe'},@{'TargetUserName'='jane.doe'})
     .EXAMPLE
-    Get-WinEventXPathFilter -ID 4663 -NamedDataFilter @{'SubjectUserName'='john.doe'}
+    Get-WinEventXPathFilter -ID 4663 -NamedDataFilter @{'SubjectUserName'='john.doe'} -LogName 'ForwardedEvents'
 
     This will return an XPath filter that will return any events with
     the id of 4663 and has a SubjectUserName of 'john.doe'
+
+    Output:
+    <QueryList>
+        <Query Id="0" Path="ForwardedEvents">
+            <Select Path="ForwardedEvents">
+                    (*[System[EventID=4663]]) and (*[EventData[Data[@Name='SubjectUserName'] = 'john.doe']])
+            </Select>
+        </Query>
+    </QueryList>
+
     .EXAMPLE
-    Get-WinEventXPathFilter -StartTime '1/1/2015 01:30:00 PM' -EndTime '1/1/2015 02:00:00 PM'
+    Get-WinEventXPathFilter -StartTime '1/1/2015 01:30:00 PM' -EndTime '1/1/2015 02:00:00 PM' -LogName 'ForwardedEvents
 
     This will return an XPath filter that will return events that occured between 1:30
     2:00 PM on 1/1/2015.  The filter will only be good if used immediately.  XPath time
     filters are based on the number of milliseconds that have occured since the event
     and when the filter is used.  StartTime and EndTime simply calculate the number of
     milliseconds and use that for the filter.
+
+    Output:
+    <QueryList>
+        <Query Id="0" Path="ForwardedEvents">
+            <Select Path="ForwardedEvents">
+                    (*[System[TimeCreated[timediff(@SystemTime) &lt;= 125812885399]]]) and (*[System[TimeCreated[timediff(@SystemTime)
+&gt;= 125811085399]]])
+            </Select>
+        </Query>
+    </QueryList>
+
     .EXAMPLE
     Get-WinEventXPathFilter -StartTime (Get-Date).AddDays(-1) -LogName System
 
@@ -111,9 +132,7 @@ Function Get-WinEventXPathFilter {
     <QueryList>
         <Query Id="0" Path="System">
                 <Select Path="System">
-
                     *[System[TimeCreated[timediff(@SystemTime) &lt;= 86404194]]]
-
             </Select>
         </Query>
     </QueryList>
@@ -127,14 +146,10 @@ Function Get-WinEventXPathFilter {
     <QueryList>
         <Query Id="0" Path="ForwardedEvents">
                 <Select Path="ForwardedEvents">
-
                     (*[System[EventID=1105]]) and (*[System[(EventRecordID=3512231) or (EventRecordID=3512232)]])
-
             </Select>
         </Query>
     </QueryList>
-
-
     #>
 
     [CmdletBinding()]
