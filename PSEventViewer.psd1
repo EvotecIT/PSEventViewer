@@ -12,7 +12,7 @@
 RootModule = 'PSEventViewer.psm1'
 
 # Version number of this module.
-ModuleVersion = '0.55'
+ModuleVersion = '0.56'
 
 # Supported PSEditions
 # CompatiblePSEditions = @()
@@ -95,7 +95,7 @@ PrivateData = @{
     PSData = @{
 
         # Tags applied to this module. These help with module discovery in online galleries.
-        Tags = 'Events', 'Viewer'
+        Tags = 'Events', 'Viewer', 'Windows'
 
         # A URL to the license for this module.
         # LicenseUri = ''
@@ -107,7 +107,7 @@ PrivateData = @{
         IconUri = 'https://evotec.xyz/wp-content/uploads/2018/10/PSEventViewer.png'
 
         # ReleaseNotes of this module
-        ReleaseNotes = 'Fix for Large Record ID'
+        # ReleaseNotes = ''
 
     } # End of PSData hashtable
 

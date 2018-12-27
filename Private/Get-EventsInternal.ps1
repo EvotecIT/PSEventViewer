@@ -629,7 +629,7 @@ $ScriptBlock = {
                 </QueryList>
 "@
 #>
-                Write-Verbose "Get-Events - Inside $Comp - FilterXML: `n$FilterXML"
+                Write-Verbose "Get-Events - Inside $Comp - Custom FilterXML: `n$FilterXML"
                 if ($MaxEvents -ne $null -and $MaxEvents -ne 0) {
                     $Events = Get-WinEvent -FilterXml $FilterXML -ComputerName $Comp -MaxEvents $MaxEvents -Oldest:$Oldest -ErrorAction Stop
                 } else {
