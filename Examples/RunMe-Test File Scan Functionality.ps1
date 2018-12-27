@@ -13,5 +13,5 @@ $Events
 $EventsNewest = Get-Events -Path $FilePath -MaxEvents 1 -Verbose
 $EventsNewest
 
-Get-WinEvent -Path $FilePath -Oldest -MaxEvents 1
-Get-WinEvent -Path $FilePath -MaxEvents 1
+#Get-WinEvent -Path $FilePath -Oldest -MaxEvents 1
+#Get-WinEvent -Path $FilePath -MaxEvents 1

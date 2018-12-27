@@ -23,7 +23,7 @@ function Get-Events {
         [string] $UserSID = $null,
         [string[]]$Data = $null,
         [int] $MaxEvents = $null,
-        $Credentials = $null,
+        [PSCredential] $Credentials = $null,
         [string] $Path = $null,
         [long[]] $Keywords = $null,
         [alias("EventRecordID")][int64] $RecordID,
@@ -68,7 +68,10 @@ function Get-Events {
             Add-ToHashTable -Hashtable $EventFilter -Key "EndTime" -Value $DateTo
             Add-ToHashTable -Hashtable $EventFilter -Key "UserID" -Value $UserSID
             Add-ToHashTable -Hashtable $EventFilter -Key "Data" -Value $Data
-            Add-ToHashTable -Hashtable $EventFilter -Key "EventRecordID" -Value $RecordID
+            Add-ToHashTable -Hashtable $EventFilter -Key "RecordID" -Value $RecordID
+
+
+            #$EventFilter |fs
 
             foreach ($Comp in $Machine) {
                 Write-Verbose "Get-Events - Processing computer $Comp for Events ID: $ID"
@@ -119,7 +122,9 @@ function Get-Events {
         Add-ToHashTable -Hashtable $EventFilter -Key "EndTime" -Value $DateTo
         Add-ToHashTable -Hashtable $EventFilter -Key "UserID" -Value $UserSID
         Add-ToHashTable -Hashtable $EventFilter -Key "Data" -Value $Data
-        Add-ToHashTable -Hashtable $EventFilter -Key "EventRecordID" -Value $RecordID
+        Add-ToHashTable -Hashtable $EventFilter -Key "RecordID" -Value $RecordID
+
+        #$EventFilter |fs
 
         $Runspaces = foreach ($Comp in $Machine) {
             #Write-Verbose "Get-Events - Processing computer $Comp for Events ID: $ID"

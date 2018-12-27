@@ -2,7 +2,6 @@ $ScriptBlock = {
     Param (
         [string]$Comp,
         [hashtable]$EventFilter,
-        #[int64]$RecordID,
         [int]$MaxEvents,
         [bool] $Oldest,
         [bool] $Verbose
@@ -601,15 +600,15 @@ $ScriptBlock = {
         )
         Write-Verbose "Get-Events - Inside $Comp executing on: $($Env:COMPUTERNAME)"
         Write-Verbose "Get-Events - Inside $Comp for Events ID: $($EventFilter.ID)"
-        Write-Verbose "Get-Events - Inside $Comp for Events ID: $($EventFilter.LogName)"
-        Write-Verbose "Get-Events - Inside $Comp for Events RecordID: $RecordID"
+        Write-Verbose "Get-Events - Inside $Comp for Events LogName: $($EventFilter.LogName)"
+        Write-Verbose "Get-Events - Inside $Comp for Events RecordID: $($EventFilter.RecordID)"
         Write-Verbose "Get-Events - Inside $Comp for Events Oldest: $Oldest"
         Write-Verbose "Get-Events - Inside $Comp for Events Max Events: $MaxEvents"
         $Measure = [System.Diagnostics.Stopwatch]::StartNew() # Timer Start
         $Events = @()
 
         try {
-            if ($EventFilter.RecordID -ne 0) {
+            if ($null -ne $EventFilter.RecordID) {
                 $FilterXML = Get-WinEventXPathFilter @EventFilter #-LogName 'ForwardedEvents' -RecordID '3512231', '3512232' -ProviderName 'Microsoft-Windows-Eventlog'
                 #Write-Verbose "`n$FilterXML"
                 #$Events = Get-WinEvent -FilterXml $FilterXML -MaxEvents $MaxEvents -ComputerName $Comp -Oldest:$Oldest -ErrorAction Stop
@@ -771,7 +770,7 @@ $ScriptBlock = {
         $Measure.Stop()
         return $Events
     }
-    Write-Verbose 'Get-Events - preparing to run'
+    Write-Verbose "Get-Events - Preparing run on $Comp"
     $Data = Get-EventsInternal -Comp $Comp -EventFilter $EventFilter -MaxEvents $MaxEvents -Oldest:$Oldest -Verbose:$Verbose
     if ($EventFilter.Path) {
         $Data | Add-Member -MemberType NoteProperty -Name "GatheredFrom" -Value $EventFilter.Path -Force
@@ -779,6 +778,6 @@ $ScriptBlock = {
         $Data | Add-Member -MemberType NoteProperty -Name "GatheredFrom" -Value $Comp -Force
     }
     $Data | Add-Member -MemberType NoteProperty -Name "GatheredLogName" -Value $EventFilter.LogName -Force
-    Write-Verbose 'Get-Events - finished run'
+    Write-Verbose "Get-Events - Finished run on $Comp"
     return @($Data)
 }
