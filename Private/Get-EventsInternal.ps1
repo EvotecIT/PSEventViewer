@@ -309,7 +309,7 @@ $ScriptBlock = {
         }
         #endregion Function definitions
 
-        $filter = ''
+        [string] $filter = ''
 
         #region ID filter
         If ($ID) {
@@ -608,7 +608,7 @@ $ScriptBlock = {
         $Events = @()
 
         try {
-            if ($null -ne $EventFilter.RecordID) {
+            if ($null -ne $EventFilter.RecordID -or $null -ne $EventFilter.NamedDataFilter -or $null -ne $EventFilter.ExcludeID) {
                 $FilterXML = Get-WinEventXPathFilter @EventFilter #-LogName 'ForwardedEvents' -RecordID '3512231', '3512232' -ProviderName 'Microsoft-Windows-Eventlog'
                 #Write-Verbose "`n$FilterXML"
                 #$Events = Get-WinEvent -FilterXml $FilterXML -MaxEvents $MaxEvents -ComputerName $Comp -Oldest:$Oldest -ErrorAction Stop

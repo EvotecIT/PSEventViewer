@@ -17,8 +17,10 @@ function Get-Events {
         [alias ("From")][nullable[DateTime]] $DateFrom = $null,
         [alias ("To")][nullable[DateTime]] $DateTo = $null,
         [alias ("Ids", "EventID", "EventIds")] [int[]] $ID = $null,
+        [alias ("ExludeEventID")][int[]] $ExcludeID = $null,
         [alias ("LogType", "Log")][string] $LogName = $null,
         [alias ("Provider")] [string] $ProviderName = '',
+        [hashtable] $NamedDataFilter,
         [int] $Level = $null,
         [string] $UserSID = $null,
         [string[]]$Data = $null,
@@ -69,6 +71,8 @@ function Get-Events {
             Add-ToHashTable -Hashtable $EventFilter -Key "UserID" -Value $UserSID
             Add-ToHashTable -Hashtable $EventFilter -Key "Data" -Value $Data
             Add-ToHashTable -Hashtable $EventFilter -Key "RecordID" -Value $RecordID
+            Add-ToHashTable -Hashtable $EventFilter -Key "NamedDataFilter" -Value $NamedDataFilter
+            Add-ToHashTable -Hashtable $EventFilter -Key "ExcludeID" -Value $ExcludeID
 
 
             #$EventFilter |fs
@@ -123,6 +127,8 @@ function Get-Events {
         Add-ToHashTable -Hashtable $EventFilter -Key "UserID" -Value $UserSID
         Add-ToHashTable -Hashtable $EventFilter -Key "Data" -Value $Data
         Add-ToHashTable -Hashtable $EventFilter -Key "RecordID" -Value $RecordID
+        Add-ToHashTable -Hashtable $EventFilter -Key "NamedDataFilter" -Value $NamedDataFilter
+        Add-ToHashTable -Hashtable $EventFilter -Key "ExcludeID" -Value $ExcludeID
 
         #$EventFilter |fs
 

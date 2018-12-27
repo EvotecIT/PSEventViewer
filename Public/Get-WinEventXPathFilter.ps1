@@ -297,7 +297,7 @@ function Get-WinEventXPathFilter {
     }
     #endregion Function definitions
 
-    $filter = ''
+    [string] $filter = ''
 
     #region ID filter
     If ($ID) {
