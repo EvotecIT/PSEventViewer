@@ -2,7 +2,7 @@ $ScriptBlock = {
     Param (
         [string]$Comp,
         [hashtable]$EventFilter,
-        [int64]$RecordID,
+        #[int64]$RecordID,
         [int]$MaxEvents,
         [bool] $Oldest,
         [bool] $Verbose
@@ -609,12 +609,12 @@ $ScriptBlock = {
         $Events = @()
 
         try {
-            if ($RecordID -ne 0) {
+            if ($EventFilter.RecordID -ne 0) {
                 $FilterXML = Get-WinEventXPathFilter @EventFilter #-LogName 'ForwardedEvents' -RecordID '3512231', '3512232' -ProviderName 'Microsoft-Windows-Eventlog'
-                Write-Verbose "`n$FilterXML"
+                #Write-Verbose "`n$FilterXML"
                 #$Events = Get-WinEvent -FilterXml $FilterXML -MaxEvents $MaxEvents -ComputerName $Comp -Oldest:$Oldest -ErrorAction Stop
 
-                <#
+<#
                 $FilterXML = @"
 
                 <QueryList>
@@ -630,7 +630,7 @@ $ScriptBlock = {
                 </QueryList>
 "@
 #>
-                Write-Verbose "Get-Events - Inside $Comp - FilterXML: $FilterXML"
+                Write-Verbose "Get-Events - Inside $Comp - FilterXML: `n$FilterXML"
                 if ($MaxEvents -ne $null -and $MaxEvents -ne 0) {
                     $Events = Get-WinEvent -FilterXml $FilterXML -ComputerName $Comp -MaxEvents $MaxEvents -Oldest:$Oldest -ErrorAction Stop
                 } else {

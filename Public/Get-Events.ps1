@@ -26,7 +26,7 @@ function Get-Events {
         $Credentials = $null,
         [string] $Path = $null,
         [long[]] $Keywords = $null,
-        [int64] $RecordID,
+        [alias("EventRecordID")][int64] $RecordID,
         [int] $MaxRunspaces = [int]$env:NUMBER_OF_PROCESSORS + 1,
         [switch] $Oldest,
         [switch] $DisableParallel
@@ -51,11 +51,63 @@ function Get-Events {
         if ($Id.Count -gt 22) {
             Write-Verbose "Get-Events - There are more events to process then 22, split will be required."
             Write-Verbose "Get-Events - This means it will take twice the time to make a scan."
+            $SplitArrayID = Split-Array -inArray $ID -size 22  # Support for more ID's then 22 (limitation of Get-WinEvent)
+        } else {
+            $SplitArrayID = $ID
         }
-    }
 
-    $SplitArrayID = Split-Array -inArray $ID -size 22  # Support for more ID's then 22 (limitation of Get-WinEvent)
-    $Runspaces = foreach ($ID in $SplitArrayID) {
+        $Runspaces = foreach ($ID in $SplitArrayID) {
+            $EventFilter = @{}
+            Add-ToHashTable -Hashtable $EventFilter -Key "LogName" -Value $LogName # Accepts Wildcard
+            Add-ToHashTable -Hashtable $EventFilter -Key "ProviderName" -Value $ProviderName # Accepts Wildcard
+            Add-ToHashTable -Hashtable $EventFilter -Key "Path" -Value $Path # https://blogs.technet.microsoft.com/heyscriptingguy/2011/01/25/use-powershell-to-parse-saved-event-logs-for-errors/
+            Add-ToHashTable -Hashtable $EventFilter -Key "Keywords" -Value $Keywords
+            Add-ToHashTable -Hashtable $EventFilter -Key "Id" -Value $ID
+            Add-ToHashTable -Hashtable $EventFilter -Key "Level" -Value $Level
+            Add-ToHashTable -Hashtable $EventFilter -Key "StartTime" -Value $DateFrom
+            Add-ToHashTable -Hashtable $EventFilter -Key "EndTime" -Value $DateTo
+            Add-ToHashTable -Hashtable $EventFilter -Key "UserID" -Value $UserSID
+            Add-ToHashTable -Hashtable $EventFilter -Key "Data" -Value $Data
+            Add-ToHashTable -Hashtable $EventFilter -Key "EventRecordID" -Value $RecordID
+
+            foreach ($Comp in $Machine) {
+                Write-Verbose "Get-Events - Processing computer $Comp for Events ID: $ID"
+                Write-Verbose "Get-Events - Processing computer $Comp for Events ID Count: $($ID.Count)"
+                Write-Verbose "Get-Events - Processing computer $Comp for Events LogName: $LogName"
+                Write-Verbose "Get-Events - Processing computer $Comp for Events ProviderName: $ProviderName"
+                Write-Verbose "Get-Events - Processing computer $Comp for Events Keywords: $Keywords"
+                Write-Verbose "Get-Events - Processing computer $Comp for Events StartTime: $DateFrom"
+                Write-Verbose "Get-Events - Processing computer $Comp for Events EndTime: $DateTo"
+                Write-Verbose "Get-Events - Processing computer $Comp for Events Path: $Path"
+                Write-Verbose "Get-Events - Processing computer $Comp for Events Level: $Level"
+                Write-Verbose "Get-Events - Processing computer $Comp for Events UserID: $UserID"
+                Write-Verbose "Get-Events - Processing computer $Comp for Events Data: $Data"
+                Write-Verbose "Get-Events - Processing computer $Comp for Events MaxEvents: $MaxEvents"
+                Write-Verbose "Get-Events - Processing computer $Comp for Events Path: $Path"
+                Write-Verbose "Get-Events - Processing computer $Comp for Events UserSID: $UserSID"
+                Write-Verbose "Get-Events - Processing computer $Comp for Events Oldest: $Oldest"
+                Write-Verbose "Get-Events - Processing computer $Comp for Events RecordID: $RecordID"
+
+                if ($DisableParallel) {
+                    Write-Verbose 'Get-Events - Running query with parallel disabled...'
+                    Invoke-Command -ScriptBlock $ScriptBlock -ArgumentList $Comp, $EventFilter, $MaxEvents, $Oldest, $Verbose
+                } else {
+                    Write-Verbose 'Get-Events - Running query with parallel enabled...'
+                    $Parameters = [ordered] @{
+                        Comp        = $Comp
+                        EventFilter = $EventFilter
+                        #RecordID    = $RecordID
+                        MaxEvents   = $MaxEvents
+                        Oldest      = $Oldest
+                        Verbose     = $Verbose
+                    }
+                    # returns values
+                    Start-Runspace -ScriptBlock $ScriptBlock -Parameters $Parameters -RunspacePool $pool -Verbose:$Verbose
+                }
+            }
+        }
+    } else {
+        # No EventID was given
         $EventFilter = @{}
         Add-ToHashTable -Hashtable $EventFilter -Key "LogName" -Value $LogName # Accepts Wildcard
         Add-ToHashTable -Hashtable $EventFilter -Key "ProviderName" -Value $ProviderName # Accepts Wildcard
@@ -67,10 +119,11 @@ function Get-Events {
         Add-ToHashTable -Hashtable $EventFilter -Key "EndTime" -Value $DateTo
         Add-ToHashTable -Hashtable $EventFilter -Key "UserID" -Value $UserSID
         Add-ToHashTable -Hashtable $EventFilter -Key "Data" -Value $Data
+        Add-ToHashTable -Hashtable $EventFilter -Key "EventRecordID" -Value $RecordID
 
-        foreach ($Comp in $Machine) {
-            Write-Verbose "Get-Events - Processing computer $Comp for Events ID: $ID"
-            Write-Verbose "Get-Events - Processing computer $Comp for Events ID Count: $($ID.Count)"
+        $Runspaces = foreach ($Comp in $Machine) {
+            #Write-Verbose "Get-Events - Processing computer $Comp for Events ID: $ID"
+            #Write-Verbose "Get-Events - Processing computer $Comp for Events ID Count: $($ID.Count)"
             Write-Verbose "Get-Events - Processing computer $Comp for Events LogName: $LogName"
             Write-Verbose "Get-Events - Processing computer $Comp for Events ProviderName: $ProviderName"
             Write-Verbose "Get-Events - Processing computer $Comp for Events Keywords: $Keywords"
@@ -94,7 +147,7 @@ function Get-Events {
                 $Parameters = [ordered] @{
                     Comp        = $Comp
                     EventFilter = $EventFilter
-                    RecordID    = $RecordID
+                    #RecordID    = $RecordID
                     MaxEvents   = $MaxEvents
                     Oldest      = $Oldest
                     Verbose     = $Verbose
