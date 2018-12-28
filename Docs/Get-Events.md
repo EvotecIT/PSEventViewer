@@ -15,9 +15,10 @@ Get-Events is a wrapper function around Get-WinEvent providing additional featur
 ```
 Get-Events [[-Machine] <String[]>] [[-DateFrom] <DateTime>] [[-DateTo] <DateTime>] [[-ID] <Int32[]>]
  [[-ExcludeID] <Int32[]>] [[-LogName] <String>] [[-ProviderName] <String>] [[-NamedDataFilter] <Hashtable>]
- [[-Level] <Int32>] [[-UserSID] <String>] [[-Data] <String[]>] [[-MaxEvents] <Int32>]
- [[-Credentials] <PSCredential>] [[-Path] <String>] [[-Keywords] <Int64[]>] [[-RecordID] <Int64>]
- [[-MaxRunspaces] <Int32>] [-Oldest] [-DisableParallel] [<CommonParameters>]
+ [[-NamedDataExcludeFilter] <Hashtable>] [[-UserID] <String[]>] [[-Level] <Int32>] [[-UserSID] <String>]
+ [[-Data] <String[]>] [[-MaxEvents] <Int32>] [[-Credentials] <PSCredential>] [[-Path] <String>]
+ [[-Keywords] <Int64[]>] [[-RecordID] <Int64>] [[-MaxRunspaces] <Int32>] [-Oldest] [-DisableParallel]
+ [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -155,6 +156,36 @@ Accept pipeline input: False
 Accept wildcard characters: False
 ```
 
+### -NamedDataExcludeFilter
+Parameter description
+
+```yaml
+Type: Hashtable
+Parameter Sets: (All)
+Aliases:
+
+Required: False
+Position: 9
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -UserID
+Parameter description
+
+```yaml
+Type: String[]
+Parameter Sets: (All)
+Aliases:
+
+Required: False
+Position: 10
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
 ### -Level
 Parameter description
 
@@ -164,7 +195,7 @@ Parameter Sets: (All)
 Aliases:
 
 Required: False
-Position: 9
+Position: 11
 Default value: None
 Accept pipeline input: False
 Accept wildcard characters: False
@@ -179,7 +210,7 @@ Parameter Sets: (All)
 Aliases:
 
 Required: False
-Position: 10
+Position: 12
 Default value: None
 Accept pipeline input: False
 Accept wildcard characters: False
@@ -194,7 +225,7 @@ Parameter Sets: (All)
 Aliases:
 
 Required: False
-Position: 11
+Position: 13
 Default value: None
 Accept pipeline input: False
 Accept wildcard characters: False
@@ -209,7 +240,7 @@ Parameter Sets: (All)
 Aliases:
 
 Required: False
-Position: 12
+Position: 14
 Default value: None
 Accept pipeline input: False
 Accept wildcard characters: False
@@ -224,7 +255,7 @@ Parameter Sets: (All)
 Aliases:
 
 Required: False
-Position: 13
+Position: 15
 Default value: None
 Accept pipeline input: False
 Accept wildcard characters: False
@@ -239,7 +270,7 @@ Parameter Sets: (All)
 Aliases:
 
 Required: False
-Position: 14
+Position: 16
 Default value: None
 Accept pipeline input: False
 Accept wildcard characters: False
@@ -254,7 +285,7 @@ Parameter Sets: (All)
 Aliases:
 
 Required: False
-Position: 15
+Position: 17
 Default value: None
 Accept pipeline input: False
 Accept wildcard characters: False
@@ -269,7 +300,7 @@ Parameter Sets: (All)
 Aliases: EventRecordID
 
 Required: False
-Position: 16
+Position: 18
 Default value: 0
 Accept pipeline input: False
 Accept wildcard characters: False
@@ -284,7 +315,7 @@ Parameter Sets: (All)
 Aliases:
 
 Required: False
-Position: 17
+Position: 19
 Default value: [int]$env:NUMBER_OF_PROCESSORS + 1
 Accept pipeline input: False
 Accept wildcard characters: False

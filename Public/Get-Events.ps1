@@ -30,6 +30,12 @@ function Get-Events {
     .PARAMETER NamedDataFilter
     Parameter description
 
+    .PARAMETER NamedDataExcludeFilter
+    Parameter description
+
+    .PARAMETER UserID
+    Parameter description
+
     .PARAMETER Level
     Parameter description
 
@@ -64,14 +70,13 @@ function Get-Events {
     Parameter description
 
     .EXAMPLE
-    $DateFrom = (get-date).AddHours(-5)
-    $DateTo = (get-date).AddHours(1)
-    get-events -Computer "Evo1" -DateFrom $DateFrom -DateTo $DateTo -EventId 916 -LogType "Application"
+        $DateFrom = (get-date).AddHours(-5)
+        $DateTo = (get-date).AddHours(1)
+        get-events -Computer "Evo1" -DateFrom $DateFrom -DateTo $DateTo -EventId 916 -LogType "Application"
 
     .NOTES
     General notes
     #>
-
     [CmdLetBinding()]
     param (
         [alias ("ADDomainControllers", "DomainController", "Server", "Servers", "Computer", "Computers", "ComputerName")] [string[]] $Machine = $Env:COMPUTERNAME,
@@ -82,6 +87,8 @@ function Get-Events {
         [alias ("LogType", "Log")][string] $LogName = $null,
         [alias ("Provider")] [string] $ProviderName = '',
         [hashtable] $NamedDataFilter,
+        [hashtable] $NamedDataExcludeFilter,
+        [string[]] $UserID,
         [int] $Level = $null,
         [string] $UserSID = $null,
         [string[]]$Data = $null,
@@ -131,6 +138,8 @@ function Get-Events {
             Add-ToHashTable -Hashtable $EventFilter -Key "Data" -Value $Data
             Add-ToHashTable -Hashtable $EventFilter -Key "RecordID" -Value $RecordID
             Add-ToHashTable -Hashtable $EventFilter -Key "NamedDataFilter" -Value $NamedDataFilter
+            Add-ToHashTable -Hashtable $EventFilter -Key "NamedDataExcludeFilter" -Value $NamedDataExcludeFilter
+            Add-ToHashTable -Hashtable $EventFilter -Key "UserID" -Value $UserID
             Add-ToHashTable -Hashtable $EventFilter -Key "ExcludeID" -Value $ExcludeID
 
             foreach ($Comp in $Machine) {
@@ -183,6 +192,8 @@ function Get-Events {
         Add-ToHashTable -Hashtable $EventFilter -Key "Data" -Value $Data
         Add-ToHashTable -Hashtable $EventFilter -Key "RecordID" -Value $RecordID
         Add-ToHashTable -Hashtable $EventFilter -Key "NamedDataFilter" -Value $NamedDataFilter
+        Add-ToHashTable -Hashtable $EventFilter -Key "NamedDataExcludeFilter" -Value $NamedDataExcludeFilter
+        Add-ToHashTable -Hashtable $EventFilter -Key "UserID" -Value $UserID
         Add-ToHashTable -Hashtable $EventFilter -Key "ExcludeID" -Value $ExcludeID
 
         $Runspaces = foreach ($Comp in $Machine) {
