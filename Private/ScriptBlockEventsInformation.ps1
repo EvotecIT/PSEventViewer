@@ -88,6 +88,7 @@ $ScriptBlockEventsInformation = {
                 ProviderNamesExpanded          = ''
                 RecordCount                    = $RecordCount
                 SecurityDescriptor             = ''
+                Source                         = 'File'
             }
 
         } else {
@@ -105,6 +106,7 @@ $ScriptBlockEventsInformation = {
             Add-Member -InputObject $EventsInfo -MemberType NoteProperty -Name "EventNewest" -Value $EventNewest -Force
             Add-Member -InputObject $EventsInfo -MemberType NoteProperty -Name "ProviderNamesExpanded" -Value $ProviderNamesExpanded -Force
             Add-Member -InputObject $EventsInfo -MemberType NoteProperty -Name "MachineName" -Value $Computer -Force
+            Add-Member -InputObject $EventsInfo -MemberType NoteProperty -Name "Source" -Value $Computer -Force
         }
     } catch {
         $ErrorMessage = $_.Exception.Message -replace "`n", " " -replace "`r", " "

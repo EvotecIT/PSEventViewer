@@ -12,11 +12,11 @@ Locale: en-US
 
 ## PSEventViewer Cmdlets
 ### [Get-Events](Get-Events.md)
-Get-Events is a wrapper function around Get-WinEvent providing additional features and options.
+{{Manually Enter Get-Events Description Here}}
+
+### [Get-EventsInformation](Get-EventsInformation.md)
+{{Manually Enter Get-EventsInformation Description Here}}
 
 ### [Get-WinEventXPathFilter](Get-WinEventXPathFilter.md)
-This function generates an xpath filter that can be used with the -FilterXPath
-parameter of Get-WinEvent. 
-It may also be used inside the \<Select\>\</Select tags
-of a Custom View in Event Viewer.
+{{Manually Enter Get-WinEventXPathFilter Description Here}}
 

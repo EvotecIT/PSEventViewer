@@ -7,7 +7,7 @@ function Get-Events {
     Long description
 
     .PARAMETER Machine
-    Parameter description
+    ComputerName or Server you want to query. Takes an array of servers as well.
 
     .PARAMETER DateFrom
     Parameter description
