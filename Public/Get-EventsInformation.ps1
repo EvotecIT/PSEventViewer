@@ -101,6 +101,34 @@ function Get-EventsInformation {
     File   15.09.2018 11:27:51 22.08.2018 01:49:20 115740672 0.11 GB           0.11 GB               False     False 15.09.2018 11:28:13 15.09.2018 11:27:55
     EVO1   28.12.2018 15:59:22 26.12.2018 15:56:31  20975616 0.02 GB           0.02 GB                True     False 28.12.2018 15:58:47 28.12.2018 15:58:47
 
+    .EXAMPLE
+
+    $Computers = 'EVO1', 'AD1'
+    $EventLogsDirectory = Get-ChildItem -Path 'C:\MyEvents'
+
+    $Size = Get-EventsInformation -FilePath $EventLogsDirectory.FullName -Computer $Computers -LogName 'Security','System' -Verbose
+    $Size | ft -a Source, EventNewest, EventOldest,FileSize, FileSizeCurrentGB, FileSizeMaximumGB, IsEnabled, IsLogFull, LastAccessTime, LastWriteTime, LogFilePath, LOgName
+
+    VERBOSE: Get-EventsInformation - processing start
+    VERBOSE: Get-EventsInformation - Setting up runspace for EVO1
+    VERBOSE: Get-EventsInformation - Setting up runspace for AD1
+    VERBOSE: Get-EventsInformation - Setting up runspace for C:\MyEvents\Archive-Security-2018-08-21-23-49-19-424.evtx
+    VERBOSE: Get-EventsInformation - Setting up runspace for C:\MyEvents\Archive-Security-2018-09-08-02-53-53-711.evtx
+    VERBOSE: Get-EventsInformation - Setting up runspace for C:\MyEvents\Archive-Security-2018-09-14-22-13-07-710.evtx
+    VERBOSE: Get-EventsInformation - Setting up runspace for C:\MyEvents\Archive-Security-2018-09-15-09-27-52-679.evtx
+    VERBOSE: Get-EventsInformation - processing end - 0 days, 0 hours, 0 minutes, 0 seconds, 137 milliseconds
+
+    Source EventNewest         EventOldest          FileSize FileSizeCurrentGB FileSizeMaximumGB IsEnabled IsLogFull LastAccessTime      LastWriteTime       LogFilePath                                               LogName
+    ------ -----------         -----------          -------- ----------------- ----------------- --------- --------- --------------      -------------       -----------                                               -------
+    File   22.08.2018 01:48:57 11.08.2018 09:28:06 115740672 0.11 GB           0.11 GB               False     False 16.09.2018 09:27:04 22.08.2018 01:49:20 C:\MyEvents\Archive-Security-2018-08-21-23-49-19-424.evtx N/A
+    File   08.09.2018 04:53:52 03.09.2018 23:50:15 115740672 0.11 GB           0.11 GB               False     False 12.09.2018 13:18:25 08.09.2018 04:53:53 C:\MyEvents\Archive-Security-2018-09-08-02-53-53-711.evtx N/A
+    EVO1   28.12.2018 18:19:48 26.12.2018 17:27:30  20975616 0.02 GB           0.02 GB                True     False 28.12.2018 18:19:47 28.12.2018 18:19:47 %SystemRoot%\System32\Winevt\Logs\Security.evtx           Security
+    AD1    28.12.2018 18:20:01 20.12.2018 19:29:57 113315840 0.11 GB           0.11 GB                True     False 27.05.2018 14:18:36 28.12.2018 17:48:24 %SystemRoot%\System32\Winevt\Logs\Security.evtx           Security
+    File   15.09.2018 00:13:06 08.09.2018 04:53:53 115740672 0.11 GB           0.11 GB               False     False 15.09.2018 00:13:26 15.09.2018 00:13:08 C:\MyEvents\Archive-Security-2018-09-14-22-13-07-710.evtx N/A
+    EVO1   28.12.2018 18:20:01 05.10.2018 01:33:48  12652544 0.01 GB           0.02 GB                True     False 28.12.2018 18:18:01 28.12.2018 18:18:01 %SystemRoot%\System32\Winevt\Logs\System.evtx             System
+    AD1    28.12.2018 18:12:47 03.12.2018 17:20:48   2166784 0 GB              0.01 GB                True     False 19.05.2018 20:05:07 27.12.2018 12:00:32 %SystemRoot%\System32\Winevt\Logs\System.evtx             System
+    File   15.09.2018 11:27:51 22.08.2018 01:49:20 115740672 0.11 GB           0.11 GB               False     False 15.09.2018 11:28:13 15.09.2018 11:27:55 C:\MyEvents\Archive-Security-2018-09-15-09-27-52-679.evtx N/A
+
     .NOTES
     General notes
     #>
@@ -111,7 +139,7 @@ function Get-EventsInformation {
         [alias ("ADDomainControllers", "DomainController", "Server", "Servers", "Computer", "Computers", "ComputerName")]
         [string[]] $Machine,
         [string[]] $FilePath,
-        [alias ("LogType", "Log")][string] $LogName = 'Security',
+        [alias ("LogType", "Log")][string[]] $LogName = 'Security',
         [int] $MaxRunspaces = 50
     )
     Write-Verbose "Get-EventsInformation - processing start"
@@ -122,14 +150,16 @@ function Get-EventsInformation {
 
     $RunSpaces = @()
     $RunSpaces += foreach ($Computer in $Machine) {
-        Write-Verbose "Get-EventsInformation - Setting up runspace for $Computer"
-        $Parameters = [ordered] @{
-            Computer = $Computer
-            LogName  = $LogName
-            Verbose  = $Verbose
+        foreach ($Log in $LogName) {
+            Write-Verbose "Get-EventsInformation - Setting up runspace for $Computer on $Log log"
+            $Parameters = [ordered] @{
+                Computer = $Computer
+                LogName  = $Log
+                Verbose  = $Verbose
+            }
+            # returns values
+            Start-Runspace -ScriptBlock $ScriptBlockEventsInformation -Parameters $Parameters -RunspacePool $Pool -Verbose:$Verbose
         }
-        # returns values
-        Start-Runspace -ScriptBlock $ScriptBlockEventsInformation -Parameters $Parameters -RunspacePool $Pool -Verbose:$Verbose
     }
 
     $RunSpaces += foreach ($Path in $FilePath) {

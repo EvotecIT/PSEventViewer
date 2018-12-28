@@ -14,7 +14,7 @@ Small wrapper against Get-WinEvent providing easy way to gather statistics for E
 ## SYNTAX
 
 ```
-Get-EventsInformation [[-Machine] <String[]>] [[-FilePath] <String[]>] [[-LogName] <String>]
+Get-EventsInformation [[-Machine] <String[]>] [[-FilePath] <String[]>] [[-LogName] <String[]>]
  [[-MaxRunspaces] <Int32>] [<CommonParameters>]
 ```
 
@@ -36,7 +36,7 @@ $LogName = 'Security'
 $Size = Get-EventsInformation -Computer $Computer -LogName $LogName
 $Size | ft -A
 
-Output:
+#Output:
 
 EventNewest         EventOldest          FileSize FileSizeCurrentGB FileSizeMaximumGB IsClassicLog IsEnabled IsLogFull LastAccessTime      LastWriteTime
 -----------         -----------          -------- ----------------- ----------------- ------------ --------- --------- --------------      -------------
@@ -57,7 +57,7 @@ $EventLogsDirectory = Get-ChildItem -Path 'C:\MyEvents'
 $Size = Get-EventsInformation -FilePath $EventLogsDirectory.FullName -Computer $Computers -LogName 'Security'
 $Size | ft -a
 
-Output:
+#Output:
 
 VERBOSE: Get-EventsInformation - processing start
 VERBOSE: Get-EventsInformation - Setting up runspace for EVO1
@@ -91,7 +91,7 @@ $EventLogsDirectory = Get-ChildItem -Path 'C:\MyEvents'
 $Size = Get-EventsInformation -FilePath $EventLogsDirectory.FullName -Computer $Computers -LogName 'Security' -Verbose
 $Size | ft -a Source, EventNewest, EventOldest,FileSize, FileSizeCurrentGB, FileSizeMaximumGB, IsEnabled, IsLogFull, LastAccessTime, LastWriteTime
 
-Output:
+#Output:
 
 VERBOSE: Get-EventsInformation - processing start
 VERBOSE: Get-EventsInformation - Setting up runspace for EVO1
@@ -114,7 +114,37 @@ File   15.09.2018 11:27:51 22.08.2018 01:49:20 115740672 0.11 GB           0.11 
 EVO1   28.12.2018 15:59:22 26.12.2018 15:56:31  20975616 0.02 GB           0.02 GB                True     False 28.12.2018 15:58:47 28.12.2018 15:58:47
 ```
 
-Output:
+### EXAMPLE 4
+
+```
+$Computers = 'EVO1', 'AD1'
+$EventLogsDirectory = Get-ChildItem -Path 'C:\MyEvents'
+
+$Size = Get-EventsInformation -FilePath $EventLogsDirectory.FullName -Computer $Computers -LogName 'Security','System' -Verbose
+$Size | ft -a Source, EventNewest, EventOldest,FileSize, FileSizeCurrentGB, FileSizeMaximumGB, IsEnabled, IsLogFull, LastAccessTime, LastWriteTime, LogFilePath, LOgName
+
+#Output:
+
+VERBOSE: Get-EventsInformation - processing start
+VERBOSE: Get-EventsInformation - Setting up runspace for EVO1
+VERBOSE: Get-EventsInformation - Setting up runspace for AD1
+VERBOSE: Get-EventsInformation - Setting up runspace for C:\MyEvents\Archive-Security-2018-08-21-23-49-19-424.evtx
+VERBOSE: Get-EventsInformation - Setting up runspace for C:\MyEvents\Archive-Security-2018-09-08-02-53-53-711.evtx
+VERBOSE: Get-EventsInformation - Setting up runspace for C:\MyEvents\Archive-Security-2018-09-14-22-13-07-710.evtx
+VERBOSE: Get-EventsInformation - Setting up runspace for C:\MyEvents\Archive-Security-2018-09-15-09-27-52-679.evtx
+VERBOSE: Get-EventsInformation - processing end - 0 days, 0 hours, 0 minutes, 0 seconds, 137 milliseconds
+
+Source EventNewest         EventOldest          FileSize FileSizeCurrentGB FileSizeMaximumGB IsEnabled IsLogFull LastAccessTime      LastWriteTime       LogFilePath                                               LogName
+------ -----------         -----------          -------- ----------------- ----------------- --------- --------- --------------      -------------       -----------                                               -------
+File   22.08.2018 01:48:57 11.08.2018 09:28:06 115740672 0.11 GB           0.11 GB               False     False 16.09.2018 09:27:04 22.08.2018 01:49:20 C:\MyEvents\Archive-Security-2018-08-21-23-49-19-424.evtx N/A
+File   08.09.2018 04:53:52 03.09.2018 23:50:15 115740672 0.11 GB           0.11 GB               False     False 12.09.2018 13:18:25 08.09.2018 04:53:53 C:\MyEvents\Archive-Security-2018-09-08-02-53-53-711.evtx N/A
+EVO1   28.12.2018 18:19:48 26.12.2018 17:27:30  20975616 0.02 GB           0.02 GB                True     False 28.12.2018 18:19:47 28.12.2018 18:19:47 %SystemRoot%\System32\Winevt\Logs\Security.evtx           Security
+AD1    28.12.2018 18:20:01 20.12.2018 19:29:57 113315840 0.11 GB           0.11 GB                True     False 27.05.2018 14:18:36 28.12.2018 17:48:24 %SystemRoot%\System32\Winevt\Logs\Security.evtx           Security
+File   15.09.2018 00:13:06 08.09.2018 04:53:53 115740672 0.11 GB           0.11 GB               False     False 15.09.2018 00:13:26 15.09.2018 00:13:08 C:\MyEvents\Archive-Security-2018-09-14-22-13-07-710.evtx N/A
+EVO1   28.12.2018 18:20:01 05.10.2018 01:33:48  12652544 0.01 GB           0.02 GB                True     False 28.12.2018 18:18:01 28.12.2018 18:18:01 %SystemRoot%\System32\Winevt\Logs\System.evtx             System
+AD1    28.12.2018 18:12:47 03.12.2018 17:20:48   2166784 0 GB              0.01 GB                True     False 19.05.2018 20:05:07 27.12.2018 12:00:32 %SystemRoot%\System32\Winevt\Logs\System.evtx             System
+File   15.09.2018 11:27:51 22.08.2018 01:49:20 115740672 0.11 GB           0.11 GB               False     False 15.09.2018 11:28:13 15.09.2018 11:27:55 C:\MyEvents\Archive-Security-2018-09-15-09-27-52-679.evtx N/A
+```
 
 ## PARAMETERS
 
@@ -155,7 +185,7 @@ Accept wildcard characters: False
 LogName such as Security or System. Works in conjuction with Machine (s). Default is Security.
 
 ```yaml
-Type: String
+Type: String[]
 Parameter Sets: (All)
 Aliases: LogType, Log
 
