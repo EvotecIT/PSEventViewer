@@ -1,4 +1,4 @@
-function Get-WinEventXPathFilter {
+function Get-EventsFilter {
     <#
     .SYNOPSIS
     This function generates an xpath filter that can be used with the -FilterXPath
@@ -91,7 +91,7 @@ function Get-WinEventXPathFilter {
 
     (@{'SubjectUserName'='john.doe'},@{'TargetUserName'='jane.doe'})
     .EXAMPLE
-    Get-WinEventXPathFilter -ID 4663 -NamedDataFilter @{'SubjectUserName'='john.doe'} -LogName 'ForwardedEvents'
+    Get-EventsFilter -ID 4663 -NamedDataFilter @{'SubjectUserName'='john.doe'} -LogName 'ForwardedEvents'
 
     This will return an XPath filter that will return any events with
     the id of 4663 and has a SubjectUserName of 'john.doe'
@@ -106,7 +106,7 @@ function Get-WinEventXPathFilter {
     </QueryList>
 
     .EXAMPLE
-    Get-WinEventXPathFilter -StartTime '1/1/2015 01:30:00 PM' -EndTime '1/1/2015 02:00:00 PM' -LogName 'ForwardedEvents
+    Get-EventsFilter -StartTime '1/1/2015 01:30:00 PM' -EndTime '1/1/2015 02:00:00 PM' -LogName 'ForwardedEvents
 
     This will return an XPath filter that will return events that occured between 1:30
     2:00 PM on 1/1/2015.  The filter will only be good if used immediately.  XPath time
@@ -125,7 +125,7 @@ function Get-WinEventXPathFilter {
     </QueryList>
 
     .EXAMPLE
-    Get-WinEventXPathFilter -StartTime (Get-Date).AddDays(-1) -LogName System
+    Get-EventsFilter -StartTime (Get-Date).AddDays(-1) -LogName System
 
     This will return an XPath filter that will get events that occured within the last 24 hours.
 
@@ -139,7 +139,7 @@ function Get-WinEventXPathFilter {
     </QueryList>
 
     .EXAMPLE
-    Get-WinEventXPathFilter -ID 1105 -LogName 'ForwardedEvents' -RecordID '3512231','3512232'
+    Get-EventsFilter -ID 1105 -LogName 'ForwardedEvents' -RecordID '3512231','3512232'
 
     This will return an XPath filter that will get events with EventRecordID 3512231 or 3512232 in Log ForwardedEvents with EventID 1105
 
@@ -201,7 +201,9 @@ function Get-WinEventXPathFilter {
         $ExcludeID,
 
         [Parameter(Mandatory = $true)][String]
-        $LogName
+        $LogName,
+
+        [switch] $XPathOnly
     )
 
     #region Function definitions
@@ -251,7 +253,7 @@ function Get-WinEventXPathFilter {
         <#
     .SYNOPSIS
     This function handles the parenthesis and logical joining
-    of XPath statements inside of Get-WinEventXPathFilter
+    of XPath statements inside of Get-EventsFilter
     #>
     }
 
@@ -292,7 +294,7 @@ function Get-WinEventXPathFilter {
     joining and parenthesis.  Before returning the result,
     it injects the resultant xpath into FinalizeFormatString.
 
-    This function is a part of Get-WinEventXPathFilter
+    This function is a part of Get-EventsFilter
     #>
     }
     #endregion Function definitions
@@ -564,7 +566,10 @@ function Get-WinEventXPathFilter {
     }
     #endregion NamedDataExcludeFilter
 
-    $FilterXML = @"
+    if ($XPathOnly) {
+        return $Filter
+    } else {
+        $FilterXML = @"
     <QueryList>
         <Query Id="0" Path="$LogName">
             <Select Path="$LogName">
@@ -573,8 +578,8 @@ function Get-WinEventXPathFilter {
         </Query>
     </QueryList>
 "@
-
-    return $FilterXML
+        return $FilterXML
+    }
     # Return $filter
 
-} # Function Get-WinEventXPathFilter
+} # Function Get-EventsFilter

@@ -5,7 +5,7 @@ online version:
 schema: 2.0.0
 ---
 
-# Get-WinEventXPathFilter
+# Get-EventsFilter
 
 ## SYNOPSIS
 This function generates an xpath filter that can be used with the -FilterXPath
@@ -16,10 +16,11 @@ of a Custom View in Event Viewer.
 ## SYNTAX
 
 ```
-Get-WinEventXPathFilter [[-ID] <String[]>] [[-EventRecordID] <String[]>] [[-StartTime] <DateTime>]
+Get-EventsFilter [[-ID] <String[]>] [[-EventRecordID] <String[]>] [[-StartTime] <DateTime>]
  [[-EndTime] <DateTime>] [[-Data] <String[]>] [[-ProviderName] <String[]>] [[-Keywords] <Int64[]>]
  [[-Level] <String[]>] [[-UserID] <String[]>] [[-NamedDataFilter] <Hashtable[]>]
- [[-NamedDataExcludeFilter] <Hashtable[]>] [[-ExcludeID] <String[]>] [-LogName] <String> [<CommonParameters>]
+ [[-NamedDataExcludeFilter] <Hashtable[]>] [[-ExcludeID] <String[]>] [-LogName] <String> [-XPathOnly]
+ [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -39,7 +40,7 @@ match the case of the data in the event's XML.
 
 ### EXAMPLE 1
 ```
-Get-WinEventXPathFilter -ID 4663 -NamedDataFilter @{'SubjectUserName'='john.doe'} -LogName 'ForwardedEvents'
+Get-EventsFilter -ID 4663 -NamedDataFilter @{'SubjectUserName'='john.doe'} -LogName 'ForwardedEvents'
 ```
 
 This will return an XPath filter that will return any events with
@@ -56,7 +57,7 @@ Output:
 
 ### EXAMPLE 2
 ```
-Get-WinEventXPathFilter -StartTime '1/1/2015 01:30:00 PM' -EndTime '1/1/2015 02:00:00 PM' -LogName 'ForwardedEvents
+Get-EventsFilter -StartTime '1/1/2015 01:30:00 PM' -EndTime '1/1/2015 02:00:00 PM' -LogName 'ForwardedEvents
 ```
 
 This will return an XPath filter that will return events that occured between 1:30
@@ -80,7 +81,7 @@ Output:
 
 ### EXAMPLE 3
 ```
-Get-WinEventXPathFilter -StartTime (Get-Date).AddDays(-1) -LogName System
+Get-EventsFilter -StartTime (Get-Date).AddDays(-1) -LogName System
 ```
 
 This will return an XPath filter that will get events that occured within the last 24 hours.
@@ -96,7 +97,7 @@ Output:
 
 ### EXAMPLE 4
 ```
-Get-WinEventXPathFilter -ID 1105 -LogName 'ForwardedEvents' -RecordID '3512231','3512232'
+Get-EventsFilter -ID 1105 -LogName 'ForwardedEvents' -RecordID '3512231','3512232'
 ```
 
 This will return an XPath filter that will get events with EventRecordID 3512231 or 3512232 in Log ForwardedEvents with EventID 1105
@@ -365,8 +366,24 @@ Accept pipeline input: False
 Accept wildcard characters: False
 ```
 
+### -XPathOnly
+{{Fill XPathOnly Description}}
+
+```yaml
+Type: SwitchParameter
+Parameter Sets: (All)
+Aliases:
+
+Required: False
+Position: Named
+Default value: False
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
 ### CommonParameters
-This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable, -InformationAction, -InformationVariable, -OutVariable, -OutBuffer, -PipelineVariable, -Verbose, -WarningAction, and -WarningVariable. For more information, see about_CommonParameters (http://go.microsoft.com/fwlink/?LinkID=113216).
+This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable, -InformationAction, -InformationVariable, -OutVariable, -OutBuffer, -PipelineVariable, -Verbose, -WarningAction, and -WarningVariable.
+For more information, see about_CommonParameters (http://go.microsoft.com/fwlink/?LinkID=113216).
 
 ## INPUTS
 

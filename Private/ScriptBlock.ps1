@@ -10,7 +10,7 @@ $ScriptBlock = {
         $VerbosePreference = 'continue'
     }
     #$WarningPreference = 'continue'
-    function Get-WinEventXPathFilter {
+    function Get-EventsFilter {
         <#
         .SYNOPSIS
         This function generates an xpath filter that can be used with the -FilterXPath
@@ -101,9 +101,12 @@ $ScriptBlock = {
         SubjectUserName of john.doe or a TargetUserName of jane.doe then pass
         the following
 
+        .PARAMETER XPathOnly
+        This is switch. If used only XPATH filter is returned. Otherwise full XML.
+
         (@{'SubjectUserName'='john.doe'},@{'TargetUserName'='jane.doe'})
         .EXAMPLE
-        Get-WinEventXPathFilter -ID 4663 -NamedDataFilter @{'SubjectUserName'='john.doe'} -LogName 'ForwardedEvents'
+        Get-EventsFilter -ID 4663 -NamedDataFilter @{'SubjectUserName'='john.doe'} -LogName 'ForwardedEvents'
 
         This will return an XPath filter that will return any events with
         the id of 4663 and has a SubjectUserName of 'john.doe'
@@ -118,7 +121,7 @@ $ScriptBlock = {
         </QueryList>
 
         .EXAMPLE
-        Get-WinEventXPathFilter -StartTime '1/1/2015 01:30:00 PM' -EndTime '1/1/2015 02:00:00 PM' -LogName 'ForwardedEvents
+        Get-EventsFilter -StartTime '1/1/2015 01:30:00 PM' -EndTime '1/1/2015 02:00:00 PM' -LogName 'ForwardedEvents
 
         This will return an XPath filter that will return events that occured between 1:30
         2:00 PM on 1/1/2015.  The filter will only be good if used immediately.  XPath time
@@ -137,7 +140,7 @@ $ScriptBlock = {
         </QueryList>
 
         .EXAMPLE
-        Get-WinEventXPathFilter -StartTime (Get-Date).AddDays(-1) -LogName System
+        Get-EventsFilter -StartTime (Get-Date).AddDays(-1) -LogName System
 
         This will return an XPath filter that will get events that occured within the last 24 hours.
 
@@ -151,7 +154,7 @@ $ScriptBlock = {
         </QueryList>
 
         .EXAMPLE
-        Get-WinEventXPathFilter -ID 1105 -LogName 'ForwardedEvents' -RecordID '3512231','3512232'
+        Get-EventsFilter -ID 1105 -LogName 'ForwardedEvents' -RecordID '3512231','3512232'
 
         This will return an XPath filter that will get events with EventRecordID 3512231 or 3512232 in Log ForwardedEvents with EventID 1105
 
@@ -263,7 +266,7 @@ $ScriptBlock = {
             <#
         .SYNOPSIS
         This function handles the parenthesis and logical joining
-        of XPath statements inside of Get-WinEventXPathFilter
+        of XPath statements inside of Get-EventsFilter
         #>
         }
 
@@ -304,7 +307,7 @@ $ScriptBlock = {
         joining and parenthesis.  Before returning the result,
         it injects the resultant xpath into FinalizeFormatString.
 
-        This function is a part of Get-WinEventXPathFilter
+        This function is a part of Get-EventsFilter
         #>
         }
         #endregion Function definitions
@@ -589,7 +592,7 @@ $ScriptBlock = {
         return $FilterXML
         # Return $filter
 
-    } # Function Get-WinEventXPathFilter
+    } # Function Get-EventsFilter
     function Get-EventsInternal () {
         [CmdLetBinding()]
         param (
@@ -614,7 +617,7 @@ $ScriptBlock = {
                     $null -ne $EventFilter.NamedDataExcludeFilter -or `
                     $null -ne $EventFilter.UserID
             ) {
-                $FilterXML = Get-WinEventXPathFilter @EventFilter #-LogName 'ForwardedEvents' -RecordID '3512231', '3512232' -ProviderName 'Microsoft-Windows-Eventlog'
+                $FilterXML = Get-EventsFilter @EventFilter #-LogName 'ForwardedEvents' -RecordID '3512231', '3512232' -ProviderName 'Microsoft-Windows-Eventlog'
                 #Write-Verbose "`n$FilterXML"
                 #$Events = Get-WinEvent -FilterXml $FilterXML -MaxEvents $MaxEvents -ComputerName $Comp -Oldest:$Oldest -ErrorAction Stop
 

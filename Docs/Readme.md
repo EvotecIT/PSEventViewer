@@ -17,9 +17,3 @@ Get-Events is a wrapper function around Get-WinEvent providing additional featur
 ### [Get-EventsInformation](Get-EventsInformation.md)
 Small wrapper against Get-WinEvent providing easy way to gather statistics for Event Logs.
 
-### [Get-WinEventXPathFilter](Get-WinEventXPathFilter.md)
-This function generates an xpath filter that can be used with the -FilterXPath
-parameter of Get-WinEvent. 
-It may also be used inside the \<Select\>\</Select tags
-of a Custom View in Event Viewer.
-
