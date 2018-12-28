@@ -660,11 +660,11 @@ $ScriptBlock = {
             } elseif ($_.Exception -match "There are no more endpoints available from the endpoint") {
                 #Write-Verbose -Message "Get-Events - Inside $Comp - Error connecting."
                 Write-Verbose -Message "Get-Events - Inside $Comp - Error $($_.Exception.Message)"
-                Write-Error -Message "(ComputerName: $Comp) $_"
+                Write-Error -Message "$Comp`: $_"
             } else {
                 #Write-Verbose -Message "Get-Events - Inside $Comp - Error connecting."
                 Write-Verbose -Message "Get-Events - Inside $Comp - Error $($_.Exception.Message)"
-                Write-Error -Message "(ComputerName: $Comp) $_"
+                Write-Error -Message "$Comp`: $_"
             }
             Write-Verbose "Get-Events - Inside $Comp - Time to generate $($Measure.Elapsed.Hours) hours, $($Measure.Elapsed.Minutes) minutes, $($Measure.Elapsed.Seconds) seconds, $($Measure.Elapsed.Milliseconds) milliseconds"
             $Measure.Stop()

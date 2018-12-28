@@ -94,11 +94,12 @@ function Get-Events {
         [switch] $Oldest,
         [switch] $DisableParallel
     )
+    if ($PSCmdlet.MyInvocation.BoundParameters["Verbose"].IsPresent) { $Verbose = $true } else { $Verbose = $false }
 
     Write-Verbose "Get-Events - Overall events processing start"
     $MeasureTotal = [System.Diagnostics.Stopwatch]::StartNew() # Timer Start
 
-    if ($PSCmdlet.MyInvocation.BoundParameters["Verbose"].IsPresent) { $Verbose = $true } else { $Verbose = $false }
+
 
     ### Define Runspace START
     $pool = New-Runspace -MaxRunspaces $maxRunspaces -Verbose:$Verbose
