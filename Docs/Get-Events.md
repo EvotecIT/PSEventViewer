@@ -18,7 +18,7 @@ Get-Events [[-Machine] <String[]>] [[-DateFrom] <DateTime>] [[-DateTo] <DateTime
  [[-NamedDataExcludeFilter] <Hashtable>] [[-UserID] <String[]>] [[-Level] <Int32>] [[-UserSID] <String>]
  [[-Data] <String[]>] [[-MaxEvents] <Int32>] [[-Credentials] <PSCredential>] [[-Path] <String>]
  [[-Keywords] <Int64[]>] [[-RecordID] <Int64>] [[-MaxRunspaces] <Int32>] [-Oldest] [-DisableParallel]
- [<CommonParameters>]
+ [-ExtendedOutput] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -338,6 +338,21 @@ Accept wildcard characters: False
 
 ### -DisableParallel
 Parameter description
+
+```yaml
+Type: SwitchParameter
+Parameter Sets: (All)
+Aliases:
+
+Required: False
+Position: Named
+Default value: False
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -ExtendedOutput
+{{Fill ExtendedOutput Description}}
 
 ```yaml
 Type: SwitchParameter

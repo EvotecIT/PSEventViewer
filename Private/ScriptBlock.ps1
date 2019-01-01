@@ -9,7 +9,6 @@ $ScriptBlock = {
     if ($Verbose) {
         $VerbosePreference = 'continue'
     }
-    #$WarningPreference = 'continue'
     function Get-EventsFilter {
         <#
         .SYNOPSIS
@@ -617,26 +616,7 @@ $ScriptBlock = {
                     $null -ne $EventFilter.NamedDataExcludeFilter -or `
                     $null -ne $EventFilter.UserID
             ) {
-                $FilterXML = Get-EventsFilter @EventFilter #-LogName 'ForwardedEvents' -RecordID '3512231', '3512232' -ProviderName 'Microsoft-Windows-Eventlog'
-                #Write-Verbose "`n$FilterXML"
-                #$Events = Get-WinEvent -FilterXml $FilterXML -MaxEvents $MaxEvents -ComputerName $Comp -Oldest:$Oldest -ErrorAction Stop
-
-                <#
-                $FilterXML = @"
-
-                <QueryList>
-                    <Query Id="0" Path="$($EventFilter.LogName)">
-                        <Select Path="$($EventFilter.LogName)">
-                        *[
-                            (System/EventID=$($EventFilter.ID))
-                            and
-                            (System/EventRecordID=$RecordID)
-                         ]
-                        </Select>
-                    </Query>
-                </QueryList>
-"@
-#>
+                $FilterXML = Get-EventsFilter @EventFilter
                 Write-Verbose "Get-Events - Inside $Comp - Custom FilterXML: `n$FilterXML"
                 if ($MaxEvents -ne $null -and $MaxEvents -ne 0) {
                     $Events = Get-WinEvent -FilterXml $FilterXML -ComputerName $Comp -MaxEvents $MaxEvents -Oldest:$Oldest -ErrorAction Stop
@@ -648,36 +628,25 @@ $ScriptBlock = {
                     Write-Verbose "Get-Events - Inside $Comp Data in FilterHashTable $k $($EventFilter[$k])"
                 }
                 if ($MaxEvents -ne 0) {
-                    #Write-Verbose "Get-Events - Inside $Comp - Running (1-1) with MaxEvents: $Maxevents"
                     $Events = Get-WinEvent -FilterHashtable $EventFilter -ComputerName $Comp -MaxEvents $MaxEvents -Oldest:$Oldest -ErrorAction Stop
-                    #Write-Verbose "Get-Events - Inside $Comp - Running (1-2) with MaxEvents: $Maxevents"
                 } else {
-                    #Write-Verbose "Get-Events - Inside $Comp - Running (2-1) with MaxEvents: $Maxevents"
                     $Events = Get-WinEvent -FilterHashtable $EventFilter -ComputerName $Comp -Oldest:$Oldest -ErrorAction Stop
-                    #Write-Verbose "Get-Events - Inside $Comp - Running (2-2) with MaxEvents: $Maxevents"
                 }
-
             }
-
-
             $EventsCount = ($Events | Measure-Object).Count
             Write-Verbose -Message "Get-Events - Inside $Comp Events founds $EventsCount"
         } catch {
             if ($_.Exception -match "No events were found that match the specified selection criteria") {
                 Write-Verbose -Message "Get-Events - Inside $Comp - No events found."
             } elseif ($_.Exception -match "There are no more endpoints available from the endpoint") {
-                #Write-Verbose -Message "Get-Events - Inside $Comp - Error connecting."
                 Write-Verbose -Message "Get-Events - Inside $Comp - Error $($_.Exception.Message)"
                 Write-Error -Message "$Comp`: $_"
             } else {
-                #Write-Verbose -Message "Get-Events - Inside $Comp - Error connecting."
                 Write-Verbose -Message "Get-Events - Inside $Comp - Error $($_.Exception.Message)"
                 Write-Error -Message "$Comp`: $_"
             }
             Write-Verbose "Get-Events - Inside $Comp - Time to generate $($Measure.Elapsed.Hours) hours, $($Measure.Elapsed.Minutes) minutes, $($Measure.Elapsed.Seconds) seconds, $($Measure.Elapsed.Milliseconds) milliseconds"
             $Measure.Stop()
-
-            #Write-Warning -Message 'My Test'
             continue
         }
         Write-Verbose "Get-Events - Inside $Comp - Processing events..."
@@ -737,7 +706,6 @@ $ScriptBlock = {
                                 }
 
                             }
-                            # }
                         }
                     } elseif ($EventSubSub.Definition -like "System.Xml.XmlElement*") {
                         # Case 1

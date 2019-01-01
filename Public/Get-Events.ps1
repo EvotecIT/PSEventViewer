@@ -99,7 +99,8 @@ function Get-Events {
         [alias("EventRecordID")][int64] $RecordID,
         [int] $MaxRunspaces = [int]$env:NUMBER_OF_PROCESSORS + 1,
         [switch] $Oldest,
-        [switch] $DisableParallel
+        [switch] $DisableParallel,
+        [switch] $ExtendedOutput
     )
     if ($PSCmdlet.MyInvocation.BoundParameters["Verbose"].IsPresent) { $Verbose = $true } else { $Verbose = $false }
 
@@ -230,8 +231,11 @@ function Get-Events {
         }
     }
     ### End Runspaces START
-    $AllEvents = Stop-Runspace -Runspaces $Runspaces -FunctionName "Get-Events" -RunspacePool $pool -Verbose:$Verbose -ErrorAction SilentlyContinue -ErrorVariable +AllErrors
+    $AllEvents = Stop-Runspace -Runspaces $Runspaces -FunctionName "Get-Events" -RunspacePool $pool -Verbose:$Verbose -ErrorAction SilentlyContinue -ErrorVariable +AllErrors -ExtendedOutput:$ExtendedOutput
     ### End Runspaces END
+    if ($ExtendedOutput) {
+        return $AllEvents # returns @{ Output and Errors }
+    }
 
     $EventsProcessed = ($AllEvents | Measure-Object).Count
     Write-Verbose "Get-Events - Overall errors: $($AllErrors.Count)"
