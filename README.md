@@ -10,6 +10,13 @@ Project was split into 2 parts:
 - [Documentation for PSEventViewer (examples and how things are different)](https://evotec.xyz/working-with-windows-events-with-powershell/)
 
 ###### Updates
+
+- 0.62 - 11.01.2019
+    - Fix for Member Name with comma inside
+
+- 0.61 - 2.1.2019
+    - Multiple new parameters, some new functionality
+
 - 0.51 - Added -RecordID parameter (currently it only works with LogName + RecordID, you can't use any other parameters with RecordID as it will take LogName + RecordID anyways and crash if it's not there)
 - 0.50 - Version that worked fine :-)
 
