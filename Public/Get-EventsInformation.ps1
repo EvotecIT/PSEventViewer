@@ -140,13 +140,24 @@ function Get-EventsInformation {
         [string[]] $Machine,
         [string[]] $FilePath,
         [alias ("LogType", "Log")][string[]] $LogName = 'Security',
-        [int] $MaxRunspaces = 50
+        [int] $MaxRunspaces = 50,
+        [alias('AskDC', 'QueryDomainControllers','AskForest')][switch] $RunAgainstDC
     )
     Write-Verbose "Get-EventsInformation - processing start"
     if ($PSCmdlet.MyInvocation.BoundParameters["Verbose"].IsPresent) { $Verbose = $true } else { $Verbose = $false }
 
     $Time = Start-TimeLog
     $Pool = New-Runspace -MaxRunspaces $maxRunspaces -Verbose:$Verbose
+
+    if ($RunAgainstDC) {
+        Write-Verbose 'Get-EventsInformation - scanning for domain controllers'
+        $ForestInformation = Get-WinADForestControllers
+        $MachineWithErrors = $ForestInformation | Where-Object { $_.HostName -eq '' } 
+        foreach ($Computer in $MachineWithErrors) {
+            Write-Warning "Get-EventsInformation - Error scanning forest $($Computer.Forest) (domain: $($Computer.Domain)) error: $($Computer.Comment)"
+        }
+        $Machine = ($ForestInformation | Where-Object { $_.HostName -ne '' }).HostName
+    }
 
     $RunSpaces = @()
     $RunSpaces += foreach ($Computer in $Machine) {
@@ -161,7 +172,6 @@ function Get-EventsInformation {
             Start-Runspace -ScriptBlock $ScriptBlockEventsInformation -Parameters $Parameters -RunspacePool $Pool -Verbose:$Verbose
         }
     }
-
     $RunSpaces += foreach ($Path in $FilePath) {
         Write-Verbose "Get-EventsInformation - Setting up runspace for $Path"
         $Parameters = [ordered] @{
@@ -171,8 +181,6 @@ function Get-EventsInformation {
         # returns values
         Start-Runspace -ScriptBlock $ScriptBlockEventsInformation -Parameters $Parameters -RunspacePool $Pool -Verbose:$Verbose
     }
-
-
     ### End Runspaces START
     $AllEvents = Stop-Runspace -Runspaces $RunSpaces `
         -FunctionName "Get-EventsInformation" `
@@ -180,6 +188,10 @@ function Get-EventsInformation {
         -ErrorAction SilentlyContinue `
         -ErrorVariable +AllErrors
 
+    foreach ($Error in $AllErrors) {
+        Write-Warning "Get-EventsInformation - Error: $Error"
+    }
+    
     $Elapsed = Stop-TimeLog -Time $Time -Option OneLiner
     Write-Verbose -Message "Get-EventsInformation - processing end - $Elapsed"
     ### End Runspaces END

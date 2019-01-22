@@ -15,9 +15,9 @@ Get-Events is a wrapper function around Get-WinEvent providing additional featur
 ```
 Get-Events [[-Machine] <String[]>] [[-DateFrom] <DateTime>] [[-DateTo] <DateTime>] [[-ID] <Int32[]>]
  [[-ExcludeID] <Int32[]>] [[-LogName] <String>] [[-ProviderName] <String>] [[-NamedDataFilter] <Hashtable>]
- [[-NamedDataExcludeFilter] <Hashtable>] [[-UserID] <String[]>] [[-Level] <Int32>] [[-UserSID] <String>]
+ [[-NamedDataExcludeFilter] <Hashtable>] [[-UserID] <String[]>] [[-Level] <Level[]>] [[-UserSID] <String>]
  [[-Data] <String[]>] [[-MaxEvents] <Int32>] [[-Credentials] <PSCredential>] [[-Path] <String>]
- [[-Keywords] <Int64[]>] [[-RecordID] <Int64>] [[-MaxRunspaces] <Int32>] [-Oldest] [-DisableParallel]
+ [[-Keywords] <Keywords[]>] [[-RecordID] <Int64>] [[-MaxRunspaces] <Int32>] [-Oldest] [-DisableParallel]
  [-ExtendedOutput] [<CommonParameters>]
 ```
 
@@ -190,9 +190,10 @@ Accept wildcard characters: False
 Parameter description
 
 ```yaml
-Type: Int32
+Type: Level[]
 Parameter Sets: (All)
 Aliases:
+Accepted values: LogAlways, Critical, Error, Warning, Informational, Verbose
 
 Required: False
 Position: 11
@@ -280,9 +281,10 @@ Accept wildcard characters: False
 Parameter description
 
 ```yaml
-Type: Int64[]
+Type: Keywords[]
 Parameter Sets: (All)
 Aliases:
+Accepted values: None, ResponseTime, WdiContext, WdiDiagnostic, Sqm, AuditFailure, AuditSuccess, CorrelationHint2, EventLogClassic
 
 Required: False
 Position: 17

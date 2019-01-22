@@ -15,7 +15,7 @@ Small wrapper against Get-WinEvent providing easy way to gather statistics for E
 
 ```
 Get-EventsInformation [[-Machine] <String[]>] [[-FilePath] <String[]>] [[-LogName] <String[]>]
- [[-MaxRunspaces] <Int32>] [<CommonParameters>]
+ [[-MaxRunspaces] <Int32>] [-RunAgainstDC] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -208,6 +208,21 @@ Aliases:
 Required: False
 Position: 4
 Default value: 10
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -RunAgainstDC
+{{Fill RunAgainstDC Description}}
+
+```yaml
+Type: SwitchParameter
+Parameter Sets: (All)
+Aliases: AskDC, QueryDomainControllers, AskForest
+
+Required: False
+Position: Named
+Default value: False
 Accept pipeline input: False
 Accept wildcard characters: False
 ```

@@ -89,13 +89,13 @@ function Get-Events {
         [hashtable] $NamedDataFilter,
         [hashtable] $NamedDataExcludeFilter,
         [string[]] $UserID,
-        [int] $Level = $null,
+        [PSEventViewer.Level[]] $Level = $null,
         [string] $UserSID = $null,
         [string[]]$Data = $null,
         [int] $MaxEvents = $null,
         [PSCredential] $Credentials = $null,
         [string] $Path = $null,
-        [long[]] $Keywords = $null,
+        [PSEventViewer.Keywords[]] $Keywords = $null,
         [alias("EventRecordID")][int64] $RecordID,
         [int] $MaxRunspaces = [int]$env:NUMBER_OF_PROCESSORS + 1,
         [switch] $Oldest,
@@ -106,8 +106,6 @@ function Get-Events {
 
     Write-Verbose "Get-Events - Overall events processing start"
     $MeasureTotal = [System.Diagnostics.Stopwatch]::StartNew() # Timer Start
-
-
 
     ### Define Runspace START
     $pool = New-Runspace -MaxRunspaces $maxRunspaces -Verbose:$Verbose
@@ -130,9 +128,9 @@ function Get-Events {
             Add-ToHashTable -Hashtable $EventFilter -Key "LogName" -Value $LogName # Accepts Wildcard
             Add-ToHashTable -Hashtable $EventFilter -Key "ProviderName" -Value $ProviderName # Accepts Wildcard
             Add-ToHashTable -Hashtable $EventFilter -Key "Path" -Value $Path # https://blogs.technet.microsoft.com/heyscriptingguy/2011/01/25/use-powershell-to-parse-saved-event-logs-for-errors/
-            Add-ToHashTable -Hashtable $EventFilter -Key "Keywords" -Value $Keywords
+            Add-ToHashTable -Hashtable $EventFilter -Key "Keywords" -Value $Keywords.value__
             Add-ToHashTable -Hashtable $EventFilter -Key "Id" -Value $ID
-            Add-ToHashTable -Hashtable $EventFilter -Key "Level" -Value $Level
+            Add-ToHashTable -Hashtable $EventFilter -Key "Level" -Value $Level.value__
             Add-ToHashTable -Hashtable $EventFilter -Key "StartTime" -Value $DateFrom
             Add-ToHashTable -Hashtable $EventFilter -Key "EndTime" -Value $DateTo
             Add-ToHashTable -Hashtable $EventFilter -Key "UserID" -Value $UserSID
@@ -148,11 +146,11 @@ function Get-Events {
                 Write-Verbose "Get-Events - Processing computer $Comp for Events ID Count: $($ID.Count)"
                 Write-Verbose "Get-Events - Processing computer $Comp for Events LogName: $LogName"
                 Write-Verbose "Get-Events - Processing computer $Comp for Events ProviderName: $ProviderName"
-                Write-Verbose "Get-Events - Processing computer $Comp for Events Keywords: $Keywords"
+                Write-Verbose "Get-Events - Processing computer $Comp for Events Keywords: $Keywords ($($Keywords.value__))"
                 Write-Verbose "Get-Events - Processing computer $Comp for Events StartTime: $DateFrom"
                 Write-Verbose "Get-Events - Processing computer $Comp for Events EndTime: $DateTo"
                 Write-Verbose "Get-Events - Processing computer $Comp for Events Path: $Path"
-                Write-Verbose "Get-Events - Processing computer $Comp for Events Level: $Level"
+                Write-Verbose "Get-Events - Processing computer $Comp for Events Level: $Level ($($Level.value__))"
                 Write-Verbose "Get-Events - Processing computer $Comp for Events UserID: $UserID"
                 Write-Verbose "Get-Events - Processing computer $Comp for Events Data: $Data"
                 Write-Verbose "Get-Events - Processing computer $Comp for Events MaxEvents: $MaxEvents"
@@ -184,9 +182,9 @@ function Get-Events {
         Add-ToHashTable -Hashtable $EventFilter -Key "LogName" -Value $LogName # Accepts Wildcard
         Add-ToHashTable -Hashtable $EventFilter -Key "ProviderName" -Value $ProviderName # Accepts Wildcard
         Add-ToHashTable -Hashtable $EventFilter -Key "Path" -Value $Path # https://blogs.technet.microsoft.com/heyscriptingguy/2011/01/25/use-powershell-to-parse-saved-event-logs-for-errors/
-        Add-ToHashTable -Hashtable $EventFilter -Key "Keywords" -Value $Keywords
+        Add-ToHashTable -Hashtable $EventFilter -Key "Keywords" -Value $Keywords.value__
         Add-ToHashTable -Hashtable $EventFilter -Key "Id" -Value $ID
-        Add-ToHashTable -Hashtable $EventFilter -Key "Level" -Value $Level
+        Add-ToHashTable -Hashtable $EventFilter -Key "Level" -Value $Level.value__
         Add-ToHashTable -Hashtable $EventFilter -Key "StartTime" -Value $DateFrom
         Add-ToHashTable -Hashtable $EventFilter -Key "EndTime" -Value $DateTo
         Add-ToHashTable -Hashtable $EventFilter -Key "UserID" -Value $UserSID
@@ -200,11 +198,11 @@ function Get-Events {
         $Runspaces = foreach ($Comp in $Machine) {
             Write-Verbose "Get-Events - Processing computer $Comp for Events LogName: $LogName"
             Write-Verbose "Get-Events - Processing computer $Comp for Events ProviderName: $ProviderName"
-            Write-Verbose "Get-Events - Processing computer $Comp for Events Keywords: $Keywords"
+            Write-Verbose "Get-Events - Processing computer $Comp for Events Keywords: $Keywords ($($Keywords.value__))"
             Write-Verbose "Get-Events - Processing computer $Comp for Events StartTime: $DateFrom"
             Write-Verbose "Get-Events - Processing computer $Comp for Events EndTime: $DateTo"
             Write-Verbose "Get-Events - Processing computer $Comp for Events Path: $Path"
-            Write-Verbose "Get-Events - Processing computer $Comp for Events Level: $Level"
+            Write-Verbose "Get-Events - Processing computer $Comp for Events Level: $Level ($($Level.value__))"
             Write-Verbose "Get-Events - Processing computer $Comp for Events UserID: $UserID"
             Write-Verbose "Get-Events - Processing computer $Comp for Events Data: $Data"
             Write-Verbose "Get-Events - Processing computer $Comp for Events MaxEvents: $MaxEvents"
