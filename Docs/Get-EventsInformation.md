@@ -46,9 +46,9 @@ EventNewest         EventOldest          FileSize FileSizeCurrentGB FileSizeMaxi
 
 ### EXAMPLE 2
 
-```
 Due to AD2 being down time to run is 22 seconds. This is actual timeout before letting it go.
 
+```
 $Computers = 'EVO1', 'AD1', 'AD2'
 $LogName = 'Security'
 
