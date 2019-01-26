@@ -1,4 +1,4 @@
-$ScriptBlockEventsInformation = {
+$Script:ScriptBlockEventsInformation = {
     Param (
         [string]$Computer,
         [string]$Path,

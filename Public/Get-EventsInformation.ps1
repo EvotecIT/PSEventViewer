@@ -169,7 +169,7 @@ function Get-EventsInformation {
                 Verbose  = $Verbose
             }
             # returns values
-            Start-Runspace -ScriptBlock $ScriptBlockEventsInformation -Parameters $Parameters -RunspacePool $Pool -Verbose:$Verbose
+            Start-Runspace -ScriptBlock $Script:ScriptBlockEventsInformation -Parameters $Parameters -RunspacePool $Pool -Verbose:$Verbose
         }
     }
     $RunSpaces += foreach ($Path in $FilePath) {
@@ -179,7 +179,7 @@ function Get-EventsInformation {
             Verbose = $Verbose
         }
         # returns values
-        Start-Runspace -ScriptBlock $ScriptBlockEventsInformation -Parameters $Parameters -RunspacePool $Pool -Verbose:$Verbose
+        Start-Runspace -ScriptBlock $Script:ScriptBlockEventsInformation -Parameters $Parameters -RunspacePool $Pool -Verbose:$Verbose
     }
     ### End Runspaces START
     $AllEvents = Stop-Runspace -Runspaces $RunSpaces `

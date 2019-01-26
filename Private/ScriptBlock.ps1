@@ -1,4 +1,4 @@
-$ScriptBlock = {
+$Script:ScriptBlock = {
     Param (
         [string]$Comp,
         [hashtable]$EventFilter,
@@ -600,14 +600,13 @@ $ScriptBlock = {
             [int]$MaxEvents,
             [switch] $Oldest
         )
-        Write-Verbose "Get-Events - Inside $Comp executing on: $($Env:COMPUTERNAME)"
         Write-Verbose "Get-Events - Inside $Comp for Events ID: $($EventFilter.ID)"
         Write-Verbose "Get-Events - Inside $Comp for Events LogName: $($EventFilter.LogName)"
         Write-Verbose "Get-Events - Inside $Comp for Events RecordID: $($EventFilter.RecordID)"
         Write-Verbose "Get-Events - Inside $Comp for Events Oldest: $Oldest"
         Write-Verbose "Get-Events - Inside $Comp for Events Max Events: $MaxEvents"
         $Measure = [System.Diagnostics.Stopwatch]::StartNew() # Timer Start
-        $Events = @()
+        [Array] $Events = @()
 
         try {
             if ($null -ne $EventFilter.RecordID -or `
@@ -639,17 +638,17 @@ $ScriptBlock = {
             if ($_.Exception -match "No events were found that match the specified selection criteria") {
                 Write-Verbose -Message "Get-Events - Inside $Comp - No events found."
             } elseif ($_.Exception -match "There are no more endpoints available from the endpoint") {
-                Write-Verbose -Message "Get-Events - Inside $Comp - Error $($_.Exception.Message)"
+                Write-Verbose -Message "Get-Events - Inside $Comp Error $($_.Exception.Message)"
                 Write-Error -Message "$Comp`: $_"
             } else {
-                Write-Verbose -Message "Get-Events - Inside $Comp - Error $($_.Exception.Message)"
+                Write-Verbose -Message "Get-Events - Inside $Comp Error $($_.Exception.Message)"
                 Write-Error -Message "$Comp`: $_"
             }
             Write-Verbose "Get-Events - Inside $Comp - Time to generate $($Measure.Elapsed.Hours) hours, $($Measure.Elapsed.Minutes) minutes, $($Measure.Elapsed.Seconds) seconds, $($Measure.Elapsed.Milliseconds) milliseconds"
             $Measure.Stop()
             continue
         }
-        Write-Verbose "Get-Events - Inside $Comp - Processing events..."
+        Write-Verbose "Get-Events - Inside $Comp Processing events..."
 
         # Parse out the event message data
         ForEach ($Event in $Events) {
@@ -742,18 +741,18 @@ $ScriptBlock = {
                 Add-Member -InputObject $Event -MemberType NoteProperty -Name 'MemberNameWithoutCN' -Value $MemberNameWithoutCN -Force
             }
         }
-        Write-Verbose "Get-Events - Inside $Comp - Time to generate $($Measure.Elapsed.Hours) hours, $($Measure.Elapsed.Minutes) minutes, $($Measure.Elapsed.Seconds) seconds, $($Measure.Elapsed.Milliseconds) milliseconds"
+        Write-Verbose "Get-Events - Inside $Comp Time to generate $($Measure.Elapsed.Hours) hours, $($Measure.Elapsed.Minutes) minutes, $($Measure.Elapsed.Seconds) seconds, $($Measure.Elapsed.Milliseconds) milliseconds"
         $Measure.Stop()
         return $Events
     }
-    Write-Verbose "Get-Events - Preparing run on $Comp"
-    $Data = Get-EventsInternal -Comp $Comp -EventFilter $EventFilter -MaxEvents $MaxEvents -Oldest:$Oldest -Verbose:$Verbose
+    Write-Verbose "Get-Events -------------START---------------------"
+    [Array] $Data = Get-EventsInternal -Comp $Comp -EventFilter $EventFilter -MaxEvents $MaxEvents -Oldest:$Oldest -Verbose:$Verbose
     if ($EventFilter.Path) {
         $Data | Add-Member -MemberType NoteProperty -Name "GatheredFrom" -Value $EventFilter.Path -Force
     } else {
         $Data | Add-Member -MemberType NoteProperty -Name "GatheredFrom" -Value $Comp -Force
     }
     $Data | Add-Member -MemberType NoteProperty -Name "GatheredLogName" -Value $EventFilter.LogName -Force
-    Write-Verbose "Get-Events - Finished run on $Comp"
-    return @($Data)
+    Write-Verbose "Get-Events --------------END----------------------"
+    return , $Data
 }
