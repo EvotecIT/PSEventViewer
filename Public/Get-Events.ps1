@@ -144,19 +144,17 @@ function Get-Events {
                     Write-Verbose "Get-Events - There are more events to process then 22, split will be required."
                 }
                 $SplitArrayID = Split-Array -inArray $ID -size 22  # Support for more ID's then 22 (limitation of Get-WinEvent)
-                foreach ($ID in $SplitArrayID) {
-                    $EventFilter.Id = $ID
-
+                foreach ($EventIdGroup in $SplitArrayID) {
+                    $EventFilter.Id = @($EventIdGroup)
                     @{
                         Comp        = $Comp
-                        EventFilter = $EventFilter
+                        EventFilter = $EventFilter.Clone()
                         MaxEvents   = $MaxEvents
                         Oldest      = $Oldest
                         Verbose     = $Verbose
                     }
                 }
-            } else {
-                
+            } else {                
                 @{
                     Comp        = $Comp
                     EventFilter = $EventFilter
@@ -203,12 +201,11 @@ function Get-Events {
                     Write-Verbose "Get-Events - There are more events to process then 22, split will be required."
                 }
                 $SplitArrayID = Split-Array -inArray $ID -size 22  # Support for more ID's then 22 (limitation of Get-WinEvent)
-                foreach ($ID in $SplitArrayID) {
-
-                    $EventFilter.Id = $ID
+                foreach ($EventIdGroup in $SplitArrayID) {
+                    $EventFilter.Id = @($EventIdGroup)
                     @{
                         Comp        = $Comp
-                        EventFilter = $EventFilter
+                        EventFilter = $EventFilter.Clone()
                         MaxEvents   = $MaxEvents
                         Oldest      = $Oldest
                         Verbose     = $Verbose
@@ -223,7 +220,6 @@ function Get-Events {
                     Oldest      = $Oldest
                     Verbose     = $Verbose
                 }
-
             }
         }
         if ($null -ne $Param) {
