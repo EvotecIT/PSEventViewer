@@ -114,38 +114,49 @@ function Get-Events {
     $ParametersList = [System.Collections.Generic.List[Object]]::new()
 
     if ($ExtendedInput.Count -gt 0) {
-        [Array] $Param = foreach ($Input in $ExtendedInput) {
-
-            $ID = $Input.EventID | Sort-Object -Unique
-            Write-Verbose "Get-Events - Events to process in Total (unique): $($Id.Count)"
-            Write-Verbose "Get-Events - Events to process in Total ID: $($ID -join ', ')"
-            if ($Id.Count -gt 22) {
-                Write-Verbose "Get-Events - There are more events to process then 22, split will be required."
+        # Special input - PSWinReporting requires it
+        [Array] $Param = foreach ($Input in $ExtendedInput) {         
+            $EventFilter = @{}
+            if ($Input.Type -eq 'File') {
+                Write-Verbose "Get-Events - Preparing data to scan file $($Input.Server)"
+                Add-ToHashTable -Hashtable $EventFilter -Key "LogName" -Value $Input.LogName # Accepts Wildcard
+                Add-ToHashTable -Hashtable $EventFilter -Key "Path" -Value $Input.Server
+                Add-ToHashTable -Hashtable $EventFilter -Key "StartTime" -Value $Input.DateFrom
+                Add-ToHashTable -Hashtable $EventFilter -Key "EndTime" -Value $Input.DateTo
+                $Comp = $Env:COMPUTERNAME
+            } else {
+                Write-Verbose "Get-Events - Preparing data to scan computer $($Input.Server)"
+                Add-ToHashTable -Hashtable $EventFilter -Key "LogName" -Value $Input.LogName
+                Add-ToHashTable -Hashtable $EventFilter -Key "StartTime" -Value $Input.DateFrom
+                Add-ToHashTable -Hashtable $EventFilter -Key "EndTime" -Value $Input.DateTo
+                $Comp = $Input.Server
+            }             
+            if ($Verbose) {
+                foreach ($Key in $EventFilter.Keys) {
+                    Write-Verbose "Get-Events - Filter parameters provided $Key = $(($EventFilter.$Key) -join ', ')"
+                }
             }
-            $SplitArrayID = Split-Array -inArray $ID -size 22  # Support for more ID's then 22 (limitation of Get-WinEvent)
-            foreach ($ID in $SplitArrayID) {
-                $EventFilter = @{}
-                if ($Input.Type -eq 'File') {
-                    Write-Verbose "Get-Events - Preparing data to scan file $($Input.Server)"
-                    Add-ToHashTable -Hashtable $EventFilter -Key "LogName" -Value $Input.LogName # Accepts Wildcard
-                    Add-ToHashTable -Hashtable $EventFilter -Key "Path" -Value $Input.Server
-                    Add-ToHashTable -Hashtable $EventFilter -Key "Id" -Value $ID
-                    Add-ToHashTable -Hashtable $EventFilter -Key "StartTime" -Value $Input.DateFrom
-                    Add-ToHashTable -Hashtable $EventFilter -Key "EndTime" -Value $Input.DateTo
-                    $Comp = $Env:COMPUTERNAME
-                } else {
-                    Write-Verbose "Get-Events - Preparing data to scan computer $($Input.Server)"
-                    Add-ToHashTable -Hashtable $EventFilter -Key "LogName" -Value $Input.LogName
-                    Add-ToHashTable -Hashtable $EventFilter -Key "Id" -Value $ID
-                    Add-ToHashTable -Hashtable $EventFilter -Key "StartTime" -Value $Input.DateFrom
-                    Add-ToHashTable -Hashtable $EventFilter -Key "EndTime" -Value $Input.DateTo
-                    $Comp = $Input.Server
-                }             
-                if ($Verbose) {
-                    foreach ($Key in $EventFilter.Keys) {
-                        Write-Verbose "Get-Events - Filter parameters provided $Key = $(($EventFilter.$Key) -join ', ')"
+            if ($null -ne $Input.EventID) {
+                $ID = $Input.EventID | Sort-Object -Unique
+                Write-Verbose "Get-Events - Events to process in Total (unique): $($Id.Count)"
+                Write-Verbose "Get-Events - Events to process in Total ID: $($ID -join ', ')"
+                if ($Id.Count -gt 22) {
+                    Write-Verbose "Get-Events - There are more events to process then 22, split will be required."
+                }
+                $SplitArrayID = Split-Array -inArray $ID -size 22  # Support for more ID's then 22 (limitation of Get-WinEvent)
+                foreach ($ID in $SplitArrayID) {
+                    $EventFilter.Id = $ID
+
+                    @{
+                        Comp        = $Comp
+                        EventFilter = $EventFilter
+                        MaxEvents   = $MaxEvents
+                        Oldest      = $Oldest
+                        Verbose     = $Verbose
                     }
                 }
+            } else {
+                
                 @{
                     Comp        = $Comp
                     EventFilter = $EventFilter
@@ -159,41 +170,42 @@ function Get-Events {
             $null = $ParametersList.AddRange($Param)
         }
     } else {
+        # Standard input
+        $EventFilter = @{}
+        Add-ToHashTable -Hashtable $EventFilter -Key "LogName" -Value $LogName # Accepts Wildcard
+        Add-ToHashTable -Hashtable $EventFilter -Key "ProviderName" -Value $ProviderName # Accepts Wildcard
+        Add-ToHashTable -Hashtable $EventFilter -Key "Path" -Value $Path # https://blogs.technet.microsoft.com/heyscriptingguy/2011/01/25/use-powershell-to-parse-saved-event-logs-for-errors/
+        Add-ToHashTable -Hashtable $EventFilter -Key "Keywords" -Value $Keywords.value__
+        Add-ToHashTable -Hashtable $EventFilter -Key "Level" -Value $Level.value__
+        Add-ToHashTable -Hashtable $EventFilter -Key "StartTime" -Value $DateFrom
+        Add-ToHashTable -Hashtable $EventFilter -Key "EndTime" -Value $DateTo
+        Add-ToHashTable -Hashtable $EventFilter -Key "UserID" -Value $UserSID
+        Add-ToHashTable -Hashtable $EventFilter -Key "Data" -Value $Data
+        Add-ToHashTable -Hashtable $EventFilter -Key "RecordID" -Value $RecordID
+        Add-ToHashTable -Hashtable $EventFilter -Key "NamedDataFilter" -Value $NamedDataFilter
+        Add-ToHashTable -Hashtable $EventFilter -Key "NamedDataExcludeFilter" -Value $NamedDataExcludeFilter
+        Add-ToHashTable -Hashtable $EventFilter -Key "UserID" -Value $UserID
+        Add-ToHashTable -Hashtable $EventFilter -Key "ExcludeID" -Value $ExcludeID
 
-        if ($null -ne $ID) {
-            $ID = $ID | Sort-Object -Unique
-            Write-Verbose "Get-Events - Events to process in Total (unique): $($Id.Count)"
-            Write-Verbose "Get-Events - Events to process in Total ID: $($ID -join ', ')"
-            if ($Id.Count -gt 22) {
-                Write-Verbose "Get-Events - There are more events to process then 22, split will be required."
+        [Array] $Param = foreach ($Comp in $Machine) {
+            if ($Verbose) {
+                Write-Verbose "Get-Events - Preparing data to scan computer $Comp"
+                foreach ($Key in $EventFilter.Keys) {
+                    Write-Verbose "Get-Events - Filter parameters provided $Key = $(($EventFilter.$Key) -join ', ')"
+                }
             }
-            $SplitArrayID = Split-Array -inArray $ID -size 22  # Support for more ID's then 22 (limitation of Get-WinEvent)
-            [Array] $Param = foreach ($ID in $SplitArrayID) {
-                
-                $EventFilter = @{}
-                Add-ToHashTable -Hashtable $EventFilter -Key "LogName" -Value $LogName # Accepts Wildcard
-                Add-ToHashTable -Hashtable $EventFilter -Key "ProviderName" -Value $ProviderName # Accepts Wildcard
-                Add-ToHashTable -Hashtable $EventFilter -Key "Path" -Value $Path # https://blogs.technet.microsoft.com/heyscriptingguy/2011/01/25/use-powershell-to-parse-saved-event-logs-for-errors/
-                Add-ToHashTable -Hashtable $EventFilter -Key "Keywords" -Value $Keywords.value__
-                Add-ToHashTable -Hashtable $EventFilter -Key "Id" -Value $ID
-                Add-ToHashTable -Hashtable $EventFilter -Key "Level" -Value $Level.value__
-                Add-ToHashTable -Hashtable $EventFilter -Key "StartTime" -Value $DateFrom
-                Add-ToHashTable -Hashtable $EventFilter -Key "EndTime" -Value $DateTo
-                Add-ToHashTable -Hashtable $EventFilter -Key "UserID" -Value $UserSID
-                Add-ToHashTable -Hashtable $EventFilter -Key "Data" -Value $Data
-                Add-ToHashTable -Hashtable $EventFilter -Key "RecordID" -Value $RecordID
-                Add-ToHashTable -Hashtable $EventFilter -Key "NamedDataFilter" -Value $NamedDataFilter
-                Add-ToHashTable -Hashtable $EventFilter -Key "NamedDataExcludeFilter" -Value $NamedDataExcludeFilter
-                Add-ToHashTable -Hashtable $EventFilter -Key "UserID" -Value $UserID
-                Add-ToHashTable -Hashtable $EventFilter -Key "ExcludeID" -Value $ExcludeID
+            if ($null -ne $ID) {
+                # EventID needed
+                $ID = $ID | Sort-Object -Unique
+                Write-Verbose "Get-Events - Events to process in Total (unique): $($Id.Count)"
+                Write-Verbose "Get-Events - Events to process in Total ID: $($ID -join ', ')"
+                if ($Id.Count -gt 22) {
+                    Write-Verbose "Get-Events - There are more events to process then 22, split will be required."
+                }
+                $SplitArrayID = Split-Array -inArray $ID -size 22  # Support for more ID's then 22 (limitation of Get-WinEvent)
+                foreach ($ID in $SplitArrayID) {
 
-                foreach ($Comp in $Machine) {
-                    if ($Verbose) {
-                        Write-Verbose "Get-Events - Preparing data to scan computer $Comp"
-                        foreach ($Key in $EventFilter.Keys) {
-                            Write-Verbose "Get-Events - Filter parameters provided $Key = $(($EventFilter.$Key) -join ', ')"
-                        }
-                    }
+                    $EventFilter.Id = $ID
                     @{
                         Comp        = $Comp
                         EventFilter = $EventFilter
@@ -201,37 +213,9 @@ function Get-Events {
                         Oldest      = $Oldest
                         Verbose     = $Verbose
                     }
-                }
-            }
-            if ($null -ne $Param) {
-                $null = $ParametersList.AddRange($Param)
-            }
-        } else {
-            # No EventID was given
-            $EventFilter = @{}
-            Add-ToHashTable -Hashtable $EventFilter -Key "LogName" -Value $LogName # Accepts Wildcard
-            Add-ToHashTable -Hashtable $EventFilter -Key "ProviderName" -Value $ProviderName # Accepts Wildcard
-            Add-ToHashTable -Hashtable $EventFilter -Key "Path" -Value $Path # https://blogs.technet.microsoft.com/heyscriptingguy/2011/01/25/use-powershell-to-parse-saved-event-logs-for-errors/
-            Add-ToHashTable -Hashtable $EventFilter -Key "Keywords" -Value $Keywords.value__
-            Add-ToHashTable -Hashtable $EventFilter -Key "Id" -Value $ID
-            Add-ToHashTable -Hashtable $EventFilter -Key "Level" -Value $Level.value__
-            Add-ToHashTable -Hashtable $EventFilter -Key "StartTime" -Value $DateFrom
-            Add-ToHashTable -Hashtable $EventFilter -Key "EndTime" -Value $DateTo
-            Add-ToHashTable -Hashtable $EventFilter -Key "UserID" -Value $UserSID
-            Add-ToHashTable -Hashtable $EventFilter -Key "Data" -Value $Data
-            Add-ToHashTable -Hashtable $EventFilter -Key "RecordID" -Value $RecordID
-            Add-ToHashTable -Hashtable $EventFilter -Key "NamedDataFilter" -Value $NamedDataFilter
-            Add-ToHashTable -Hashtable $EventFilter -Key "NamedDataExcludeFilter" -Value $NamedDataExcludeFilter
-            Add-ToHashTable -Hashtable $EventFilter -Key "UserID" -Value $UserID
-            Add-ToHashTable -Hashtable $EventFilter -Key "ExcludeID" -Value $ExcludeID
-
-            [Array] $Param = foreach ($Comp in $Machine) {
-                if ($Verbose) {
-                    Write-Verbose "Get-Events - Preparing data to scan computer $Comp"
-                    foreach ($Key in $EventFilter.Keys) {
-                        Write-Verbose "Get-Events - Filter parameters provided $Key = $(($EventFilter.$Key) -join ', ')"
-                    }
-                }
+                } 
+            } else {
+                # No EventID given
                 @{
                     Comp        = $Comp
                     EventFilter = $EventFilter
@@ -239,13 +223,13 @@ function Get-Events {
                     Oldest      = $Oldest
                     Verbose     = $Verbose
                 }
-            }
-            if ($null -ne $Param) {
-                $null = $ParametersList.AddRange($Param)
+
             }
         }
+        if ($null -ne $Param) {
+            $null = $ParametersList.AddRange($Param)
+        }
     }
-
     $AllErrors = @()
     if ($DisableParallel) {
         Write-Verbose 'Get-Events - Running query with parallel disabled...'

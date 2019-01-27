@@ -1,7 +1,7 @@
 Clear-Host
 Import-Module ..\PSEventViewer.psd1 -force
 Write-Color "Start 1" -Color Red
-$Output1 = Get-Events -LogName 'Setup' -ID 2 -ComputerName 'Evo1' -MaxEvents 1 -Verbose -DisableParallel #| Format-Table *
+$Output1 = Get-Events -LogName 'Setup' -ID 2 -ComputerName 'Evo1' -MaxEvents 1 -Verbose #| Format-Table *
 Write-Color 'Start 2' -Color Red
 $Output2 = Get-Events -LogName 'Setup' -ComputerName 'Evo1' -MaxEvents 1 -Verbose #| Format-Table *
 Write-Color 'Start 3' -Color Blue
@@ -13,6 +13,7 @@ $List = @()
 #$List += @{ Server = 'C:\MyEvents\Archive-Security-2018-09-15-09-27-52-679.evtx'; LogName = 'Security'; EventID = '5136', '5137'; Type = 'File' }
 #$List += @{ Server = 'Evo1'; LogName = 'Setup'; EventID = 2; Type = 'Computer'; }
 $List += @{ Server = 'AD1.ad.evotec.xyz'; LogName = 'Security'; EventID = 4720, 4738, 5136, 5137, 5141, 4722, 4725, 4767, 4723, 4724, 4726, 4728, 4729, 4732, 4733, 4746, 4747, 4751, 4752, 4756, 4757, 4761, 4762, 4785, 4786, 4787, 4788, 5136, 5137, 5141, 5136, 5137, 5141, 5136, 5137, 5141; Type = 'Computer' }
+$List += @{ Server = 'Evo1'; LogName = 'Setup'; Type = 'Computer'; }
 $Output3 = Get-Events -ExtendedInput $List -Verbose
 
 Write-Color "End 1" -Color Red
