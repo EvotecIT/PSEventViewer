@@ -18,7 +18,7 @@ Get-Events [[-Machine] <String[]>] [[-DateFrom] <DateTime>] [[-DateTo] <DateTime
  [[-NamedDataExcludeFilter] <Hashtable>] [[-UserID] <String[]>] [[-Level] <Level[]>] [[-UserSID] <String>]
  [[-Data] <String[]>] [[-MaxEvents] <Int32>] [[-Credentials] <PSCredential>] [[-Path] <String>]
  [[-Keywords] <Keywords[]>] [[-RecordID] <Int64>] [[-MaxRunspaces] <Int32>] [-Oldest] [-DisableParallel]
- [-ExtendedOutput] [<CommonParameters>]
+ [-ExtendedOutput] [[-ExtendedInput] <Array>] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -57,7 +57,7 @@ Parameter description
 ```yaml
 Type: DateTime
 Parameter Sets: (All)
-Aliases: From
+Aliases: StartTime, From
 
 Required: False
 Position: 2
@@ -72,7 +72,7 @@ Parameter description
 ```yaml
 Type: DateTime
 Parameter Sets: (All)
-Aliases: To
+Aliases: EndTime, To
 
 Required: False
 Position: 3
@@ -364,6 +364,21 @@ Aliases:
 Required: False
 Position: Named
 Default value: False
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -ExtendedInput
+Parameter description
+
+```yaml
+Type: Array
+Parameter Sets: (All)
+Aliases:
+
+Required: False
+Position: 20
+Default value: None
 Accept pipeline input: False
 Accept wildcard characters: False
 ```
