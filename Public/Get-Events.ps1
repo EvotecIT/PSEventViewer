@@ -85,8 +85,8 @@ function Get-Events {
     [CmdLetBinding()]
     param (
         [alias ("ADDomainControllers", "DomainController", "Server", "Servers", "Computer", "Computers", "ComputerName")] [string[]] $Machine = $Env:COMPUTERNAME,
-        [alias ("From")][nullable[DateTime]] $DateFrom = $null,
-        [alias ("To")][nullable[DateTime]] $DateTo = $null,
+        [alias ("StartTime", "From")][nullable[DateTime]] $DateFrom = $null,
+        [alias ("EndTime", "To")][nullable[DateTime]] $DateTo = $null,
         [alias ("Ids", "EventID", "EventIds")] [int[]] $ID = $null,
         [alias ("ExludeEventID")][int[]] $ExcludeID = $null,
         [alias ("LogType", "Log")][string] $LogName = $null,
@@ -115,30 +115,44 @@ function Get-Events {
 
     if ($ExtendedInput.Count -gt 0) {
         [Array] $Param = foreach ($Input in $ExtendedInput) {
-            $EventFilter = @{}
-            if ($Input.Type -eq 'File') {
-                Write-Verbose "Get-Events - Preparing data to scan file $($Input.Server)"
-                Add-ToHashTable -Hashtable $EventFilter -Key "LogName" -Value $Input.LogName # Accepts Wildcard
-                Add-ToHashTable -Hashtable $EventFilter -Key "Path" -Value $Input.Server
-                Add-ToHashTable -Hashtable $EventFilter -Key "Id" -Value $Input.EventID
-                $Comp = $Env:COMPUTERNAME
-            } else {
-                Write-Verbose "Get-Events - Preparing data to scan computer $($Input.Server)"
-                Add-ToHashTable -Hashtable $EventFilter -Key "LogName" -Value $Input.LogName
-                Add-ToHashTable -Hashtable $EventFilter -Key "Id" -Value $Input.EventID
-                $Comp = $Input.Server
-            }             
-            if ($Verbose) {
-                foreach ($Key in $EventFilter.Keys) {
-                    Write-Verbose "Get-Events - Filter parameters provided $Key = $($EventFilter.$Key)"
-                }
+
+            $ID = $Input.EventID | Sort-Object -Unique
+            Write-Verbose "Get-Events - Events to process in Total (unique): $($Id.Count)"
+            Write-Verbose "Get-Events - Events to process in Total ID: $($ID -join ', ')"
+            if ($Id.Count -gt 22) {
+                Write-Verbose "Get-Events - There are more events to process then 22, split will be required."
             }
-            @{
-                Comp        = $Comp
-                EventFilter = $EventFilter
-                MaxEvents   = $MaxEvents
-                Oldest      = $Oldest
-                Verbose     = $Verbose
+            $SplitArrayID = Split-Array -inArray $ID -size 22  # Support for more ID's then 22 (limitation of Get-WinEvent)
+            foreach ($ID in $SplitArrayID) {
+                $EventFilter = @{}
+                if ($Input.Type -eq 'File') {
+                    Write-Verbose "Get-Events - Preparing data to scan file $($Input.Server)"
+                    Add-ToHashTable -Hashtable $EventFilter -Key "LogName" -Value $Input.LogName # Accepts Wildcard
+                    Add-ToHashTable -Hashtable $EventFilter -Key "Path" -Value $Input.Server
+                    Add-ToHashTable -Hashtable $EventFilter -Key "Id" -Value $ID
+                    Add-ToHashTable -Hashtable $EventFilter -Key "StartTime" -Value $Input.DateFrom
+                    Add-ToHashTable -Hashtable $EventFilter -Key "EndTime" -Value $Input.DateTo
+                    $Comp = $Env:COMPUTERNAME
+                } else {
+                    Write-Verbose "Get-Events - Preparing data to scan computer $($Input.Server)"
+                    Add-ToHashTable -Hashtable $EventFilter -Key "LogName" -Value $Input.LogName
+                    Add-ToHashTable -Hashtable $EventFilter -Key "Id" -Value $ID
+                    Add-ToHashTable -Hashtable $EventFilter -Key "StartTime" -Value $Input.DateFrom
+                    Add-ToHashTable -Hashtable $EventFilter -Key "EndTime" -Value $Input.DateTo
+                    $Comp = $Input.Server
+                }             
+                if ($Verbose) {
+                    foreach ($Key in $EventFilter.Keys) {
+                        Write-Verbose "Get-Events - Filter parameters provided $Key = $(($EventFilter.$Key) -join ', ')"
+                    }
+                }
+                @{
+                    Comp        = $Comp
+                    EventFilter = $EventFilter
+                    MaxEvents   = $MaxEvents
+                    Oldest      = $Oldest
+                    Verbose     = $Verbose
+                }
             }
         }
         $null = $ParametersList.AddRange($Param)
@@ -146,13 +160,14 @@ function Get-Events {
 
         if ($null -ne $ID) {
             $ID = $ID | Sort-Object -Unique
-            Write-Verbose "Get-Events - Events to process in Total: $($Id.Count)"
-            Write-Verbose "Get-Events - Events to process in Total ID: $ID"
+            Write-Verbose "Get-Events - Events to process in Total (unique): $($Id.Count)"
+            Write-Verbose "Get-Events - Events to process in Total ID: $($ID -join ', ')"
             if ($Id.Count -gt 22) {
                 Write-Verbose "Get-Events - There are more events to process then 22, split will be required."
             }
             $SplitArrayID = Split-Array -inArray $ID -size 22  # Support for more ID's then 22 (limitation of Get-WinEvent)
             [Array] $Param = foreach ($ID in $SplitArrayID) {
+                
                 $EventFilter = @{}
                 Add-ToHashTable -Hashtable $EventFilter -Key "LogName" -Value $LogName # Accepts Wildcard
                 Add-ToHashTable -Hashtable $EventFilter -Key "ProviderName" -Value $ProviderName # Accepts Wildcard
@@ -171,9 +186,11 @@ function Get-Events {
                 Add-ToHashTable -Hashtable $EventFilter -Key "ExcludeID" -Value $ExcludeID
 
                 foreach ($Comp in $Machine) {
-                    Write-Verbose "Get-Events - Preparing data to scan computer $Comp"
-                    foreach ($Key in $EventFilter.Keys) {
-                        Write-Verbose "Get-Events - Filter parameters provided $Key = $($EventFilter.$Key)"
+                    if ($Verbose) {
+                        Write-Verbose "Get-Events - Preparing data to scan computer $Comp"
+                        foreach ($Key in $EventFilter.Keys) {
+                            Write-Verbose "Get-Events - Filter parameters provided $Key = $(($EventFilter.$Key) -join ', ')"
+                        }
                     }
                     @{
                         Comp        = $Comp
@@ -205,9 +222,11 @@ function Get-Events {
             Add-ToHashTable -Hashtable $EventFilter -Key "ExcludeID" -Value $ExcludeID
 
             [Array] $Param = foreach ($Comp in $Machine) {
-                Write-Verbose "Get-Events - Preparing data to scan computer $Comp"
-                foreach ($Key in $EventFilter.Keys) {
-                    Write-Verbose "Get-Events - Filter parameters provided $Key = $($EventFilter.$Key)"
+                if ($Verbose) {
+                    Write-Verbose "Get-Events - Preparing data to scan computer $Comp"
+                    foreach ($Key in $EventFilter.Keys) {
+                        Write-Verbose "Get-Events - Filter parameters provided $Key = $(($EventFilter.$Key) -join ', ')"
+                    }
                 }
                 @{
                     Comp        = $Comp
@@ -235,14 +254,14 @@ function Get-Events {
         }        
         [Array] $AllEvents = Stop-Runspace -Runspaces $Runspaces -FunctionName "Get-Events" -RunspacePool $RunspacePool -Verbose:$Verbose -ErrorAction SilentlyContinue -ErrorVariable +AllErrors -ExtendedOutput:$ExtendedOutput
     }
-    if ($ExtendedOutput) {
-        return , $AllEvents # returns @{ Output and Errors }
-    }
-    $EventsProcessed = ($AllEvents | Measure-Object).Count
+    #$EventsProcessed = Get-ObjectCount -Object $AllEvents
     Write-Verbose "Get-Events - Overall errors: $($AllErrors.Count)"
-    Write-Verbose "Get-Events - Overall events processed in total for the report: $EventsProcessed"
+    Write-Verbose "Get-Events - Overall events processed in total for the report: $($AllEvents.Count)"
     Write-Verbose "Get-Events - Overall time to generate $($MeasureTotal.Elapsed.Hours) hours, $($MeasureTotal.Elapsed.Minutes) minutes, $($MeasureTotal.Elapsed.Seconds) seconds, $($MeasureTotal.Elapsed.Milliseconds) milliseconds"
     $MeasureTotal.Stop()
     Write-Verbose "Get-Events - Overall events processing end"
+    if ($ExtendedOutput) {
+        return , $AllEvents # returns @{ Output and Errors }
+    }
     return , $AllEvents
 }

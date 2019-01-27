@@ -633,10 +633,10 @@ $Script:ScriptBlock = {
                 }
             }
             $EventsCount = ($Events | Measure-Object).Count
-            Write-Verbose -Message "Get-Events - Inside $Comp Events founds $EventsCount"
+            Write-Verbose -Message "Get-Events - Inside $Comp Events found $EventsCount"
         } catch {
             if ($_.Exception -match "No events were found that match the specified selection criteria") {
-                Write-Verbose -Message "Get-Events - Inside $Comp - No events found."
+                Write-Verbose -Message "Get-Events - Inside $Comp No events found."
             } elseif ($_.Exception -match "There are no more endpoints available from the endpoint") {
                 Write-Verbose -Message "Get-Events - Inside $Comp Error $($_.Exception.Message)"
                 Write-Error -Message "$Comp`: $_"
@@ -644,9 +644,9 @@ $Script:ScriptBlock = {
                 Write-Verbose -Message "Get-Events - Inside $Comp Error $($_.Exception.Message)"
                 Write-Error -Message "$Comp`: $_"
             }
-            Write-Verbose "Get-Events - Inside $Comp - Time to generate $($Measure.Elapsed.Hours) hours, $($Measure.Elapsed.Minutes) minutes, $($Measure.Elapsed.Seconds) seconds, $($Measure.Elapsed.Milliseconds) milliseconds"
+            Write-Verbose "Get-Events - Inside $Comp Time to generate $($Measure.Elapsed.Hours) hours, $($Measure.Elapsed.Minutes) minutes, $($Measure.Elapsed.Seconds) seconds, $($Measure.Elapsed.Milliseconds) milliseconds"
             $Measure.Stop()
-            continue
+            return
         }
         Write-Verbose "Get-Events - Inside $Comp Processing events..."
 
@@ -746,7 +746,7 @@ $Script:ScriptBlock = {
         return $Events
     }
     Write-Verbose "Get-Events -------------START---------------------"
-    [Array] $Data = Get-EventsInternal -Comp $Comp -EventFilter $EventFilter -MaxEvents $MaxEvents -Oldest:$Oldest -Verbose:$Verbose
+    $Data = Get-EventsInternal -Comp $Comp -EventFilter $EventFilter -MaxEvents $MaxEvents -Oldest:$Oldest -Verbose:$Verbose
     if ($EventFilter.Path) {
         $Data | Add-Member -MemberType NoteProperty -Name "GatheredFrom" -Value $EventFilter.Path -Force
     } else {
@@ -754,5 +754,5 @@ $Script:ScriptBlock = {
     }
     $Data | Add-Member -MemberType NoteProperty -Name "GatheredLogName" -Value $EventFilter.LogName -Force
     Write-Verbose "Get-Events --------------END----------------------"
-    return , $Data
+    return $Data
 }
