@@ -155,7 +155,9 @@ function Get-Events {
                 }
             }
         }
-        $null = $ParametersList.AddRange($Param)
+        if ($null -ne $Param) {
+            $null = $ParametersList.AddRange($Param)
+        }
     } else {
 
         if ($null -ne $ID) {
@@ -201,7 +203,9 @@ function Get-Events {
                     }
                 }
             }
-            $null = $ParametersList.AddRange($param)
+            if ($null -ne $Param) {
+                $null = $ParametersList.AddRange($Param)
+            }
         } else {
             # No EventID was given
             $EventFilter = @{}
@@ -236,7 +240,9 @@ function Get-Events {
                     Verbose     = $Verbose
                 }
             }
-            $null = $ParametersList.AddRange($Param)
+            if ($null -ne $Param) {
+                $null = $ParametersList.AddRange($Param)
+            }
         }
     }
 
