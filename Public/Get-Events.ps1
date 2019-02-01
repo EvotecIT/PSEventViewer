@@ -115,29 +115,42 @@ function Get-Events {
 
     if ($ExtendedInput.Count -gt 0) {
         # Special input - PSWinReporting requires it
-        [Array] $Param = foreach ($Input in $ExtendedInput) {         
+        [Array] $Param = foreach ($EventEntry in $ExtendedInput) {         
             $EventFilter = @{}
-            if ($Input.Type -eq 'File') {
-                Write-Verbose "Get-Events - Preparing data to scan file $($Input.Server)"
-                Add-ToHashTable -Hashtable $EventFilter -Key "LogName" -Value $Input.LogName # Accepts Wildcard
-                Add-ToHashTable -Hashtable $EventFilter -Key "Path" -Value $Input.Server
-                Add-ToHashTable -Hashtable $EventFilter -Key "StartTime" -Value $Input.DateFrom
-                Add-ToHashTable -Hashtable $EventFilter -Key "EndTime" -Value $Input.DateTo
+            if ($EventEntry.Type -eq 'File') {
+                Write-Verbose "Get-Events - Preparing data to scan file $($EventEntry.Server)"
+                Add-ToHashTable -Hashtable $EventFilter -Key "Path" -Value $EventEntry.Server
                 $Comp = $Env:COMPUTERNAME
             } else {
-                Write-Verbose "Get-Events - Preparing data to scan computer $($Input.Server)"
-                Add-ToHashTable -Hashtable $EventFilter -Key "LogName" -Value $Input.LogName
-                Add-ToHashTable -Hashtable $EventFilter -Key "StartTime" -Value $Input.DateFrom
-                Add-ToHashTable -Hashtable $EventFilter -Key "EndTime" -Value $Input.DateTo
-                $Comp = $Input.Server
-            }             
+                Write-Verbose "Get-Events - Preparing data to scan computer $($EventEntry.Server)"
+                $Comp = $EventEntry.Server
+            }            
+            $ConvertedLevels = foreach ($Data in $EventEntry.Level) {
+               ([PSEventViewer.Level]::$Data).value__
+            }
+            $ConvertedKeywords = foreach ($Data in $EventEntry.Keywords) {
+                ([PSEventViewer.Keywords]::$Data).value__
+            }
+            Add-ToHashTable -Hashtable $EventFilter -Key "LogName" -Value $EventEntry.LogName
+            Add-ToHashTable -Hashtable $EventFilter -Key "StartTime" -Value $EventEntry.DateFrom
+            Add-ToHashTable -Hashtable $EventFilter -Key "EndTime" -Value $EventEntry.DateTo
+            Add-ToHashTable -Hashtable $EventFilter -Key "Keywords" -Value $ConvertedKeywords
+            Add-ToHashTable -Hashtable $EventFilter -Key "Level" -Value $ConvertedLevels
+            Add-ToHashTable -Hashtable $EventFilter -Key "UserID" -Value $EventEntry.UserSID
+            Add-ToHashTable -Hashtable $EventFilter -Key "Data" -Value $EventEntry.Data
+            Add-ToHashTable -Hashtable $EventFilter -Key "RecordID" -Value $EventEntry.RecordID
+            Add-ToHashTable -Hashtable $EventFilter -Key "NamedDataFilter" -Value $EventEntry.NamedDataFilter
+            Add-ToHashTable -Hashtable $EventFilter -Key "NamedDataExcludeFilter" -Value $EventEntry.NamedDataExcludeFilter
+            Add-ToHashTable -Hashtable $EventFilter -Key "UserID" -Value $EventEntry.UserID
+            Add-ToHashTable -Hashtable $EventFilter -Key "ExcludeID" -Value $EventEntry.ExcludeID
+            
             if ($Verbose) {
                 foreach ($Key in $EventFilter.Keys) {
                     Write-Verbose "Get-Events - Filter parameters provided $Key = $(($EventFilter.$Key) -join ', ')"
                 }
             }
-            if ($null -ne $Input.EventID) {
-                $ID = $Input.EventID | Sort-Object -Unique
+            if ($null -ne $EventEntry.EventID) {
+                $ID = $EventEntry.EventID | Sort-Object -Unique
                 Write-Verbose "Get-Events - Events to process in Total (unique): $($Id.Count)"
                 Write-Verbose "Get-Events - Events to process in Total ID: $($ID -join ', ')"
                 if ($Id.Count -gt 22) {
@@ -149,7 +162,7 @@ function Get-Events {
                     @{
                         Comp        = $Comp
                         EventFilter = $EventFilter.Clone()
-                        MaxEvents   = $MaxEvents
+                        MaxEvents   = $EventEntry.MaxEvents
                         Oldest      = $Oldest
                         Verbose     = $Verbose
                     }
@@ -158,7 +171,7 @@ function Get-Events {
                 @{
                     Comp        = $Comp
                     EventFilter = $EventFilter
-                    MaxEvents   = $MaxEvents
+                    MaxEvents   = $EventEntry.MaxEvents
                     Oldest      = $Oldest
                     Verbose     = $Verbose
                 }
