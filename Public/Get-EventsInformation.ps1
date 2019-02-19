@@ -141,7 +141,7 @@ function Get-EventsInformation {
         [string[]] $FilePath,
         [alias ("LogType", "Log")][string[]] $LogName = 'Security',
         [int] $MaxRunspaces = 50,
-        [alias('AskDC', 'QueryDomainControllers','AskForest')][switch] $RunAgainstDC
+        [alias('AskDC', 'QueryDomainControllers', 'AskForest')][switch] $RunAgainstDC
     )
     Write-Verbose "Get-EventsInformation - processing start"
     if ($PSCmdlet.MyInvocation.BoundParameters["Verbose"].IsPresent) { $Verbose = $true } else { $Verbose = $false }
@@ -159,28 +159,29 @@ function Get-EventsInformation {
         $Machine = ($ForestInformation | Where-Object { $_.HostName -ne '' }).HostName
     }
 
-    $RunSpaces = @()
-    $RunSpaces += foreach ($Computer in $Machine) {
-        foreach ($Log in $LogName) {
-            Write-Verbose "Get-EventsInformation - Setting up runspace for $Computer on $Log log"
+    $RunSpaces = @(
+        foreach ($Computer in $Machine) {
+            foreach ($Log in $LogName) {
+                Write-Verbose "Get-EventsInformation - Setting up runspace for $Computer on $Log log"
+                $Parameters = [ordered] @{
+                    Computer = $Computer
+                    LogName  = $Log
+                    Verbose  = $Verbose
+                }
+                # returns values
+                Start-Runspace -ScriptBlock $Script:ScriptBlockEventsInformation -Parameters $Parameters -RunspacePool $Pool -Verbose:$Verbose
+            }
+        }
+        foreach ($Path in $FilePath) {
+            Write-Verbose "Get-EventsInformation - Setting up runspace for $Path"
             $Parameters = [ordered] @{
-                Computer = $Computer
-                LogName  = $Log
-                Verbose  = $Verbose
+                Path    = $Path
+                Verbose = $Verbose
             }
             # returns values
             Start-Runspace -ScriptBlock $Script:ScriptBlockEventsInformation -Parameters $Parameters -RunspacePool $Pool -Verbose:$Verbose
         }
-    }
-    $RunSpaces += foreach ($Path in $FilePath) {
-        Write-Verbose "Get-EventsInformation - Setting up runspace for $Path"
-        $Parameters = [ordered] @{
-            Path    = $Path
-            Verbose = $Verbose
-        }
-        # returns values
-        Start-Runspace -ScriptBlock $Script:ScriptBlockEventsInformation -Parameters $Parameters -RunspacePool $Pool -Verbose:$Verbose
-    }
+    )
     ### End Runspaces START
     $AllEvents = Stop-Runspace -Runspaces $RunSpaces `
         -FunctionName "Get-EventsInformation" `
