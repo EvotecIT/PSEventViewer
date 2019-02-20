@@ -126,7 +126,7 @@ function Get-Events {
                 $Comp = $EventEntry.Server
             }            
             $ConvertedLevels = foreach ($Data in $EventEntry.Level) {
-               ([PSEventViewer.Level]::$Data).value__
+                ([PSEventViewer.Level]::$Data).value__
             }
             $ConvertedKeywords = foreach ($Data in $EventEntry.Keywords) {
                 ([PSEventViewer.Keywords]::$Data).value__
@@ -146,7 +146,13 @@ function Get-Events {
             
             if ($Verbose) {
                 foreach ($Key in $EventFilter.Keys) {
-                    Write-Verbose "Get-Events - Filter parameters provided $Key = $(($EventFilter.$Key) -join ', ')"
+                    if ($Key -eq 'NamedDataFilter' -or $Key -eq 'NamedDataExcludeFilter') {
+                        foreach ($SubKey in $($EventFilter.$Key).Keys) {
+                            Write-Verbose "Get-Events - Filter parameters provided $Key with SubKey $SubKey = $(($EventFilter.$Key.$SubKey) -join ', ')"
+                        }
+                    } else {
+                        Write-Verbose "Get-Events - Filter parameters provided $Key = $(($EventFilter.$Key) -join ', ')"
+                    }
                 }
             }
             if ($null -ne $EventEntry.EventID) {
@@ -202,7 +208,13 @@ function Get-Events {
             if ($Verbose) {
                 Write-Verbose "Get-Events - Preparing data to scan computer $Comp"
                 foreach ($Key in $EventFilter.Keys) {
-                    Write-Verbose "Get-Events - Filter parameters provided $Key = $(($EventFilter.$Key) -join ', ')"
+                    if ($Key -eq 'NamedDataFilter' -or $Key -eq 'NamedDataExcludeFilter') {
+                        foreach ($SubKey in $($EventFilter.$Key).Keys) {
+                            Write-Verbose "Get-Events - Filter parameters provided $Key with SubKey $SubKey = $(($EventFilter.$Key.$SubKey) -join ', ')"
+                        }
+                    } else {
+                        Write-Verbose "Get-Events - Filter parameters provided $Key = $(($EventFilter.$Key) -join ', ')"
+                    }
                 }
             }
             if ($null -ne $ID) {

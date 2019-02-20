@@ -606,32 +606,33 @@ $Script:ScriptBlock = {
         Write-Verbose "Get-Events - Inside $Comp for Events Oldest: $Oldest"
         Write-Verbose "Get-Events - Inside $Comp for Events Max Events: $MaxEvents"
         $Measure = [System.Diagnostics.Stopwatch]::StartNew() # Timer Start
-        [Array] $Events = @()
-
+        
         try {
-            if ($null -ne $EventFilter.RecordID -or `
-                    $null -ne $EventFilter.NamedDataFilter -or `
-                    $null -ne $EventFilter.ExcludeID -or `
-                    $null -ne $EventFilter.NamedDataExcludeFilter -or `
-                    $null -ne $EventFilter.UserID
-            ) {
-                $FilterXML = Get-EventsFilter @EventFilter
-                Write-Verbose "Get-Events - Inside $Comp - Custom FilterXML: `n$FilterXML"
-                if ($MaxEvents -ne $null -and $MaxEvents -ne 0) {
-                    $Events = Get-WinEvent -FilterXml $FilterXML -ComputerName $Comp -MaxEvents $MaxEvents -Oldest:$Oldest -ErrorAction Stop
+            $Events = @(
+                if ($null -ne $EventFilter.RecordID -or `
+                        $null -ne $EventFilter.NamedDataFilter -or `
+                        $null -ne $EventFilter.ExcludeID -or `
+                        $null -ne $EventFilter.NamedDataExcludeFilter -or `
+                        $null -ne $EventFilter.UserID
+                ) {
+                    $FilterXML = Get-EventsFilter @EventFilter
+                    Write-Verbose "Get-Events - Inside $Comp - Custom FilterXML: `n$FilterXML"
+                    if ($MaxEvents -ne $null -and $MaxEvents -ne 0) {
+                        Get-WinEvent -FilterXml $FilterXML -ComputerName $Comp -MaxEvents $MaxEvents -Oldest:$Oldest -ErrorAction Stop
+                    } else {
+                        Get-WinEvent -FilterXml $FilterXML -ComputerName $Comp -Oldest:$Oldest -ErrorAction Stop
+                    }
                 } else {
-                    $Events = Get-WinEvent -FilterXml $FilterXML -ComputerName $Comp -Oldest:$Oldest -ErrorAction Stop
+                    foreach ($k in $EventFilter.Keys) {
+                        Write-Verbose "Get-Events - Inside $Comp Data in FilterHashTable $k $($EventFilter[$k])"
+                    }
+                    if ($MaxEvents -ne 0) {
+                        Get-WinEvent -FilterHashtable $EventFilter -ComputerName $Comp -MaxEvents $MaxEvents -Oldest:$Oldest -ErrorAction Stop
+                    } else {
+                        Get-WinEvent -FilterHashtable $EventFilter -ComputerName $Comp -Oldest:$Oldest -ErrorAction Stop
+                    }
                 }
-            } else {
-                foreach ($k in $EventFilter.Keys) {
-                    Write-Verbose "Get-Events - Inside $Comp Data in FilterHashTable $k $($EventFilter[$k])"
-                }
-                if ($MaxEvents -ne 0) {
-                    $Events = Get-WinEvent -FilterHashtable $EventFilter -ComputerName $Comp -MaxEvents $MaxEvents -Oldest:$Oldest -ErrorAction Stop
-                } else {
-                    $Events = Get-WinEvent -FilterHashtable $EventFilter -ComputerName $Comp -Oldest:$Oldest -ErrorAction Stop
-                }
-            }
+            )
             $EventsCount = ($Events | Measure-Object).Count
             Write-Verbose -Message "Get-Events - Inside $Comp Events found $EventsCount"
         } catch {
