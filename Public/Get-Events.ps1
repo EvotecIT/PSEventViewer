@@ -271,8 +271,12 @@ function Get-Events {
     Write-Verbose "Get-Events - Overall time to generate $($MeasureTotal.Elapsed.Hours) hours, $($MeasureTotal.Elapsed.Minutes) minutes, $($MeasureTotal.Elapsed.Seconds) seconds, $($MeasureTotal.Elapsed.Milliseconds) milliseconds"
     $MeasureTotal.Stop()
     Write-Verbose "Get-Events - Overall events processing end"
-    if ($ExtendedOutput) {
-        return , $AllEvents # returns @{ Output and Errors }
+    #if ($ExtendedOutput) {
+    #    return , $AllEvents # returns @{ Output and Errors }
+    #}
+    if ($AllEvents.Count -eq 1) {
+        return , $AllEvents
+    } else {
+        return $AllEvents
     }
-    return , $AllEvents
 }

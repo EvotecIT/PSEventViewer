@@ -717,11 +717,21 @@ $Script:ScriptBlock = {
                         }
                         # Case 1
                     } else {
-                        # Case 4
-                        $h++
-                        $fieldName = "NoNameB$h"
+                        # Case 4 - Where Data has no Names
                         $fieldValue = $eventXML.Event.$TopNode.$SubNode
-                        Add-Member -InputObject $Event -MemberType NoteProperty -Name $fieldName -Value $fieldValue -Force
+                        if ($fieldValue -match "\n") {
+                            # this is case with ADConnect - event id 6946 where 1 Value has multiple values line per line 
+                            $SplittedValues = $fieldValue -split '\n'
+                            foreach ($Split in $SplittedValues) {
+                                $h++
+                                $fieldName = "NoNameB$h"
+                                Add-Member -InputObject $Event -MemberType NoteProperty -Name $fieldName -Value $Split -Force
+                            }
+                        } else {
+                            $h++
+                            $fieldName = "NoNameB$h"
+                            Add-Member -InputObject $Event -MemberType NoteProperty -Name $fieldName -Value $fieldValue -Force
+                        }
                         # Case 4
                     }
                 }
@@ -730,6 +740,12 @@ $Script:ScriptBlock = {
             [string] $MessageSubject = ($Event.Message -split '\n')[0]
             Add-Member -InputObject $Event -MemberType NoteProperty -Name 'MessageSubject' -Value $MessageSubject -Force
             Add-Member -InputObject $Event -MemberType NoteProperty -Name 'Action' -Value $MessageSubject -Force
+
+            # Level value is not needed because there is actually LevelDisplayName
+            #Add-Member -InputObject $Event -MemberType NoteProperty -Name 'LevelTranslated' -Value ([PSEventViewer.Level] $Event.Level)
+
+            # Overwrite value - the old value is collection
+            Add-Member -InputObject $Event -MemberType NoteProperty -Name 'KeywordDisplayName' -Value ($Event.KeywordsDisplayNames -join ',') -Force
 
             if ($Event.SubjectDomainName -and $Event.SubjectUserName) {
                 Add-Member -InputObject $Event -MemberType NoteProperty -Name 'Who' -Value "$($Event.SubjectDomainName)\$($Event.SubjectUserName)" -Force
