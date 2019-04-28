@@ -16,6 +16,7 @@ if ($null -eq (Get-Module -ListAvailable PSSharedGoods)) {
     Install-Module -Name PSSharedGoods -Repository PSGallery -Force -Scope CurrentUser
 }
 import-module PSSharedGoods -Force
+import-module .\PSEventViewer.psd1 -Force
 
 $result = Invoke-Pester -Script $PSScriptRoot\Tests -EnableExit
 
