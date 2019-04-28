@@ -9,7 +9,7 @@
         $Events[0].GatheredLogName | Should -Be 'Application'
     }
     It 'Should have more then 1 event' {
-        $Events.Count | Should -BeGreaterThan 1
+        $Events.Count | Should -BeGreaterOrEqual 1
     }
     It 'Should return an Array' {
         $Events -is [Array] | Should -Be $true
