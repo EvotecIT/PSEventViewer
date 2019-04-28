@@ -12,7 +12,7 @@
     RootModule = 'PSEventViewer.psm1'
 
     # Version number of this module.
-    ModuleVersion = '1.0.4'
+    ModuleVersion = '1.0.5'
 
     # Supported PSEditions
     # CompatiblePSEditions = @()
@@ -57,7 +57,7 @@
     # RequiredAssemblies = @()
 
     # Script files (.ps1) that are run in the caller's environment prior to importing this module.
-    # ScriptsToProcess = @()
+    ScriptsToProcess = 'Enums\PSEventViewer.Keywords.ps1', 'Enums\PSEventViewer.Level.ps1'
 
     # Type files (.ps1xml) to be loaded when importing this module
     # TypesToProcess = @()
