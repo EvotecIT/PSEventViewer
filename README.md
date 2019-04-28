@@ -1,3 +1,17 @@
+<center>
+
+[![PowerShellGallery Version](https://img.shields.io/powershellgallery/v/PSEventViewer.svg)](https://www.powershellgallery.com/packages/PSWinReportingV2)
+[![Build Status Azure DevOps](https://dev.azure.com/evotecpl/PSEventViewer/_apis/build/status/EvotecIT.PSEventViewer?branchName=master)](https://dev.azure.com/evotecpl/PSEventViewer/_build/latest?definitionId=1)
+
+[![PowerShellGallery Platform](https://img.shields.io/powershellgallery/p/PSEventViewer.svg)](https://www.powershellgallery.com/packages/PSWinReportingV2)
+[![PowerShellGallery Preview Version](https://img.shields.io/powershellgallery/vpre/PSEventViewer.svg?label=powershell%20gallery%20preview&colorB=yellow)](https://www.powershellgallery.com/packages/PSEventViewer)
+
+![Top Language](https://img.shields.io/github/languages/top/evotecit/PSEventViewer.svg)
+![Code](https://img.shields.io/github/languages/code-size/evotecit/PSEventViewer.svg)
+[![PowerShellGallery Downloads](https://img.shields.io/powershellgallery/dt/PSEventViewer.svg)](https://www.powershellgallery.com/packages/PSEventViewer)
+
+</center>
+
 ###### Description
 This module was built for a project of Events Reporting. As it was a bit inefficient I've decided to rewrite it and split reading events to separate module. While underneath it's just a wrapper over `Get-WinEvent` it does add few tweaks here and there...
 
