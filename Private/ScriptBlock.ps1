@@ -606,9 +606,9 @@ $Script:ScriptBlock = {
         Write-Verbose "Get-Events - Inside $Comp for Events Oldest: $Oldest"
         Write-Verbose "Get-Events - Inside $Comp for Events Max Events: $MaxEvents"
         $Measure = [System.Diagnostics.Stopwatch]::StartNew() # Timer Start
-        
+
         try {
-            $Events = @(
+            [Array] $Events = @(
                 if ($null -ne $EventFilter.RecordID -or `
                         $null -ne $EventFilter.NamedDataFilter -or `
                         $null -ne $EventFilter.ExcludeID -or `
@@ -617,7 +617,7 @@ $Script:ScriptBlock = {
                 ) {
                     $FilterXML = Get-EventsFilter @EventFilter
                     Write-Verbose "Get-Events - Inside $Comp - Custom FilterXML: `n$FilterXML"
-                    if ($MaxEvents -ne $null -and $MaxEvents -ne 0) {
+                    if ($null -ne $MaxEvents -and $MaxEvents -ne 0) {
                         Get-WinEvent -FilterXml $FilterXML -ComputerName $Comp -MaxEvents $MaxEvents -Oldest:$Oldest -ErrorAction Stop
                     } else {
                         Get-WinEvent -FilterXml $FilterXML -ComputerName $Comp -Oldest:$Oldest -ErrorAction Stop
@@ -633,8 +633,8 @@ $Script:ScriptBlock = {
                     }
                 }
             )
-            $EventsCount = ($Events | Measure-Object).Count
-            Write-Verbose -Message "Get-Events - Inside $Comp Events found $EventsCount"
+            #$EventsCount = ($Events | Measure-Object).Count
+            Write-Verbose -Message "Get-Events - Inside $Comp Events found $($Events.Count)"
         } catch {
             if ($_.Exception -match "No events were found that match the specified selection criteria") {
                 Write-Verbose -Message "Get-Events - Inside $Comp No events found."
@@ -720,7 +720,7 @@ $Script:ScriptBlock = {
                         # Case 4 - Where Data has no Names
                         $fieldValue = $eventXML.Event.$TopNode.$SubNode
                         if ($fieldValue -match "\n") {
-                            # this is case with ADConnect - event id 6946 where 1 Value has multiple values line per line 
+                            # this is case with ADConnect - event id 6946 where 1 Value has multiple values line per line
                             $SplittedValues = $fieldValue -split '\n'
                             foreach ($Split in $SplittedValues) {
                                 $h++
@@ -757,19 +757,19 @@ $Script:ScriptBlock = {
                 [string] $MemberNameWithoutCN = $Event.MemberName -replace 'CN=|\\|,(OU|DC|CN).*$'
                 Add-Member -InputObject $Event -MemberType NoteProperty -Name 'MemberNameWithoutCN' -Value $MemberNameWithoutCN -Force
             }
+            if ($EventFilter.Path) {
+                Add-Member -InputObject $Event -MemberType NoteProperty -Name "GatheredFrom" -Value $EventFilter.Path -Force
+            } else {
+                Add-Member -InputObject $Event -MemberType NoteProperty -Name "GatheredFrom" -Value $Comp -Force
+            }
+            Add-Member -InputObject $Event -MemberType NoteProperty -Name "GatheredLogName" -Value $EventFilter.LogName -Force
         }
         Write-Verbose "Get-Events - Inside $Comp Time to generate $($Measure.Elapsed.Hours) hours, $($Measure.Elapsed.Minutes) minutes, $($Measure.Elapsed.Seconds) seconds, $($Measure.Elapsed.Milliseconds) milliseconds"
         $Measure.Stop()
         return $Events
     }
     Write-Verbose "Get-Events -------------START---------------------"
-    $Data = Get-EventsInternal -Comp $Comp -EventFilter $EventFilter -MaxEvents $MaxEvents -Oldest:$Oldest -Verbose:$Verbose
-    if ($EventFilter.Path) {
-        $Data | Add-Member -MemberType NoteProperty -Name "GatheredFrom" -Value $EventFilter.Path -Force
-    } else {
-        $Data | Add-Member -MemberType NoteProperty -Name "GatheredFrom" -Value $Comp -Force
-    }
-    $Data | Add-Member -MemberType NoteProperty -Name "GatheredLogName" -Value $EventFilter.LogName -Force
+    [Array] $Data = Get-EventsInternal -Comp $Comp -EventFilter $EventFilter -MaxEvents $MaxEvents -Oldest:$Oldest -Verbose:$Verbose
     Write-Verbose "Get-Events --------------END----------------------"
     return $Data
 }

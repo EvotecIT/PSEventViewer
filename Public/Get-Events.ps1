@@ -8,80 +8,80 @@ function Get-Events {
 
     .PARAMETER Machine
     ComputerName or Server you want to query. Takes an array of servers as well.
-    
+
     .PARAMETER DateFrom
     Parameter description
-    
+
     .PARAMETER DateTo
     Parameter description
-    
+
     .PARAMETER ID
     Parameter description
-    
+
     .PARAMETER ExcludeID
     Parameter description
-    
+
     .PARAMETER LogName
     Parameter description
-    
+
     .PARAMETER ProviderName
     Parameter description
-    
+
     .PARAMETER NamedDataFilter
     Parameter description
-    
+
     .PARAMETER NamedDataExcludeFilter
     Parameter description
-    
+
     .PARAMETER UserID
     Parameter description
-    
+
     .PARAMETER Level
     Parameter description
-    
+
     .PARAMETER UserSID
     Parameter description
-    
+
     .PARAMETER Data
     Parameter description
-    
+
     .PARAMETER MaxEvents
     Parameter description
-    
+
     .PARAMETER Credentials
     Parameter description
-    
+
     .PARAMETER Path
     Parameter description
-    
+
     .PARAMETER Keywords
     Parameter description
-    
+
     .PARAMETER RecordID
     Parameter description
-    
+
     .PARAMETER MaxRunspaces
     Parameter description
-    
+
     .PARAMETER Oldest
     Parameter description
-    
+
     .PARAMETER DisableParallel
     Parameter description
-    
+
     .PARAMETER ExtendedOutput
     Parameter description
-    
+
     .PARAMETER ExtendedInput
     Parameter description
-    
+
     .EXAMPLE
     An example
-    
+
     .NOTES
     General notes
     #>
-    
+
     [CmdLetBinding()]
     param (
         [alias ("ADDomainControllers", "DomainController", "Server", "Servers", "Computer", "Computers", "ComputerName")] [string[]] $Machine = $Env:COMPUTERNAME,
@@ -115,7 +115,7 @@ function Get-Events {
 
     if ($ExtendedInput.Count -gt 0) {
         # Special input - PSWinReporting requires it
-        [Array] $Param = foreach ($EventEntry in $ExtendedInput) {         
+        [Array] $Param = foreach ($EventEntry in $ExtendedInput) {
             $EventFilter = @{}
             if ($EventEntry.Type -eq 'File') {
                 Write-Verbose "Get-Events - Preparing data to scan file $($EventEntry.Server)"
@@ -124,7 +124,7 @@ function Get-Events {
             } else {
                 Write-Verbose "Get-Events - Preparing data to scan computer $($EventEntry.Server)"
                 $Comp = $EventEntry.Server
-            }            
+            }
             $ConvertedLevels = foreach ($Data in $EventEntry.Level) {
                 ([PSEventViewer.Level]::$Data).value__
             }
@@ -143,7 +143,7 @@ function Get-Events {
             Add-ToHashTable -Hashtable $EventFilter -Key "NamedDataExcludeFilter" -Value $EventEntry.NamedDataExcludeFilter
             Add-ToHashTable -Hashtable $EventFilter -Key "UserID" -Value $EventEntry.UserID
             Add-ToHashTable -Hashtable $EventFilter -Key "ExcludeID" -Value $EventEntry.ExcludeID
-            
+
             if ($Verbose) {
                 foreach ($Key in $EventFilter.Keys) {
                     if ($Key -eq 'NamedDataFilter' -or $Key -eq 'NamedDataExcludeFilter') {
@@ -173,7 +173,7 @@ function Get-Events {
                         Verbose     = $Verbose
                     }
                 }
-            } else {                
+            } else {
                 @{
                     Comp        = $Comp
                     EventFilter = $EventFilter
@@ -235,7 +235,7 @@ function Get-Events {
                         Oldest      = $Oldest
                         Verbose     = $Verbose
                     }
-                } 
+                }
             } else {
                 # No EventID given
                 @{
@@ -254,15 +254,15 @@ function Get-Events {
     $AllErrors = @()
     if ($DisableParallel) {
         Write-Verbose 'Get-Events - Running query with parallel disabled...'
-        [Array] $AllEvents = foreach ($Param in $ParametersList) {  
+        [Array] $AllEvents = foreach ($Param in $ParametersList) {
             Invoke-Command -ScriptBlock $Script:ScriptBlock -ArgumentList $Param.Comp, $Param.EventFilter, $Param.MaxEvents, $Param.Oldest, $Param.Verbose
         }
     } else {
         Write-Verbose 'Get-Events - Running query with parallel enabled...'
         $RunspacePool = New-Runspace -MaxRunspaces $maxRunspaces -Verbose:$Verbose
-        $Runspaces = foreach ($Parameter in $ParametersList) {    
+        $Runspaces = foreach ($Parameter in $ParametersList) {
             Start-Runspace -ScriptBlock $Script:ScriptBlock -Parameters $Parameter -RunspacePool $RunspacePool -Verbose:$Verbose
-        }        
+        }
         [Array] $AllEvents = Stop-Runspace -Runspaces $Runspaces -FunctionName "Get-Events" -RunspacePool $RunspacePool -Verbose:$Verbose -ErrorAction SilentlyContinue -ErrorVariable +AllErrors -ExtendedOutput:$ExtendedOutput
     }
     #$EventsProcessed = Get-ObjectCount -Object $AllEvents
@@ -271,9 +271,6 @@ function Get-Events {
     Write-Verbose "Get-Events - Overall time to generate $($MeasureTotal.Elapsed.Hours) hours, $($MeasureTotal.Elapsed.Minutes) minutes, $($MeasureTotal.Elapsed.Seconds) seconds, $($MeasureTotal.Elapsed.Milliseconds) milliseconds"
     $MeasureTotal.Stop()
     Write-Verbose "Get-Events - Overall events processing end"
-    #if ($ExtendedOutput) {
-    #    return , $AllEvents # returns @{ Output and Errors }
-    #}
     if ($AllEvents.Count -eq 1) {
         return , $AllEvents
     } else {
