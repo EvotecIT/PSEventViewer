@@ -14,4 +14,13 @@
     It 'Should return an Array' {
         $Events -is [Array] | Should -Be $true
     }
+    It 'Should return proper Level' {
+        $Events[0].LevelDisplayName | Should -Be 'Information'
+    }
+    It 'Should return proper LogName' {
+        $Events[0].LogName | Should -Be 'Application'
+    }
+    It 'Should return proper ID (EventID)' {
+        $Events[0].ID | Should -Be 5617
+    }
 }
