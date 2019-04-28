@@ -1,4 +1,6 @@
-﻿Describe 'Get-Events - Verify functionality' {
+﻿import-module .\PSEventViewer.psd1 -Force
+
+Describe 'Get-Events - Verify functionality' {
     $Date = (Get-Date).AddDays(-3)
     $Date1 = Get-Date
 
