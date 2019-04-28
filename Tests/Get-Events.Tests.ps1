@@ -2,10 +2,10 @@
     $Date = (Get-Date).AddDays(-3)
     $Date1 = Get-Date
 
-    $Events = Get-Events -Machine AD1 -DateFrom $Date -DateTo $Date1 -ID 5617 -LogName 'Application'
+    $Events = Get-Events -Machine $Env:COMPUTERNAME -DateFrom $Date -DateTo $Date1 -ID 5617 -LogName 'Application'
 
     It 'Should have GatheredLogName, GatheredFrom fields properly filled in' {
-        $Events[0].GatheredFrom | Should -Be 'AD1'
+        $Events[0].GatheredFrom | Should -Be $Env:COMPUTERNAME
         $Events[0].GatheredLogName | Should -Be 'Application'
     }
     It 'Should have more then 1 event' {
