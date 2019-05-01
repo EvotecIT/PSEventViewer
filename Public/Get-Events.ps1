@@ -98,8 +98,12 @@ function Get-Events {
         [string] $UserSID = $null,
         [string[]]$Data = $null,
         [int] $MaxEvents = $null,
-        [PSCredential] $Credentials = $null,
-        [string] $Path = $null,
+
+        [ValidateNotNull()]
+        [alias('Credentials')][System.Management.Automation.PSCredential]
+        [System.Management.Automation.Credential()]$Credential = [System.Management.Automation.PSCredential]::Empty,
+
+        #[string] $Path = $null,
         [PSEventViewer.Keywords[]] $Keywords = $null,
         [alias("EventRecordID")][int64] $RecordID,
         [int] $MaxRunspaces = [int]$env:NUMBER_OF_PROCESSORS + 1,
@@ -167,6 +171,7 @@ function Get-Events {
                     $EventFilter.Id = @($EventIdGroup)
                     @{
                         Comp        = $Comp
+                        Credentials = $Credentials
                         EventFilter = $EventFilter.Clone()
                         MaxEvents   = $EventEntry.MaxEvents
                         Oldest      = $Oldest
@@ -176,6 +181,7 @@ function Get-Events {
             } else {
                 @{
                     Comp        = $Comp
+                    Credentials = $Credentials
                     EventFilter = $EventFilter
                     MaxEvents   = $EventEntry.MaxEvents
                     Oldest      = $Oldest
@@ -230,6 +236,7 @@ function Get-Events {
                     $EventFilter.Id = @($EventIdGroup)
                     @{
                         Comp        = $Comp
+                        Credential  = $Credential
                         EventFilter = $EventFilter.Clone()
                         MaxEvents   = $MaxEvents
                         Oldest      = $Oldest
@@ -240,6 +247,7 @@ function Get-Events {
                 # No EventID given
                 @{
                     Comp        = $Comp
+                    Credential  = $Credential
                     EventFilter = $EventFilter
                     MaxEvents   = $MaxEvents
                     Oldest      = $Oldest
@@ -254,8 +262,8 @@ function Get-Events {
     $AllErrors = @()
     if ($DisableParallel) {
         Write-Verbose 'Get-Events - Running query with parallel disabled...'
-        [Array] $AllEvents = foreach ($Param in $ParametersList) {
-            Invoke-Command -ScriptBlock $Script:ScriptBlock -ArgumentList $Param.Comp, $Param.EventFilter, $Param.MaxEvents, $Param.Oldest, $Param.Verbose
+        [Array] $AllEvents = foreach ($Parameter in $ParametersList) {
+            Invoke-Command -ScriptBlock $Script:ScriptBlock -ArgumentList $Parameter.Comp, $Parameter.Credential, $Parameter.EventFilter, $Parameter.MaxEvents, $Parameter.Oldest, $Parameter.Verbose
         }
     } else {
         Write-Verbose 'Get-Events - Running query with parallel enabled...'
