@@ -1,6 +1,7 @@
 $Script:ScriptBlock = {
     Param (
         [string]$Comp,
+        [alias('Credentials')][PSCredential] $Credential = $null,
         [hashtable]$EventFilter,
         [int]$MaxEvents,
         [bool] $Oldest,
@@ -596,17 +597,17 @@ $Script:ScriptBlock = {
         [CmdLetBinding()]
         param (
             [string]$Comp,
+            [alias('Credentials')][PSCredential] $Credential = $null,
             [hashtable]$EventFilter,
             [int]$MaxEvents,
             [switch] $Oldest
         )
+        $Measure = [System.Diagnostics.Stopwatch]::StartNew() # Timer Start
+
         Write-Verbose "Get-Events - Inside $Comp for Events ID: $($EventFilter.ID)"
         Write-Verbose "Get-Events - Inside $Comp for Events LogName: $($EventFilter.LogName)"
         Write-Verbose "Get-Events - Inside $Comp for Events RecordID: $($EventFilter.RecordID)"
         Write-Verbose "Get-Events - Inside $Comp for Events Oldest: $Oldest"
-        Write-Verbose "Get-Events - Inside $Comp for Events Max Events: $MaxEvents"
-        $Measure = [System.Diagnostics.Stopwatch]::StartNew() # Timer Start
-
         try {
             [Array] $Events = @(
                 if ($null -ne $EventFilter.RecordID -or `
@@ -616,22 +617,33 @@ $Script:ScriptBlock = {
                         $null -ne $EventFilter.UserID
                 ) {
                     $FilterXML = Get-EventsFilter @EventFilter
-                    Write-Verbose "Get-Events - Inside $Comp - Custom FilterXML: `n$FilterXML"
-                    if ($null -ne $MaxEvents -and $MaxEvents -ne 0) {
-                        Get-WinEvent -FilterXml $FilterXML -ComputerName $Comp -MaxEvents $MaxEvents -Oldest:$Oldest -ErrorAction Stop
-                    } else {
-                        Get-WinEvent -FilterXml $FilterXML -ComputerName $Comp -Oldest:$Oldest -ErrorAction Stop
+                    $SplatEvents = @{
+                        ErrorAction  = 'Stop'
+                        ComputerName = $Comp
+                        Oldest       = $Oldest
+                        FilterXml    = $FilterXML
                     }
+                    Write-Verbose "Get-Events - Inside $Comp - Custom FilterXML: `n$FilterXML"
                 } else {
+                    $SplatEvents = @{
+                        ErrorAction     = 'Stop'
+                        ComputerName    = $Comp
+                        Oldest          = $Oldest
+                        FilterHashtable = $EventFilter
+                    }
                     foreach ($k in $EventFilter.Keys) {
                         Write-Verbose "Get-Events - Inside $Comp Data in FilterHashTable $k $($EventFilter[$k])"
                     }
-                    if ($MaxEvents -ne 0) {
-                        Get-WinEvent -FilterHashtable $EventFilter -ComputerName $Comp -MaxEvents $MaxEvents -Oldest:$Oldest -ErrorAction Stop
-                    } else {
-                        Get-WinEvent -FilterHashtable $EventFilter -ComputerName $Comp -Oldest:$Oldest -ErrorAction Stop
-                    }
                 }
+                if ($MaxEvents -ne 0) {
+                    $SplatEvents.MaxEvents = $MaxEvents
+                    Write-Verbose "Get-Events - Inside $Comp for Events Max Events: $MaxEvents"
+                }
+                if ($Credential -ne [System.Management.Automation.PSCredential]::Empty) {
+                    $SplatEvents.Credential = $Credential
+                    Write-Verbose "Get-Events - Inside $Comp for Events Credential: $Credential"
+                }
+                Get-WinEvent @SplatEvents
             )
             #$EventsCount = ($Events | Measure-Object).Count
             Write-Verbose -Message "Get-Events - Inside $Comp Events found $($Events.Count)"
@@ -769,7 +781,7 @@ $Script:ScriptBlock = {
         return $Events
     }
     Write-Verbose "Get-Events -------------START---------------------"
-    [Array] $Data = Get-EventsInternal -Comp $Comp -EventFilter $EventFilter -MaxEvents $MaxEvents -Oldest:$Oldest -Verbose:$Verbose
+    [Array] $Data = Get-EventsInternal -Comp $Comp -EventFilter $EventFilter -MaxEvents $MaxEvents -Oldest:$Oldest -Verbose:$Verbose -Credential $Credential
     Write-Verbose "Get-Events --------------END----------------------"
     return $Data
 }
