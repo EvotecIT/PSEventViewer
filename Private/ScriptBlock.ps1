@@ -1,7 +1,9 @@
 $Script:ScriptBlock = {
     Param (
         [string]$Comp,
-        [alias('Credentials')][PSCredential] $Credential = $null,
+        [ValidateNotNull()]
+        [alias('Credentials')][System.Management.Automation.PSCredential]
+        [System.Management.Automation.Credential()]$Credential = [System.Management.Automation.PSCredential]::Empty,
         [hashtable]$EventFilter,
         [int]$MaxEvents,
         [bool] $Oldest,
@@ -597,7 +599,9 @@ $Script:ScriptBlock = {
         [CmdLetBinding()]
         param (
             [string]$Comp,
-            [alias('Credentials')][PSCredential] $Credential = $null,
+            [ValidateNotNull()]
+            [alias('Credentials')][System.Management.Automation.PSCredential]
+            [System.Management.Automation.Credential()]$Credential = [System.Management.Automation.PSCredential]::Empty,
             [hashtable]$EventFilter,
             [int]$MaxEvents,
             [switch] $Oldest

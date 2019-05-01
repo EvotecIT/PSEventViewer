@@ -171,7 +171,7 @@ function Get-Events {
                     $EventFilter.Id = @($EventIdGroup)
                     @{
                         Comp        = $Comp
-                        Credentials = $Credentials
+                        Credential  = $Credential
                         EventFilter = $EventFilter.Clone()
                         MaxEvents   = $EventEntry.MaxEvents
                         Oldest      = $Oldest
@@ -181,7 +181,7 @@ function Get-Events {
             } else {
                 @{
                     Comp        = $Comp
-                    Credentials = $Credentials
+                    Credential  = $Credential
                     EventFilter = $EventFilter
                     MaxEvents   = $EventEntry.MaxEvents
                     Oldest      = $Oldest
