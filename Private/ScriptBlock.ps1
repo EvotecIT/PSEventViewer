@@ -753,7 +753,7 @@ $Script:ScriptBlock = {
                 }
             }
             # This adds some fields specific to PSWinReporting
-            [string] $MessageSubject = ($Event.Message -split '\n')[0]
+            [string] $MessageSubject = ($Event.Message -split '\n')[0] -replace "`n", '' -replace "`r", '' -replace "`t", ''
             Add-Member -InputObject $Event -MemberType NoteProperty -Name 'MessageSubject' -Value $MessageSubject -Force
             Add-Member -InputObject $Event -MemberType NoteProperty -Name 'Action' -Value $MessageSubject -Force
 
