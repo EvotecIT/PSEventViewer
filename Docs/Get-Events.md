@@ -16,9 +16,9 @@ Get-Events is a wrapper function around Get-WinEvent providing additional featur
 Get-Events [[-Machine] <String[]>] [[-DateFrom] <DateTime>] [[-DateTo] <DateTime>] [[-ID] <Int32[]>]
  [[-ExcludeID] <Int32[]>] [[-LogName] <String>] [[-ProviderName] <String>] [[-NamedDataFilter] <Hashtable>]
  [[-NamedDataExcludeFilter] <Hashtable>] [[-UserID] <String[]>] [[-Level] <Level[]>] [[-UserSID] <String>]
- [[-Data] <String[]>] [[-MaxEvents] <Int32>] [[-Credentials] <PSCredential>] [[-Path] <String>]
- [[-Keywords] <Keywords[]>] [[-RecordID] <Int64>] [[-MaxRunspaces] <Int32>] [-Oldest] [-DisableParallel]
- [-ExtendedOutput] [[-ExtendedInput] <Array>] [<CommonParameters>]
+ [[-Data] <String[]>] [[-MaxEvents] <Int32>] [[-Credential] <PSCredential>] [[-Keywords] <Keywords[]>]
+ [[-RecordID] <Int64>] [[-MaxRunspaces] <Int32>] [-Oldest] [-DisableParallel] [-ExtendedOutput]
+ [[-ExtendedInput] <Array>] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -247,32 +247,17 @@ Accept pipeline input: False
 Accept wildcard characters: False
 ```
 
-### -Credentials
-Parameter description
+### -Credential
+{{ Fill Credential Description }}
 
 ```yaml
 Type: PSCredential
 Parameter Sets: (All)
-Aliases:
+Aliases: Credentials
 
 Required: False
 Position: 15
-Default value: None
-Accept pipeline input: False
-Accept wildcard characters: False
-```
-
-### -Path
-Parameter description
-
-```yaml
-Type: String
-Parameter Sets: (All)
-Aliases:
-
-Required: False
-Position: 16
-Default value: None
+Default value: [System.Management.Automation.PSCredential]::Empty
 Accept pipeline input: False
 Accept wildcard characters: False
 ```
@@ -287,7 +272,7 @@ Aliases:
 Accepted values: None, ResponseTime, WdiContext, WdiDiagnostic, Sqm, AuditFailure, AuditSuccess, CorrelationHint2, EventLogClassic
 
 Required: False
-Position: 17
+Position: 16
 Default value: None
 Accept pipeline input: False
 Accept wildcard characters: False
@@ -302,7 +287,7 @@ Parameter Sets: (All)
 Aliases: EventRecordID
 
 Required: False
-Position: 18
+Position: 17
 Default value: 0
 Accept pipeline input: False
 Accept wildcard characters: False
@@ -317,7 +302,7 @@ Parameter Sets: (All)
 Aliases:
 
 Required: False
-Position: 19
+Position: 18
 Default value: [int]$env:NUMBER_OF_PROCESSORS + 1
 Accept pipeline input: False
 Accept wildcard characters: False
@@ -377,14 +362,14 @@ Parameter Sets: (All)
 Aliases:
 
 Required: False
-Position: 20
+Position: 19
 Default value: None
 Accept pipeline input: False
 Accept wildcard characters: False
 ```
 
 ### CommonParameters
-This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable, -InformationAction, -InformationVariable, -OutVariable, -OutBuffer, -PipelineVariable, -Verbose, -WarningAction, and -WarningVariable. For more information, see about_CommonParameters (http://go.microsoft.com/fwlink/?LinkID=113216).
+This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable, -InformationAction, -InformationVariable, -OutVariable, -OutBuffer, -PipelineVariable, -Verbose, -WarningAction, and -WarningVariable. For more information, see [about_CommonParameters](http://go.microsoft.com/fwlink/?LinkID=113216).
 
 ## INPUTS
 
