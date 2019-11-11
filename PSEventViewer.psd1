@@ -12,7 +12,7 @@
     RootModule           = 'PSEventViewer.psm1'
 
     # Version number of this module.
-    ModuleVersion        = '1.0.8'
+    ModuleVersion        = '1.0.9'
 
     # Supported PSEditions
     CompatiblePSEditions = 'Desktop', 'Core'
@@ -33,7 +33,7 @@
     Description          = 'Simple module allowing parsing of event logs. Has its own quirks...'
 
     # Minimum version of the Windows PowerShell engine required by this module
-    # PowerShellVersion = ''
+    PowerShellVersion    = '5.1'
 
     # Name of the Windows PowerShell host required by this module
     # PowerShellHostName = ''

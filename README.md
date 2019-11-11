@@ -28,7 +28,7 @@ Project was split into 2 parts:
 
 ###### Updates
 
-- 1.0.8 - 12.11.2019
+- 1.0.9 - 12.11.2019
   - Removed dependency on PSSharedGoods on published module
     - PSSharedGoods is still dependency but building process makes it possible to compile it and push to PSGallery/Releases without that dependency.
 
