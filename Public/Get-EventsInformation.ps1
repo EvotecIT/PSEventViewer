@@ -137,7 +137,7 @@ function Get-EventsInformation {
     [CmdLetBinding()]
     param(
         [alias ("ADDomainControllers", "DomainController", "Server", "Servers", "Computer", "Computers", "ComputerName")]
-        [string[]] $Machine,
+        [string[]] $Machine = $Env:COMPUTERNAME,
         [string[]] $FilePath,
         [alias ("LogType", "Log")][string[]] $LogName = 'Security',
         [int] $MaxRunspaces = 50,
@@ -152,7 +152,7 @@ function Get-EventsInformation {
     if ($RunAgainstDC) {
         Write-Verbose 'Get-EventsInformation - scanning for domain controllers'
         $ForestInformation = Get-WinADForestControllers
-        $MachineWithErrors = $ForestInformation | Where-Object { $_.HostName -eq '' } 
+        $MachineWithErrors = $ForestInformation | Where-Object { $_.HostName -eq '' }
         foreach ($Computer in $MachineWithErrors) {
             Write-Warning "Get-EventsInformation - Error scanning forest $($Computer.Forest) (domain: $($Computer.Domain)) error: $($Computer.Comment)"
         }
@@ -192,7 +192,7 @@ function Get-EventsInformation {
     foreach ($Error in $AllErrors) {
         Write-Warning "Get-EventsInformation - Error: $Error"
     }
-    
+
     $Elapsed = Stop-TimeLog -Time $Time -Option OneLiner
     Write-Verbose -Message "Get-EventsInformation - processing end - $Elapsed"
     ### End Runspaces END

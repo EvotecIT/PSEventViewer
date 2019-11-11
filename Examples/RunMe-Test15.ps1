@@ -1,5 +1,27 @@
 Import-Module PSEventViewer -Force
-$AllEvents = Get-Events -LogName 'Application' -ID 6946 -Machine 'ADConnect' -MaxEvents 10
+
+#$WrongCredentials = (Get-Credential)
+$Credentials = (Get-Credential)
+
+$AllEvents = Get-Events -LogName 'Application' -ID 16384 -Machine 'AD1' -MaxEvents 3 -Verbose -ErrorVariable Test -Credential $Credentials
+
+$AllEvents | ft -a
+
+$Test | ft -a
+
+
+#Get-WinEvent -LogName Application -ComputerName AD1 -Credential $Credentials -FilterHas
+
+$FilterHashTable = @{
+    LogName = 'Application'
+    ID = 16384
+}
+$Event1 = Get-WinEvent -FilterHashtable $FilterHashTable -ComputerName AD1 -MaxEvents 3 -Credential $Credentials
+$Event1 | ft -a
+
+
+
+return
 
 $Data = @(
     if ($AllEvents[2].NoNameB1 -match "\n") {
