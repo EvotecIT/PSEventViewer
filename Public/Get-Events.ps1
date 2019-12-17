@@ -103,7 +103,7 @@ function Get-Events {
         [alias('Credentials')][System.Management.Automation.PSCredential]
         [System.Management.Automation.Credential()]$Credential = [System.Management.Automation.PSCredential]::Empty,
 
-        #[string] $Path = $null,
+        [string] $Path = $null,
         [PSEventViewer.Keywords[]] $Keywords = $null,
         [alias("EventRecordID")][int64] $RecordID,
         [int] $MaxRunspaces = [int]$env:NUMBER_OF_PROCESSORS + 1,
