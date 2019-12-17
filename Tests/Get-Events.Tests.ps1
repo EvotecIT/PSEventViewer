@@ -87,3 +87,14 @@ Describe 'Get-Events - MaxEvents on 3 servers' {
         $Events[2].ID | Should -Be 5617
     }
 }
+
+Describe 'Get-Events - Read events from path (oldest / newest)' {
+    $FilePath = [System.IO.Path]::Combine($PSScriptRoot, 'Logs', 'Active Directory Web Services.evtx')
+    $Events = Get-Events -Path $FilePath -Oldest -MaxEvents 1 -Verbose
+    $Events.Count | Should -Be 1
+    $Events[0].Id | Should -Be 1000
+    $Events[0].GatheredFrom | Should -Be $FilePath
+
+    $EventsNewest = Get-Events -Path $FilePath -MaxEvents 1 -Verbose
+    $EventsNewest.Count | Should -Be 1
+}
