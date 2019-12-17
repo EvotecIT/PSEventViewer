@@ -2,7 +2,7 @@
     $Date = (Get-Date).AddDays(-60)
     $Date1 = Get-Date
 
-    $Events = Get-Events -Machine $Env:COMPUTERNAME -DateFrom $Date -DateTo $Date1 -ID 5617 -LogName 'Application' -Verbose
+    $Events = Get-Events -Machine $Env:COMPUTERNAME -DateFrom $Date -DateTo $Date1 -ID 5617 -LogName 'Application' # -Verbose
 
     It 'Should have GatheredLogName, GatheredFrom fields properly filled in' {
         $Events[0].GatheredFrom | Should -Be $Env:COMPUTERNAME
@@ -28,7 +28,7 @@ Describe 'Get-Events - MaxEvents Test' {
     $Date = (Get-Date).AddDays(-60)
     $Date1 = Get-Date
 
-    $Events = Get-Events -Machine $Env:COMPUTERNAME -DateFrom $Date -DateTo $Date1 -ID 5617 -LogName 'Application' -MaxEvents 1 -Verbose
+    $Events = Get-Events -Machine $Env:COMPUTERNAME -DateFrom $Date -DateTo $Date1 -ID 5617 -LogName 'Application' -MaxEvents 1 #-Verbose
 
     It 'Should have GatheredLogName, GatheredFrom fields properly filled in' {
         $Events[0].GatheredFrom | Should -Be $Env:COMPUTERNAME
@@ -55,7 +55,7 @@ Describe 'Get-Events - MaxEvents on 3 servers' {
     $Date = (Get-Date).AddDays(-60)
     $Date1 = Get-Date
 
-    $Events = Get-Events -Machine $Env:COMPUTERNAME, $Env:COMPUTERNAME, $Env:COMPUTERNAME -DateFrom $Date -DateTo $Date1 -ID 5617 -LogName 'Application' -MaxEvents 1 -Verbose
+    $Events = Get-Events -Machine $Env:COMPUTERNAME, $Env:COMPUTERNAME, $Env:COMPUTERNAME -DateFrom $Date -DateTo $Date1 -ID 5617 -LogName 'Application' -MaxEvents 1 #-Verbose
 
     It 'Should have GatheredLogName, GatheredFrom fields properly filled in' {
         $Events[0].GatheredFrom | Should -Be $Env:COMPUTERNAME
@@ -89,12 +89,26 @@ Describe 'Get-Events - MaxEvents on 3 servers' {
 }
 
 Describe 'Get-Events - Read events from path (oldest / newest)' {
-    $FilePath = [System.IO.Path]::Combine($PSScriptRoot, 'Logs', 'Active Directory Web Services.evtx')
-    $Events = Get-Events -Path $FilePath -Oldest -MaxEvents 1 -Verbose
-    $Events.Count | Should -Be 1
-    $Events[0].Id | Should -Be 1000
-    $Events[0].GatheredFrom | Should -Be $FilePath
 
-    $EventsNewest = Get-Events -Path $FilePath -MaxEvents 1 -Verbose
-    $EventsNewest.Count | Should -Be 1
+
+    $FilePath = [System.IO.Path]::Combine($PSScriptRoot, 'Logs', 'Active Directory Web Services.evtx')
+
+    It 'Should read 1 oldest event' {
+        $Events = Get-Events -Path $FilePath -Oldest -MaxEvents 1 #-Verbose
+        $Events.Count | Should -Be 1
+        $Events[0].Id | Should -Be 1000
+        $Events[0].GatheredFrom | Should -Be $FilePath
+    }
+
+    It 'Should read 1 newest event' {
+
+        $EventsNewest = Get-Events -Path $FilePath -MaxEvents 1 #-Verbose
+        $EventsNewest.Count | Should -Be 1
+        $EventsNewest[0].Id | Should -Be 1200
+        $EventsNewest[0].GatheredFrom | Should -Be $FilePath
+
+        $EventsNewest[0].NoNameA0 | Should -Be 'GC'
+        $EventsNewest[0].NoNameA1 | Should -Be  3268
+        $EventsNewest[0].NoNameA2 | Should -Be  3269
+    }
 }
