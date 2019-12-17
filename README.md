@@ -28,6 +28,8 @@ Project was split into 2 parts:
 
 ###### Updates
 
+- 1.0.10 - 17.12.2019
+  - Path is back. Not sure why it was gone. Need improvments.
 - 1.0.9 - 12.11.2019
   - Removed dependency on PSSharedGoods on published module
     - PSSharedGoods is still dependency but building process makes it possible to compile it and push to PSGallery/Releases without that dependency.
@@ -51,7 +53,7 @@ Project was split into 2 parts:
 
 There is huge difference difference if you ask for `-RecordID` in `FilterXML` and when you do post-processing of it via Where { }. And by huge difference I mean really huge one. Depending on amount of Event ID's stored that you query for... it maye take minutes or even hours to get a single RecordID. Since -FilterHashTable doesn't allow `RecordID` as parameter, nor `Get-WinEvent` doesn't have the `-RecordID` directly ... one has to use `FilterXML` which as you can see below speed up search from `6+ minutes to 141 miliseconds`.
 
-```
+```powershell
 Clear-Host
 Import-Module PSEventViewer -Force
 Get-Events -LogName 'Security' -ID 5379 -RecordID 19626 -Verbose | Format-Table TimeCreated, ProviderName, Id, Message # takes 380 miliseconds
@@ -106,7 +108,7 @@ TimeCreated         ProviderName                          Id Message
 17.07.2018 19:24:58 Microsoft-Windows-Security-Auditing 5379 Credential Manager credentials were read....
 ```
 
-```
+```powershell
 Get-Events -LogName 'Security' -ID 5379 -Verbose | Where { $_.RecordID -eq 19626 } | Format-Table  TimeCreated, ProviderName, Id, Message  # takes 4-6 minutes depending on amount of events there are.
 
 VERBOSE: Get-Events - Overall events processing start
