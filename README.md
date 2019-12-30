@@ -1,18 +1,26 @@
-<center>
+<p align="center">
+  <a href="https://dev.azure.com/evotecpl/PSEventViewer/_build/latest?definitionId=3"><img src="https://dev.azure.com/evotecpl/PSEventViewer/_apis/build/status/EvotecIT.PSEventViewer"></a>
+  <a href="https://www.powershellgallery.com/packages/PSEventViewer"><img src="https://img.shields.io/powershellgallery/v/PSEventViewer.svg"></a>
+  <a href="https://www.powershellgallery.com/packages/PSEventViewer"><img src="https://img.shields.io/powershellgallery/vpre/PSEventViewer.svg?label=powershell%20gallery%20preview&colorB=yellow"></a>
+  <a href="https://github.com/EvotecIT/PSEventViewer"><img src="https://img.shields.io/github/license/EvotecIT/PSEventViewer.svg"></a>
+</p>
 
-[![PowerShellGallery Version](https://img.shields.io/powershellgallery/v/PSEventViewer.svg)](https://www.powershellgallery.com/packages/PSWinReportingV2)
-[![Build Status Azure DevOps](https://dev.azure.com/evotecpl/PSEventViewer/_apis/build/status/EvotecIT.PSEventViewer?branchName=master)](https://dev.azure.com/evotecpl/PSEventViewer/_build/latest?definitionId=1)
+<p align="center">
+  <a href="https://www.powershellgallery.com/packages/PSEventViewer"><img src="https://img.shields.io/powershellgallery/p/PSEventViewer.svg"></a>
+  <a href="https://github.com/EvotecIT/PSEventViewer"><img src="https://img.shields.io/github/languages/top/evotecit/PSEventViewer.svg"></a>
+  <a href="https://github.com/EvotecIT/PSEventViewer"><img src="https://img.shields.io/github/languages/code-size/evotecit/PSEventViewer.svg"></a>
+  <a href="https://github.com/EvotecIT/PSEventViewer"><img src="https://img.shields.io/powershellgallery/dt/PSEventViewer.svg"></a>
+</p>
 
-[![PowerShellGallery Platform](https://img.shields.io/powershellgallery/p/PSEventViewer.svg)](https://www.powershellgallery.com/packages/PSWinReportingV2)
-[![PowerShellGallery Preview Version](https://img.shields.io/powershellgallery/vpre/PSEventViewer.svg?label=powershell%20gallery%20preview&colorB=yellow)](https://www.powershellgallery.com/packages/PSEventViewer)
+<p align="center">
+  <a href="https://twitter.com/PrzemyslawKlys"><img src="https://img.shields.io/twitter/follow/PrzemyslawKlys.svg?label=Twitter%20%40PrzemyslawKlys&style=social"></a>
+  <a href="https://evotec.xyz/hub"><img src="https://img.shields.io/badge/Blog-evotec.xyz-2A6496.svg"></a>
+  <a href="https://www.linkedin.com/in/pklys"><img src="https://img.shields.io/badge/LinkedIn-pklys-0077B5.svg?logo=LinkedIn"></a>
+</p>
 
-![Top Language](https://img.shields.io/github/languages/top/evotecit/PSEventViewer.svg)
-![Code](https://img.shields.io/github/languages/code-size/evotecit/PSEventViewer.svg)
-[![PowerShellGallery Downloads](https://img.shields.io/powershellgallery/dt/PSEventViewer.svg)](https://www.powershellgallery.com/packages/PSEventViewer)
+# PSEventViewer - PowerShell Module
 
-</center>
-
-###### Description
+## Description
 
 This module was built for a project of Events Reporting. As it was a bit inefficient I've decided to rewrite it and split reading events to separate module. While underneath it's just a wrapper over `Get-WinEvent` it does add few tweaks here and there...
 
@@ -21,26 +29,30 @@ Project was split into 2 parts:
 - `PSEventViewer` - this module.
 - `PSWinReporting` - reporting on Active Directory Events, Windows Events... generally reporting (separate project on GitHub)
 
-###### Links
+### Links
 
 - [Documentation for PSEventViewer (overview)](https://evotec.xyz/hub/scripts/pseventviewer-powershell-module/)
 - [Documentation for PSEventViewer (examples and how things are different)](https://evotec.xyz/working-with-windows-events-with-powershell/)
 
-###### Updates
+## Changelog
 
-- 1.0.10 - 17.12.2019
+- 1.0.11 - 2019.12.30
+  - Added Write-Event
+
+- 1.0.10 - 2019.12.17
   - Path is back. Not sure why it was gone. Need improvments.
-- 1.0.9 - 12.11.2019
-  - Removed dependency on PSSharedGoods on published module
-    - PSSharedGoods is still dependency but building process makes it possible to compile it and push to PSGallery/Releases without that dependency.
 
-- 1.0.7 - 12.09.2019
+- 1.0.9 - 2019.11.12
+  - Removed dependency on PSSharedGoods on published module
+  - PSSharedGoods is still dependency but building process makes it possible to compile it and push to PSGallery/Releases without that dependency.
+
+- 1.0.7 - 2019.09.12
   - Small changes to Get-EventsInformation
 
-- 0.62 - 11.01.2019
+- 0.62 - 2019.01.11
   - Fix for Member Name with comma inside
 
-- 0.61 - 2.1.2019
+- 0.61 - 2019.01.02
   - Multiple new parameters, some new functionality
 
 - 0.51
@@ -49,7 +61,7 @@ Project was split into 2 parts:
 - 0.50
   - Version that worked fine :-)
 
-###### Example for -RecordID (added in 0.51)
+### Example for -RecordID (added in 0.51)
 
 There is huge difference difference if you ask for `-RecordID` in `FilterXML` and when you do post-processing of it via Where { }. And by huge difference I mean really huge one. Depending on amount of Event ID's stored that you query for... it maye take minutes or even hours to get a single RecordID. Since -FilterHashTable doesn't allow `RecordID` as parameter, nor `Get-WinEvent` doesn't have the `-RecordID` directly ... one has to use `FilterXML` which as you can see below speed up search from `6+ minutes to 141 miliseconds`.
 
