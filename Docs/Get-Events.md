@@ -16,9 +16,9 @@ Get-Events is a wrapper function around Get-WinEvent providing additional featur
 Get-Events [[-Machine] <String[]>] [[-DateFrom] <DateTime>] [[-DateTo] <DateTime>] [[-ID] <Int32[]>]
  [[-ExcludeID] <Int32[]>] [[-LogName] <String>] [[-ProviderName] <String>] [[-NamedDataFilter] <Hashtable>]
  [[-NamedDataExcludeFilter] <Hashtable>] [[-UserID] <String[]>] [[-Level] <Level[]>] [[-UserSID] <String>]
- [[-Data] <String[]>] [[-MaxEvents] <Int32>] [[-Credential] <PSCredential>] [[-Keywords] <Keywords[]>]
- [[-RecordID] <Int64>] [[-MaxRunspaces] <Int32>] [-Oldest] [-DisableParallel] [-ExtendedOutput]
- [[-ExtendedInput] <Array>] [<CommonParameters>]
+ [[-Data] <String[]>] [[-MaxEvents] <Int32>] [[-Credential] <PSCredential>] [[-Path] <String>]
+ [[-Keywords] <Keywords[]>] [[-RecordID] <Int64>] [[-MaxRunspaces] <Int32>] [-Oldest] [-DisableParallel]
+ [-ExtendedOutput] [[-ExtendedInput] <Array>] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -132,7 +132,7 @@ Parameter description
 ```yaml
 Type: String
 Parameter Sets: (All)
-Aliases: Provider
+Aliases: Provider, Source
 
 Required: False
 Position: 7
@@ -262,6 +262,21 @@ Accept pipeline input: False
 Accept wildcard characters: False
 ```
 
+### -Path
+Parameter description
+
+```yaml
+Type: String
+Parameter Sets: (All)
+Aliases:
+
+Required: False
+Position: 16
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
 ### -Keywords
 Parameter description
 
@@ -272,7 +287,7 @@ Aliases:
 Accepted values: None, ResponseTime, WdiContext, WdiDiagnostic, Sqm, AuditFailure, AuditSuccess, CorrelationHint2, EventLogClassic
 
 Required: False
-Position: 16
+Position: 17
 Default value: None
 Accept pipeline input: False
 Accept wildcard characters: False
@@ -287,7 +302,7 @@ Parameter Sets: (All)
 Aliases: EventRecordID
 
 Required: False
-Position: 17
+Position: 18
 Default value: 0
 Accept pipeline input: False
 Accept wildcard characters: False
@@ -302,7 +317,7 @@ Parameter Sets: (All)
 Aliases:
 
 Required: False
-Position: 18
+Position: 19
 Default value: [int]$env:NUMBER_OF_PROCESSORS + 1
 Accept pipeline input: False
 Accept wildcard characters: False
@@ -362,7 +377,7 @@ Parameter Sets: (All)
 Aliases:
 
 Required: False
-Position: 19
+Position: 20
 Default value: None
 Accept pipeline input: False
 Accept wildcard characters: False
