@@ -90,7 +90,7 @@ function Get-Events {
         [alias ("Ids", "EventID", "EventIds")] [int[]] $ID = $null,
         [alias ("ExludeEventID")][int[]] $ExcludeID = $null,
         [alias ("LogType", "Log")][string] $LogName = $null,
-        [alias ("Provider")] [string] $ProviderName = '',
+        [alias ("Provider", "Source")] [string] $ProviderName,
         [hashtable] $NamedDataFilter,
         [hashtable] $NamedDataExcludeFilter,
         [string[]] $UserID,
@@ -120,7 +120,7 @@ function Get-Events {
     if ($ExtendedInput.Count -gt 0) {
         # Special input - PSWinReporting requires it
         [Array] $Param = foreach ($EventEntry in $ExtendedInput) {
-            $EventFilter = @{}
+            $EventFilter = @{ }
             if ($EventEntry.Type -eq 'File') {
                 Write-Verbose "Get-Events - Preparing data to scan file $($EventEntry.Server)"
                 Add-ToHashTable -Hashtable $EventFilter -Key "Path" -Value $EventEntry.Server
@@ -194,7 +194,7 @@ function Get-Events {
         }
     } else {
         # Standard input
-        $EventFilter = @{}
+        $EventFilter = @{ }
         Add-ToHashTable -Hashtable $EventFilter -Key "LogName" -Value $LogName # Accepts Wildcard
         Add-ToHashTable -Hashtable $EventFilter -Key "ProviderName" -Value $ProviderName # Accepts Wildcard
         Add-ToHashTable -Hashtable $EventFilter -Key "Path" -Value $Path # https://blogs.technet.microsoft.com/heyscriptingguy/2011/01/25/use-powershell-to-parse-saved-event-logs-for-errors/

@@ -4,9 +4,9 @@
     param(
         [string[]] $Computer,
         [Parameter(Mandatory)][alias('EventLog')][string] $LogName,
-        [Parameter(Mandatory)][string] $Source,
+        [Parameter(Mandatory)][alias('Provider', 'ProviderName')][string] $Source,
         [int] $Category,
-        [System.Diagnostics.EventLogEntryType] $EntryType = [System.Diagnostics.EventLogEntryType]::Information,
+        [alias('Level')][System.Diagnostics.EventLogEntryType] $EntryType = [System.Diagnostics.EventLogEntryType]::Information,
         [Parameter(Mandatory)][alias('EventID')][int] $ID,
         [Parameter(Mandatory)][string] $Message,
         [Array] $AdditionalFields
