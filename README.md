@@ -9,7 +9,7 @@
   <a href="https://www.powershellgallery.com/packages/PSEventViewer"><img src="https://img.shields.io/powershellgallery/p/PSEventViewer.svg"></a>
   <a href="https://github.com/EvotecIT/PSEventViewer"><img src="https://img.shields.io/github/languages/top/evotecit/PSEventViewer.svg"></a>
   <a href="https://github.com/EvotecIT/PSEventViewer"><img src="https://img.shields.io/github/languages/code-size/evotecit/PSEventViewer.svg"></a>
-  <a href="https://github.com/EvotecIT/PSEventViewer"><img src="https://img.shields.io/powershellgallery/dt/PSEventViewer.svg"></a>
+  <a href="https://www.powershellgallery.com/packages/PSEventViewer"><img src="https://img.shields.io/powershellgallery/dt/PSEventViewer.svg"></a>
 </p>
 
 <p align="center">
@@ -22,7 +22,7 @@
 
 ## Description
 
-This module was built for a project of Events Reporting. As it was a bit inefficient I've decided to rewrite it and split reading events to separate module. While underneath it's just a wrapper over `Get-WinEvent` it does add few tweaks here and there...
+This module was built for a project of Events Reporting. As it was a bit inefficient, I've decided to rewrite it and split reading events to separate module. While underneath it's just a wrapper over `Get-WinEvent`, it does add few tweaks here and there...
 
 Project was split into 2 parts:
 
@@ -36,6 +36,9 @@ Project was split into 2 parts:
 
 ## Changelog
 
+- 1.0.13 - 2020.02.16
+  - Added Get-EventsSettings/Set-EventsSettings (Work in progress)
+
 - 1.0.12 - 2020.01.01
   - Added some new aliases
 
@@ -43,10 +46,10 @@ Project was split into 2 parts:
   - Added Write-Event
 
 - 1.0.10 - 2019.12.17
-  - Path is back. Not sure why it was gone. Need improvments.
+  - Path is back. Not sure why it was gone. Need improvements.
 
 - 1.0.9 - 2019.11.12
-  - Removed dependency on PSSharedGoods on published module
+  - Removed dependency on PSSharedGoods on the published module
   - PSSharedGoods is still dependency but building process makes it possible to compile it and push to PSGallery/Releases without that dependency.
 
 - 1.0.7 - 2019.09.12
@@ -66,7 +69,7 @@ Project was split into 2 parts:
 
 ### Example for -RecordID (added in 0.51)
 
-There is huge difference difference if you ask for `-RecordID` in `FilterXML` and when you do post-processing of it via Where { }. And by huge difference I mean really huge one. Depending on amount of Event ID's stored that you query for... it maye take minutes or even hours to get a single RecordID. Since -FilterHashTable doesn't allow `RecordID` as parameter, nor `Get-WinEvent` doesn't have the `-RecordID` directly ... one has to use `FilterXML` which as you can see below speed up search from `6+ minutes to 141 miliseconds`.
+There is huge difference if you ask for `-RecordID` in `FilterXML` and when you do post-processing of it via Where { }. And by huge difference I mean really huge one. Depending on amount of Event ID's stored that you query for... it maye take minutes or even hours to get a single RecordID. Since -FilterHashTable doesn't allow `RecordID` as parameter, nor `Get-WinEvent` doesn't have the `-RecordID` directly ... one has to use `FilterXML`, which as you can see below speed up the search from `6+ minutes to 141 milliseconds`.
 
 ```powershell
 Clear-Host
