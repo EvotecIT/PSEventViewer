@@ -36,7 +36,7 @@ Project was split into 2 parts:
 
 ## Changelog
 
-- 1.0.15 - Unreleased
+- 1.0.14 - 2020.04.11
   - Updates to PSD1
 
 - 1.0.13 - 2020.02.16

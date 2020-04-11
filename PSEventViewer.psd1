@@ -13,15 +13,15 @@
         PSData = @{
             Tags                       = 'Events', 'Viewer', 'Windows', 'XML', 'XPATH', 'EVTX'
             ProjectUri                 = 'https://github.com/EvotecIT/PSEventViewer'
-            ExternalModuleDependencies = 'Microsoft.PowerShell.Utility'
+            ExternalModuleDependencies = 'Microsoft.PowerShell.Utility', 'Microsoft.PowerShell.Diagnostics', 'Microsoft.PowerShell.Management'
             IconUri                    = 'https://evotec.xyz/wp-content/uploads/2018/10/PSEventViewer.png'
         }
     }
     RequiredModules      = @{
-        ModuleVersion = '0.0.132'
+        ModuleVersion = '0.0.134'
         ModuleName    = 'PSSharedGoods'
         Guid          = 'ee272aa8-baaa-4edf-9f45-b6d6f7d844fe'
-    }, 'Microsoft.PowerShell.Utility'
+    }, 'Microsoft.PowerShell.Utility', 'Microsoft.PowerShell.Diagnostics', 'Microsoft.PowerShell.Management'
     RootModule           = 'PSEventViewer.psm1'
     ScriptsToProcess     = 'Enums\PSEventViewer.Keywords.ps1', 'Enums\PSEventViewer.Level.ps1'
 }
