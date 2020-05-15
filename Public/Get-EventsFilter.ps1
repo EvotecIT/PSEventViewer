@@ -269,17 +269,20 @@ function Get-EventsFilter {
             [String]
             $FinalizeFormatString,
 
+            [ValidateSet("and",  "or", IgnoreCase = $False)]
+            [String]
+            $Logic = 'or',
+
             [switch]$NoParenthesis
         )
 
         $filter = ''
 
         ForEach ($item in $Items) {
-            $options = @{
-                'NewFilter'      = ($ForEachFormatString -f $item)
-                'ExistingFilter' = $filter
-                'Logic'          = 'or'
-                'NoParenthesis'  = $NoParenthesis
+            $options = @{'NewFilter' = ($ForEachFormatString -f $item)
+                'ExistingFilter'     = $filter
+                'Logic'              = $logic
+                'NoParenthesis'      = $NoParenthesis
             }
             $filter = Join-XPathFilter @options
         }
@@ -494,8 +497,8 @@ function Get-EventsFilter {
                                     $options = @{
                                         'Items'                = $item[$key]
                                         'NoParenthesis'        = $true
-                                        'ForEachFormatString'  = "'{0}'"
-                                        'FinalizeFormatString' = "Data[@Name='$key'] = {0}"
+                                        'ForEachFormatString'  = "Data[@Name='$key'] = '{0}'"
+                                        'FinalizeFormatString' = "{0}"
                                     }
                                     Initialize-XPathFilter @options
                                 } Else {
@@ -540,8 +543,9 @@ function Get-EventsFilter {
                                     $options = @{
                                         'Items'                = $item[$key]
                                         'NoParenthesis'        = $true
-                                        'ForEachFormatString'  = "'{0}'"
-                                        'FinalizeFormatString' = "Data[@Name='$key'] != {0}"
+                                        'ForEachFormatString'  = "Data[@Name='$key'] != '{0}'"
+                                        'FinalizeFormatString' = "{0}"
+                                        'Logic'                = 'and'
                                     }
                                     Initialize-XPathFilter @options
                                 } Else {
