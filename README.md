@@ -36,6 +36,9 @@ Project was split into 2 parts:
 
 ## Changelog
 
+- 1.0.15 - 2020.05.17
+  - Fix for `Get-EventsFilter` - provided by [danubie #9](https://github.com/EvotecIT/PSEventViewer/pull/9) - solves [#7](https://github.com/EvotecIT/PSEventViewer/issues/7) and [#8](https://github.com/EvotecIT/PSEventViewer/issues/8)
+
 - 1.0.14 - 2020.04.11
   - Updates to PSD1
 
