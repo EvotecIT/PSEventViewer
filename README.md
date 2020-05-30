@@ -24,17 +24,21 @@
 
 This module was built for a project of Events Reporting. As it was a bit inefficient, I've decided to rewrite it and split reading events to separate module. While underneath it's just a wrapper over `Get-WinEvent`, it does add few tweaks here and there...
 
-Project was split into 2 parts:
+The project was split into 2 parts:
 
 - `PSEventViewer` - this module.
 - `PSWinReporting` - reporting on Active Directory Events, Windows Events... generally reporting (separate project on GitHub)
 
-### Links
+### Recommended read
 
 - [Documentation for PSEventViewer (overview)](https://evotec.xyz/hub/scripts/pseventviewer-powershell-module/)
 - [Documentation for PSEventViewer (examples and how things are different)](https://evotec.xyz/working-with-windows-events-with-powershell/)
+- [PowerShell – Everything you wanted to know about Event Logs and then some](https://evotec.xyz/powershell-everything-you-wanted-to-know-about-event-logs/)
 
 ## Changelog
+
+- 1.0.15 - 2020.05.17
+  - Fix for `Get-EventsFilter` - provided by [danubie #9](https://github.com/EvotecIT/PSEventViewer/pull/9) - solves [#7](https://github.com/EvotecIT/PSEventViewer/issues/7) and [#8](https://github.com/EvotecIT/PSEventViewer/issues/8)
 
 - 1.0.14 - 2020.04.11
   - Updates to PSD1
@@ -53,7 +57,7 @@ Project was split into 2 parts:
 
 - 1.0.9 - 2019.11.12
   - Removed dependency on PSSharedGoods on the published module
-  - PSSharedGoods is still dependency but building process makes it possible to compile it and push to PSGallery/Releases without that dependency.
+  - PSSharedGoods is still dependency but the building process makes it possible to compile it and push to PSGallery/Releases without that dependency.
 
 - 1.0.7 - 2019.09.12
   - Small changes to Get-EventsInformation
