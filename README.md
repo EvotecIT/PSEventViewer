@@ -22,7 +22,7 @@
 
 ## Description
 
-This module was built for a project of Events Reporting. As it was a bit inefficient, I've decided to rewrite it and split reading events to separate module. While underneath it's just a wrapper over `Get-WinEvent`, it does add few tweaks here and there...
+This module was built for a project of Events Reporting. As it was a bit inefficient, I've decided to rewrite it and split reading events to separate modules. While underneath it's just a wrapper over `Get-WinEvent`, it does add few tweaks here and there...
 
 The project was split into 2 parts:
 
@@ -36,6 +36,9 @@ The project was split into 2 parts:
 - [PowerShell – Everything you wanted to know about Event Logs and then some](https://evotec.xyz/powershell-everything-you-wanted-to-know-about-event-logs/)
 
 ## Changelog
+
+- 1.0.16 - 2020.05.31
+  - Fix for `Get-Events` for NamedDataFilter - provided by [danubie #11](https://github.com/EvotecIT/PSEventViewer/pull/11) - solves [#10](https://github.com/EvotecIT/PSEventViewer/issues/10)
 
 - 1.0.15 - 2020.05.17
   - Fix for `Get-EventsFilter` - provided by [danubie #9](https://github.com/EvotecIT/PSEventViewer/pull/9) - solves [#7](https://github.com/EvotecIT/PSEventViewer/issues/7) and [#8](https://github.com/EvotecIT/PSEventViewer/issues/8)
@@ -57,13 +60,13 @@ The project was split into 2 parts:
 
 - 1.0.9 - 2019.11.12
   - Removed dependency on PSSharedGoods on the published module
-  - PSSharedGoods is still dependency but the building process makes it possible to compile it and push to PSGallery/Releases without that dependency.
+  - PSSharedGoods is still dependency, but the building process makes it possible to compile it and push to PSGallery/Releases without that dependency.
 
 - 1.0.7 - 2019.09.12
   - Small changes to Get-EventsInformation
 
 - 0.62 - 2019.01.11
-  - Fix for Member Name with comma inside
+  - Fix for Member Name with a comma inside
 
 - 0.61 - 2019.01.02
   - Multiple new parameters, some new functionality
@@ -72,11 +75,11 @@ The project was split into 2 parts:
   - Added -RecordID parameter (currently it only works with LogName + RecordID, you can't use any other parameters with RecordID as it will take LogName + RecordID anyways and crash if it's not there)
 
 - 0.50
-  - Version that worked fine :-)
+  - A version that worked fine :-)
 
 ### Example for -RecordID (added in 0.51)
 
-There is huge difference if you ask for `-RecordID` in `FilterXML` and when you do post-processing of it via Where { }. And by huge difference I mean really huge one. Depending on amount of Event ID's stored that you query for... it maye take minutes or even hours to get a single RecordID. Since -FilterHashTable doesn't allow `RecordID` as parameter, nor `Get-WinEvent` doesn't have the `-RecordID` directly ... one has to use `FilterXML`, which as you can see below speed up the search from `6+ minutes to 141 milliseconds`.
+There is a huge difference if you ask for `-RecordID` in `FilterXML` a and when you do post-processing of it via Where { }. And by the huge difference I mean a really huge one. Depending on amount of Event ID's stored a that you query for... it may take minutes or even hours to get a single RecordID. Since -FilterHashTable doesn't allow `RecordID` as parameter, nor `Get-WinEvent` doesn't have the `-RecordID` directly ... one has to use `FilterXML`, which as you can see below speed up the search from `6+ minutes to 141 milliseconds`.
 
 ```powershell
 Clear-Host
