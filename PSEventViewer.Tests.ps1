@@ -18,7 +18,7 @@ if ($null -eq (Get-Module -ListAvailable PSSharedGoods)) {
 #import-module PSSharedGoods -Force
 import-module .\PSEventViewer.psd1 -Force
 
-$result = Invoke-Pester -Script $PSScriptRoot\Tests -EnableExit
+$result = Invoke-Pester -Path $PSScriptRoot\Tests
 
 if ($result.FailedCount -gt 0) {
     throw "$($result.FailedCount) tests failed."

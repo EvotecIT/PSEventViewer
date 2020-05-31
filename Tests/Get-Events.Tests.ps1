@@ -4,6 +4,10 @@
 
     $Events = Get-Events -Machine $Env:COMPUTERNAME -DateFrom $Date -DateTo $Date1 -ID 5617 -LogName 'Application' # -Verbose
 
+    $PSDefaultParameterValues = @{
+        "It:TestCases" = @{ Date = $Date; Date1 = $Date1; Events = $Events }
+    }
+
     It 'Should have GatheredLogName, GatheredFrom fields properly filled in' {
         $Events[0].GatheredFrom | Should -Be $Env:COMPUTERNAME
         $Events[0].GatheredLogName | Should -Be 'Application'
@@ -29,6 +33,10 @@ Describe 'Get-Events - MaxEvents Test' {
     $Date1 = Get-Date
 
     $Events = Get-Events -Machine $Env:COMPUTERNAME -DateFrom $Date -DateTo $Date1 -ID 5617 -LogName 'Application' -MaxEvents 1 #-Verbose
+
+    $PSDefaultParameterValues = @{
+        "It:TestCases" = @{ Date = $Date; Date1 = $Date1; Events = $Events }
+    }
 
     It 'Should have GatheredLogName, GatheredFrom fields properly filled in' {
         $Events[0].GatheredFrom | Should -Be $Env:COMPUTERNAME
@@ -56,6 +64,10 @@ Describe 'Get-Events - MaxEvents on 3 servers' {
     $Date1 = Get-Date
 
     $Events = Get-Events -Machine $Env:COMPUTERNAME, $Env:COMPUTERNAME, $Env:COMPUTERNAME -DateFrom $Date -DateTo $Date1 -ID 5617 -LogName 'Application' -MaxEvents 1 #-Verbose
+
+    $PSDefaultParameterValues = @{
+        "It:TestCases" = @{ Date = $Date; Date1 = $Date1; Events = $Events }
+    }
 
     It 'Should have GatheredLogName, GatheredFrom fields properly filled in' {
         $Events[0].GatheredFrom | Should -Be $Env:COMPUTERNAME
@@ -89,11 +101,14 @@ Describe 'Get-Events - MaxEvents on 3 servers' {
 }
 
 Describe 'Get-Events - Read events from path (oldest / newest)' {
-
-
     $FilePath = [System.IO.Path]::Combine($PSScriptRoot, 'Logs', 'Active Directory Web Services.evtx')
 
+    $PSDefaultParameterValues = @{
+        "It:TestCases" = @{ FilePath = $FilePath; }
+    }
+
     It 'Should read 1 oldest event' {
+
         $Events = Get-Events -Path $FilePath -Oldest -MaxEvents 1 #-Verbose
         $Events.Count | Should -Be 1
         $Events[0].Id | Should -Be 1000
