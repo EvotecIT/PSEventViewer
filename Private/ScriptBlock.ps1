@@ -103,9 +103,6 @@ $Script:ScriptBlock = {
         SubjectUserName of john.doe or a TargetUserName of jane.doe then pass
         the following
 
-        .PARAMETER XPathOnly
-        This is switch. If used only XPATH filter is returned. Otherwise full XML.
-
         (@{'SubjectUserName'='john.doe'},@{'TargetUserName'='jane.doe'})
         .EXAMPLE
         Get-EventsFilter -ID 4663 -NamedDataFilter @{'SubjectUserName'='john.doe'} -LogName 'ForwardedEvents'
@@ -218,7 +215,9 @@ $Script:ScriptBlock = {
             $ExcludeID,
 
             [Parameter(Mandatory = $true)][String]
-            $LogName
+            $LogName,
+
+            [switch] $XPathOnly
         )
 
         #region Function definitions
@@ -284,17 +283,20 @@ $Script:ScriptBlock = {
                 [String]
                 $FinalizeFormatString,
 
+                [ValidateSet("and",  "or", IgnoreCase = $False)]
+                [String]
+                $Logic = 'or',
+
                 [switch]$NoParenthesis
             )
 
             $filter = ''
 
             ForEach ($item in $Items) {
-                $options = @{
-                    'NewFilter'      = ($ForEachFormatString -f $item)
-                    'ExistingFilter' = $filter
-                    'Logic'          = 'or'
-                    'NoParenthesis'  = $NoParenthesis
+                $options = @{'NewFilter' = ($ForEachFormatString -f $item)
+                    'ExistingFilter'     = $filter
+                    'Logic'              = $logic
+                    'NoParenthesis'      = $NoParenthesis
                 }
                 $filter = Join-XPathFilter @options
             }
@@ -509,8 +511,8 @@ $Script:ScriptBlock = {
                                         $options = @{
                                             'Items'                = $item[$key]
                                             'NoParenthesis'        = $true
-                                            'ForEachFormatString'  = "'{0}'"
-                                            'FinalizeFormatString' = "Data[@Name='$key'] = {0}"
+                                            'ForEachFormatString'  = "Data[@Name='$key'] = '{0}'"
+                                            'FinalizeFormatString' = "{0}"
                                         }
                                         Initialize-XPathFilter @options
                                     } Else {
@@ -555,8 +557,9 @@ $Script:ScriptBlock = {
                                         $options = @{
                                             'Items'                = $item[$key]
                                             'NoParenthesis'        = $true
-                                            'ForEachFormatString'  = "'{0}'"
-                                            'FinalizeFormatString' = "Data[@Name='$key'] != {0}"
+                                            'ForEachFormatString'  = "Data[@Name='$key'] != '{0}'"
+                                            'FinalizeFormatString' = "{0}"
+                                            'Logic'                = 'and'
                                         }
                                         Initialize-XPathFilter @options
                                     } Else {
@@ -581,7 +584,10 @@ $Script:ScriptBlock = {
         }
         #endregion NamedDataExcludeFilter
 
-        $FilterXML = @"
+        if ($XPathOnly) {
+            return $Filter
+        } else {
+            $FilterXML = @"
         <QueryList>
             <Query Id="0" Path="$LogName">
                 <Select Path="$LogName">
@@ -590,8 +596,8 @@ $Script:ScriptBlock = {
             </Query>
         </QueryList>
 "@
-
-        return $FilterXML
+            return $FilterXML
+        }
         # Return $filter
 
     } # Function Get-EventsFilter
