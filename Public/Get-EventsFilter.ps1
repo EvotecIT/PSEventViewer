@@ -200,8 +200,11 @@ function Get-EventsFilter {
         [String[]]
         $ExcludeID,
 
-        [Parameter(Mandatory = $true)][String]
+        [String]
         $LogName,
+
+        [String]
+        $Path,
 
         [switch] $XPathOnly
     )
@@ -573,17 +576,27 @@ function Get-EventsFilter {
     if ($XPathOnly) {
         return $Filter
     } else {
-        $FilterXML = @"
-    <QueryList>
-        <Query Id="0" Path="$LogName">
-            <Select Path="$LogName">
-                    $filter
-            </Select>
-        </Query>
-    </QueryList>
+        if ($Path -ne '') {
+            $FilterXML = @"
+                <QueryList>
+                    <Query Id="0" Path="file://$Path">
+                        <Select>
+                                $filter
+                        </Select>
+                    </Query>
+                </QueryList>
 "@
+        } else {
+            $FilterXML = @"
+                <QueryList>
+                    <Query Id="0" Path="$LogName">
+                        <Select Path="$LogName">
+                                $filter
+                        </Select>
+                    </Query>
+                </QueryList>
+"@
+        }
         return $FilterXML
     }
-    # Return $filter
-
 } # Function Get-EventsFilter
