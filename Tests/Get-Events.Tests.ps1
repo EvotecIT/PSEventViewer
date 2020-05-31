@@ -127,3 +127,14 @@ Describe 'Get-Events - Read events from path (oldest / newest)' {
         $EventsNewest[0].NoNameA2 | Should -Be  3269
     }
 }
+
+Describe 'Get-Events - Read events with NamedDataFilter' {
+    It 'Using -Path should not fail' {
+        Get-Events -Path $FilePath -Oldest -MaxEvents 1 -DisableParallel -ErrorVariable err
+        $err | Should -BeNullOrEmpty
+    }
+    It 'Using named filter and -Path should not fail' {
+        Get-Events -Path $FilePath -NamedDataExcludeFilter @{ Data0 = ('blabla','blublu') } -Oldest -MaxEvents 1 -DisableParallel -ErrorVariable err
+        $err | Should -BeNullOrEmpty
+    }
+}
