@@ -22,20 +22,26 @@
 
 ## Description
 
-This module was built for a project of Events Reporting. As it was a bit inefficient, I've decided to rewrite it and split reading events to separate modules. While underneath it's just a wrapper over `Get-WinEvent`, it does add few tweaks here and there...
+This module was built for a project of Events Reporting. As it was a bit inefficient, I've decided to rewrite it and split reading events to separate modules.
+While underneath it's just a wrapper over `Get-WinEvent`, it does add few tweaks here and there...
 
 The project was split into 2 parts:
 
 - `PSEventViewer` - this module.
-- `PSWinReporting` - reporting on Active Directory Events, Windows Events... generally reporting (separate project on GitHub)
+- [PSWinReporting](https://github.com/EvotecIT/PSWinReporting) - reporting on Active Directory Events, Windows Events...
 
 ### Recommended read
 
 - [Documentation for PSEventViewer (overview)](https://evotec.xyz/hub/scripts/pseventviewer-powershell-module/)
 - [Documentation for PSEventViewer (examples and how things are different)](https://evotec.xyz/working-with-windows-events-with-powershell/)
 - [PowerShell – Everything you wanted to know about Event Logs and then some](https://evotec.xyz/powershell-everything-you-wanted-to-know-about-event-logs/)
+- [Sending information to Event Log with extended fields using PowerShell](https://evotec.xyz/sending-information-to-event-log-with-extended-fields-using-powershell/)
+- [The only PowerShell Command you will ever need to find out who did what in Active Directory](https://evotec.xyz/the-only-powershell-command-you-will-ever-need-to-find-out-who-did-what-in-active-directory/)
 
 ## Changelog
+
+- 1.0.17 - 2020.05.31
+  - Fix for `Get-Events` (use of Path and NamedDataFilter) - provided by [danubie #13](https://github.com/EvotecIT/PSEventViewer/pull/13) - solves [#12](https://github.com/EvotecIT/PSEventViewer/issues/12)
 
 - 1.0.16 - 2020.05.31
   - Fix for `Get-Events` for NamedDataFilter - provided by [danubie #11](https://github.com/EvotecIT/PSEventViewer/pull/11) - solves [#10](https://github.com/EvotecIT/PSEventViewer/issues/10)
@@ -79,7 +85,11 @@ The project was split into 2 parts:
 
 ### Example for -RecordID (added in 0.51)
 
-There is a huge difference if you ask for `-RecordID` in `FilterXML` a and when you do post-processing of it via Where { }. And by the huge difference I mean a really huge one. Depending on amount of Event ID's stored a that you query for... it may take minutes or even hours to get a single RecordID. Since -FilterHashTable doesn't allow `RecordID` as parameter, nor `Get-WinEvent` doesn't have the `-RecordID` directly ... one has to use `FilterXML`, which as you can see below speed up the search from `6+ minutes to 141 milliseconds`.
+There is a big difference if you ask for `-RecordID` in `FilterXML` a and when you do post-processing of it via Where { }.
+And by the huge difference I mean a really huge one. Depending on the amount of Event ID's stored a that you query for...
+it may take minutes or even hours to get a single RecordID.
+Since -FilterHashTable doesn't allow `RecordID` as parameter, nor `Get-WinEvent` doesn't have the `-RecordID` directly ... one has to use `FilterXML`.
+This, as you can see below, speed up the search from `6+ minutes to 141 milliseconds`.
 
 ```powershell
 Clear-Host
