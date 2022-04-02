@@ -4,84 +4,125 @@ function Get-Events {
     Get-Events is a wrapper function around Get-WinEvent providing additional features and options.
 
     .DESCRIPTION
-    Long description
+    Get-Events is a wrapper function around Get-WinEvent providing additional features and options exposing most of the Get-WinEvent functionality in easy to use manner.
 
     .PARAMETER Machine
-    ComputerName or Server you want to query. Takes an array of servers as well.
+    Specifies the name of the computer that this cmdlet gets events from the event logs. Type the NetBIOS name, an IP address, or the fully qualified domain name (FQDN) of the computer. The default value is the local computer, localhost. This parameter accepts only one computer name at a time.
+
+    To get event logs from remote computers, configure the firewall port for the event log service to allow remote access.
+
+    This cmdlet does not rely on PowerShell remoting. You can use the ComputerName parameter even if your computer is not configured to run remote commands.
 
     .PARAMETER DateFrom
-    Parameter description
+    Specifies the date and time of the earliest event in the event log you want to search for.
 
     .PARAMETER DateTo
-    Parameter description
+    Specifies the date and time of the latest event in the event log you want to search for.
 
     .PARAMETER ID
-    Parameter description
+    Specifies the event ID (or events) of the event you want to search for. If provided more than 23 the cmdlet will split the events into multiple queries automatically.
 
     .PARAMETER ExcludeID
-    Parameter description
+    Specifies the event ID (or events) of the event you want to exclude from the search. If provided more than 23 the cmdlet will split the events into multiple queries automatically.
 
     .PARAMETER LogName
-    Parameter description
+    Specifies the event logs that this cmdlet get events from. Enter the event log names in a comma-separated list. Wildcards are permitted.
 
     .PARAMETER ProviderName
-    Parameter description
+    Specifies, as a string array, the event log providers from which this cmdlet gets events. Enter the provider names in a comma-separated list, or use wildcard characters to create provider name patterns.
+
+    An event log provider is a program or service that writes events to the event log. It is not a PowerShell provider.
 
     .PARAMETER NamedDataFilter
-    Parameter description
+    Provide NamedDataFilter in specific form to optimize search performance looking for specific events.
 
     .PARAMETER NamedDataExcludeFilter
-    Parameter description
+    Provide NamedDataExcludeFilter in specific form to optimize search performance looking for specific events.
 
     .PARAMETER UserID
-    Parameter description
+    The UserID key can take a valid security identifier (SID) or a domain account name that can be used to construct a valid System.Security.Principal.NTAccount object.
 
     .PARAMETER Level
-    Parameter description
+    Define the event level that this cmdlet gets events from. Options are Verbose, Informational, Warning, Error, Critical, LogAlways
 
     .PARAMETER UserSID
-    Parameter description
+    Search events by UserSID
 
     .PARAMETER Data
-    Parameter description
+    The Data value takes event data in an unnamed field. For example, events in classic event logs.
 
     .PARAMETER MaxEvents
-    Parameter description
+    Specifies the maximum number of events that are returned. Enter an integer such as 100. The default is to return all the events in the logs or files.
 
-    .PARAMETER Credentials
-    Parameter description
+    .PARAMETER Credential
+    Specifies the name of the computer that this cmdlet gets events from the event logs. Type the NetBIOS name, an IP address, or the fully qualified domain name (FQDN) of the computer. The default value is the local computer, localhost. This parameter accepts only one computer name at a time.
+
+    To get event logs from remote computers, configure the firewall port for the event log service to allow remote access.
+
+    This cmdlet does not rely on PowerShell remoting. You can use the ComputerName parameter even if your computer is not configured to run remote commands.
 
     .PARAMETER Path
-    Parameter description
+    Specifies the path to the event log files that this cmdlet get events from. Enter the paths to the log files in a comma-separated list, or use wildcard characters to create file path patterns.
 
     .PARAMETER Keywords
-    Parameter description
+    Define keywords to search for by their name. Available keywords are: AuditFailure, AuditSuccess, CorrelationHint2, EventLogClassic, Sqm, WdiDiagnostic, WdiContext, ResponseTime, None
 
     .PARAMETER RecordID
-    Parameter description
+    Find a single event in the event log using it's RecordId
 
     .PARAMETER MaxRunspaces
-    Parameter description
+    Limit the number of concurrent runspaces that can be used to process the events. By default it uses $env:NUMBER_OF_PROCESSORS + 1
 
     .PARAMETER Oldest
-    Parameter description
+    Indicate that this cmdlet gets the events in oldest-first order. By default, events are returned in newest-first order.
 
     .PARAMETER DisableParallel
-    Parameter description
+    Disables parallel processing of the events. By default, events are processed in parallel.
 
     .PARAMETER ExtendedOutput
-    Parameter description
+    Indicates that this cmdlet returns an extended set of output parameters. By default, this cmdlet does not generate any extended output.
 
     .PARAMETER ExtendedInput
-    Parameter description
+    Indicates that this cmdlet takes an extended set of input parameters. Extended input is used by PSWinReportingV2 to provide special input parameters.
 
     .EXAMPLE
-    An example
+    Get-Events -LogName 'Application' -ID 1001 -MaxEvents 1 -Verbose -DisableParallel
+
+    .EXAMPLE
+    Get-Events -LogName 'Setup' -ID 2 -ComputerName 'AD1' -MaxEvents 1 -Verbose | Format-List *
+
+    .EXAMPLE
+    Get-Events -LogName 'Setup' -ID 2 -ComputerName 'AD1','AD2','AD3' -MaxEvents 1 -Verbose | Format-List *
+
+    .EXAMPLE
+    Get-Events -LogName 'Security' -ID 5379 -RecordID 19626 -Verbose
+
+    .EXAMPLE
+    Get-Events -LogName 'System' -ID 1001,1018 -ProviderName 'Microsoft-Windows-WER-SystemErrorReporting' -Verbose
+    Get-Events -LogName 'System' -ID 42,41,109 -ProviderName 'Microsoft-Windows-Kernel-Power' -Verbose
+    Get-Events -LogName 'System' -ID 1,12,13 -ProviderName 'Microsoft-Windows-Kernel-General' -Verbose
+    Get-Events -LogName 'System' -ID 6005,6006,6008,6013 -ProviderName 'EventLog' -Verbose
+
+    .EXAMPLE
+    $List = @(
+        @{ Server = 'AD1'; LogName = 'Security'; EventID = '5136', '5137'; Type = 'Computer' }
+        @{ Server = 'AD2'; LogName = 'Security'; EventID = '5136', '5137'; Type = 'Computer' }
+        @{ Server = 'C:\MyEvents\Archive-Security-2018-08-21-23-49-19-424.evtx'; LogName = 'Security'; EventID = '5136', '5137'; Type = 'File' }
+        @{ Server = 'C:\MyEvents\Archive-Security-2018-09-15-09-27-52-679.evtx'; LogName = 'Security'; EventID = '5136', '5137'; Type = 'File' }
+        @{ Server = 'Evo1'; LogName = 'Setup'; EventID = 2; Type = 'Computer'; }
+        @{ Server = 'AD1.ad.evotec.xyz'; LogName = 'Security'; EventID = 4720, 4738, 5136, 5137, 5141, 4722, 4725, 4767, 4723, 4724, 4726, 4728, 4729, 4732, 4733, 4746, 4747, 4751, 4752, 4756, 4757, 4761, 4762, 4785, 4786, 4787, 4788, 5136, 5137, 5141, 5136, 5137, 5141, 5136, 5137, 5141; Type = 'Computer' }
+        @{ Server = 'Evo1'; LogName = 'Security'; Type = 'Computer'; MaxEvents = 15; Keywords = 'AuditSuccess' }
+        @{ Server = 'Evo1'; LogName = 'Security'; Type = 'Computer'; MaxEvents = 15; Level = 'Informational'; Keywords = 'AuditFailure' }
+    )
+    $Output = Get-Events -ExtendedInput $List -Verbose
+    $Output | Format-Table Computer, Date, LevelDisplayName
+
+    .EXAMPLE
+    Get-Events -MaxEvents 2 -LogName 'Security' -ComputerName 'AD1.AD.EVOTEC.XYZ','AD2' -ID 4720, 4738, 5136, 5137, 5141, 4722, 4725, 4767, 4723, 4724, 4726, 4728, 4729, 4732, 4733, 4746, 4747, 4751, 4752, 4756, 4757, 4761, 4762, 4785, 4786, 4787, 4788, 5136, 5137, 5141, 5136, 5137, 5141, 5136, 5137, 5141 -Verbose
 
     .NOTES
     General notes
     #>
-
     [CmdLetBinding()]
     param (
         [alias ("ADDomainControllers", "DomainController", "Server", "Servers", "Computer", "Computers", "ComputerName")] [string[]] $Machine = $Env:COMPUTERNAME,
@@ -90,7 +131,7 @@ function Get-Events {
         [alias ("Ids", "EventID", "EventIds")] [int[]] $ID = $null,
         [alias ("ExludeEventID")][int[]] $ExcludeID = $null,
         [alias ("LogType", "Log")][string] $LogName = $null,
-        [alias ("Provider", "Source")] [string] $ProviderName,
+        [alias ("Provider", "Source")] [string[]] $ProviderName,
         [hashtable] $NamedDataFilter,
         [hashtable] $NamedDataExcludeFilter,
         [string[]] $UserID,
@@ -129,11 +170,11 @@ function Get-Events {
                 Write-Verbose "Get-Events - Preparing data to scan computer $($EventEntry.Server)"
                 $Comp = $EventEntry.Server
             }
-            $ConvertedLevels = foreach ($Data in $EventEntry.Level) {
-                ([PSEventViewer.Level]::$Data).value__
+            $ConvertedLevels = foreach ($DataLevel in $EventEntry.Level) {
+                ([PSEventViewer.Level]::$DataLevel).value__
             }
-            $ConvertedKeywords = foreach ($Data in $EventEntry.Keywords) {
-                ([PSEventViewer.Keywords]::$Data).value__
+            $ConvertedKeywords = foreach ($DataKeyword in $EventEntry.Keywords) {
+                ([PSEventViewer.Keywords]::$DataKeyword).value__
             }
             Add-ToHashTable -Hashtable $EventFilter -Key "LogName" -Value $EventEntry.LogName
             Add-ToHashTable -Hashtable $EventFilter -Key "StartTime" -Value $EventEntry.DateFrom
@@ -267,13 +308,12 @@ function Get-Events {
         }
     } else {
         Write-Verbose 'Get-Events - Running query with parallel enabled...'
-        $RunspacePool = New-Runspace -MaxRunspaces $maxRunspaces -Verbose:$Verbose
+        $RunspacePool = New-Runspace -maxRunspaces $maxRunspaces -Verbose:$Verbose
         $Runspaces = foreach ($Parameter in $ParametersList) {
             Start-Runspace -ScriptBlock $Script:ScriptBlock -Parameters $Parameter -RunspacePool $RunspacePool -Verbose:$Verbose
         }
         [Array] $AllEvents = Stop-Runspace -Runspaces $Runspaces -FunctionName "Get-Events" -RunspacePool $RunspacePool -Verbose:$Verbose -ErrorAction SilentlyContinue -ErrorVariable +AllErrors -ExtendedOutput:$ExtendedOutput
     }
-    #$EventsProcessed = Get-ObjectCount -Object $AllEvents
     Write-Verbose "Get-Events - Overall errors: $($AllErrors.Count)"
     Write-Verbose "Get-Events - Overall events processed in total for the report: $($AllEvents.Count)"
     Write-Verbose "Get-Events - Overall time to generate $($MeasureTotal.Elapsed.Hours) hours, $($MeasureTotal.Elapsed.Minutes) minutes, $($MeasureTotal.Elapsed.Seconds) seconds, $($MeasureTotal.Elapsed.Milliseconds) milliseconds"
