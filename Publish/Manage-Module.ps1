@@ -9,11 +9,8 @@ $Configuration = @{
         ScriptsToProcess  = 'Enums'
 
         Manifest          = @{
-            Path                 = "C:\Support\GitHub\PSEventViewer\PSEventViewer.psd1"
-            # Script module or binary module file associated with this manifest.
-            RootModule           = 'PSEventViewer.psm1'
             # Version number of this module.
-            ModuleVersion        = '1.0.17'
+            ModuleVersion        = '1.0.X'
             # Supported PSEditions
             CompatiblePSEditions = @('Desktop', 'Core')
             # ID used to uniquely identify this module
@@ -23,7 +20,7 @@ $Configuration = @{
             # Company or vendor of this module
             CompanyName          = 'Evotec'
             # Copyright statement for this module
-            Copyright            = '(c) 2011 - 2019 Przemyslaw Klys. All rights reserved.'
+            Copyright            = "(c) 2011 - $((Get-Date).Year) Przemyslaw Klys @ Evotec. All rights reserved."
             # Description of the functionality provided by this module
             Description          = 'Simple module allowing parsing of event logs. Has its own quirks...'
             # Tags applied to this module. These help with module discovery in online galleries.
@@ -32,6 +29,7 @@ $Configuration = @{
             IconUri              = 'https://evotec.xyz/wp-content/uploads/2018/10/PSEventViewer.png'
 
             ProjectUri           = 'https://github.com/EvotecIT/PSEventViewer'
+
             PowerShellVersion    = '5.1'
             #ReleaseNotes = ''
             RequiredModules      = @(
@@ -137,25 +135,30 @@ $Configuration = @{
     }
     Steps       = @{
         BuildModule        = @{  # requires Enable to be on to process all of that
-            Enable           = $true
-            DeleteBefore     = $false
-            Merge            = $true
-            MergeMissing     = $true
-            Releases         = $true
-            ReleasesUnpacked = $false
-            RefreshPSD1Only  = $false
+            Enable              = $true
+            DeleteBefore        = $true
+            Merge               = $true
+            MergeMissing        = $true
+            LibrarySeparateFile = $false
+            LibraryDotSource    = $false
+            ClassesDotSource    = $false
+            SignMerged          = $true
+            CreateFileCatalog   = $false # not working
+            Releases            = $true
+            ReleasesUnpacked    = $false
+            RefreshPSD1Only     = $false
         }
-        BuildDocumentation = $false
+        BuildDocumentation = $true
         ImportModules      = @{
             Self            = $true
             RequiredModules = $false
             Verbose         = $false
         }
         PublishModule      = @{  # requires Enable to be on to process all of that
-            Enabled      = $false
+            Enabled      = $true
             Prerelease   = ''
             RequireForce = $false
-            GitHub       = $false
+            GitHub       = $true
         }
     }
 }
