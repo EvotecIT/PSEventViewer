@@ -1,7 +1,7 @@
 ﻿function Set-EventsSettings {
     [cmdletBinding()]
     param(
-        [string] $LogName,
+        [Parameter(Mandatory)][string] $LogName,
         [string] $ComputerName,
         [int] $MaximumSizeMB,
         [ValidateSet('OverwriteEventsAsNeededOldestFirst', 'ArchiveTheLogWhenFullDoNotOverwrite', 'DoNotOverwriteEventsClearLogManually', 'None')][string] $EventAction
@@ -26,7 +26,6 @@
                 } else {
                     # No choice
                 }
-
             }
         }
     }
