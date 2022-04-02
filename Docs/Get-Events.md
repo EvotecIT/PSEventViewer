@@ -14,7 +14,7 @@ Get-Events is a wrapper function around Get-WinEvent providing additional featur
 
 ```
 Get-Events [[-Machine] <String[]>] [[-DateFrom] <DateTime>] [[-DateTo] <DateTime>] [[-ID] <Int32[]>]
- [[-ExcludeID] <Int32[]>] [[-LogName] <String>] [[-ProviderName] <String>] [[-NamedDataFilter] <Hashtable>]
+ [[-ExcludeID] <Int32[]>] [[-LogName] <String>] [[-ProviderName] <String[]>] [[-NamedDataFilter] <Hashtable>]
  [[-NamedDataExcludeFilter] <Hashtable>] [[-UserID] <String[]>] [[-Level] <Level[]>] [[-UserSID] <String>]
  [[-Data] <String[]>] [[-MaxEvents] <Int32>] [[-Credential] <PSCredential>] [[-Path] <String>]
  [[-Keywords] <Keywords[]>] [[-RecordID] <Int64>] [[-MaxRunspaces] <Int32>] [-Oldest] [-DisableParallel]
@@ -22,22 +22,71 @@ Get-Events [[-Machine] <String[]>] [[-DateFrom] <DateTime>] [[-DateTo] <DateTime
 ```
 
 ## DESCRIPTION
-Long description
+Get-Events is a wrapper function around Get-WinEvent providing additional features and options exposing most of the Get-WinEvent functionality in easy to use manner.
 
 ## EXAMPLES
 
 ### EXAMPLE 1
 ```
-$DateFrom = (get-date).AddHours(-5)
+Get-Events -LogName 'Application' -ID 1001 -MaxEvents 1 -Verbose -DisableParallel
 ```
 
-$DateTo = (get-date).AddHours(1)
-get-events -Computer "Evo1" -DateFrom $DateFrom -DateTo $DateTo -EventId 916 -LogType "Application"
+### EXAMPLE 2
+```
+Get-Events -LogName 'Setup' -ID 2 -ComputerName 'AD1' -MaxEvents 1 -Verbose | Format-List *
+```
+
+### EXAMPLE 3
+```
+Get-Events -LogName 'Setup' -ID 2 -ComputerName 'AD1','AD2','AD3' -MaxEvents 1 -Verbose | Format-List *
+```
+
+### EXAMPLE 4
+```
+Get-Events -LogName 'Security' -ID 5379 -RecordID 19626 -Verbose
+```
+
+### EXAMPLE 5
+```
+Get-Events -LogName 'System' -ID 1001,1018 -ProviderName 'Microsoft-Windows-WER-SystemErrorReporting' -Verbose
+```
+
+Get-Events -LogName 'System' -ID 42,41,109 -ProviderName 'Microsoft-Windows-Kernel-Power' -Verbose
+Get-Events -LogName 'System' -ID 1,12,13 -ProviderName 'Microsoft-Windows-Kernel-General' -Verbose
+Get-Events -LogName 'System' -ID 6005,6006,6008,6013 -ProviderName 'EventLog' -Verbose
+
+### EXAMPLE 6
+```
+$List = @(
+@{ Server = 'AD1'; LogName = 'Security'; EventID = '5136', '5137'; Type = 'Computer' }
+    @{ Server = 'AD2'; LogName = 'Security'; EventID = '5136', '5137'; Type = 'Computer' }
+    @{ Server = 'C:\MyEvents\Archive-Security-2018-08-21-23-49-19-424.evtx'; LogName = 'Security'; EventID = '5136', '5137'; Type = 'File' }
+    @{ Server = 'C:\MyEvents\Archive-Security-2018-09-15-09-27-52-679.evtx'; LogName = 'Security'; EventID = '5136', '5137'; Type = 'File' }
+    @{ Server = 'Evo1'; LogName = 'Setup'; EventID = 2; Type = 'Computer'; }
+    @{ Server = 'AD1.ad.evotec.xyz'; LogName = 'Security'; EventID = 4720, 4738, 5136, 5137, 5141, 4722, 4725, 4767, 4723, 4724, 4726, 4728, 4729, 4732, 4733, 4746, 4747, 4751, 4752, 4756, 4757, 4761, 4762, 4785, 4786, 4787, 4788, 5136, 5137, 5141, 5136, 5137, 5141, 5136, 5137, 5141; Type = 'Computer' }
+    @{ Server = 'Evo1'; LogName = 'Security'; Type = 'Computer'; MaxEvents = 15; Keywords = 'AuditSuccess' }
+    @{ Server = 'Evo1'; LogName = 'Security'; Type = 'Computer'; MaxEvents = 15; Level = 'Informational'; Keywords = 'AuditFailure' }
+)
+$Output = Get-Events -ExtendedInput $List -Verbose
+$Output | Format-Table Computer, Date, LevelDisplayName
+
+### EXAMPLE 7
+```
+Get-Events -MaxEvents 2 -LogName 'Security' -ComputerName 'AD1.AD.EVOTEC.XYZ','AD2' -ID 4720, 4738, 5136, 5137, 5141, 4722, 4725, 4767, 4723, 4724, 4726, 4728, 4729, 4732, 4733, 4746, 4747, 4751, 4752, 4756, 4757, 4761, 4762, 4785, 4786, 4787, 4788, 5136, 5137, 5141, 5136, 5137, 5141, 5136, 5137, 5141 -Verbose
+```
 
 ## PARAMETERS
 
 ### -Machine
-Parameter description
+Specifies the name of the computer that this cmdlet gets events from the event logs.
+Type the NetBIOS name, an IP address, or the fully qualified domain name (FQDN) of the computer.
+The default value is the local computer, localhost.
+This parameter accepts only one computer name at a time.
+
+To get event logs from remote computers, configure the firewall port for the event log service to allow remote access.
+
+This cmdlet does not rely on PowerShell remoting.
+You can use the ComputerName parameter even if your computer is not configured to run remote commands.
 
 ```yaml
 Type: String[]
@@ -52,7 +101,7 @@ Accept wildcard characters: False
 ```
 
 ### -DateFrom
-Parameter description
+Specifies the date and time of the earliest event in the event log you want to search for.
 
 ```yaml
 Type: DateTime
@@ -67,7 +116,7 @@ Accept wildcard characters: False
 ```
 
 ### -DateTo
-Parameter description
+Specifies the date and time of the latest event in the event log you want to search for.
 
 ```yaml
 Type: DateTime
@@ -82,7 +131,8 @@ Accept wildcard characters: False
 ```
 
 ### -ID
-Parameter description
+Specifies the event ID (or events) of the event you want to search for.
+If provided more than 23 the cmdlet will split the events into multiple queries automatically.
 
 ```yaml
 Type: Int32[]
@@ -97,7 +147,8 @@ Accept wildcard characters: False
 ```
 
 ### -ExcludeID
-Parameter description
+Specifies the event ID (or events) of the event you want to exclude from the search.
+If provided more than 23 the cmdlet will split the events into multiple queries automatically.
 
 ```yaml
 Type: Int32[]
@@ -112,7 +163,9 @@ Accept wildcard characters: False
 ```
 
 ### -LogName
-Parameter description
+Specifies the event logs that this cmdlet get events from.
+Enter the event log names in a comma-separated list.
+Wildcards are permitted.
 
 ```yaml
 Type: String
@@ -127,10 +180,14 @@ Accept wildcard characters: False
 ```
 
 ### -ProviderName
-Parameter description
+Specifies, as a string array, the event log providers from which this cmdlet gets events.
+Enter the provider names in a comma-separated list, or use wildcard characters to create provider name patterns.
+
+An event log provider is a program or service that writes events to the event log.
+It is not a PowerShell provider.
 
 ```yaml
-Type: String
+Type: String[]
 Parameter Sets: (All)
 Aliases: Provider, Source
 
@@ -142,7 +199,7 @@ Accept wildcard characters: False
 ```
 
 ### -NamedDataFilter
-Parameter description
+Provide NamedDataFilter in specific form to optimize search performance looking for specific events.
 
 ```yaml
 Type: Hashtable
@@ -157,7 +214,7 @@ Accept wildcard characters: False
 ```
 
 ### -NamedDataExcludeFilter
-Parameter description
+Provide NamedDataExcludeFilter in specific form to optimize search performance looking for specific events.
 
 ```yaml
 Type: Hashtable
@@ -172,7 +229,7 @@ Accept wildcard characters: False
 ```
 
 ### -UserID
-Parameter description
+The UserID key can take a valid security identifier (SID) or a domain account name that can be used to construct a valid System.Security.Principal.NTAccount object.
 
 ```yaml
 Type: String[]
@@ -187,7 +244,8 @@ Accept wildcard characters: False
 ```
 
 ### -Level
-Parameter description
+Define the event level that this cmdlet gets events from.
+Options are Verbose, Informational, Warning, Error, Critical, LogAlways
 
 ```yaml
 Type: Level[]
@@ -203,7 +261,7 @@ Accept wildcard characters: False
 ```
 
 ### -UserSID
-Parameter description
+Search events by UserSID
 
 ```yaml
 Type: String
@@ -218,7 +276,8 @@ Accept wildcard characters: False
 ```
 
 ### -Data
-Parameter description
+The Data value takes event data in an unnamed field.
+For example, events in classic event logs.
 
 ```yaml
 Type: String[]
@@ -233,7 +292,9 @@ Accept wildcard characters: False
 ```
 
 ### -MaxEvents
-Parameter description
+Specifies the maximum number of events that are returned.
+Enter an integer such as 100.
+The default is to return all the events in the logs or files.
 
 ```yaml
 Type: Int32
@@ -248,7 +309,15 @@ Accept wildcard characters: False
 ```
 
 ### -Credential
-{{ Fill Credential Description }}
+Specifies the name of the computer that this cmdlet gets events from the event logs.
+Type the NetBIOS name, an IP address, or the fully qualified domain name (FQDN) of the computer.
+The default value is the local computer, localhost.
+This parameter accepts only one computer name at a time.
+
+To get event logs from remote computers, configure the firewall port for the event log service to allow remote access.
+
+This cmdlet does not rely on PowerShell remoting.
+You can use the ComputerName parameter even if your computer is not configured to run remote commands.
 
 ```yaml
 Type: PSCredential
@@ -263,7 +332,8 @@ Accept wildcard characters: False
 ```
 
 ### -Path
-Parameter description
+Specifies the path to the event log files that this cmdlet get events from.
+Enter the paths to the log files in a comma-separated list, or use wildcard characters to create file path patterns.
 
 ```yaml
 Type: String
@@ -278,7 +348,8 @@ Accept wildcard characters: False
 ```
 
 ### -Keywords
-Parameter description
+Define keywords to search for by their name.
+Available keywords are: AuditFailure, AuditSuccess, CorrelationHint2, EventLogClassic, Sqm, WdiDiagnostic, WdiContext, ResponseTime, None
 
 ```yaml
 Type: Keywords[]
@@ -294,7 +365,7 @@ Accept wildcard characters: False
 ```
 
 ### -RecordID
-Parameter description
+Find a single event in the event log using it's RecordId
 
 ```yaml
 Type: Int64
@@ -309,7 +380,8 @@ Accept wildcard characters: False
 ```
 
 ### -MaxRunspaces
-Parameter description
+Limit the number of concurrent runspaces that can be used to process the events.
+By default it uses $env:NUMBER_OF_PROCESSORS + 1
 
 ```yaml
 Type: Int32
@@ -324,7 +396,8 @@ Accept wildcard characters: False
 ```
 
 ### -Oldest
-Parameter description
+Indicate that this cmdlet gets the events in oldest-first order.
+By default, events are returned in newest-first order.
 
 ```yaml
 Type: SwitchParameter
@@ -339,7 +412,8 @@ Accept wildcard characters: False
 ```
 
 ### -DisableParallel
-Parameter description
+Disables parallel processing of the events.
+By default, events are processed in parallel.
 
 ```yaml
 Type: SwitchParameter
@@ -354,7 +428,8 @@ Accept wildcard characters: False
 ```
 
 ### -ExtendedOutput
-{{Fill ExtendedOutput Description}}
+Indicates that this cmdlet returns an extended set of output parameters.
+By default, this cmdlet does not generate any extended output.
 
 ```yaml
 Type: SwitchParameter
@@ -369,7 +444,8 @@ Accept wildcard characters: False
 ```
 
 ### -ExtendedInput
-Parameter description
+Indicates that this cmdlet takes an extended set of input parameters.
+Extended input is used by PSWinReportingV2 to provide special input parameters.
 
 ```yaml
 Type: Array
