@@ -1,6 +1,6 @@
 Clear-Host
 Import-Module PSSharedGoods -Force
-Import-Module ..\PSEventViewer.psd1 -force
+Import-Module ..\PSEventViewer.psd1 -Force
 Write-Color "Start 1" -Color Red
 $Output1 = Get-Events -LogName 'Setup' -ID 2 -ComputerName 'Evo1' -MaxEvents 1 -Verbose #| Format-Table *
 Write-Color 'Start 2' -Color Red
