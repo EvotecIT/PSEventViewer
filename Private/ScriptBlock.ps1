@@ -787,6 +787,8 @@ $Script:ScriptBlock = {
             }
             if ($Event.TargetDomainName -and $Event.TargetUserName) {
                 Add-Member -InputObject $Event -MemberType NoteProperty -Name 'ObjectAffected' -Value "$($Event.TargetDomainName)\$($Event.TargetUserName)" -Force
+            } elseif ($Event.TargetUserName) {
+                Add-Member -InputObject $Event -MemberType NoteProperty -Name 'ObjectAffected' -Value "$($Event.TargetUserName)" -Force
             }
             if ($Event.MemberName) {
                 [string] $MemberNameWithoutCN = $Event.MemberName -replace 'CN=|\\|,(OU|DC|CN).*$'
