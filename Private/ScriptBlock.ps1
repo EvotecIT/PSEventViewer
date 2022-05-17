@@ -696,20 +696,34 @@ $Script:ScriptBlock = {
             $Event.PSObject.Properties.Add([System.Management.Automation.PSNoteProperty]::new('Computer', $event.MachineName.ToString()))
             $Event.PSObject.Properties.Add([System.Management.Automation.PSNoteProperty]::new('Date', $Event.TimeCreated))
 
-            $EventTopNodes = Get-Member -InputObject $eventXML.Event -MemberType Properties | Where-Object { $_.Name -ne 'System' -and $_.Name -ne 'xmlns' }
-            foreach ($EventTopNode in $EventTopNodes) {
-                $TopNode = $EventTopNode.Name
+            #$EventTopNodes = Get-Member -InputObject $eventXML.Event -MemberType Properties | Where-Object { $_.Name -ne 'System' -and $_.Name -ne 'xmlns' }
+            $EventTopNodes = $eventXML.Event.PSAdapted.PSObject.Properties.Name #| Where-Object { $_ -ne 'System' -and $_ -ne 'xmlns' }
 
-                $EventSubsSubs = Get-Member -InputObject $eventXML.Event.$TopNode -MemberType Properties
+            [Array] $EventTopNodes = foreach ($Entry in $EventTopNodes) {
+                if ($Entry -ne 'System' -and $Entry -ne 'xmlns' ) {
+                    $Entry
+                }
+            }
+            foreach ($TopNode in $EventTopNodes) {
+                #$TopNode = $EventTopNode.Name
+
+                #$EventSubsSubs = Get-Member -InputObject $eventXML.Event.$TopNode -MemberType Properties
+                $EventSubsSubs = $eventXML.Event.$TopNode.PSAdapted.PSObject.Properties
                 $h = 0
                 foreach ($EventSubSub in $EventSubsSubs) {
                     $SubNode = $EventSubSub.Name
                     #$EventSubSub | ft -a
-                    if ($EventSubSub.Definition -like "System.Object*") {
+                    if ($EventSubSub.TypeNameOfValue -like "System.Object*") {
                         #if (Get-Member -InputObject $eventXML.Event.$TopNode -Name "$SubNode" -MemberType Properties) {
                         if ($eventXML.Event.$TopNode.$SubNode) {
                             # Case 1
-                            $SubSubNode = Get-Member -InputObject $eventXML.Event.$TopNode.$SubNode -MemberType Properties | Where-Object { $_.Name -ne 'xmlns' -and $_.Definition -like "string*" }
+                            #$SubSubNode = Get-Member -InputObject $eventXML.Event.$TopNode.$SubNode -MemberType Properties | Where-Object { $_.Name -ne 'xmlns' -and $_.Definition -like "string*" }
+                            $SubSubNode = $eventXML.Event.$TopNode.$SubNode.PSAdapted.PSObject.Properties #| Where-Object { $_.Name -ne 'xmlns' -and $_.TypeNameOfValue -like "string*" }
+                            [Array] $SubSubNode = foreach ($Entry in $SubSubNode) {
+                                if ($Entry.Name -ne 'xmls' -and $_.TypeNameOfValue -like "string*") {
+                                    $Entry
+                                }
+                            }
                             foreach ($Name in $SubSubNode.Name) {
                                 $fieldName = $Name
                                 $fieldValue = $eventXML.Event.$TopNode.$SubNode.$Name
@@ -749,9 +763,15 @@ $Script:ScriptBlock = {
 
                             }
                         }
-                    } elseif ($EventSubSub.Definition -like "System.Xml.XmlElement*") {
+                    } elseif ($EventSubSub.TypeNameOfValue -like "System.Xml.XmlElement*") {
                         # Case 1
-                        $SubSubNode = Get-Member -InputObject $eventXML.Event.$TopNode.$SubNode -MemberType Properties | Where-Object { $_.Name -ne 'xmlns' -and $_.Definition -like "string*" }
+                        #$SubSubNode = Get-Member -InputObject $eventXML.Event.$TopNode.$SubNode -MemberType Properties | Where-Object { $_.Name -ne 'xmlns' -and $_.Definition -like "string*" }
+                        $SubSubNode = $eventXML.Event.$TopNode.$SubNode.PSAdapted.PSObject.Properties #| Where-Object { $_.Name -ne 'xmlns' -and $_.TypeNameOfValue -like "string*" }
+                        [Array] $SubSubNode = foreach ($Entry in $SubSubNode) {
+                            if ($Entry.Name -ne 'xmls' -and $_.TypeNameOfValue -like "string*") {
+                                $Entry
+                            }
+                        }
                         foreach ($Name in $SubSubNode.Name) {
                             $fieldName = $Name
                             $fieldValue = $eventXML.Event.$TopNode.$SubNode.$Name
