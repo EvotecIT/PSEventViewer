@@ -286,7 +286,7 @@ $Script:ScriptBlock = {
                 [String]
                 $FinalizeFormatString,
 
-                [ValidateSet("and",  "or", IgnoreCase = $False)]
+                [ValidateSet("and", "or", IgnoreCase = $False)]
                 [String]
                 $Logic = 'or',
 
@@ -688,45 +688,56 @@ $Script:ScriptBlock = {
 
         # Parse out the event message data
         ForEach ($Event in $Events) {
+            $CreatedEvent = [ordered] @{}
             # Convert the event to XML
             $eventXML = [xml]$Event.ToXml()
-            # Iterate through each one of the XML message properties
-            Add-Member -InputObject $Event -MemberType NoteProperty -Name "Computer" -Value $event.MachineName.ToString() -Force
-            Add-Member -InputObject $Event -MemberType NoteProperty -Name "Date" -Value $Event.TimeCreated -Force
 
-            $EventTopNodes = Get-Member -InputObject $eventXML.Event -MemberType Properties | Where-Object { $_.Name -ne 'System' -and $_.Name -ne 'xmlns'}
+            foreach ($PropertyName in $Event.PSObject.Properties.Name) {
+                $CreatedEvent[$PropertyName] = $Event.$PropertyName
+            }
+            $CreatedEvent['Computer'] = $event.MachineName.ToString()
+            $CreatedEvent['Date'] = $Event.TimeCreated
+
+
+            # Iterate through each one of the XML message properties
+            #Add-Member -InputObject $Event -MemberType NoteProperty -Name "Computer" -Value $event.MachineName.ToString() -Force
+            #Add-Member -InputObject $Event -MemberType NoteProperty -Name "Date" -Value $Event.TimeCreated -Force
+
+            $EventTopNodes = Get-Member -InputObject $eventXML.Event -MemberType Properties | Where-Object { $_.Name -ne 'System' -and $_.Name -ne 'xmlns' }
             foreach ($EventTopNode in $EventTopNodes) {
                 $TopNode = $EventTopNode.Name
 
-                $EventSubsSubs = Get-Member -InputObject $eventXML.Event.$TopNode -Membertype Properties
+                $EventSubsSubs = Get-Member -InputObject $eventXML.Event.$TopNode -MemberType Properties
                 $h = 0
                 foreach ($EventSubSub in $EventSubsSubs) {
                     $SubNode = $EventSubSub.Name
                     #$EventSubSub | ft -a
                     if ($EventSubSub.Definition -like "System.Object*") {
-                        if (Get-Member -InputObject $eventXML.Event.$TopNode -name "$SubNode" -Membertype Properties) {
+                        if (Get-Member -InputObject $eventXML.Event.$TopNode -Name "$SubNode" -MemberType Properties) {
 
                             # Case 1
                             $SubSubNode = Get-Member -InputObject $eventXML.Event.$TopNode.$SubNode -MemberType Properties | Where-Object { $_.Name -ne 'xmlns' -and $_.Definition -like "string*" }
                             foreach ($Name in $SubSubNode.Name) {
                                 $fieldName = $Name
                                 $fieldValue = $eventXML.Event.$TopNode.$SubNode.$Name
-                                Add-Member -InputObject $Event -MemberType NoteProperty -Name $fieldName -Value $fieldValue -Force
+                                #Add-Member -InputObject $Event -MemberType NoteProperty -Name $fieldName -Value $fieldValue -Force
+                                $CreatedEvent[$fieldName] = $fieldValue
                             }
                             # Case 1
 
                             For ($i = 0; $i -lt $eventXML.Event.$TopNode.$SubNode.Count; $i++) {
-                                if (Get-Member -InputObject $eventXML.Event.$TopNode.$SubNode[$i] -name "Name" -Membertype Properties) {
+                                if (Get-Member -InputObject $eventXML.Event.$TopNode.$SubNode[$i] -Name "Name" -MemberType Properties) {
                                     # Case 2
                                     $fieldName = $eventXML.Event.$TopNode.$SubNode[$i].Name
-                                    if (Get-Member -InputObject $eventXML.Event.$TopNode.$SubNode[$i] -name "#text" -Membertype Properties) {
+                                    if (Get-Member -InputObject $eventXML.Event.$TopNode.$SubNode[$i] -Name "#text" -MemberType Properties) {
                                         $fieldValue = $eventXML.Event.$TopNode.$SubNode[$i]."#text"
                                         if ($fieldValue -eq "-".Trim()) { $fieldValue = $fieldValue -replace "-" }
                                     } else {
                                         $fieldValue = ""
                                     }
                                     if ($fieldName -ne "") {
-                                        Add-Member -InputObject $Event -MemberType NoteProperty -Name $fieldName -Value $fieldValue -Force
+                                        #Add-Member -InputObject $Event -MemberType NoteProperty -Name $fieldName -Value $fieldValue -Force
+                                        $CreatedEvent[$fieldName] = $fieldValue
                                     }
                                     # Case 2
                                 } else {
@@ -735,7 +746,8 @@ $Script:ScriptBlock = {
                                     if ($Value.Name -ne 'Name' -and $Value.Name -ne '#text') {
                                         $fieldName = "NoNameA$i"
                                         $fieldValue = $Value
-                                        Add-Member -InputObject $Event -MemberType NoteProperty -Name $fieldName -Value $fieldValue -Force
+                                        #Add-Member -InputObject $Event -MemberType NoteProperty -Name $fieldName -Value $fieldValue -Force
+                                        $CreatedEvent[$fieldName] = $fieldValue
                                     }
                                     # Case 3
                                 }
@@ -748,7 +760,8 @@ $Script:ScriptBlock = {
                         foreach ($Name in $SubSubNode.Name) {
                             $fieldName = $Name
                             $fieldValue = $eventXML.Event.$TopNode.$SubNode.$Name
-                            Add-Member -InputObject $Event -MemberType NoteProperty -Name $fieldName -Value $fieldValue -Force
+                            #Add-Member -InputObject $Event -MemberType NoteProperty -Name $fieldName -Value $fieldValue -Force
+                            $CreatedEvent[$fieldName] = $fieldValue
                         }
                         # Case 1
                     } else {
@@ -760,12 +773,14 @@ $Script:ScriptBlock = {
                             foreach ($Split in $SplittedValues) {
                                 $h++
                                 $fieldName = "NoNameB$h"
-                                Add-Member -InputObject $Event -MemberType NoteProperty -Name $fieldName -Value $Split -Force
+                                #Add-Member -InputObject $Event -MemberType NoteProperty -Name $fieldName -Value $Split -Force
+                                $CreatedEvent[$fieldName] = $Split
                             }
                         } else {
                             $h++
                             $fieldName = "NoNameB$h"
-                            Add-Member -InputObject $Event -MemberType NoteProperty -Name $fieldName -Value $fieldValue -Force
+                            #Add-Member -InputObject $Event -MemberType NoteProperty -Name $fieldName -Value $fieldValue -Force
+                            $CreatedEvent[$fieldName] = $fieldValue
                         }
                         # Case 4
                     }
@@ -773,33 +788,45 @@ $Script:ScriptBlock = {
             }
             # This adds some fields specific to PSWinReporting
             [string] $MessageSubject = ($Event.Message -split '\n')[0] -replace "`n", '' -replace "`r", '' -replace "`t", ''
-            Add-Member -InputObject $Event -MemberType NoteProperty -Name 'MessageSubject' -Value $MessageSubject -Force
-            Add-Member -InputObject $Event -MemberType NoteProperty -Name 'Action' -Value $MessageSubject -Force
+            #Add-Member -InputObject $Event -MemberType NoteProperty -Name 'MessageSubject' -Value $MessageSubject -Force
+            #Add-Member -InputObject $Event -MemberType NoteProperty -Name 'Action' -Value $MessageSubject -Force
+            $CreatedEvent['MessageSubject'] = $MessageSubject
+            $CreatedEvent['Action'] = $MessageSubject
 
             # Level value is not needed because there is actually LevelDisplayName
             #Add-Member -InputObject $Event -MemberType NoteProperty -Name 'LevelTranslated' -Value ([PSEventViewer.Level] $Event.Level)
 
             # Overwrite value - the old value is collection
-            Add-Member -InputObject $Event -MemberType NoteProperty -Name 'KeywordDisplayName' -Value ($Event.KeywordsDisplayNames -join ',') -Force
+            #Add-Member -InputObject $Event -MemberType NoteProperty -Name 'KeywordDisplayName' -Value ($Event.KeywordsDisplayNames -join ',') -Force
+            $CreatedEvent['KeywordDisplayName'] = ($Event.KeywordsDisplayNames -join ',')
+
 
             if ($Event.SubjectDomainName -and $Event.SubjectUserName) {
-                Add-Member -InputObject $Event -MemberType NoteProperty -Name 'Who' -Value "$($Event.SubjectDomainName)\$($Event.SubjectUserName)" -Force
+                #Add-Member -InputObject $Event -MemberType NoteProperty -Name 'Who' -Value "$($Event.SubjectDomainName)\$($Event.SubjectUserName)" -Force
+                $CreatedEvent['Who'] = "$($Event.SubjectDomainName)\$($Event.SubjectUserName)"
             }
             if ($Event.TargetDomainName -and $Event.TargetUserName) {
-                Add-Member -InputObject $Event -MemberType NoteProperty -Name 'ObjectAffected' -Value "$($Event.TargetDomainName)\$($Event.TargetUserName)" -Force
+                #Add-Member -InputObject $Event -MemberType NoteProperty -Name 'ObjectAffected' -Value "$($Event.TargetDomainName)\$($Event.TargetUserName)" -Force
+                $CreatedEvent['ObjectAffected'] = "$($Event.TargetDomainName)\$($Event.TargetUserName)"
             } elseif ($Event.TargetUserName) {
                 Add-Member -InputObject $Event -MemberType NoteProperty -Name 'ObjectAffected' -Value "$($Event.TargetUserName)" -Force
+                $CreatedEvent['ObjectAffected'] = "$($Event.TargetUserName)"
             }
             if ($Event.MemberName) {
                 [string] $MemberNameWithoutCN = $Event.MemberName -replace 'CN=|\\|,(OU|DC|CN).*$'
-                Add-Member -InputObject $Event -MemberType NoteProperty -Name 'MemberNameWithoutCN' -Value $MemberNameWithoutCN -Force
+                #Add-Member -InputObject $Event -MemberType NoteProperty -Name 'MemberNameWithoutCN' -Value $MemberNameWithoutCN -Force
+                $CreatedEvent['MemberNameWithoutCN'] = $MemberNameWithoutCN
             }
             if ($EventFilter.Path) {
-                Add-Member -InputObject $Event -MemberType NoteProperty -Name "GatheredFrom" -Value $EventFilter.Path -Force
+                #Add-Member -InputObject $Event -MemberType NoteProperty -Name "GatheredFrom" -Value $EventFilter.Path -Force
+                $CreatedEvent['GatheredFrom'] = $EventFilter.Path
             } else {
-                Add-Member -InputObject $Event -MemberType NoteProperty -Name "GatheredFrom" -Value $Comp -Force
+                #Add-Member -InputObject $Event -MemberType NoteProperty -Name "GatheredFrom" -Value $Comp -Force
+                $CreatedEvent['GatheredFrom'] = $Comp
             }
-            Add-Member -InputObject $Event -MemberType NoteProperty -Name "GatheredLogName" -Value $EventFilter.LogName -Force
+            #Add-Member -InputObject $Event -MemberType NoteProperty -Name "GatheredLogName" -Value $EventFilter.LogName -Force
+            $CreatedEvent['GatheredLogName'] = $EventFilter.LogName
+            [PSCustomObject] $CreatedEvent
         }
         Write-Verbose "Get-Events - Inside $Comp Time to generate $($Measure.Elapsed.Hours) hours, $($Measure.Elapsed.Minutes) minutes, $($Measure.Elapsed.Seconds) seconds, $($Measure.Elapsed.Milliseconds) milliseconds"
         $Measure.Stop()
