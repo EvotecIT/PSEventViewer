@@ -688,20 +688,13 @@ $Script:ScriptBlock = {
 
         # Parse out the event message data
         ForEach ($Event in $Events) {
-            $CreatedEvent = [ordered] @{}
             # Convert the event to XML
             $eventXML = [xml]$Event.ToXml()
-
-            foreach ($PropertyName in $Event.PSObject.Properties.Name) {
-                $CreatedEvent[$PropertyName] = $Event.$PropertyName
-            }
-            $CreatedEvent['Computer'] = $event.MachineName.ToString()
-            $CreatedEvent['Date'] = $Event.TimeCreated
-
-
             # Iterate through each one of the XML message properties
             #Add-Member -InputObject $Event -MemberType NoteProperty -Name "Computer" -Value $event.MachineName.ToString() -Force
             #Add-Member -InputObject $Event -MemberType NoteProperty -Name "Date" -Value $Event.TimeCreated -Force
+            $Event.PSObject.Properties.Add([System.Management.Automation.PSNoteProperty]::new('Computer', $event.MachineName.ToString()))
+            $Event.PSObject.Properties.Add([System.Management.Automation.PSNoteProperty]::new('Date', $Event.TimeCreated))
 
             $EventTopNodes = Get-Member -InputObject $eventXML.Event -MemberType Properties | Where-Object { $_.Name -ne 'System' -and $_.Name -ne 'xmlns' }
             foreach ($EventTopNode in $EventTopNodes) {
@@ -713,23 +706,25 @@ $Script:ScriptBlock = {
                     $SubNode = $EventSubSub.Name
                     #$EventSubSub | ft -a
                     if ($EventSubSub.Definition -like "System.Object*") {
-                        if (Get-Member -InputObject $eventXML.Event.$TopNode -Name "$SubNode" -MemberType Properties) {
-
+                        #if (Get-Member -InputObject $eventXML.Event.$TopNode -Name "$SubNode" -MemberType Properties) {
+                        if ($eventXML.Event.$TopNode.$SubNode) {
                             # Case 1
                             $SubSubNode = Get-Member -InputObject $eventXML.Event.$TopNode.$SubNode -MemberType Properties | Where-Object { $_.Name -ne 'xmlns' -and $_.Definition -like "string*" }
                             foreach ($Name in $SubSubNode.Name) {
                                 $fieldName = $Name
                                 $fieldValue = $eventXML.Event.$TopNode.$SubNode.$Name
                                 #Add-Member -InputObject $Event -MemberType NoteProperty -Name $fieldName -Value $fieldValue -Force
-                                $CreatedEvent[$fieldName] = $fieldValue
+                                $Event.PSObject.Properties.Add([System.Management.Automation.PSNoteProperty]::new($fieldName, $fieldValue))
                             }
                             # Case 1
 
                             For ($i = 0; $i -lt $eventXML.Event.$TopNode.$SubNode.Count; $i++) {
-                                if (Get-Member -InputObject $eventXML.Event.$TopNode.$SubNode[$i] -Name "Name" -MemberType Properties) {
+                                #if (Get-Member -InputObject $eventXML.Event.$TopNode.$SubNode[$i] -Name "Name" -MemberType Properties) {
+                                if ($eventXML.Event.$TopNode.$SubNode[$i].Name) {
                                     # Case 2
                                     $fieldName = $eventXML.Event.$TopNode.$SubNode[$i].Name
-                                    if (Get-Member -InputObject $eventXML.Event.$TopNode.$SubNode[$i] -Name "#text" -MemberType Properties) {
+                                    #if (Get-Member -InputObject $eventXML.Event.$TopNode.$SubNode[$i] -Name "#text" -MemberType Properties) {
+                                    if ($eventXML.Event.$TopNode.$SubNode[$i]."#text") {
                                         $fieldValue = $eventXML.Event.$TopNode.$SubNode[$i]."#text"
                                         if ($fieldValue -eq "-".Trim()) { $fieldValue = $fieldValue -replace "-" }
                                     } else {
@@ -737,7 +732,7 @@ $Script:ScriptBlock = {
                                     }
                                     if ($fieldName -ne "") {
                                         #Add-Member -InputObject $Event -MemberType NoteProperty -Name $fieldName -Value $fieldValue -Force
-                                        $CreatedEvent[$fieldName] = $fieldValue
+                                        $Event.PSObject.Properties.Add([System.Management.Automation.PSNoteProperty]::new($fieldName, $fieldValue))
                                     }
                                     # Case 2
                                 } else {
@@ -746,8 +741,8 @@ $Script:ScriptBlock = {
                                     if ($Value.Name -ne 'Name' -and $Value.Name -ne '#text') {
                                         $fieldName = "NoNameA$i"
                                         $fieldValue = $Value
-                                        #Add-Member -InputObject $Event -MemberType NoteProperty -Name $fieldName -Value $fieldValue -Force
-                                        $CreatedEvent[$fieldName] = $fieldValue
+                                        # Add-Member -InputObject $Event -MemberType NoteProperty -Name $fieldName -Value $fieldValue -Force
+                                        $Event.PSObject.Properties.Add([System.Management.Automation.PSNoteProperty]::new($fieldName, $fieldValue))
                                     }
                                     # Case 3
                                 }
@@ -760,8 +755,8 @@ $Script:ScriptBlock = {
                         foreach ($Name in $SubSubNode.Name) {
                             $fieldName = $Name
                             $fieldValue = $eventXML.Event.$TopNode.$SubNode.$Name
-                            #Add-Member -InputObject $Event -MemberType NoteProperty -Name $fieldName -Value $fieldValue -Force
-                            $CreatedEvent[$fieldName] = $fieldValue
+                            # Add-Member -InputObject $Event -MemberType NoteProperty -Name $fieldName -Value $fieldValue -Force
+                            $Event.PSObject.Properties.Add([System.Management.Automation.PSNoteProperty]::new($fieldName, $fieldValue))
                         }
                         # Case 1
                     } else {
@@ -774,13 +769,13 @@ $Script:ScriptBlock = {
                                 $h++
                                 $fieldName = "NoNameB$h"
                                 #Add-Member -InputObject $Event -MemberType NoteProperty -Name $fieldName -Value $Split -Force
-                                $CreatedEvent[$fieldName] = $Split
+                                $Event.PSObject.Properties.Add([System.Management.Automation.PSNoteProperty]::new($fieldName, $Split))
                             }
                         } else {
                             $h++
                             $fieldName = "NoNameB$h"
                             #Add-Member -InputObject $Event -MemberType NoteProperty -Name $fieldName -Value $fieldValue -Force
-                            $CreatedEvent[$fieldName] = $fieldValue
+                            $Event.PSObject.Properties.Add([System.Management.Automation.PSNoteProperty]::new($fieldName, $fieldValue))
                         }
                         # Case 4
                     }
@@ -790,43 +785,43 @@ $Script:ScriptBlock = {
             [string] $MessageSubject = ($Event.Message -split '\n')[0] -replace "`n", '' -replace "`r", '' -replace "`t", ''
             #Add-Member -InputObject $Event -MemberType NoteProperty -Name 'MessageSubject' -Value $MessageSubject -Force
             #Add-Member -InputObject $Event -MemberType NoteProperty -Name 'Action' -Value $MessageSubject -Force
-            $CreatedEvent['MessageSubject'] = $MessageSubject
-            $CreatedEvent['Action'] = $MessageSubject
+            $Event.PSObject.Properties.Add([System.Management.Automation.PSNoteProperty]::new('MessageSubject', $MessageSubject))
+            $Event.PSObject.Properties.Add([System.Management.Automation.PSNoteProperty]::new('Action', $MessageSubject))
 
             # Level value is not needed because there is actually LevelDisplayName
             #Add-Member -InputObject $Event -MemberType NoteProperty -Name 'LevelTranslated' -Value ([PSEventViewer.Level] $Event.Level)
 
             # Overwrite value - the old value is collection
-            #Add-Member -InputObject $Event -MemberType NoteProperty -Name 'KeywordDisplayName' -Value ($Event.KeywordsDisplayNames -join ',') -Force
-            $CreatedEvent['KeywordDisplayName'] = ($Event.KeywordsDisplayNames -join ',')
-
+            # Add-Member -InputObject $Event -MemberType NoteProperty -Name 'KeywordDisplayName' -Value ($Event.KeywordsDisplayNames -join ',') -Force
+            $Event.PSObject.Properties.Add([System.Management.Automation.PSNoteProperty]::new('KeywordDisplayName', ($Event.KeywordsDisplayNames -join ',')))
 
             if ($Event.SubjectDomainName -and $Event.SubjectUserName) {
                 #Add-Member -InputObject $Event -MemberType NoteProperty -Name 'Who' -Value "$($Event.SubjectDomainName)\$($Event.SubjectUserName)" -Force
-                $CreatedEvent['Who'] = "$($Event.SubjectDomainName)\$($Event.SubjectUserName)"
+                $Event.PSObject.Properties.Add([System.Management.Automation.PSNoteProperty]::new('Who', "$($Event.SubjectDomainName)\$($Event.SubjectUserName)" ))
+            } elseif ($Event.SubjectUserName) {
+                $Event.PSObject.Properties.Add([System.Management.Automation.PSNoteProperty]::new('Who', "$($Event.SubjectUserName)"))
             }
             if ($Event.TargetDomainName -and $Event.TargetUserName) {
-                #Add-Member -InputObject $Event -MemberType NoteProperty -Name 'ObjectAffected' -Value "$($Event.TargetDomainName)\$($Event.TargetUserName)" -Force
-                $CreatedEvent['ObjectAffected'] = "$($Event.TargetDomainName)\$($Event.TargetUserName)"
+                Add-Member -InputObject $Event -MemberType NoteProperty -Name 'ObjectAffected' -Value "$($Event.TargetDomainName)\$($Event.TargetUserName)" -Force
+                $Event.PSObject.Properties.Add([System.Management.Automation.PSNoteProperty]::new('ObjectAffected', "$($Event.TargetDomainName)\$($Event.TargetUserName)"))
             } elseif ($Event.TargetUserName) {
-                Add-Member -InputObject $Event -MemberType NoteProperty -Name 'ObjectAffected' -Value "$($Event.TargetUserName)" -Force
-                $CreatedEvent['ObjectAffected'] = "$($Event.TargetUserName)"
+                # Add-Member -InputObject $Event -MemberType NoteProperty -Name 'ObjectAffected' -Value "$($Event.TargetUserName)" -Force
+                $Event.PSObject.Properties.Add([System.Management.Automation.PSNoteProperty]::new('ObjectAffected', "$($Event.TargetUserName)"))
             }
             if ($Event.MemberName) {
                 [string] $MemberNameWithoutCN = $Event.MemberName -replace 'CN=|\\|,(OU|DC|CN).*$'
                 #Add-Member -InputObject $Event -MemberType NoteProperty -Name 'MemberNameWithoutCN' -Value $MemberNameWithoutCN -Force
-                $CreatedEvent['MemberNameWithoutCN'] = $MemberNameWithoutCN
+                $Event.PSObject.Properties.Add([System.Management.Automation.PSNoteProperty]::new('MemberNameWithoutCN', $MemberNameWithoutCN))
             }
             if ($EventFilter.Path) {
                 #Add-Member -InputObject $Event -MemberType NoteProperty -Name "GatheredFrom" -Value $EventFilter.Path -Force
-                $CreatedEvent['GatheredFrom'] = $EventFilter.Path
+                $Event.PSObject.Properties.Add([System.Management.Automation.PSNoteProperty]::new('GatheredFrom', $EventFilter.Path))
             } else {
                 #Add-Member -InputObject $Event -MemberType NoteProperty -Name "GatheredFrom" -Value $Comp -Force
-                $CreatedEvent['GatheredFrom'] = $Comp
+                $Event.PSObject.Properties.Add([System.Management.Automation.PSNoteProperty]::new('GatheredFrom', $Comp))
             }
             #Add-Member -InputObject $Event -MemberType NoteProperty -Name "GatheredLogName" -Value $EventFilter.LogName -Force
-            $CreatedEvent['GatheredLogName'] = $EventFilter.LogName
-            [PSCustomObject] $CreatedEvent
+            $Event.PSObject.Properties.Add([System.Management.Automation.PSNoteProperty]::new('GatheredLogName', $EventFilter.LogName))
         }
         Write-Verbose "Get-Events - Inside $Comp Time to generate $($Measure.Elapsed.Hours) hours, $($Measure.Elapsed.Minutes) minutes, $($Measure.Elapsed.Seconds) seconds, $($Measure.Elapsed.Milliseconds) milliseconds"
         $Measure.Stop()
