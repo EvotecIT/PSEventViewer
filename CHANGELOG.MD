@@ -1,5 +1,8 @@
 ﻿### Changelog
 
+#### 1.0.19 - 2022.05.18
+   - Performance improvements
+   - `ObjectAffected` property not reporting when `TargetDomainName` is empty - [#16](https://github.com/EvotecIT/PSEventViewer/issues/16)
 #### 1.0.18 - 2022.04.02
    - Improved documentation
    - Signed module
