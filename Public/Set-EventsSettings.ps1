@@ -6,7 +6,7 @@
         [int] $MaximumSizeMB,
         [int] $MaximumSizeInBytes,
         [ValidateSet('OverwriteEventsAsNeededOldestFirst', 'ArchiveTheLogWhenFullDoNotOverwrite', 'DoNotOverwriteEventsClearLogManually')][string] $EventAction,
-        [System.Diagnostics.Eventing.Reader.EventLogMode] $Mode
+        [alias('LogMode')][System.Diagnostics.Eventing.Reader.EventLogMode] $Mode
     )
 
     $TranslateEventAction = @{
