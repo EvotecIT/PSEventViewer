@@ -42,14 +42,16 @@
     if ($MaximumSizeInBytes) {
         $Log.MaximumSizeInBytes = $MaximumSizeInBytes
     }
-    try {
-        $Log.SaveChanges()
-    } catch {
-        if ($ErrorActionPreference -eq 'Stop') {
-            throw
-        } else {
-            Write-Warning -Message "Set-EventsSettings - Error occured during saving of changes for $LogName log - $($_.Exception.Message)"
-            return
+    if ($PSCmdlet.ShouldProcess($LogName, "Saving event log settings")) {
+        try {
+            $Log.SaveChanges()
+        } catch {
+            if ($ErrorActionPreference -eq 'Stop') {
+                throw
+            } else {
+                Write-Warning -Message "Set-EventsSettings - Error occured during saving of changes for $LogName log - $($_.Exception.Message)"
+                return
+            }
         }
     }
 }
