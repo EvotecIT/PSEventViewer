@@ -1,51 +1,55 @@
 ﻿### Changelog
 
+#### 1.0.10 - 2022.05.25
+- Improved `Get-EventsSettings` to work using native ways rather than playing with registry settings, also more options
+- Improved `Set-EventsSettings` to work using native ways rather than playing with registry settings, also more options
+
 #### 1.0.19 - 2022.05.18
-   - Performance improvements
-   - `ObjectAffected` property not reporting when `TargetDomainName` is empty - [#16](https://github.com/EvotecIT/PSEventViewer/issues/16)
+- Performance improvements
+- `ObjectAffected` property not reporting when `TargetDomainName` is empty - [#16](https://github.com/EvotecIT/PSEventViewer/issues/16)
 #### 1.0.18 - 2022.04.02
-   - Improved documentation
-   - Signed module
+- Improved documentation
+- Signed module
 
 #### 1.0.17 - 2020.05.31
-  - Fix for `Get-Events` (use of Path and NamedDataFilter) - provided by [danubie #13](https://github.com/EvotecIT/PSEventViewer/pull/13) - solves [#12](https://github.com/EvotecIT/PSEventViewer/issues/12)
+- Fix for `Get-Events` (use of Path and NamedDataFilter) - provided by [danubie #13](https://github.com/EvotecIT/PSEventViewer/pull/13) - solves [#12](https://github.com/EvotecIT/PSEventViewer/issues/12)
 
 #### 1.0.16 - 2020.05.31
-  - Fix for `Get-Events` for NamedDataFilter - provided by [danubie #11](https://github.com/EvotecIT/PSEventViewer/pull/11) - solves [#10](https://github.com/EvotecIT/PSEventViewer/issues/10)
+- Fix for `Get-Events` for NamedDataFilter - provided by [danubie #11](https://github.com/EvotecIT/PSEventViewer/pull/11) - solves [#10](https://github.com/EvotecIT/PSEventViewer/issues/10)
 
 #### 1.0.15 - 2020.05.17
-  - Fix for `Get-EventsFilter` - provided by [danubie #9](https://github.com/EvotecIT/PSEventViewer/pull/9) - solves [#7](https://github.com/EvotecIT/PSEventViewer/issues/7) and [#8](https://github.com/EvotecIT/PSEventViewer/issues/8)
+- Fix for `Get-EventsFilter` - provided by [danubie #9](https://github.com/EvotecIT/PSEventViewer/pull/9) - solves [#7](https://github.com/EvotecIT/PSEventViewer/issues/7) and [#8](https://github.com/EvotecIT/PSEventViewer/issues/8)
 
 #### 1.0.14 - 2020.04.11
-  - Updates to PSD1
+- Updates to PSD1
 
 #### 1.0.13 - 2020.02.16
-  - Added Get-EventsSettings/Set-EventsSettings (Work in progress)
+- Added Get-EventsSettings/Set-EventsSettings (Work in progress)
 
 #### 1.0.12 - 2020.01.01
-  - Added some new aliases
+- Added some new aliases
 
 #### 1.0.11 - 2019.12.30
-  - Added Write-Event
+- Added Write-Event
 
 #### 1.0.10 - 2019.12.17
-  - Path is back. Not sure why it was gone. Need improvements.
+- Path is back. Not sure why it was gone. Need improvements.
 
 #### 1.0.9 - 2019.11.12
-  - Removed dependency on PSSharedGoods on the published module
-  - PSSharedGoods is still dependency, but the building process makes it possible to compile it and push to PSGallery/Releases without that dependency.
+- Removed dependency on PSSharedGoods on the published module
+- PSSharedGoods is still dependency, but the building process makes it possible to compile it and push to PSGallery/Releases without that dependency.
 
 #### 1.0.7 - 2019.09.12
-  - Small changes to Get-EventsInformation
+- Small changes to Get-EventsInformation
 
 #### 0.62 - 2019.01.11
-  - Fix for Member Name with a comma inside
+- Fix for Member Name with a comma inside
 
 #### 0.61 - 2019.01.02
-  - Multiple new parameters, some new functionality
+- Multiple new parameters, some new functionality
 
 #### 0.51
-  - Added -RecordID parameter (currently it only works with LogName + RecordID, you can't use any other parameters with RecordID as it will take LogName + RecordID anyways and crash if it's not there)
+- Added -RecordID parameter (currently it only works with LogName + RecordID, you can't use any other parameters with RecordID as it will take LogName + RecordID anyways and crash if it's not there)
 
 #### 0.50
-  - A version that worked fine :-)
+- A version that worked fine :-)
