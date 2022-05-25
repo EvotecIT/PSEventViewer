@@ -1,5 +1,8 @@
 ﻿### Changelog
 
+#### 1.0.11 - 2022.05.25
+- Added alias to parameter in `Set-EventsSettings`
+
 #### 1.0.10 - 2022.05.25
 - Improved `Get-EventsSettings` to work using native ways rather than playing with registry settings, also more options
 - Improved `Set-EventsSettings` to work using native ways rather than playing with registry settings, also more options
