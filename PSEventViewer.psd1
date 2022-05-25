@@ -8,7 +8,7 @@
     Description          = 'Simple module allowing parsing of event logs. Has its own quirks...'
     FunctionsToExport    = @('Get-Events', 'Get-EventsFilter', 'Get-EventsInformation', 'Get-EventsSettings', 'Set-EventsSettings', 'Write-Event')
     GUID                 = '5df72a79-cdf6-4add-b38d-bcacf26fb7bc'
-    ModuleVersion        = '1.0.19'
+    ModuleVersion        = '1.0.20'
     PowerShellVersion    = '5.1'
     PrivateData          = @{
         PSData = @{
@@ -19,7 +19,7 @@
         }
     }
     RequiredModules      = @(@{
-            ModuleVersion = '0.0.225'
+            ModuleVersion = '0.0.226'
             ModuleName    = 'PSSharedGoods'
             Guid          = 'ee272aa8-baaa-4edf-9f45-b6d6f7d844fe'
         }, 'Microsoft.PowerShell.Utility', 'Microsoft.PowerShell.Diagnostics', 'Microsoft.PowerShell.Management')
