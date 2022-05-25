@@ -1,32 +1,55 @@
 ﻿function Set-EventsSettings {
-    [cmdletBinding()]
+    [cmdletBinding(SupportsShouldProcess)]
     param(
         [Parameter(Mandatory)][string] $LogName,
         [string] $ComputerName,
         [int] $MaximumSizeMB,
-        [ValidateSet('OverwriteEventsAsNeededOldestFirst', 'ArchiveTheLogWhenFullDoNotOverwrite', 'DoNotOverwriteEventsClearLogManually', 'None')][string] $EventAction
+        [int] $MaximumSizeInBytes,
+        [ValidateSet('OverwriteEventsAsNeededOldestFirst', 'ArchiveTheLogWhenFullDoNotOverwrite', 'DoNotOverwriteEventsClearLogManually')][string] $EventAction,
+        [System.Diagnostics.Eventing.Reader.EventLogMode] $Mode
     )
+
+    $TranslateEventAction = @{
+        'OverwriteEventsAsNeededOldestFirst'   = [System.Diagnostics.Eventing.Reader.EventLogMode]::Circular
+        'ArchiveTheLogWhenFullDoNotOverwrite'  = [System.Diagnostics.Eventing.Reader.EventLogMode]::AutoBackup
+        'DoNotOverwriteEventsClearLogManually' = [System.Diagnostics.Eventing.Reader.EventLogMode]::Retain
+    }
+
+    try {
+        if ($ComputerName) {
+            $Log = Get-WinEvent -ListLog $LogName -ErrorAction Stop
+        } else {
+            $Log = Get-WinEvent -ListLog $LogName -ComputerName $ComputerName -ErrorAction Stop
+        }
+    } catch {
+        if ($ErrorActionPreference -eq 'Stop') {
+            throw
+        } else {
+            Write-Warning -Message "Set-EventsSettings - Error occured during reading $LogName log - $($_.Exception.Message)"
+            return
+        }
+    }
+    if ($EventAction) {
+        $Log.LogMode = $TranslateEventAction[$EventAction]
+    }
+    if ($Mode) {
+        $Log.LogMode = $Mode
+    }
     if ($MaximumSizeMB) {
         $MaxSize = $MaximumSizeMB * 1MB
-        $Log = Get-EventsSettings -LogName $LogName
-        if ($Log.PSError -eq $false) {
-            if ($MaximumSizeMB -ne 0) {
-                Set-PSRegistry -RegistryPath $Log.PSRegistryPath -ComputerName $ComputerName -Key 'MaxSize' -Value $MaxSize -Type REG_DWORD
-            }
-            if ($EventAction) {
-                if ($EventAction -eq 'ArchiveTheLogWhenFullDoNotOverwrite') {
-                    Set-PSRegistry -RegistryPath $Log.PSRegistryPath -ComputerName $ComputerName -Key 'AutoBackupLogFiles' -Value 1 -Type REG_DWORD
-                    Set-PSRegistry -RegistryPath $Log.PSRegistryPath -ComputerName $ComputerName -Key 'Retention' -Value 4294967295 -Type REG_DWORD
-                } elseif ($EventAction -eq 'DoNotOverwriteEventsClearLogManually') {
-                    Set-PSRegistry -RegistryPath $Log.PSRegistryPath -ComputerName $ComputerName -Key 'AutoBackupLogFiles' -Value 0 -Type REG_DWORD
-                    Set-PSRegistry -RegistryPath $Log.PSRegistryPath -ComputerName $ComputerName -Key 'Retention' -Value 4294967295 -Type REG_DWORD
-                } elseif ( $EventAction -eq 'OverwriteEventsAsNeededOldestFirst') {
-                    Set-PSRegistry -RegistryPath $Log.PSRegistryPath -ComputerName $ComputerName -Key 'AutoBackupLogFiles' -Value 0 -Type REG_DWORD
-                    Set-PSRegistry -RegistryPath $Log.PSRegistryPath -ComputerName $ComputerName -Key 'Retention' -Value 0 -Type REG_DWORD
-                } else {
-                    # No choice
-                }
-            }
+        $Log.MaximumSizeInBytes = $MaxSize
+    }
+    if ($MaximumSizeInBytes) {
+        $Log.MaximumSizeInBytes = $MaximumSizeInBytes
+    }
+    try {
+        $Log.SaveChanges()
+    } catch {
+        if ($ErrorActionPreference -eq 'Stop') {
+            throw
+        } else {
+            Write-Warning -Message "Set-EventsSettings - Error occured during saving of changes for $LogName log - $($_.Exception.Message)"
+            return
         }
     }
 }
