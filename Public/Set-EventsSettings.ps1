@@ -29,17 +29,17 @@
             return
         }
     }
-    if ($EventAction) {
+    if ($PSBoundParameters.ContainsKey('EventAction')) {
         $Log.LogMode = $TranslateEventAction[$EventAction]
     }
-    if ($Mode) {
+    if ($PSBoundParameters.ContainsKey('Mode')) {
         $Log.LogMode = $Mode
     }
-    if ($MaximumSizeMB) {
+    if ($PSBoundParameters.ContainsKey('MaximumSizeMB')) {
         $MaxSize = $MaximumSizeMB * 1MB
         $Log.MaximumSizeInBytes = $MaxSize
     }
-    if ($MaximumSizeInBytes) {
+    if ($PSBoundParameters.ContainsKey('MaximumSizeInBytes')) {
         $Log.MaximumSizeInBytes = $MaximumSizeInBytes
     }
     if ($PSCmdlet.ShouldProcess($LogName, "Saving event log settings")) {
