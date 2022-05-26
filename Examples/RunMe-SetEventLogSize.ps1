@@ -7,5 +7,8 @@ Get-PSRegistry -RegistryPath 'HKEY_LOCAL_MACHINE\\Software\\Policies\\Microsoft\
 # optional, but usually not existing
 Get-PSRegistry -RegistryPath 'HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\WINEVT\Channels' | Format-Table -AutoSize
 
-Get-EventsSettings -LogName 'Application'
-Set-EventsSettings -LogName 'Application' -MaximumSizeMB 15 -Mode AutoBackup
+Get-EventsSettings -LogName 'Application' | Format-Table
+
+Set-EventsSettings -LogName 'Application' -MaximumSizeMB 15 -Mode Circular -WhatIf
+
+Get-EventsSettings -LogName 'Application' | Format-Table
