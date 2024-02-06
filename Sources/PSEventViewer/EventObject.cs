@@ -6,6 +6,12 @@ using System.Security.Principal;
 using System.Xml.Linq;
 
 namespace PSEventViewer {
+    public enum Modes {
+        Disabled,
+        Parallel,
+        ParallelForEachBuiltin,
+        ParallelForEach,
+    }
 
     public enum Level {
         Verbose = 5,

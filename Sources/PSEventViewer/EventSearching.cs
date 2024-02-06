@@ -1,8 +1,11 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics.Eventing.Reader;
 using System.Linq;
 using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace PSEventViewer {
     public class EventSearching : Settings {
@@ -30,7 +33,7 @@ namespace PSEventViewer {
         /// <param name="userId"></param>
         /// <param name="maxEvents"></param>
         /// <returns></returns>
-        public static IEnumerable<EventObject> QueryLog(string logName, List<int> eventIds = null, string machineName = null, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null, int maxEvents = 0) {
+        public static IEnumerable<EventObject> QueryLogNoErrorhandling(string logName, List<int> eventIds = null, string machineName = null, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null, int maxEvents = 0) {
             string queryString = BuildQueryString(eventIds, providerName, keywords, level, startTime, endTime, userId);
 
             _logger.WriteVerbose($"Querying log '{logName}' with query: {queryString}");
@@ -39,7 +42,6 @@ namespace PSEventViewer {
             if (machineName != null) {
                 query.Session = new EventLogSession(machineName);
             }
-
             using (EventLogReader reader = new EventLogReader(query)) {
                 EventRecord record;
                 int eventCount = 0;
@@ -55,6 +57,46 @@ namespace PSEventViewer {
                 }
             }
         }
+
+        private static EventLogReader CreateEventLogReader(EventLogQuery query, string machineName) {
+            try {
+                return new EventLogReader(query);
+            } catch (EventLogException ex) {
+                _logger.WriteError($"An error occurred on {machineName} while creating the event log reader: {ex.Message}");
+                return null;
+            }
+        }
+
+        public static IEnumerable<EventObject> QueryLog(string logName, List<int> eventIds = null, string machineName = null, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null, int maxEvents = 0) {
+            string queryString = BuildQueryString(eventIds, providerName, keywords, level, startTime, endTime, userId);
+
+            _logger.WriteVerbose($"Querying log '{logName}' with query: {queryString}");
+
+            EventLogQuery query = new EventLogQuery(logName, PathType.LogName, queryString);
+            if (machineName != null) {
+                query.Session = new EventLogSession(machineName);
+            }
+
+            using (EventLogReader reader = CreateEventLogReader(query, machineName)) {
+                if (reader != null) {
+                    EventRecord record;
+                    int eventCount = 0;
+                    while ((record = reader.ReadEvent()) != null) {
+                        using (record) {
+                            EventObject eventObject = new EventObject(record);
+                            yield return eventObject;
+                            eventCount++;
+                            if (maxEvents > 0 && eventCount >= maxEvents) {
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+
+
         private static string BuildQueryString(List<int> eventIds, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null) {
             StringBuilder queryString = new StringBuilder();
 
@@ -89,6 +131,58 @@ namespace PSEventViewer {
             queryString.Append("]");
 
             return queryString.ToString();
+        }
+
+        public static IEnumerable<EventObject> QueryLogsParallel(string logName, List<int> eventIds = null, List<string> machineNames = null, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null, int maxEvents = 0, int maxThreads = 4) {
+            if (machineNames == null || !machineNames.Any()) {
+                throw new ArgumentException("At least one machine name must be provided", nameof(machineNames));
+            }
+
+            var semaphore = new SemaphoreSlim(maxThreads);
+            var results = new BlockingCollection<EventObject>();
+
+            var tasks = machineNames.Select(machineName => Task.Factory.StartNew(() => {
+                semaphore.Wait();
+                try {
+                    Console.WriteLine("Starting task for machine: " + machineName);
+                    var queryResults = QueryLog(logName, eventIds, machineName, providerName, keywords, level, startTime, endTime, userId, maxEvents);
+                    foreach (var result in queryResults) {
+                        results.Add(result);
+                    }
+                    Console.WriteLine("Finished task for machine: " + machineName);
+                } finally {
+                    semaphore.Release();
+                }
+            }, TaskCreationOptions.LongRunning)).ToList();
+
+            Task.Factory.StartNew(() => {
+                Task.WaitAll(tasks.ToArray());
+                results.CompleteAdding();
+            });
+
+            return results.GetConsumingEnumerable();
+        }
+        public static IEnumerable<EventObject> QueryLogsParallelForEach(string logName, List<int> eventIds = null, List<string> machineNames = null, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null, int maxEvents = 0, int maxThreads = 4) {
+            if (machineNames == null || !machineNames.Any()) {
+                throw new ArgumentException("At least one machine name must be provided", nameof(machineNames));
+            }
+
+            var results = new BlockingCollection<EventObject>();
+            var options = new ParallelOptions { MaxDegreeOfParallelism = maxThreads };
+
+            Task.Factory.StartNew(() => {
+                Parallel.ForEach(machineNames, options, machineName => {
+                    Console.WriteLine("Starting task for machine: " + machineName);
+                    var queryResults = QueryLog(logName, eventIds, machineName, providerName, keywords, level, startTime, endTime, userId, maxEvents);
+                    foreach (var result in queryResults) {
+                        results.Add(result);
+                    }
+                    Console.WriteLine("Finished task for machine: " + machineName);
+                });
+                results.CompleteAdding();
+            });
+
+            return results.GetConsumingEnumerable();
         }
     }
 }
