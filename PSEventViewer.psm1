@@ -12,8 +12,10 @@ $Development = $true
 $BinaryDev = @(
     if ($PSEdition -eq 'Core') {
         "$PSScriptRoot\Sources\PSEventViewer.PowerShell\bin\Debug\netstandard2.0\PSEventViewer.PowerShell.dll"
+        Write-Warning "Development mode: Using binaries from $PSScriptRoot\Sources\PSEventViewer.PowerShell\bin\Debug\netstandard2.0"
     } else {
         "$PSScriptRoot\Sources\PSEventViewer.PowerShell\bin\Debug\net472\PSEventViewer.PowerShell.dll"
+        Write-Warning "Development mode: Using binaries from $PSScriptRoot\Sources\PSEventViewer.PowerShell\bin\Debug\net472"
     }
 )
 $BinaryModules = @(
