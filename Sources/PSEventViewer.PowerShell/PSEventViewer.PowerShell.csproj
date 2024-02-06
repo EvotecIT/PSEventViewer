@@ -1,0 +1,20 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<TargetFrameworks>net472;netstandard2.0</TargetFrameworks>
+		<Description>PowerShell Module for working with Event Logs</Description>
+		<AssemblyName>PSEventViewer.PowerShell</AssemblyName>
+		<AssemblyTitle>PSEventViewer.PowerShell</AssemblyTitle>
+		<VersionPrefix>0.1.0</VersionPrefix>
+		<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+		<Company>Evotec</Company>
+		<Authors>Przemyslaw Klys</Authors>
+
+	</PropertyGroup>
+	<ItemGroup>
+		<PackageReference Include="PowerShellStandard.Library" Version="5.1.1" PrivateAssets="all" />
+	</ItemGroup>
+	<ItemGroup>
+	  <ProjectReference Include="..\PSEventViewer\PSEventViewer.csproj" />
+	</ItemGroup>
+</Project>
