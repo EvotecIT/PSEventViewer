@@ -30,7 +30,7 @@ namespace PSEventViewer {
         /// <param name="userId"></param>
         /// <param name="maxEvents"></param>
         /// <returns></returns>
-        public IEnumerable<EventObject> QueryLog(string logName, List<int> eventIds = null, string machineName = null, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null, int maxEvents = 0) {
+        public static IEnumerable<EventObject> QueryLog(string logName, List<int> eventIds = null, string machineName = null, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null, int maxEvents = 0) {
             string queryString = BuildQueryString(eventIds, providerName, keywords, level, startTime, endTime, userId);
 
             _logger.WriteVerbose($"Querying log '{logName}' with query: {queryString}");
