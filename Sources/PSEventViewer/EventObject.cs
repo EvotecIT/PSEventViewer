@@ -56,6 +56,11 @@ namespace PSEventViewer {
         public string LogName => _eventRecord.LogName;
 
         /// <summary>
+        /// Log name where the event was queried from
+        /// </summary>
+        public string ContainerLog => _eventRecord.ContainerLog;
+
+        /// <summary>
         /// Computer name where the event was logged
         /// </summary>
         public string ComputerName => _eventRecord.MachineName;
@@ -123,18 +128,26 @@ namespace PSEventViewer {
         /// </summary>
         public Dictionary<string, string> MessageData { get; private set; }
 
+        public string MessageSubject;
+
         /// <summary>
         /// Data available in XML format
         /// </summary>
         public string XMLData;
 
         /// <summary>
+        /// Machine where the event was queried from
+        /// </summary>
+        public string QueriedMachine;
+
+        /// <summary>
         /// Original event record
         /// </summary>
-        private readonly EventRecord _eventRecord;
+        private readonly EventLogRecord _eventRecord;
 
-        public EventObject(EventRecord eventRecord) {
-            _eventRecord = eventRecord;
+        public EventObject(EventRecord eventRecord, string queriedMachine) {
+            QueriedMachine = queriedMachine;
+            _eventRecord = (EventLogRecord)eventRecord;
 
             XMLData = eventRecord.ToXml();
             // Create a dictionary to hold the xml data
@@ -156,6 +169,8 @@ namespace PSEventViewer {
 
             // Add the first line of the message to the dictionary with a default key of "Message"
             data["Message"] = lines[0].Trim();
+
+            MessageSubject = data["Message"];
 
             // Process the remaining lines
             for (int i = 1; i < lines.Length; i++) {
@@ -215,6 +230,22 @@ namespace PSEventViewer {
                 }
             }
             return data;
+        }
+
+        public string GetValueFromDataDictionary(string key1, string key2 = null, string splitter = "\\", bool reverseOrder = false) {
+            if (key1 != null && key2 != null && Data.ContainsKey(key1) && Data.ContainsKey(key2)) {
+                if (reverseOrder) {
+                    return Data[key2] + splitter + Data[key1];
+                } else {
+                    return Data[key1] + splitter + Data[key2];
+                }
+            } else if (key1 != null && Data.ContainsKey(key1)) {
+                return Data[key1];
+            } else if (key2 != null && Data.ContainsKey(key2)) {
+                return Data[key2];
+            } else {
+                return "";
+            }
         }
     }
 }
