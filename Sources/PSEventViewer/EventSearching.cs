@@ -3,6 +3,8 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics.Eventing.Reader;
 using System.Linq;
+using System.Net.NetworkInformation;
+using System.Net;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -36,18 +38,21 @@ namespace PSEventViewer {
         public static IEnumerable<EventObject> QueryLogNoErrorhandling(string logName, List<int> eventIds = null, string machineName = null, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null, int maxEvents = 0) {
             string queryString = BuildQueryString(eventIds, providerName, keywords, level, startTime, endTime, userId);
 
-            _logger.WriteVerbose($"Querying log '{logName}' with query: {queryString}");
+            _logger.WriteVerbose($"Querying log '{logName}' with query: {queryString} on {machineName}");
 
             EventLogQuery query = new EventLogQuery(logName, PathType.LogName, queryString);
             if (machineName != null) {
                 query.Session = new EventLogSession(machineName);
             }
+
+            var queriedMachine = machineName ?? GetFQDN();
+
             using (EventLogReader reader = new EventLogReader(query)) {
                 EventRecord record;
                 int eventCount = 0;
                 while ((record = reader.ReadEvent()) != null) {
                     using (record) {
-                        EventObject eventObject = new EventObject(record);
+                        EventObject eventObject = new EventObject(record, queriedMachine);
                         yield return eventObject;
                         eventCount++;
                         if (maxEvents > 0 && eventCount >= maxEvents) {
@@ -67,6 +72,21 @@ namespace PSEventViewer {
             }
         }
 
+        public static string GetFQDN() {
+            //string domainName = IPGlobalProperties.GetIPGlobalProperties().DomainName;
+            //string hostName = Dns.GetHostName();
+
+            //domainName = "." + domainName;
+            //if (!hostName.EndsWith(domainName)) {
+            //    // if hostname does not already include domain name
+            //    hostName += domainName;
+            //}
+            //return hostName; // return the fully qualified name
+            //return Dns.GetHostEntry("LocalHost").HostName;
+            return Dns.GetHostEntry("").HostName;
+            //return System.Net.Dns.GetHostEntry(Environment.MachineName).HostName;
+        }
+
         public static IEnumerable<EventObject> QueryLog(string logName, List<int> eventIds = null, string machineName = null, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null, int maxEvents = 0) {
             string queryString = BuildQueryString(eventIds, providerName, keywords, level, startTime, endTime, userId);
 
@@ -77,13 +97,15 @@ namespace PSEventViewer {
                 query.Session = new EventLogSession(machineName);
             }
 
+            var queriedMachine = machineName ?? GetFQDN();
+
             using (EventLogReader reader = CreateEventLogReader(query, machineName)) {
                 if (reader != null) {
                     EventRecord record;
                     int eventCount = 0;
                     while ((record = reader.ReadEvent()) != null) {
                         using (record) {
-                            EventObject eventObject = new EventObject(record);
+                            EventObject eventObject = new EventObject(record, queriedMachine);
                             yield return eventObject;
                             eventCount++;
                             if (maxEvents > 0 && eventCount >= maxEvents) {
