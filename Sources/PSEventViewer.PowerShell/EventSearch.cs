@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace PSEventViewer.PowerShell {
 
-    [Cmdlet(VerbsCommon.Get, "PSEvent")]
+    [Cmdlet(VerbsCommon.Find, "GenericEvent")]
     public sealed class EventSearch : PSCmdlet {
         [Parameter(Mandatory = true, Position = 0)] public string LogName;
         [Parameter(Mandatory = false)] public List<int> EventId = null;
@@ -28,6 +28,7 @@ namespace PSEventViewer.PowerShell {
             // Initialize the PowerShell logger, and subscribe to the verbose message event
             var internalLoggerPowerShell = new InternalLoggerPowerShell(internalLogger, this.WriteVerbose, this.WriteWarning, this.WriteDebug, this.WriteError, this.WriteProgress, this.WriteInformation);
             var eventSearching = new EventSearching(internalLogger);
+            eventSearching.Verbose = false;
         }
         protected override void ProcessRecord() {
             if (Mode == Modes.Disabled) {
@@ -51,6 +52,8 @@ namespace PSEventViewer.PowerShell {
                 foreach (var eventObject in EventSearching.QueryLogsParallelForEach(LogName, EventId, MachineName, ProviderName, Keywords, Level, StartTime, EndTime, UserId, MaxEvents, NumberOfThreads)) {
                     WriteObject(eventObject);
                 }
+            } else if (Mode == Modes.Async) {
+
             }
         }
         protected override void EndProcessing() {
