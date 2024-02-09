@@ -18,6 +18,8 @@ namespace PSEventViewer {
         /// </summary>
         readonly ConcurrentDictionary<EventObject, byte> WatchedEvents = new ConcurrentDictionary<EventObject, byte>();
 
+        private string _machineName;
+
         public EventWatching(InternalLogger internalLogger = null) {
             if (internalLogger != null) {
                 _logger = internalLogger;
@@ -25,6 +27,7 @@ namespace PSEventViewer {
         }
 
         public void Watch(string machineName, string logName, List<int> eventId) {
+            _machineName = machineName;
             _watchEventId = new ConcurrentBag<int>(eventId);
             try {
                 var eventLogSession = new EventLogSession(machineName);
@@ -53,7 +56,7 @@ namespace PSEventViewer {
                     Interlocked.Increment(ref NumberOfEventsFound);
                     _logger.WriteVerbose("Found event id {0} on {1}.", Event.Id, Event.MachineName);
 
-                    var eventObject = new EventObject(Event);
+                    var eventObject = new EventObject(Event, _machineName);
                     WatchedEvents.TryAdd(eventObject, 0);
                 }
             } else {
