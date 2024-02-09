@@ -9,6 +9,7 @@ namespace PSEventViewer {
         public long? RecordID; // = _eventObject.RecordId;
         public string GatheredFrom; // = _eventObject.MachineName;
         public string GatheredLogName; // = _eventObject.LogName;
+        public string Type;
 
 
         public EventObjectSlim(EventObject eventObject) {
@@ -34,6 +35,31 @@ namespace PSEventViewer {
             } else {
                 return "";
             }
+        }
+        internal string ConvertFromOperationType(string s) {
+            Dictionary<string, string> known = new Dictionary<string, string> {
+                {"%%14674", "Value Added"},
+                {"%%14675", "Value Deleted"},
+                {"%%14676", "Unknown"}
+            };
+
+            if (known.ContainsKey(s)) {
+                return known[s];
+            } else {
+                return "Unknown Operation";
+            }
+        }
+        internal static string OverwriteByField(string findField, string expectedValue, string currentValue, string insertValue) {
+            //OverwriteByField = [ordered] @{
+            //    'User Object' = 'Action', 'A directory service object was moved.', 'OldObjectDN'
+            //    'Field Value' = 'Action', 'A directory service object was moved.', 'NewObjectDN'
+            //}
+            if (findField == expectedValue) {
+                return insertValue;
+            } else {
+                return currentValue;
+            }
+
         }
     }
 }
