@@ -7,5 +7,9 @@ using PSEventViewer.Examples;
 //Examples.QueryParallelSpeed();
 //Examples.QueryParallelWithCount();
 
-Examples.QueryParallelCompare();
+//Examples.QueryParallelCompare();
 //Examples.QueryBasicParallelForEach();
+//Examples.QueryBasicForwardedEvents();
+
+//Examples.FindEventsTargetedBasic();
+Examples.FindEventsTargetedPerType();

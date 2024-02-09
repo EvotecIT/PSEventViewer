@@ -1,16 +1,18 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace PSEventViewer.Examples {
+﻿namespace PSEventViewer.Examples {
     internal partial class Examples {
 
         public static void QueryBasic() {
             EventSearching.QueryLog("Application", [1008, 4098, 1001], "AD1");
             EventSearching.QueryLog("Application", [1001], "AD1");
             EventSearching.QueryLog("Security", new List<int>() { 4627, 4624 }, "AD1");
+        }
+
+        public static void QueryBasicForwardedEvents() {
+            var list = EventSearching.QueryLog("ForwardedEvents", [4722, 4738]);
+            foreach (var test in list) {
+                Console.WriteLine(test.Id + " " + test.QueriedMachine + " " + test.MachineName + " " + test.ContainerLog + " " + test.LogName);
+            }
+            Console.WriteLine("Count: " + list.Count());
         }
 
         public static void QueryBasicWithOutput() {
