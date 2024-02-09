@@ -160,18 +160,22 @@ namespace PSEventViewer {
                 throw new ArgumentException("At least one machine name must be provided", nameof(machineNames));
             }
 
+            _logger.WriteVerbose("Querying logs in parallel");
+
             var semaphore = new SemaphoreSlim(maxThreads);
             var results = new BlockingCollection<EventObject>();
+
+            _logger.WriteVerbose("Creating tasks for each machine: " + string.Join(", ", machineNames));
 
             var tasks = machineNames.Select(machineName => Task.Factory.StartNew(() => {
                 semaphore.Wait();
                 try {
-                    Console.WriteLine("Starting task for machine: " + machineName);
+                    _logger.WriteVerbose("Starting task for machine: " + machineName + " logName: " + logName + " event ids: " + eventIds);
                     var queryResults = QueryLog(logName, eventIds, machineName, providerName, keywords, level, startTime, endTime, userId, maxEvents);
                     foreach (var result in queryResults) {
                         results.Add(result);
                     }
-                    Console.WriteLine("Finished task for machine: " + machineName);
+                    _logger.WriteVerbose("Finished task for machine: " + machineName);
                 } finally {
                     semaphore.Release();
                 }
