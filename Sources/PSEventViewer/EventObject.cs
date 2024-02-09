@@ -11,6 +11,7 @@ namespace PSEventViewer {
         Parallel,
         ParallelForEachBuiltin,
         ParallelForEach,
+        Async
     }
 
     public enum Level {
@@ -58,7 +59,7 @@ namespace PSEventViewer {
         /// <summary>
         /// Log name where the event was queried from
         /// </summary>
-        public string ContainerLog => _eventRecord.ContainerLog;
+        public string ContainerLog;
 
         /// <summary>
         /// Computer name where the event was logged
@@ -143,11 +144,13 @@ namespace PSEventViewer {
         /// <summary>
         /// Original event record
         /// </summary>
-        private readonly EventLogRecord _eventRecord;
+        private readonly EventRecord _eventRecord;
 
         public EventObject(EventRecord eventRecord, string queriedMachine) {
             QueriedMachine = queriedMachine;
-            _eventRecord = (EventLogRecord)eventRecord;
+            _eventRecord = eventRecord;
+
+            ContainerLog = ((EventLogRecord)_eventRecord).ContainerLog;
 
             XMLData = eventRecord.ToXml();
             // Create a dictionary to hold the xml data
