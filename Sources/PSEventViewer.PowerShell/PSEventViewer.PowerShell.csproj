@@ -9,6 +9,7 @@
 		<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
 		<Company>Evotec</Company>
 		<Authors>Przemyslaw Klys</Authors>
+		<LangVersion>latest</LangVersion>
 
 	</PropertyGroup>
 	<ItemGroup>
