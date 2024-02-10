@@ -199,12 +199,12 @@ namespace PSEventViewer {
 
             Task.Factory.StartNew(() => {
                 Parallel.ForEach(machineNames, options, machineName => {
-                    Console.WriteLine("Starting task for machine: " + machineName);
+                    _logger.WriteVerbose("Starting task for machine: " + machineName);
                     var queryResults = QueryLog(logName, eventIds, machineName, providerName, keywords, level, startTime, endTime, userId, maxEvents);
                     foreach (var result in queryResults) {
                         results.Add(result);
                     }
-                    Console.WriteLine("Finished task for machine: " + machineName);
+                    _logger.WriteVerbose("Finished task for machine: " + machineName);
                 });
                 results.CompleteAdding();
             });

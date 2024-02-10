@@ -25,34 +25,18 @@ namespace PSEventViewer.PowerShell {
         [Parameter(Mandatory = false)] public int MaxEvents = 0;
         [Parameter(Mandatory = false)] public Modes Mode { get; set; } = Modes.Parallel;
 
-        private EventSearching eventSearching;
-        private InternalLogger _logger;
-
         protected override Task BeginProcessingAsync() {
-            // Initialize the logger
+            // Initialize the logger to be able to see verbose, warning, debug, error, progress, and information messages.
             var internalLogger = new InternalLogger(false);
-            //Initialize the PowerShell logger, and subscribe to the verbose message event
-            //var internalLoggerPowerShell = new InternalLoggerPowerShell(internalLogger, this.WriteVerbose, this.WriteWarning, this.WriteDebug, null, this.WriteProgress, this.WriteInformation);
             var internalLoggerPowerShell = new InternalLoggerPowerShell(internalLogger, this.WriteVerbose, this.WriteWarning, this.WriteDebug, this.WriteError, this.WriteProgress, this.WriteInformation);
-            eventSearching = new EventSearching(internalLogger);
-            eventSearching.Verbose = false;
-            eventSearching.Error = true;
-            eventSearching.Warning = true;
-            _logger = internalLogger;
+            var eventSearching = new EventSearching(internalLogger);
             return Task.CompletedTask;
         }
         protected override Task ProcessRecordAsync() {
-            WriteVerbose("foo");
-            //WriteObject(EventSearching.QueryLogsParallel(LogName, EventId, MachineName, maxThreads: 0), true);
-            foreach (var eventObject in EventSearching.QueryLogsParallel(LogName, EventId, MachineName, maxThreads: 0)) {
+            //WriteObject(EventSearching.QueryLogsParallel(LogName, EventId, MachineName, maxThreads: NumberOfThreads), true);
+            foreach (var eventObject in EventSearching.QueryLogsParallel(LogName, EventId, MachineName, maxThreads: NumberOfThreads)) {
                 WriteObject(eventObject);
             }
-
-            _logger.WriteVerbose("fo1o");
-
-            // WriteObject("testMe");
-
-            WriteVerbose("foo2");
             return Task.CompletedTask;
         }
     }

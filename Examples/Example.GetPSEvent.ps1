@@ -15,7 +15,7 @@ $Test.Data['NoNameA1']
 
 #Find-NamedEvent -Type ADComputerChangeDetailed -MachineName AD1,AD2 -Verbose | Format-Table
 
-Find-GenericTest -LogName 'Security' -EventId 5136, 5137, 5168 -Verbose -MachineName 'AD1', 'AD2', 'AD0' -Mode Parallel
+Find-GenericEvent -LogName 'Security' -EventId 5136, 5137, 5168 -Verbose -MachineName 'AD1', 'AD2', 'AD0' -Mode ParallelForEachBuiltin | Select-Object -First 1 | Format-Table
 
 return
 
@@ -31,4 +31,4 @@ $IDs.Add(5137)
 $IDs.Add(5168)
 
 $V = [PSEventViewer.EventSearching]::QueryLogsParallel('Security', $Ids, $List)
-$V| Format-Table
+$V | Format-Table
