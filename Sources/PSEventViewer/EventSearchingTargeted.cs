@@ -17,7 +17,9 @@ namespace PSEventViewer {
         ADOtherChangeDetailed,
         ADUserLockouts,
         ADUserLogon,
-        ADUserUnlocked
+        ADUserUnlocked,
+        ADLdapBindingSummary,
+        ADLdapBindingDetails,
     }
 
     public class EventSearchingTargeted : Settings {
@@ -115,6 +117,10 @@ namespace PSEventViewer {
                             return new ADUserLogon(eventObject);
                         case NamedEvents.ADUserUnlocked:
                             return new ADUserUnlocked(eventObject);
+                        case NamedEvents.ADLdapBindingSummary:
+                            return new ADLdapBindingSummary(eventObject);
+                        case NamedEvents.ADLdapBindingDetails:
+                            return new ADLdapBindingDetails(eventObject);
                         default:
                             throw new ArgumentException($"Invalid NamedEvents value: {typeEvents}");
                     }
@@ -135,7 +141,9 @@ namespace PSEventViewer {
             { NamedEvents.ADOtherChangeDetailed, (new List<int> { 5136, 5137, 5139, 5141 }, "Security") },
             { NamedEvents.ADUserLockouts, (new List<int> { 4740 }, "Security") },
             { NamedEvents.ADUserLogon, (new List<int> { 4624 }, "Security") },
-            { NamedEvents.ADUserUnlocked, (new List<int> { 4767 }, "Security") }
+            { NamedEvents.ADUserUnlocked, (new List<int> { 4767 }, "Security") },
+            { NamedEvents.ADLdapBindingSummary, (new List<int> { 2887 }, "Directory Service") },
+            { NamedEvents.ADLdapBindingDetails,(new List<int> { 2889 }, "Directory Service") }
         };
 
         public EventSearchingTargeted(InternalLogger internalLogger) {
