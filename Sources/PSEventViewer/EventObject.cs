@@ -6,12 +6,11 @@ using System.Security.Principal;
 using System.Xml.Linq;
 
 namespace PSEventViewer {
-    public enum Modes {
+    public enum ParallelOption {
         Disabled,
         Parallel,
-        ParallelForEachBuiltin,
-        ParallelForEach,
-        Async
+        //ParallelForEachBuiltin,
+        //ParallelForEach,
     }
 
     public enum Level {
@@ -158,7 +157,12 @@ namespace PSEventViewer {
             // Create a dictionary to hold the xml data
             Data = ParseXML(XMLData);
             // Create a dictionary to hold the message data
-            MessageData = ParseMessage(eventRecord.FormatDescription());
+            try {
+                MessageData = ParseMessage(eventRecord.FormatDescription());
+            } catch {
+                MessageData = new Dictionary<string, string>();
+                //_logger.WriteError("Error parsing message");
+            }
         }
 
         /// <summary>
