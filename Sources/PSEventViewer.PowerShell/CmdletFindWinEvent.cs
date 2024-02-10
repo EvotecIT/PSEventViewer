@@ -95,34 +95,34 @@ namespace PSEventViewer.PowerShell {
             return Task.CompletedTask;
         }
 
-        /// <summary>
-        /// Parses string to NamedEvents
-        /// </summary>
-        /// <param name="typeStrings"></param>
-        /// <returns></returns>
-        private List<NamedEvents> ParseNamedEvents(string[] typeStrings) {
-            var namedEvents = new List<NamedEvents>();
-            foreach (var typeString in typeStrings) {
-                if (Enum.TryParse(typeString, out NamedEvents namedEvent)) {
-                    namedEvents.Add(namedEvent);
-                } else {
-                    // Handle invalid values here
-                }
-            }
-            return namedEvents;
-        }
+        ///// <summary>
+        ///// Parses string to NamedEvents
+        ///// </summary>
+        ///// <param name="typeStrings"></param>
+        ///// <returns></returns>
+        //private List<NamedEvents> ParseNamedEvents(string[] typeStrings) {
+        //    var namedEvents = new List<NamedEvents>();
+        //    foreach (var typeString in typeStrings) {
+        //        if (Enum.TryParse(typeString, out NamedEvents namedEvent)) {
+        //            namedEvents.Add(namedEvent);
+        //        } else {
+        //            // Handle invalid values here
+        //        }
+        //    }
+        //    return namedEvents;
+        //}
 
-        /// <summary>
-        /// Provides auto-completion for NamedEvents from strings
-        /// </summary>
-        public class NamedEventsCompleter : IArgumentCompleter {
-            public IEnumerable<CompletionResult> CompleteArgument(string commandName, string parameterName, string wordToComplete, CommandAst commandAst, IDictionary fakeBoundParameters) {
-                foreach (var namedEvent in Enum.GetNames(typeof(NamedEvents))) {
-                    if (namedEvent.StartsWith(wordToComplete, StringComparison.OrdinalIgnoreCase)) {
-                        yield return new CompletionResult(namedEvent);
-                    }
-                }
-            }
-        }
+        ///// <summary>
+        ///// Provides auto-completion for NamedEvents from strings
+        ///// </summary>
+        //public class NamedEventsCompleter : IArgumentCompleter {
+        //    public IEnumerable<CompletionResult> CompleteArgument(string commandName, string parameterName, string wordToComplete, CommandAst commandAst, IDictionary fakeBoundParameters) {
+        //        foreach (var namedEvent in Enum.GetNames(typeof(NamedEvents))) {
+        //            if (namedEvent.StartsWith(wordToComplete, StringComparison.OrdinalIgnoreCase)) {
+        //                yield return new CompletionResult(namedEvent);
+        //            }
+        //        }
+        //    }
+        //}
     }
 }
