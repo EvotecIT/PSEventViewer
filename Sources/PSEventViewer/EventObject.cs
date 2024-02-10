@@ -176,14 +176,22 @@ namespace PSEventViewer {
             // Split the message into lines
             string[] lines = message.Split('\n');
 
-            // Add the first line of the message to the dictionary with a default key of "Message"
-            data["Message"] = lines[0].Trim();
-
-            MessageSubject = data["Message"];
+            // Find the first non-empty line and add it to the dictionary with a default key of "Message"
+            string firstLine = lines.FirstOrDefault(line => !string.IsNullOrWhiteSpace(line));
+            if (firstLine != null) {
+                data["Message"] = firstLine.Trim();
+                MessageSubject = firstLine.Trim();
+            }
 
             // Process the remaining lines
             for (int i = 1; i < lines.Length; i++) {
-                string line = lines[i];
+                string line = lines[i].Trim(); // Trim the line to remove leading and trailing whitespace
+
+                // Skip empty lines
+                if (string.IsNullOrEmpty(line)) {
+                    continue;
+                }
+
                 // Check if the line contains a colon
                 if (line.Contains(':')) {
                     // Split the line into a key and a value
