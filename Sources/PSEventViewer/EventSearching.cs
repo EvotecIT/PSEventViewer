@@ -33,6 +33,12 @@ namespace PSEventViewer {
             } catch (EventLogException ex) {
                 _logger.WriteWarning($"An error occurred on {machineName} while creating the event log reader: {ex.Message}");
                 return null;
+            } catch (UnauthorizedAccessException ex) {
+                _logger.WriteWarning($"Insufficient permissions to read the event log on {machineName}: {ex.Message}");
+                return null;
+            } catch (Exception ex) {
+                _logger.WriteWarning($"An error occurred on {machineName} while creating the event log reader: {ex.Message}");
+                return null;
             }
         }
 
@@ -42,18 +48,6 @@ namespace PSEventViewer {
         /// <returns></returns>
         public static string GetFQDN() {
             return Dns.GetHostEntry("").HostName;
-        }
-
-        /// <summary>
-        /// Query a log for events based on EventRecordID
-        /// </summary>
-        /// <param name="logName"></param>
-        /// <param name="eventRecordId"></param>
-        /// <param name="maxEvents"></param>
-        /// <param name="machineName"></param>
-        /// <returns></returns>
-        public static IEnumerable<EventObject> QueryLog(string logName, List<long> eventRecordId, int maxEvents = 0, string machineName = null) {
-            return QueryLog(logName, eventRecordId: eventRecordId, maxEvents: maxEvents, machineName: machineName);
         }
 
 
@@ -180,15 +174,49 @@ namespace PSEventViewer {
 
         public static IEnumerable<EventObject> QueryLogsParallel(string logName, List<int> eventIds = null, List<string> machineNames = null, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null, int maxEvents = 0, int maxThreads = 4, List<long> eventRecordId = null) {
             if (machineNames == null || !machineNames.Any()) {
-                throw new ArgumentException("At least one machine name must be provided", nameof(machineNames));
+                machineNames = new List<string> { null };
             }
             var semaphore = new SemaphoreSlim(maxThreads);
             var results = new BlockingCollection<EventObject>();
 
             _logger.WriteVerbose("Creating tasks for each machine: " + string.Join(", ", machineNames));
 
-            var tasks = machineNames.Select(machineName => Task.Run(async () => {
-                _logger.WriteVerbose($"Querying log on machine: {machineName}, logName: {logName}, event ids: " + string.Join(", ", eventIds));
+            var tasks = new List<Task>();
+            foreach (var machineName in machineNames) {
+                if (eventIds != null) {
+                    var eventIdsChunks = eventIds.Select((x, i) => new { Index = i, Value = x })
+                        .GroupBy(x => x.Index / 22)
+                        .Select(x => x.Select(v => v.Value).ToList())
+                        .ToList();
+
+                    foreach (var chunk in eventIdsChunks) {
+                        tasks.Add(CreateTask(machineName, logName, chunk, providerName, keywords, level, startTime, endTime, userId, maxEvents, semaphore, results));
+                    }
+                }
+
+                if (eventRecordId != null) {
+                    var eventRecordIdChunks = eventRecordId.Select((x, i) => new { Index = i, Value = x })
+                        .GroupBy(x => x.Index / 22)
+                        .Select(x => x.Select(v => v.Value).ToList())
+                        .ToList();
+
+                    foreach (var chunk in eventRecordIdChunks) {
+                        tasks.Add(CreateTask(machineName, logName, null, providerName, keywords, level, startTime, endTime, userId, maxEvents, semaphore, results, chunk));
+                    }
+                }
+            }
+
+            Task.Factory.StartNew(() => {
+                Task.WaitAll(tasks.ToArray());
+                results.CompleteAdding();
+            });
+
+            return results.GetConsumingEnumerable();
+        }
+
+        private static Task CreateTask(string machineName, string logName, List<int> eventIds, string providerName, Keywords? keywords, Level? level, DateTime? startTime, DateTime? endTime, string userId, int maxEvents, SemaphoreSlim semaphore, BlockingCollection<EventObject> results, List<long> eventRecordId = null) {
+            return Task.Run(async () => {
+                _logger.WriteVerbose($"Querying log on machine: {machineName}, logName: {logName}, event ids: " + string.Join(", ", eventIds ?? new List<int>()));
                 await semaphore.WaitAsync();
                 try {
                     var queryResults = QueryLog(logName, eventIds, machineName, providerName, keywords, level, startTime, endTime, userId, maxEvents, eventRecordId);
@@ -199,14 +227,7 @@ namespace PSEventViewer {
                 } finally {
                     semaphore.Release();
                 }
-            })).ToList();
-
-            Task.Factory.StartNew(() => {
-                Task.WaitAll(tasks.ToArray());
-                results.CompleteAdding();
             });
-
-            return results.GetConsumingEnumerable();
         }
 
         public static IEnumerable<EventObject> QueryLogsParallelForEach(string logName, List<int> eventIds = null, List<string> machineNames = null, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null, int maxEvents = 0, int maxThreads = 4, List<long> eventRecordId = null) {

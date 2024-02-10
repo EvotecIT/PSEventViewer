@@ -62,15 +62,21 @@ namespace PSEventViewer.PowerShell {
                 // let's find the events prepared for search
                 //var types = ParseNamedEvents(Type);
                 List<NamedEvents> typeList = Type.ToList();
-                foreach (var eventObject in EventSearchingTargeted.FindEventsByNamedEventsOld(MachineName, typeList)) {
+                foreach (var eventObject in EventSearchingTargeted.FindEventsByNamedEvents(typeList, MachineName)) {
                     WriteObject(eventObject);
                 }
             } else {
                 // Lets find the events by generic log name, event id, machine name, provider name, keywords, level, start time, end time, user id, and max events.
                 if (ParallelOption == ParallelOption.Disabled) {
-                    foreach (var machine in MachineName) {
-                        foreach (var eventObject in EventSearching.QueryLog(LogName, EventId, machine, ProviderName, Keywords, Level, StartTime, EndTime, UserId, MaxEvents, EventRecordId)) {
+                    if (MachineName == null) {
+                        foreach (var eventObject in EventSearching.QueryLog(LogName, EventId, null, ProviderName, Keywords, Level, StartTime, EndTime, UserId, MaxEvents, EventRecordId)) {
                             WriteObject(eventObject);
+                        }
+                    } else {
+                        foreach (var machine in MachineName) {
+                            foreach (var eventObject in EventSearching.QueryLog(LogName, EventId, machine, ProviderName, Keywords, Level, StartTime, EndTime, UserId, MaxEvents, EventRecordId)) {
+                                WriteObject(eventObject);
+                            }
                         }
                     }
                 } else if (ParallelOption == ParallelOption.Parallel) {

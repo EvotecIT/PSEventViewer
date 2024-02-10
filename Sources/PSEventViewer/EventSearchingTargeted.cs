@@ -229,7 +229,7 @@ namespace PSEventViewer {
         //    return results.ToList(); // Convert the ConcurrentBag to a List and return it
         //}
 
-        public static IEnumerable<EventObjectSlim> FindEventsByNamedEventsOld(List<NamedEvents> typeEventsList, List<string> machineNames = null) {
+        public static IEnumerable<EventObjectSlim> FindEventsByNamedEvents(List<NamedEvents> typeEventsList, List<string> machineNames = null) {
             // Create a dictionary to store unique event IDs and log names
             var eventInfoDict = new Dictionary<string, HashSet<int>>();
 
