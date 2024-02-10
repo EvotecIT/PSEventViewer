@@ -67,7 +67,7 @@ namespace PSEventViewer {
             try {
                 return new EventLogReader(query);
             } catch (EventLogException ex) {
-                _logger.WriteError($"An error occurred on {machineName} while creating the event log reader: {ex.Message}");
+                 _logger.WriteWarning($"An error occurred on {machineName} while creating the event log reader: {ex.Message}");
                 return null;
             }
         }
@@ -167,8 +167,9 @@ namespace PSEventViewer {
 
             _logger.WriteVerbose("Creating tasks for each machine: " + string.Join(", ", machineNames));
 
-            var tasks = machineNames.Select(machineName => Task.Factory.StartNew(() => {
-                semaphore.Wait();
+            var tasks = machineNames.Select(machineName => Task.Run(async () => {
+                _logger.WriteVerbose("Starting task for machine: " + machineName + " logName: " + logName + " event ids: " + eventIds);
+                await semaphore.WaitAsync();
                 try {
                     _logger.WriteVerbose("Starting task for machine: " + machineName + " logName: " + logName + " event ids: " + eventIds);
                     var queryResults = QueryLog(logName, eventIds, machineName, providerName, keywords, level, startTime, endTime, userId, maxEvents);
@@ -179,7 +180,7 @@ namespace PSEventViewer {
                 } finally {
                     semaphore.Release();
                 }
-            }, TaskCreationOptions.LongRunning)).ToList();
+            })).ToList();
 
             Task.Factory.StartNew(() => {
                 Task.WaitAll(tasks.ToArray());
@@ -209,6 +210,39 @@ namespace PSEventViewer {
             });
 
             return results.GetConsumingEnumerable();
+        }
+
+
+        public ConcurrentQueue<EventObject> results = new ConcurrentQueue<EventObject>();
+
+        public async Task QueryLogParallelTask(List<string> machineNames, string logName, List<int> eventIds = null, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null, int maxEvents = 0) {
+            _logger.WriteVerbose("Querying logs in parallel");
+            var tasks = machineNames.Select(machineName => Task.Factory.StartNew(() => {
+                try {
+                    _logger.WriteVerbose("Starting task for machine: " + machineName);
+                    int resultCount = 0;
+                    foreach (var result in QueryLog(logName, eventIds, machineName, providerName, keywords, level, startTime, endTime, userId, maxEvents)) {
+                        results.Enqueue(result);
+                        resultCount++;
+                        _logger.WriteVerbose("Added result to queue: " + result.Id);
+                    }
+                    _logger.WriteVerbose($"Finished task for machine: {machineName}. Found {resultCount} results.");
+                } catch (Exception ex) {
+                    _logger.WriteWarning("Exception in task for machine: " + machineName + ". Exception: " + ex.ToString());
+                    // Depending on your requirements, you might want to rethrow the exception or stop processing further machines.
+                    // throw;
+                }
+            }, TaskCreationOptions.LongRunning));
+
+            await Task.WhenAll(tasks);
+            _logger.WriteVerbose("Finished querying logs in parallel");
+        }
+
+        public static void JustRunMe(EventSearching eventSearching, List<string> machineNames, string logName, List<int> eventIds = null, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null, int maxEvents = 0) {
+            var queryTask = eventSearching.QueryLogParallelTask(machineNames, logName, eventIds, providerName, keywords, level, startTime, endTime, userId, maxEvents);
+            queryTask.GetAwaiter().GetResult();
+
+            Console.WriteLine(eventSearching.results.Count);
         }
     }
 }
