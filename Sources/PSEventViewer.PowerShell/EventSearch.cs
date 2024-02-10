@@ -10,7 +10,7 @@ using System.Collections.Concurrent;
 namespace PSEventViewer.PowerShell {
 
     [Cmdlet(VerbsCommon.Find, "GenericEvent")]
-    public sealed class EventSearch : PSCmdlet {
+    public sealed class EventSearch : AsyncPSCmdlet {
         [Parameter(Mandatory = true, Position = 0)] public string LogName;
         [Parameter(Mandatory = false)] public List<int> EventId = null;
         [Alias("ComputerName", "ServerName")]
@@ -28,6 +28,7 @@ namespace PSEventViewer.PowerShell {
         private EventSearching eventSearching;
 
         protected override void BeginProcessing() {
+            WriteVerbose("Test0");
             // Initialize the logger
             var internalLogger = new InternalLogger(false);
             //Initialize the PowerShell logger, and subscribe to the verbose message event
@@ -37,6 +38,8 @@ namespace PSEventViewer.PowerShell {
             eventSearching.Verbose = false;
             eventSearching.Error = true;
             eventSearching.Warning = true;
+
+            WriteVerbose("Test1");
         }
         protected override void ProcessRecord() {
 
@@ -48,7 +51,8 @@ namespace PSEventViewer.PowerShell {
             //        }
             //    }
             //} else if (Mode == Modes.Parallel) {
-            WriteObject(EventSearching.QueryLogsParallel(LogName, EventId, MachineName, maxThreads: 0), true);
+            WriteVerbose("Test2");
+            //WriteObject(EventSearching.QueryLogsParallel(LogName, EventId, MachineName, maxThreads: 0), true);
             //} else if (Mode == Modes.ParallelForEach) {
             //    var options = new ParallelOptions { MaxDegreeOfParallelism = NumberOfThreads };
             //    Parallel.ForEach(MachineName, options, machine => {
@@ -65,7 +69,7 @@ namespace PSEventViewer.PowerShell {
             //}
         }
         protected override void EndProcessing() {
-
+            WriteVerbose("Test3");
 
             base.EndProcessing();
         }

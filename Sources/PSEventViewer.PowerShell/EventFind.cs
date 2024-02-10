@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace PSEventViewer.PowerShell {
     [Cmdlet(VerbsCommon.Find, "NamedEvent")]
-    public sealed class EventFind : PSCmdlet {
+    public sealed class EventFind : AsyncPSCmdlet {
         [Alias("ComputerName", "ServerName")]
         [Parameter(Mandatory = false)] public List<string> MachineName = null;
         [Parameter(Mandatory = false)] public DateTime? StartTime = null;
