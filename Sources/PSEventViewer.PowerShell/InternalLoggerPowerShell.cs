@@ -5,7 +5,7 @@ namespace PSEventViewer.PowerShell {
     /// <summary>
     /// This class allow connecting to the InternalLogger class of ADPlayground and act on events from it in different streams
     /// </summary>
-    public class InternalLoggerPowerShell : AsyncPSCmdlet {
+    public class InternalLoggerPowerShell {
         private readonly InternalLogger _logger;
         private readonly Action<string> _writeVerboseAction;
         private readonly Action<string> _writeDebugAction;
@@ -52,15 +52,23 @@ namespace PSEventViewer.PowerShell {
                 _logger.OnProgressMessage += Logger_OnProgressMessage;
             }
 
-            //if (writeInformationAction != null) {
-            //    _writeInformationAction = writeInformationAction;
-            //    _logger.OnInformationMessage += Logger_OnInformationMessage;
-            //}
+            if (writeInformationAction != null) {
+                _writeInformationAction = writeInformationAction;
+                _logger.OnInformationMessage += Logger_OnInformationMessage;
+            }
         }
 
+        /// <summary>
+        /// Message event handler
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
         private void Logger_OnVerboseMessage(object sender, LogEventArgs e) {
-            var message = e.Args != null && e.Args.Length > 0 ? string.Format(e.Message, e.Args) : e.Message;
-            WriteVerbose(message);
+            if (e.Args != null && e.Args.Length > 0) {
+                WriteVerbose(e.Message, e.Args);
+            } else {
+                WriteVerbose(e.Message);
+            }
         }
         private void Logger_OnDebugMessage(object sender, LogEventArgs e) {
             WriteDebug(e.Message);
@@ -102,53 +110,53 @@ namespace PSEventViewer.PowerShell {
             }
             WriteProgress(progressRecord);
         }
-        //private void Logger_OnInformationMessage(object sender, LogEventArgs e) {
-        //    WriteInformation(e.Message);
-        //}
+        private void Logger_OnInformationMessage(object sender, LogEventArgs e) {
+            WriteInformation(e.Message);
+        }
 
-        //private void WriteVerbose(string message) {
-        //    _writeVerboseAction?.Invoke(message);
-        //}
+        private void WriteVerbose(string message) {
+            _writeVerboseAction?.Invoke(message);
+        }
 
         /// <summary>
         /// Method to write verbose message to PowerShell
         /// </summary>
         /// <param name="message"></param>
         /// <param name="eArgs"></param>
-        //private void WriteVerbose(string message, object[] eArgs) {
-        //    // Write to PowerShell verbose stream
-        //    var fullMessage = string.Format(message, eArgs);
-        //    _writeVerboseAction?.Invoke(fullMessage);
-        //}
+        private void WriteVerbose(string message, object[] eArgs) {
+            // Write to PowerShell verbose stream
+            var fullMessage = string.Format(message, eArgs);
+            _writeVerboseAction?.Invoke(fullMessage);
+        }
 
-        //private void WriteDebug(string message) {
-        //    // Write to PowerShell debug stream
-        //    _writeDebugAction?.Invoke(message);
-        //}
+        private void WriteDebug(string message) {
+            // Write to PowerShell debug stream
+            _writeDebugAction?.Invoke(message);
+        }
 
-        //private void WriteInformation(string message) {
-        //    InformationRecord informationRecord = new InformationRecord(message, "ADPlayground");
-        //    // Write to PowerShell information stream
-        //    _writeInformationAction?.Invoke(informationRecord);
-        //}
+        private void WriteInformation(string message) {
+            InformationRecord informationRecord = new InformationRecord(message, "ADPlayground");
+            // Write to PowerShell information stream
+            _writeInformationAction?.Invoke(informationRecord);
+        }
 
-        //private void WriteWarning(string message) {
-        //    // Write to PowerShell warning stream
-        //    _writeWarningAction?.Invoke(message);
-        //}
+        private void WriteWarning(string message) {
+            // Write to PowerShell warning stream
+            _writeWarningAction?.Invoke(message);
+        }
 
         //private void WriteError(string message) {
         //    // Write to PowerShell error stream
         //    _writeErrorAction?.Invoke(message);
         //}
-        //private void WriteError(ErrorRecord errorRecord) {
-        //    // Write to PowerShell error stream
-        //    _writeErrorAction?.Invoke(errorRecord);
-        //}
+        private void WriteError(ErrorRecord errorRecord) {
+            // Write to PowerShell error stream
+            _writeErrorAction?.Invoke(errorRecord);
+        }
 
-        //private void WriteProgress(ProgressRecord progressRecord) {
-        //    // Write to PowerShell progress stream
-        //    _writeProgressAction?.Invoke(progressRecord);
-        //}
+        private void WriteProgress(ProgressRecord progressRecord) {
+            // Write to PowerShell progress stream
+            _writeProgressAction?.Invoke(progressRecord);
+        }
     }
 }
