@@ -1,16 +1,10 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
+using System.Collections.Concurrent;
+using System.Management.Automation;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace PSEventViewer.PowerShell {
-    using System;
-    using System.Collections.Concurrent;
-    using System.Management.Automation;
-    using System.Threading;
-    using System.Threading.Tasks;
-
     public abstract class AsyncPSCmdlet : PSCmdlet, IDisposable {
         private enum PipelineType {
             Output,
@@ -38,7 +32,7 @@ namespace PSEventViewer.PowerShell {
         protected override void ProcessRecord()
             => RunBlockInAsync(ProcessRecordAsync);
 
-        public virtual Task ProcessRecordAsync()
+        protected virtual Task ProcessRecordAsync()
             => Task.CompletedTask;
 
         protected override void EndProcessing()
