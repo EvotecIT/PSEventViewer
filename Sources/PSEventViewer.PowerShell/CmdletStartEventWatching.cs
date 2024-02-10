@@ -1,31 +1,30 @@
 ﻿using System.Management.Automation;
+using System.Threading.Tasks;
 
 namespace PSEventViewer.PowerShell {
-
     [Cmdlet(VerbsLifecycle.Start, "EventWatching")]
-    public sealed class EventWatchingStart : PSCmdlet {
+    public sealed class CmdletStartEventWatching : AsyncPSCmdlet {
         private EventWatching EventWatching { get; set; }
 
         [Parameter(Mandatory = false, Position = 1)] public int NumberOfThreads { get; set; } = 8;
 
-        protected override void BeginProcessing() {
-            // Initialize the logger
+        protected override Task BeginProcessingAsync() {
+            // Initialize the logger to be able to see verbose, warning, debug, error, progress, and information messages.
             var internalLogger = new InternalLogger(false);
-            // Initialize the PowerShell logger, and subscribe to the verbose message event
             var internalLoggerPowerShell = new InternalLoggerPowerShell(internalLogger, this.WriteVerbose, this.WriteWarning, this.WriteDebug, this.WriteError, this.WriteProgress, this.WriteInformation);
-            // Initialize the LingeringObjects class
+
             EventWatching = new EventWatching(internalLogger) {
                 NumberOfThreads = NumberOfThreads
             };
+            return Task.CompletedTask;
         }
+        protected override Task ProcessRecordAsync() {
 
-        protected override void ProcessRecord() {
-
-
+            return Task.CompletedTask;
         }
-        protected override void EndProcessing() {
-            //this.WriteObject(lingeringObjects);
-            base.EndProcessing();
+        protected override Task EndProcessingAsync() {
+
+            return Task.CompletedTask;
         }
     }
 }
