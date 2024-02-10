@@ -15,9 +15,9 @@ $Test.Data['NoNameA1']
 
 #Find-NamedEvent -Type ADComputerChangeDetailed -MachineName AD1,AD2 -Verbose | Format-Table
 
-Find-GenericEvent -LogName 'Security' -EventId 5136, 5137, 5168 -Verbose -MachineName 'AD1', 'AD2', 'AD0' -Mode Parallel
+Find-GenericTest -LogName 'Security' -EventId 5136, 5137, 5168 -Verbose -MachineName 'AD1', 'AD2', 'AD0' -Mode Parallel
 
-#return
+return
 
 
 $List = [System.Collections.Generic.List[string]]::new()
