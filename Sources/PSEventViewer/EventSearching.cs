@@ -67,7 +67,7 @@ namespace PSEventViewer {
             try {
                 return new EventLogReader(query);
             } catch (EventLogException ex) {
-                 _logger.WriteWarning($"An error occurred on {machineName} while creating the event log reader: {ex.Message}");
+                _logger.WriteWarning($"An error occurred on {machineName} while creating the event log reader: {ex.Message}");
                 return null;
             }
         }
@@ -98,20 +98,20 @@ namespace PSEventViewer {
             }
 
             var queriedMachine = machineName ?? GetFQDN();
-
+            EventRecord record;
             using (EventLogReader reader = CreateEventLogReader(query, machineName)) {
                 if (reader != null) {
-                    EventRecord record;
+
                     int eventCount = 0;
                     while ((record = reader.ReadEvent()) != null) {
-                        using (record) {
-                            EventObject eventObject = new EventObject(record, queriedMachine);
-                            yield return eventObject;
-                            eventCount++;
-                            if (maxEvents > 0 && eventCount >= maxEvents) {
-                                break;
-                            }
+                        // using (record) {
+                        EventObject eventObject = new EventObject(record, queriedMachine);
+                        yield return eventObject;
+                        eventCount++;
+                        if (maxEvents > 0 && eventCount >= maxEvents) {
+                            break;
                         }
+                        // }
                     }
                 }
             }
