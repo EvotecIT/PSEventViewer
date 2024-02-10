@@ -76,41 +76,51 @@ namespace PSEventViewer {
         }
 
         public void WriteProgress(string activity, string currentOperation, int percentCompleted, int? currentSteps = null, int? totalSteps = null) {
-            OnProgressMessage?.Invoke(this, new LogEventArgs(activity, currentOperation, currentSteps, totalSteps, totalSteps));
-            if (IsProgress) {
-                if (currentSteps.HasValue && totalSteps.HasValue) {
-                    Console.WriteLine("[progress] activity: {0} / operation: {1} / percent completed: {2}% ({3} out of {4})", activity, currentOperation, percentCompleted, currentSteps, totalSteps);
-                } else {
-                    Console.WriteLine("[progress] activity: {0} / operation: {1} / percent completed: {2}%", activity, currentOperation, percentCompleted);
+            lock (_lock) {
+                OnProgressMessage?.Invoke(this, new LogEventArgs(activity, currentOperation, currentSteps, totalSteps, totalSteps));
+                if (IsProgress) {
+                    if (currentSteps.HasValue && totalSteps.HasValue) {
+                        Console.WriteLine("[progress] activity: {0} / operation: {1} / percent completed: {2}% ({3} out of {4})", activity, currentOperation, percentCompleted, currentSteps, totalSteps);
+                    } else {
+                        Console.WriteLine("[progress] activity: {0} / operation: {1} / percent completed: {2}%", activity, currentOperation, percentCompleted);
+                    }
                 }
             }
         }
 
         public void WriteError(string message) {
-            OnErrorMessage?.Invoke(this, new LogEventArgs(message));
-            if (IsError) {
-                Console.WriteLine("[error] " + message);
+            lock (_lock) {
+                OnErrorMessage?.Invoke(this, new LogEventArgs(message));
+                if (IsError) {
+                    Console.WriteLine("[error] " + message);
+                }
             }
         }
 
         public void WriteError(string message, params object[] args) {
-            OnErrorMessage?.Invoke(this, new LogEventArgs(string.Format(message, args)));
-            if (IsError) {
-                Console.WriteLine("[error] " + message, args);
+            lock (_lock) {
+                OnErrorMessage?.Invoke(this, new LogEventArgs(string.Format(message, args)));
+                if (IsError) {
+                    Console.WriteLine("[error] " + message, args);
+                }
             }
         }
 
         public void WriteWarning(string message) {
-            OnWarningMessage?.Invoke(this, new LogEventArgs(message));
-            if (IsError) {
-                Console.WriteLine("[warning] " + message);
+            lock (_lock) {
+                OnWarningMessage?.Invoke(this, new LogEventArgs(message));
+                if (IsWarning) {
+                    Console.WriteLine("[warning] " + message);
+                }
             }
         }
 
         public void WriteWarning(string message, params object[] args) {
-            OnWarningMessage?.Invoke(this, new LogEventArgs(string.Format(message, args)));
-            if (IsError) {
-                Console.WriteLine("[warning] " + message, args);
+            lock (_lock) {
+                OnWarningMessage?.Invoke(this, new LogEventArgs(string.Format(message, args)));
+                if (IsWarning) {
+                    Console.WriteLine("[warning] " + message, args);
+                }
             }
         }
 
@@ -121,10 +131,6 @@ namespace PSEventViewer {
                     Console.WriteLine(message);
                 }
             }
-            //OnVerboseMessage?.Invoke(this, new LogEventArgs(message));
-            //if (IsVerbose) {
-            //    Console.WriteLine(message);
-            //}
         }
 
         public void WriteVerbose(string message, params object[] args) {
@@ -134,30 +140,23 @@ namespace PSEventViewer {
                     Console.WriteLine(message, args);
                 }
             }
-            //OnVerboseMessage?.Invoke(this, new LogEventArgs(message, args));
-            ////OnVerboseMessage?.Invoke(this, new LogEventArgs(string.Format(message, args)));
-            //if (IsVerbose) {
-            //    Console.WriteLine(message, args);
-            //}
         }
 
         public void WriteDebug(string message, params object[] args) {
             lock (_lock) {
                 OnDebugMessage?.Invoke(this, new LogEventArgs(message, args));
-            }
-
-            if (IsDebug) {
-                Console.WriteLine("[debug] " + message, args);
+                if (IsDebug) {
+                    Console.WriteLine("[debug] " + message, args);
+                }
             }
         }
 
         public void WriteInformation(string message, params object[] args) {
             lock (_lock) {
-                OnProgressMessage?.Invoke(this, new LogEventArgs(message, args));
-            }
-
-            if (IsInformation) {
-                Console.WriteLine("[information] " + message, args);
+                OnInformationMessage?.Invoke(this, new LogEventArgs(message, args));
+                if (IsInformation) {
+                    Console.WriteLine("[information] " + message, args);
+                }
             }
         }
     }
