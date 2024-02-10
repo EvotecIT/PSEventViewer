@@ -22,7 +22,30 @@ namespace PSEventViewer {
         }
 
         /// <summary>
-        /// Search for events in the event log
+        /// Create an event log reader allowing for catching errors and logging them
+        /// </summary>
+        /// <param name="query"></param>
+        /// <param name="machineName"></param>
+        /// <returns></returns>
+        private static EventLogReader CreateEventLogReader(EventLogQuery query, string machineName) {
+            try {
+                return new EventLogReader(query);
+            } catch (EventLogException ex) {
+                _logger.WriteWarning($"An error occurred on {machineName} while creating the event log reader: {ex.Message}");
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Get the fully qualified domain name of the machine
+        /// </summary>
+        /// <returns></returns>
+        public static string GetFQDN() {
+            return Dns.GetHostEntry("").HostName;
+        }
+
+        /// <summary>
+        /// Query a log for events
         /// </summary>
         /// <param name="logName"></param>
         /// <param name="eventIds"></param>
@@ -35,58 +58,6 @@ namespace PSEventViewer {
         /// <param name="userId"></param>
         /// <param name="maxEvents"></param>
         /// <returns></returns>
-        public static IEnumerable<EventObject> QueryLogNoErrorhandling(string logName, List<int> eventIds = null, string machineName = null, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null, int maxEvents = 0) {
-            string queryString = BuildQueryString(eventIds, providerName, keywords, level, startTime, endTime, userId);
-
-            _logger.WriteVerbose($"Querying log '{logName}' with query: {queryString} on {machineName}");
-
-            EventLogQuery query = new EventLogQuery(logName, PathType.LogName, queryString);
-            if (machineName != null) {
-                query.Session = new EventLogSession(machineName);
-            }
-
-            var queriedMachine = machineName ?? GetFQDN();
-
-            using (EventLogReader reader = new EventLogReader(query)) {
-                EventRecord record;
-                int eventCount = 0;
-                while ((record = reader.ReadEvent()) != null) {
-                    using (record) {
-                        EventObject eventObject = new EventObject(record, queriedMachine);
-                        yield return eventObject;
-                        eventCount++;
-                        if (maxEvents > 0 && eventCount >= maxEvents) {
-                            break;
-                        }
-                    }
-                }
-            }
-        }
-
-        private static EventLogReader CreateEventLogReader(EventLogQuery query, string machineName) {
-            try {
-                return new EventLogReader(query);
-            } catch (EventLogException ex) {
-                _logger.WriteWarning($"An error occurred on {machineName} while creating the event log reader: {ex.Message}");
-                return null;
-            }
-        }
-
-        public static string GetFQDN() {
-            //string domainName = IPGlobalProperties.GetIPGlobalProperties().DomainName;
-            //string hostName = Dns.GetHostName();
-
-            //domainName = "." + domainName;
-            //if (!hostName.EndsWith(domainName)) {
-            //    // if hostname does not already include domain name
-            //    hostName += domainName;
-            //}
-            //return hostName; // return the fully qualified name
-            //return Dns.GetHostEntry("LocalHost").HostName;
-            return Dns.GetHostEntry("").HostName;
-            //return System.Net.Dns.GetHostEntry(Environment.MachineName).HostName;
-        }
-
         public static IEnumerable<EventObject> QueryLog(string logName, List<int> eventIds = null, string machineName = null, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null, int maxEvents = 0) {
             string queryString = BuildQueryString(eventIds, providerName, keywords, level, startTime, endTime, userId);
 
@@ -97,11 +68,13 @@ namespace PSEventViewer {
                 query.Session = new EventLogSession(machineName);
             }
 
+            // If machineName is null, the query will be executed on the local machine
+            // , but we still want to know the fully qualified domain name of the machine for logging purposes
             var queriedMachine = machineName ?? GetFQDN();
+
             EventRecord record;
             using (EventLogReader reader = CreateEventLogReader(query, machineName)) {
                 if (reader != null) {
-
                     int eventCount = 0;
                     while ((record = reader.ReadEvent()) != null) {
                         // using (record) {
@@ -168,10 +141,9 @@ namespace PSEventViewer {
             _logger.WriteVerbose("Creating tasks for each machine: " + string.Join(", ", machineNames));
 
             var tasks = machineNames.Select(machineName => Task.Run(async () => {
-                _logger.WriteVerbose("Starting task for machine: " + machineName + " logName: " + logName + " event ids: " + eventIds);
+                _logger.WriteVerbose($"Starting task for machine: {machineName} logName: {logName} event ids: {eventIds}");
                 await semaphore.WaitAsync();
                 try {
-                    _logger.WriteVerbose("Starting task for machine: " + machineName + " logName: " + logName + " event ids: " + eventIds);
                     var queryResults = QueryLog(logName, eventIds, machineName, providerName, keywords, level, startTime, endTime, userId, maxEvents);
                     foreach (var result in queryResults) {
                         results.Add(result);
@@ -189,6 +161,7 @@ namespace PSEventViewer {
 
             return results.GetConsumingEnumerable();
         }
+
         public static IEnumerable<EventObject> QueryLogsParallelForEach(string logName, List<int> eventIds = null, List<string> machineNames = null, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null, int maxEvents = 0, int maxThreads = 4) {
             if (machineNames == null || !machineNames.Any()) {
                 throw new ArgumentException("At least one machine name must be provided", nameof(machineNames));
@@ -210,39 +183,6 @@ namespace PSEventViewer {
             });
 
             return results.GetConsumingEnumerable();
-        }
-
-
-        public ConcurrentQueue<EventObject> results = new ConcurrentQueue<EventObject>();
-
-        public async Task QueryLogParallelTask(List<string> machineNames, string logName, List<int> eventIds = null, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null, int maxEvents = 0) {
-            _logger.WriteVerbose("Querying logs in parallel");
-            var tasks = machineNames.Select(machineName => Task.Factory.StartNew(() => {
-                try {
-                    _logger.WriteVerbose("Starting task for machine: " + machineName);
-                    int resultCount = 0;
-                    foreach (var result in QueryLog(logName, eventIds, machineName, providerName, keywords, level, startTime, endTime, userId, maxEvents)) {
-                        results.Enqueue(result);
-                        resultCount++;
-                        _logger.WriteVerbose("Added result to queue: " + result.Id);
-                    }
-                    _logger.WriteVerbose($"Finished task for machine: {machineName}. Found {resultCount} results.");
-                } catch (Exception ex) {
-                    _logger.WriteWarning("Exception in task for machine: " + machineName + ". Exception: " + ex.ToString());
-                    // Depending on your requirements, you might want to rethrow the exception or stop processing further machines.
-                    // throw;
-                }
-            }, TaskCreationOptions.LongRunning));
-
-            await Task.WhenAll(tasks);
-            _logger.WriteVerbose("Finished querying logs in parallel");
-        }
-
-        public static void JustRunMe(EventSearching eventSearching, List<string> machineNames, string logName, List<int> eventIds = null, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null, int maxEvents = 0) {
-            var queryTask = eventSearching.QueryLogParallelTask(machineNames, logName, eventIds, providerName, keywords, level, startTime, endTime, userId, maxEvents);
-            queryTask.GetAwaiter().GetResult();
-
-            Console.WriteLine(eventSearching.results.Count);
         }
     }
 }
