@@ -9,75 +9,75 @@ using System.Collections.Concurrent;
 namespace PSEventViewer {
 
     public enum NamedEvents {
+        ADComputerChangeDetailed,
+        ADLdapBindingSummary,
+        ADLdapBindingDetails,
         ADUserChange,
         ADUserStatus,
         ADUserChangeDetailed,
-        ADComputerChangeDetailed,
-        ADOrganizationalUnitChangeDetailed,
-        ADOtherChangeDetailed,
         ADUserLockouts,
         ADUserLogon,
         ADUserUnlocked,
-        ADLdapBindingSummary,
-        ADLdapBindingDetails,
+        ADOrganizationalUnitChangeDetailed,
+        ADOtherChangeDetailed,
     }
 
     public class EventSearchingTargeted : Settings {
-        public static EventObjectSlim BuildTargetEvents(EventObject eventObject) {
-            switch (eventObject.LogName) {
-                case "Security":
-                    switch (eventObject.Id) {
-                        case 4720:
-                        case 4738:
-                            return new ADUserChange(eventObject); // Includes users added or modified in Active Directory
-                        case 4722:
-                        case 4725:
-                        //case 4767:
-                        case 4723:
-                        case 4724:
-                        case 4726:
-                            return new ADUserStatus(eventObject);
-                        case 5136:
-                        case 5137:
-                        case 5139:
-                        case 5141:
-                            if (eventObject.Data["ObjectClass"] == "user") {
-                                return new ADUserChangeDetailed(eventObject);
-                            } else if (eventObject.Data["ObjectClass"] == "computer") {
-                                return new ADComputerChangeDetailed(eventObject);
-                            } else if (eventObject.Data["ObjectClass"] == "organizationalUnit") {
-                                return new ADOrganizationalUnitChangeDetailed(eventObject);
-                            } else {
-                                return new ADOtherChangeDetailed(eventObject);
-                            }
-                        case 4740:
-                            return new ADUserLockouts(eventObject);
-                        case 4624:
-                            return new ADUserLogon(eventObject);
-                        case 4767:
-                            // both support the same
-                            //return new ADUserStatus(eventObject);
-                            return new ADUserUnlocked(eventObject);
-                        default:
-                            throw new ArgumentException("Invalid EventID for Security LogName");
-                    }
-                case "Application":
-                    // Handle Application LogName here
-                    break;
-                case "System":
-                    // Handle System LogName here
-                    break;
-                case "Setup":
-                    // Handle Setup LogName here
-                    break;
-                case "Directory Service":
-                    // Handle Directory Service LogName here
-                    break;
-                default:
-                    throw new ArgumentException("Invalid LogName");
-            }
-            return null;
-        }
+        //public static EventObjectSlim BuildTargetEvents(EventObject eventObject) {
+        //    switch (eventObject.LogName) {
+        //        case "Security":
+        //            switch (eventObject.Id) {
+        //                case 4720:
+        //                case 4738:
+        //                    return new ADUserChange(eventObject); // Includes users added or modified in Active Directory
+        //                case 4722:
+        //                case 4725:
+        //                //case 4767:
+        //                case 4723:
+        //                case 4724:
+        //                case 4726:
+        //                    return new ADUserStatus(eventObject);
+        //                case 5136:
+        //                case 5137:
+        //                case 5139:
+        //                case 5141:
+        //                    if (eventObject.Data["ObjectClass"] == "user") {
+        //                        return new ADUserChangeDetailed(eventObject);
+        //                    } else if (eventObject.Data["ObjectClass"] == "computer") {
+        //                        return new ADComputerChangeDetailed(eventObject);
+        //                    } else if (eventObject.Data["ObjectClass"] == "organizationalUnit") {
+        //                        return new ADOrganizationalUnitChangeDetailed(eventObject);
+        //                    } else {
+        //                        return new ADOtherChangeDetailed(eventObject);
+        //                    }
+        //                case 4740:
+        //                    return new ADUserLockouts(eventObject);
+        //                case 4624:
+        //                    return new ADUserLogon(eventObject);
+        //                case 4767:
+        //                    // both support the same
+        //                    //return new ADUserStatus(eventObject);
+        //                    return new ADUserUnlocked(eventObject);
+        //                default:
+        //                    throw new ArgumentException("Invalid EventID for Security LogName");
+        //            }
+        //        case "Application":
+        //            // Handle Application LogName here
+        //            break;
+        //        case "System":
+        //            // Handle System LogName here
+        //            break;
+        //        case "Setup":
+        //            // Handle Setup LogName here
+        //            break;
+        //        case "Directory Service":
+        //            // Handle Directory Service LogName here
+        //            break;
+        //        default:
+        //            throw new ArgumentException("Invalid LogName");
+        //    }
+        //    return null;
+        //}
 
         public static EventObjectSlim BuildTargetEvents(EventObject eventObject, List<NamedEvents> typeEventsList) {
             // Check if the event ID and log name match any of the NamedEvents values
@@ -153,84 +153,83 @@ namespace PSEventViewer {
         }
 
 
-        public static IEnumerable<EventObjectSlim> FindEvents(List<string> machineNames, NamedEvents typeEvents) {
-            List<int> eventIds = new List<int> { 4720, 4738, 4722, 4725, 4767, 4723, 4724, 4726, 5136, 5139, 5141 };
+        //public static IEnumerable<EventObjectSlim> FindEvents(List<string> machineNames, NamedEvents typeEvents) {
+        //    List<int> eventIds = new List<int> { 4720, 4738, 4722, 4725, 4767, 4723, 4724, 4726, 5136, 5139, 5141 };
 
-            foreach (var foundEvent in EventSearching.QueryLogsParallel("Security", eventIds, machineNames)) {
-                yield return BuildTargetEvents(foundEvent);
-            }
-        }
-
-
-        public static IEnumerable<EventObjectSlim> FindEvents() {
-            List<int> eventIds = new List<int> { 4720, 4738, 4722, 4725, 4767, 4723, 4724, 4726, 5136, 5139, 5141 };
-            List<string> machineNames = new List<string> { "AD0", "AD1" };
-            foreach (var foundEvent in EventSearching.QueryLogsParallel("Security", eventIds, machineNames)) {
-                yield return BuildTargetEvents(foundEvent);
-            }
-        }
-
-        public static async Task<List<EventObjectSlim>> FindEventsByNamedEvents(List<string> machineNames, List<NamedEvents> typeEventsList) {
-            var eventInfoDict = new Dictionary<string, HashSet<int>>();
-            var results = new ConcurrentBag<EventObjectSlim>(); // Thread-safe collection for storing results
+        //    foreach (var foundEvent in EventSearching.QueryLogsParallel("Security", eventIds, machineNames)) {
+        //        yield return BuildTargetEvents(foundEvent);
+        //    }
+        //}
 
 
-            foreach (var typeEvents in typeEventsList) {
-                if (!eventIdsMap.TryGetValue(typeEvents, out var eventInfo)) {
-                    throw new ArgumentException($"Invalid typeEvents value: {typeEvents}");
-                }
+        //public static IEnumerable<EventObjectSlim> FindEvents() {
+        //    List<int> eventIds = new List<int> { 4720, 4738, 4722, 4725, 4767, 4723, 4724, 4726, 5136, 5139, 5141 };
+        //    List<string> machineNames = new List<string> { "AD0", "AD1" };
+        //    foreach (var foundEvent in EventSearching.QueryLogsParallel("Security", eventIds, machineNames)) {
+        //        yield return BuildTargetEvents(foundEvent);
+        //    }
+        //}
 
-                if (!eventInfoDict.TryGetValue(eventInfo.LogName, out var eventIds)) {
-                    eventIds = new HashSet<int>();
-                    eventInfoDict[eventInfo.LogName] = eventIds;
-                }
+        //public static async Task<List<EventObjectSlim>> FindEventsByNamedEvents(List<string> machineNames, List<NamedEvents> typeEventsList) {
+        //    var eventInfoDict = new Dictionary<string, HashSet<int>>();
+        //    var results = new ConcurrentBag<EventObjectSlim>(); // Thread-safe collection for storing results
 
-                foreach (var eventId in eventInfo.EventIds) {
-                    eventIds.Add(eventId);
-                }
-            }
 
-            CancellationTokenSource cts = new CancellationTokenSource();
-            int maxDegreeOfParallelism = 8; // Adjust this value as needed
-            SemaphoreSlim semaphore = new SemaphoreSlim(maxDegreeOfParallelism);
+        //    foreach (var typeEvents in typeEventsList) {
+        //        if (!eventIdsMap.TryGetValue(typeEvents, out var eventInfo)) {
+        //            throw new ArgumentException($"Invalid typeEvents value: {typeEvents}");
+        //        }
 
-            List<Task> tasks = new List<Task>();
+        //        if (!eventInfoDict.TryGetValue(eventInfo.LogName, out var eventIds)) {
+        //            eventIds = new HashSet<int>();
+        //            eventInfoDict[eventInfo.LogName] = eventIds;
+        //        }
 
-            foreach (var kvp in eventInfoDict) {
-                var logName = kvp.Key;
-                var eventIds = kvp.Value.ToList();
+        //        foreach (var eventId in eventInfo.EventIds) {
+        //            eventIds.Add(eventId);
+        //        }
+        //    }
 
-                _logger.WriteDebug($"FindEventsByNamedEvents: {logName} {string.Join(", ", eventIds)}");
+        //    CancellationTokenSource cts = new CancellationTokenSource();
+        //    int maxDegreeOfParallelism = 8; // Adjust this value as needed
+        //    SemaphoreSlim semaphore = new SemaphoreSlim(maxDegreeOfParallelism);
 
-                foreach (var machineName in machineNames) {
-                    await semaphore.WaitAsync(cts.Token);
-                    tasks.Add(Task.Run(async () => {
-                        try {
-                            if (cts.IsCancellationRequested) {
-                                semaphore.Release();
-                                return;
-                            }
+        //    List<Task> tasks = new List<Task>();
 
-                            foreach (var foundEvent in EventSearching.QueryLog(logName, eventIds, machineName)) {
-                                _logger.WriteDebug($"Found event: {foundEvent.Id} {foundEvent.LogName} {foundEvent.ComputerName}");
-                                var targetEvent = BuildTargetEvents(foundEvent, typeEventsList);
-                                if (targetEvent != null) {
-                                    results.Add(targetEvent);
-                                }
-                            }
-                        } finally {
-                            semaphore.Release();
-                        }
-                    }, cts.Token));
-                }
-            }
+        //    foreach (var kvp in eventInfoDict) {
+        //        var logName = kvp.Key;
+        //        var eventIds = kvp.Value.ToList();
 
-            await Task.WhenAll(tasks);
-            return results.ToList(); // Convert the ConcurrentBag to a List and return it
+        //        _logger.WriteDebug($"FindEventsByNamedEvents: {logName} {string.Join(", ", eventIds)}");
 
-        }
+        //        foreach (var machineName in machineNames) {
+        //            await semaphore.WaitAsync(cts.Token);
+        //            tasks.Add(Task.Run(async () => {
+        //                try {
+        //                    if (cts.IsCancellationRequested) {
+        //                        semaphore.Release();
+        //                        return;
+        //                    }
 
-        public static IEnumerable<EventObjectSlim> FindEventsByNamedEventsOld(List<string> machineNames, List<NamedEvents> typeEventsList) {
+        //                    foreach (var foundEvent in EventSearching.QueryLog(logName, eventIds, machineName)) {
+        //                        _logger.WriteDebug($"Found event: {foundEvent.Id} {foundEvent.LogName} {foundEvent.ComputerName}");
+        //                        var targetEvent = BuildTargetEvents(foundEvent, typeEventsList);
+        //                        if (targetEvent != null) {
+        //                            results.Add(targetEvent);
+        //                        }
+        //                    }
+        //                } finally {
+        //                    semaphore.Release();
+        //                }
+        //            }, cts.Token));
+        //        }
+        //    }
+
+        //    await Task.WhenAll(tasks);
+        //    return results.ToList(); // Convert the ConcurrentBag to a List and return it
+        //}
+
+        public static IEnumerable<EventObjectSlim> FindEventsByNamedEventsOld(List<NamedEvents> typeEventsList, List<string> machineNames = null) {
             // Create a dictionary to store unique event IDs and log names
             var eventInfoDict = new Dictionary<string, HashSet<int>>();
 
@@ -256,9 +255,9 @@ namespace PSEventViewer {
                 var logName = kvp.Key;
                 var eventIds = kvp.Value.ToList();
 
-                _logger.WriteDebug($"FindEventsByNamedEvents: {logName} {string.Join(", ", eventIds)}");
+                //_logger.WriteDebug($"FindEventsByNamedEvents: {logName} {string.Join(", ", eventIds)}");
 
-                foreach (var foundEvent in EventSearching.QueryLogsParallelForEach(logName, eventIds, machineNames)) {
+                foreach (var foundEvent in EventSearching.QueryLogsParallel(logName, eventIds, machineNames)) {
                     _logger.WriteDebug($"Found event: {foundEvent.Id} {foundEvent.LogName} {foundEvent.ComputerName}");
                     // yield return BuildTargetEvents(foundEvent, typeEventsList);
                     var targetEvent = BuildTargetEvents(foundEvent, typeEventsList);
