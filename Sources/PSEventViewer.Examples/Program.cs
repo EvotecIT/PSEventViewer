@@ -12,4 +12,13 @@ using PSEventViewer.Examples;
 //Examples.QueryBasicForwardedEvents();
 
 //Examples.FindEventsTargetedBasic();
-Examples.FindEventsTargetedPerType();
+//Examples.FindEventsTargetedPerType();
+
+var eventSearching = new EventSearching();
+eventSearching.Verbose = true;
+List<string> MachineName = new List<string> { "AD1", "AD2", "AD0" };
+string LogName = "Security";
+List<int> EventId = new List<int>() { 5136 };
+
+var queryTask = eventSearching.QueryLogParallel(MachineName, LogName, EventId);
+queryTask.GetAwaiter().GetResult();
