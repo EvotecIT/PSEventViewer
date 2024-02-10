@@ -3,8 +3,15 @@ using System.Collections.Generic;
 using System.Text;
 
 namespace PSEventViewer.Rules.ActiveDirectory {
-    public class ADOtherChangeDetailed : EventObjectSlim {
 
+    /// <summary>
+    /// Active Directory Other Change Detailed
+    /// 5136: A directory service object was modified
+    /// 5137: A directory service object was created
+    /// 5139: A directory service object was deleted
+    /// 5141: A directory service object was moved
+    /// </summary>
+    public class ADOtherChangeDetailed : EventObjectSlim {
 
         public string Computer;
         public string Action;
@@ -36,7 +43,5 @@ namespace PSEventViewer.Rules.ActiveDirectory {
             User = OverwriteByField(Action, "A directory service object was moved.", User, _eventObject.GetValueFromDataDictionary("OldObjectDN"));
             FieldValue = OverwriteByField(Action, "A directory service object was moved.", FieldValue, _eventObject.GetValueFromDataDictionary("NewObjectDN"));
         }
-
     }
-
 }
