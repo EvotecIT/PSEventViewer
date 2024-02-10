@@ -45,6 +45,19 @@ namespace PSEventViewer {
         }
 
         /// <summary>
+        /// Query a log for events based on EventRecordID
+        /// </summary>
+        /// <param name="logName"></param>
+        /// <param name="eventRecordId"></param>
+        /// <param name="maxEvents"></param>
+        /// <param name="machineName"></param>
+        /// <returns></returns>
+        public static IEnumerable<EventObject> QueryLog(string logName, List<long> eventRecordId, int maxEvents = 0, string machineName = null) {
+            return QueryLog(logName, eventRecordId: eventRecordId, maxEvents: maxEvents, machineName: machineName);
+        }
+
+
+        /// <summary>
         /// Query a log for events
         /// </summary>
         /// <param name="logName"></param>
@@ -57,11 +70,19 @@ namespace PSEventViewer {
         /// <param name="endTime"></param>
         /// <param name="userId"></param>
         /// <param name="maxEvents"></param>
+        /// <param name="eventRecordId"></param>
         /// <returns></returns>
-        public static IEnumerable<EventObject> QueryLog(string logName, List<int> eventIds = null, string machineName = null, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null, int maxEvents = 0) {
-            string queryString = BuildQueryString(eventIds, providerName, keywords, level, startTime, endTime, userId);
+        public static IEnumerable<EventObject> QueryLog(string logName, List<int> eventIds = null, string machineName = null, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null, int maxEvents = 0, List<long> eventRecordId = null) {
+            string queryString;
+            if (eventRecordId != null) {
+                // If eventRecordId is provided, query the log for the specific event record ID
+                queryString = BuildQueryString(eventRecordId);
+            } else {
+                // If eventRecordId is not provided, query the log for events based on the provided parameters
+                queryString = BuildQueryString(eventIds, providerName, keywords, level, startTime, endTime, userId);
+            }
 
-            _logger.WriteVerbose($"Querying log '{logName}' with query: {queryString}");
+            _logger.WriteVerbose($"Querying log '{logName}' on '{machineName} with query: {queryString}");
 
             EventLogQuery query = new EventLogQuery(logName, PathType.LogName, queryString);
             if (machineName != null) {
@@ -72,6 +93,8 @@ namespace PSEventViewer {
             // , but we still want to know the fully qualified domain name of the machine for logging purposes
             var queriedMachine = machineName ?? GetFQDN();
 
+            // We need to keep record not disposed to be able to access it after the using block
+            // Maybe there's a better way to do this
             EventRecord record;
             using (EventLogReader reader = CreateEventLogReader(query, machineName)) {
                 if (reader != null) {
@@ -90,13 +113,40 @@ namespace PSEventViewer {
             }
         }
 
+        /// <summary>
+        /// Build a query string for querying a log for a specific event record ID or IDs
+        /// </summary>
+        /// <param name="eventRecordIds"></param>
+        /// <returns></returns>
+        private static string BuildQueryString(List<long> eventRecordIds) {
+            if (eventRecordIds != null && eventRecordIds.Any()) {
+                return $"*[System[{string.Join(" or ", eventRecordIds.Select(id => $"EventRecordID={id}"))}]]";
+            } else {
+                return "*";
+            }
+        }
 
 
-        private static string BuildQueryString(List<int> eventIds, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null) {
+        /// <summary>
+        /// Build a query string for querying a log for events based on the provided parameters
+        /// </summary>
+        /// <param name="eventIds"></param>
+        /// <param name="providerName"></param>
+        /// <param name="keywords"></param>
+        /// <param name="level"></param>
+        /// <param name="startTime"></param>
+        /// <param name="endTime"></param>
+        /// <param name="userId"></param>
+        /// <returns></returns>
+        private static string BuildQueryString(List<int> eventIds = null, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null) {
             StringBuilder queryString = new StringBuilder();
 
             // Add event IDs to the query
-            queryString.AppendFormat("*[System[{0}]", string.Join(" or ", eventIds.Select(id => $"EventID={id}")));
+            if (eventIds != null && eventIds.Any()) {
+                queryString.AppendFormat("*[System[{0}]", string.Join(" or ", eventIds.Select(id => $"EventID={id}")));
+            } else {
+                queryString.Append("*[System[");
+            }
 
             // Add provider name to the query
             if (!string.IsNullOrEmpty(providerName)) {
@@ -128,27 +178,24 @@ namespace PSEventViewer {
             return queryString.ToString();
         }
 
-        public static IEnumerable<EventObject> QueryLogsParallel(string logName, List<int> eventIds = null, List<string> machineNames = null, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null, int maxEvents = 0, int maxThreads = 4) {
+        public static IEnumerable<EventObject> QueryLogsParallel(string logName, List<int> eventIds = null, List<string> machineNames = null, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null, int maxEvents = 0, int maxThreads = 4, List<long> eventRecordId = null) {
             if (machineNames == null || !machineNames.Any()) {
                 throw new ArgumentException("At least one machine name must be provided", nameof(machineNames));
             }
-
-            _logger.WriteVerbose("Querying logs in parallel");
-
             var semaphore = new SemaphoreSlim(maxThreads);
             var results = new BlockingCollection<EventObject>();
 
             _logger.WriteVerbose("Creating tasks for each machine: " + string.Join(", ", machineNames));
 
             var tasks = machineNames.Select(machineName => Task.Run(async () => {
-                _logger.WriteVerbose($"Starting task for machine: {machineName} logName: {logName} event ids: {eventIds}");
+                _logger.WriteVerbose($"Querying log on machine: {machineName}, logName: {logName}, event ids: " + string.Join(", ", eventIds));
                 await semaphore.WaitAsync();
                 try {
-                    var queryResults = QueryLog(logName, eventIds, machineName, providerName, keywords, level, startTime, endTime, userId, maxEvents);
+                    var queryResults = QueryLog(logName, eventIds, machineName, providerName, keywords, level, startTime, endTime, userId, maxEvents, eventRecordId);
                     foreach (var result in queryResults) {
                         results.Add(result);
                     }
-                    _logger.WriteVerbose("Finished task for machine: " + machineName);
+                    _logger.WriteVerbose("Querying log on machine: " + machineName + " completed.");
                 } finally {
                     semaphore.Release();
                 }
@@ -162,7 +209,7 @@ namespace PSEventViewer {
             return results.GetConsumingEnumerable();
         }
 
-        public static IEnumerable<EventObject> QueryLogsParallelForEach(string logName, List<int> eventIds = null, List<string> machineNames = null, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null, int maxEvents = 0, int maxThreads = 4) {
+        public static IEnumerable<EventObject> QueryLogsParallelForEach(string logName, List<int> eventIds = null, List<string> machineNames = null, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null, int maxEvents = 0, int maxThreads = 4, List<long> eventRecordId = null) {
             if (machineNames == null || !machineNames.Any()) {
                 throw new ArgumentException("At least one machine name must be provided", nameof(machineNames));
             }
@@ -173,7 +220,7 @@ namespace PSEventViewer {
             Task.Factory.StartNew(() => {
                 Parallel.ForEach(machineNames, options, machineName => {
                     _logger.WriteVerbose("Starting task for machine: " + machineName);
-                    var queryResults = QueryLog(logName, eventIds, machineName, providerName, keywords, level, startTime, endTime, userId, maxEvents);
+                    var queryResults = QueryLog(logName, eventIds, machineName, providerName, keywords, level, startTime, endTime, userId, maxEvents, eventRecordId);
                     foreach (var result in queryResults) {
                         results.Add(result);
                     }
