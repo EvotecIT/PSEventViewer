@@ -144,9 +144,11 @@ namespace PSEventViewer {
         /// <summary>
         /// Original event record
         /// </summary>
-        private readonly EventRecord _eventRecord;
+        public readonly EventRecord _eventRecord;
 
         public EventObject(EventRecord eventRecord, string queriedMachine) {
+
+
             QueriedMachine = queriedMachine;
             _eventRecord = eventRecord;
 
@@ -215,7 +217,7 @@ namespace PSEventViewer {
 
             if (eventData != null) {
                 // Add each data element to the dictionary
-                int noNameIndex = 1;
+                int noNameIndex = 0;
                 foreach (XElement dataElement in eventData.Elements()) {
                     string value = dataElement.Value;
                     string name = dataElement.Attribute("Name")?.Value;
