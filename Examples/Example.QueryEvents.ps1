@@ -1,4 +1,10 @@
 ﻿Clear-Host
-Import-Module .\PSEventViewer.psd1 -Force
+Import-Module $PSScriptRoot\..\PSEventViewer.psd1 -Force
 
-Find-WinEvent -LogName 'Security' -EventId 5136, 5137, 5168 -Verbose -MachineName 'AD1', 'AD2', 'AD0' -ParallelOption Parallel | Format-Table
+$EventId = @(
+    1..30
+    5136, 5137, 5168
+)
+
+$Output = Find-WinEvent -LogName 'Security' -EventId $EventId -Verbose -MachineName 'AD1', 'AD2', 'AD0' -ParallelOption Parallel
+$Output | Format-Table
