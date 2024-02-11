@@ -6,10 +6,10 @@ namespace PSEventViewer.Rules.ActiveDirectory {
     /// 4720: A user account was created
     /// 4738: A user account was changed
     /// </summary>
-    public class ADUserChange : EventObjectSlim {
+    public class ADUserCreateChange : EventObjectSlim {
         public string Computer;
         public string Action;
-        public string ObjectAffected;
+        public string UserAffected;
         public string SamAccountName;
         public string DisplayName;
         public string UserPrincipalName;
@@ -27,17 +27,18 @@ namespace PSEventViewer.Rules.ActiveDirectory {
         public string UserAccountControl;
         public string UserParameters;
         public string SidHistory;
+        public string LogonHours;
         public string Who;
         public DateTime When;
 
-        public ADUserChange(EventObject eventObject) : base(eventObject) {
+        public ADUserCreateChange(EventObject eventObject) : base(eventObject) {
             // main object initialization
             _eventObject = eventObject;
             // dedicated properties initialization
             Type = "ADUserChange";
             Computer = _eventObject.ComputerName;
             Action = _eventObject.MessageSubject;
-            ObjectAffected = _eventObject.GetValueFromDataDictionary("TargetUserName", "TargetDomainName", "\\", reverseOrder: true);
+            UserAffected = _eventObject.GetValueFromDataDictionary("TargetUserName", "TargetDomainName", "\\", reverseOrder: true);
             SamAccountName = _eventObject.GetValueFromDataDictionary("SamAccountName");
             DisplayName = _eventObject.GetValueFromDataDictionary("DisplayName");
             UserPrincipalName = _eventObject.GetValueFromDataDictionary("UserPrincipalName");
@@ -55,15 +56,21 @@ namespace PSEventViewer.Rules.ActiveDirectory {
             UserAccountControl = _eventObject.GetValueFromDataDictionary("UserAccountControl");
             UserParameters = _eventObject.GetValueFromDataDictionary("UserParameters");
             SidHistory = _eventObject.GetValueFromDataDictionary("SidHistory");
+            LogonHours = _eventObject.GetValueFromDataDictionary("LogonHours");
             Who = _eventObject.GetValueFromDataDictionary("SubjectUserName", "SubjectDomainName", "\\", reverseOrder: true);
             When = _eventObject.TimeCreated;
+
+            // let's try to translate them
+            OldUacValue = TranslateUacValue(OldUacValue);
+            NewUacValue = TranslateUacValue(NewUacValue);
+            UserAccountControl = TranslateUacValue(UserAccountControl);
         }
     }
 
     /// <summary>
     /// A user account was enabled, disabled, unlocked, password changed, password reset, or deleted
-    /// 4722: A user account was enabled
-    /// 4725: A user account was disabled
+    /// 4722: A user account was enabled (this includes computer accounts)
+    /// 4725: A user account was disabled (this includes computer accounts)
     /// 4767: A user account was unlocked
     /// 4723: An attempt was made to change an account's password
     /// 4724: An attempt was made to reset an account's password
