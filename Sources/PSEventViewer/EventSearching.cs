@@ -137,8 +137,10 @@ namespace PSEventViewer {
         /// <param name="startTime"></param>
         /// <param name="endTime"></param>
         /// <param name="userId"></param>
+        /// <param name="tasks"></param>
+        /// <param name="opcodes"></param>
         /// <returns></returns>
-        private static string BuildQueryString(List<int> eventIds = null, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null) {
+        private static string BuildQueryString(List<int> eventIds = null, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null, List<int> tasks = null, List<int> opcodes = null) {
             StringBuilder queryString = new StringBuilder();
 
             queryString.Append("<QueryList><Query Id='0' Path='Security'><Select Path='Security'>*[System[");
@@ -161,6 +163,16 @@ namespace PSEventViewer {
             // Add level to the query
             if (level.HasValue) {
                 queryString.AppendFormat(" and Level={0}", (int)level.Value);
+            }
+
+            // Add tasks to the query
+            if (tasks != null && tasks.Any()) {
+                queryString.Append(" and (" + string.Join(" or ", tasks.Select(task => $"Task={task}")) + ")");
+            }
+
+            // Add opcodes to the query
+            if (opcodes != null && opcodes.Any()) {
+                queryString.Append(" and (" + string.Join(" or ", opcodes.Select(opcode => $"Opcode={opcode}")) + ")");
             }
 
             // Add time range to the query
