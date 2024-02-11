@@ -41,62 +41,6 @@ namespace PSEventViewer {
     }
 
     public class EventSearchingTargeted : Settings {
-        //public static EventObjectSlim BuildTargetEvents(EventObject eventObject) {
-        //    switch (eventObject.LogName) {
-        //        case "Security":
-        //            switch (eventObject.Id) {
-        //                case 4720:
-        //                case 4738:
-        //                    return new ADUserChange(eventObject); // Includes users added or modified in Active Directory
-        //                case 4722:
-        //                case 4725:
-        //                //case 4767:
-        //                case 4723:
-        //                case 4724:
-        //                case 4726:
-        //                    return new ADUserStatus(eventObject);
-        //                case 5136:
-        //                case 5137:
-        //                case 5139:
-        //                case 5141:
-        //                    if (eventObject.Data["ObjectClass"] == "user") {
-        //                        return new ADUserChangeDetailed(eventObject);
-        //                    } else if (eventObject.Data["ObjectClass"] == "computer") {
-        //                        return new ADComputerChangeDetailed(eventObject);
-        //                    } else if (eventObject.Data["ObjectClass"] == "organizationalUnit") {
-        //                        return new ADOrganizationalUnitChangeDetailed(eventObject);
-        //                    } else {
-        //                        return new ADOtherChangeDetailed(eventObject);
-        //                    }
-        //                case 4740:
-        //                    return new ADUserLockouts(eventObject);
-        //                case 4624:
-        //                    return new ADUserLogon(eventObject);
-        //                case 4767:
-        //                    // both support the same
-        //                    //return new ADUserStatus(eventObject);
-        //                    return new ADUserUnlocked(eventObject);
-        //                default:
-        //                    throw new ArgumentException("Invalid EventID for Security LogName");
-        //            }
-        //        case "Application":
-        //            // Handle Application LogName here
-        //            break;
-        //        case "System":
-        //            // Handle System LogName here
-        //            break;
-        //        case "Setup":
-        //            // Handle Setup LogName here
-        //            break;
-        //        case "Directory Service":
-        //            // Handle Directory Service LogName here
-        //            break;
-        //        default:
-        //            throw new ArgumentException("Invalid LogName");
-        //    }
-        //    return null;
-        //}
-
         public static EventObjectSlim BuildTargetEvents(EventObject eventObject, List<NamedEvents> typeEventsList) {
             // Check if the event ID and log name match any of the NamedEvents values
             foreach (var typeEvents in typeEventsList) {
