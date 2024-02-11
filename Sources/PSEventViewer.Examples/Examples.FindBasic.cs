@@ -33,7 +33,7 @@ namespace PSEventViewer.Examples {
             EventSearchingTargeted eventSearching = new EventSearchingTargeted(internalLogger);
             eventSearching.Verbose = true;
 
-            List<NamedEvents> Type = new List<NamedEvents> { NamedEvents.ADLdapBindingDetails };
+            List<NamedEvents> Type = new List<NamedEvents> { NamedEvents.ADLdapBindingDetails, NamedEvents.ADLdapBindingSummary };
             foreach (var foundObject in EventSearchingTargeted.FindEventsByNamedEvents(Type, MachineName)) {
                 // Check if the foundObject is of type ADComputerChangeDetailed
 
