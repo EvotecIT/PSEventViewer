@@ -1,8 +1,10 @@
 ﻿using PSEventViewer.Rules.ActiveDirectory;
 using PSEventViewer.Rules.Logs;
+using PSEventViewer.Rules.Windows;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using PSEventViewer.Rules.Windows;
 
 namespace PSEventViewer {
 
@@ -24,6 +26,7 @@ namespace PSEventViewer {
         ADUserChangeDetailed,
         ADUserLockouts,
         ADUserLogon,
+        ADUserLogonKerberos,
         ADUserUnlocked,
         ADOrganizationalUnitChangeDetailed,
         ADOtherChangeDetailed,
@@ -32,7 +35,10 @@ namespace PSEventViewer {
         LogsClearedOther,
         LogsFullSecurity,
 
-        NetworkAccessAuthenticationPolicy
+        NetworkAccessAuthenticationPolicy,
+
+        OSCrash,
+        OSStartupShutdownCrash,
     }
 
     public class EventSearchingTargeted : Settings {
@@ -174,6 +180,8 @@ namespace PSEventViewer {
                             return new LogsClearedSecurity(eventObject);
                         case NamedEvents.LogsClearedOther:
                             return new LogsClearedOther(eventObject);
+                        case NamedEvents.OSCrash:
+                            return new OSCrash(eventObject);
                         default:
                             throw new ArgumentException($"Invalid NamedEvents value: {typeEvents}");
                     }
@@ -203,6 +211,7 @@ namespace PSEventViewer {
             { NamedEvents.ADOrganizationalUnitChangeDetailed, (new List<int> { 5136, 5137, 5139, 5141 }, "Security") },
             { NamedEvents.ADUserLockouts, (new List<int> { 4740 }, "Security") },
             { NamedEvents.ADUserLogon, (new List<int> { 4624 }, "Security") },
+            { NamedEvents.ADUserLogonKerberos, (new List<int> { 4768 }, "Security") },
             { NamedEvents.ADUserUnlocked, (new List<int> { 4767 }, "Security") },
             // other based events
             { NamedEvents.ADOtherChangeDetailed, (new List<int> { 5136, 5137, 5139, 5141 }, "Security") },
@@ -214,7 +223,10 @@ namespace PSEventViewer {
             { NamedEvents.LogsClearedOther,(new List<int> { 104 }, "System") },
             { NamedEvents.LogsFullSecurity, (new List<int> { 1104  }, "Security") },
             // network access
-            { NamedEvents.NetworkAccessAuthenticationPolicy,  (new List<int> { 6272, 6273 }, "Security") },
+            { NamedEvents.NetworkAccessAuthenticationPolicy, (new List<int> { 6272, 6273 }, "Security") },
+            // windows OS
+            { NamedEvents.OSCrash, (new List<int> { 6008 }, "System") },
+            { NamedEvents.OSStartupShutdownCrash,  (new List<int> { 12, 13, 41, 4608, 4621, 6008 }, "System") },
         };
 
         public EventSearchingTargeted(InternalLogger internalLogger) {
@@ -325,8 +337,6 @@ namespace PSEventViewer {
             foreach (var kvp in eventInfoDict) {
                 var logName = kvp.Key;
                 var eventIds = kvp.Value.ToList();
-
-                //_logger.WriteDebug($"FindEventsByNamedEvents: {logName} {string.Join(", ", eventIds)}");
 
                 foreach (var foundEvent in EventSearching.QueryLogsParallel(logName, eventIds, machineNames)) {
                     _logger.WriteDebug($"Found event: {foundEvent.Id} {foundEvent.LogName} {foundEvent.ComputerName}");
