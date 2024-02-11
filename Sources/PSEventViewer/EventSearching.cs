@@ -3,7 +3,6 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics.Eventing.Reader;
 using System.Linq;
-using System.Net.NetworkInformation;
 using System.Net;
 using System.Text;
 using System.Threading;
@@ -66,7 +65,14 @@ namespace PSEventViewer {
         /// <param name="maxEvents"></param>
         /// <param name="eventRecordId"></param>
         /// <returns></returns>
-        public static IEnumerable<EventObject> QueryLog(string logName, List<int> eventIds = null, string machineName = null, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null, int maxEvents = 0, List<long> eventRecordId = null) {
+        public static IEnumerable<EventObject> QueryLog(string logName, List<int> eventIds = null, string machineName = null, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null, int maxEvents = 0, List<long> eventRecordId = null, TimePeriod? timePeriod = null) {
+            if (timePeriod.HasValue) {
+                var times = TimeHelper.GetTimePeriod(timePeriod.Value);
+                startTime = times.StartTime;
+                endTime = times.EndTime;
+                _logger.WriteVerbose("Time period: " + timePeriod + ", time start: " + startTime + ", time end: " + endTime);
+            }
+
             string queryString;
             if (eventRecordId != null) {
                 // If eventRecordId is provided, query the log for the specific event record ID
@@ -160,6 +166,10 @@ namespace PSEventViewer {
             // Add time range to the query
             if (startTime.HasValue && endTime.HasValue) {
                 queryString.AppendFormat(" and TimeCreated[@SystemTime>='{0:O}' and @SystemTime<='{1:O}']", startTime.Value, endTime.Value);
+            } else if (startTime.HasValue) {
+                queryString.AppendFormat(" and TimeCreated[@SystemTime>='{0:O}']", startTime.Value);
+            } else if (endTime.HasValue) {
+                queryString.AppendFormat(" and TimeCreated[@SystemTime<='{0:O}']", endTime.Value);
             }
 
             // Add user ID to the query
@@ -172,7 +182,7 @@ namespace PSEventViewer {
             return queryString.ToString();
         }
 
-        public static IEnumerable<EventObject> QueryLogsParallel(string logName, List<int> eventIds = null, List<string> machineNames = null, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null, int maxEvents = 0, int maxThreads = 4, List<long> eventRecordId = null) {
+        public static IEnumerable<EventObject> QueryLogsParallel(string logName, List<int> eventIds = null, List<string> machineNames = null, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null, int maxEvents = 0, int maxThreads = 8, List<long> eventRecordId = null, TimePeriod? timePeriod = null) {
             if (machineNames == null || !machineNames.Any()) {
                 machineNames = new List<string> { null };
             }
@@ -190,7 +200,7 @@ namespace PSEventViewer {
                         .ToList();
 
                     foreach (var chunk in eventIdsChunks) {
-                        tasks.Add(CreateTask(machineName, logName, chunk, providerName, keywords, level, startTime, endTime, userId, maxEvents, semaphore, results));
+                        tasks.Add(CreateTask(machineName, logName, chunk, providerName, keywords, level, startTime, endTime, userId, maxEvents, semaphore, results, timePeriod: timePeriod));
                     }
                 }
 
@@ -201,7 +211,7 @@ namespace PSEventViewer {
                         .ToList();
 
                     foreach (var chunk in eventRecordIdChunks) {
-                        tasks.Add(CreateTask(machineName, logName, null, providerName, keywords, level, startTime, endTime, userId, maxEvents, semaphore, results, chunk));
+                        tasks.Add(CreateTask(machineName, logName, null, providerName, keywords, level, startTime, endTime, userId, maxEvents, semaphore, results, chunk, timePeriod: timePeriod));
                     }
                 }
             }
@@ -214,12 +224,12 @@ namespace PSEventViewer {
             return results.GetConsumingEnumerable();
         }
 
-        private static Task CreateTask(string machineName, string logName, List<int> eventIds, string providerName, Keywords? keywords, Level? level, DateTime? startTime, DateTime? endTime, string userId, int maxEvents, SemaphoreSlim semaphore, BlockingCollection<EventObject> results, List<long> eventRecordId = null) {
+        private static Task CreateTask(string machineName, string logName, List<int> eventIds, string providerName, Keywords? keywords, Level? level, DateTime? startTime, DateTime? endTime, string userId, int maxEvents, SemaphoreSlim semaphore, BlockingCollection<EventObject> results, List<long> eventRecordId = null, TimePeriod? timePeriod = null) {
             return Task.Run(async () => {
                 _logger.WriteVerbose($"Querying log on machine: {machineName}, logName: {logName}, event ids: " + string.Join(", ", eventIds ?? new List<int>()));
                 await semaphore.WaitAsync();
                 try {
-                    var queryResults = QueryLog(logName, eventIds, machineName, providerName, keywords, level, startTime, endTime, userId, maxEvents, eventRecordId);
+                    var queryResults = QueryLog(logName, eventIds, machineName, providerName, keywords, level, startTime, endTime, userId, maxEvents, eventRecordId, timePeriod);
                     foreach (var result in queryResults) {
                         results.Add(result);
                     }
