@@ -8,9 +8,7 @@ using System.Xml.Linq;
 namespace PSEventViewer {
     public enum ParallelOption {
         Disabled,
-        Parallel,
-        //ParallelForEachBuiltin,
-        //ParallelForEach,
+        Parallel
     }
 
     public enum Level {

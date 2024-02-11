@@ -4,7 +4,6 @@ using PSEventViewer.Rules.Windows;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using PSEventViewer.Rules.Windows;
 
 namespace PSEventViewer {
 
@@ -234,83 +233,6 @@ namespace PSEventViewer {
                 _logger = internalLogger;
             }
         }
-
-
-        //public static IEnumerable<EventObjectSlim> FindEvents(List<string> machineNames, NamedEvents typeEvents) {
-        //    List<int> eventIds = new List<int> { 4720, 4738, 4722, 4725, 4767, 4723, 4724, 4726, 5136, 5139, 5141 };
-
-        //    foreach (var foundEvent in EventSearching.QueryLogsParallel("Security", eventIds, machineNames)) {
-        //        yield return BuildTargetEvents(foundEvent);
-        //    }
-        //}
-
-
-        //public static IEnumerable<EventObjectSlim> FindEvents() {
-        //    List<int> eventIds = new List<int> { 4720, 4738, 4722, 4725, 4767, 4723, 4724, 4726, 5136, 5139, 5141 };
-        //    List<string> machineNames = new List<string> { "AD0", "AD1" };
-        //    foreach (var foundEvent in EventSearching.QueryLogsParallel("Security", eventIds, machineNames)) {
-        //        yield return BuildTargetEvents(foundEvent);
-        //    }
-        //}
-
-        //public static async Task<List<EventObjectSlim>> FindEventsByNamedEvents(List<string> machineNames, List<NamedEvents> typeEventsList) {
-        //    var eventInfoDict = new Dictionary<string, HashSet<int>>();
-        //    var results = new ConcurrentBag<EventObjectSlim>(); // Thread-safe collection for storing results
-
-
-        //    foreach (var typeEvents in typeEventsList) {
-        //        if (!eventIdsMap.TryGetValue(typeEvents, out var eventInfo)) {
-        //            throw new ArgumentException($"Invalid typeEvents value: {typeEvents}");
-        //        }
-
-        //        if (!eventInfoDict.TryGetValue(eventInfo.LogName, out var eventIds)) {
-        //            eventIds = new HashSet<int>();
-        //            eventInfoDict[eventInfo.LogName] = eventIds;
-        //        }
-
-        //        foreach (var eventId in eventInfo.EventIds) {
-        //            eventIds.Add(eventId);
-        //        }
-        //    }
-
-        //    CancellationTokenSource cts = new CancellationTokenSource();
-        //    int maxDegreeOfParallelism = 8; // Adjust this value as needed
-        //    SemaphoreSlim semaphore = new SemaphoreSlim(maxDegreeOfParallelism);
-
-        //    List<Task> tasks = new List<Task>();
-
-        //    foreach (var kvp in eventInfoDict) {
-        //        var logName = kvp.Key;
-        //        var eventIds = kvp.Value.ToList();
-
-        //        _logger.WriteDebug($"FindEventsByNamedEvents: {logName} {string.Join(", ", eventIds)}");
-
-        //        foreach (var machineName in machineNames) {
-        //            await semaphore.WaitAsync(cts.Token);
-        //            tasks.Add(Task.Run(async () => {
-        //                try {
-        //                    if (cts.IsCancellationRequested) {
-        //                        semaphore.Release();
-        //                        return;
-        //                    }
-
-        //                    foreach (var foundEvent in EventSearching.QueryLog(logName, eventIds, machineName)) {
-        //                        _logger.WriteDebug($"Found event: {foundEvent.Id} {foundEvent.LogName} {foundEvent.ComputerName}");
-        //                        var targetEvent = BuildTargetEvents(foundEvent, typeEventsList);
-        //                        if (targetEvent != null) {
-        //                            results.Add(targetEvent);
-        //                        }
-        //                    }
-        //                } finally {
-        //                    semaphore.Release();
-        //                }
-        //            }, cts.Token));
-        //        }
-        //    }
-
-        //    await Task.WhenAll(tasks);
-        //    return results.ToList(); // Convert the ConcurrentBag to a List and return it
-        //}
 
         public static IEnumerable<EventObjectSlim> FindEventsByNamedEvents(List<NamedEvents> typeEventsList, List<string> machineNames = null) {
             // Create a dictionary to store unique event IDs and log names

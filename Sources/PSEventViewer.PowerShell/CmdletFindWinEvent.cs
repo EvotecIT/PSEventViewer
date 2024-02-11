@@ -2,8 +2,6 @@
 using System;
 using System.Management.Automation;
 using System.Threading.Tasks;
-using System.Collections;
-using System.Management.Automation.Language;
 using System.Linq;
 
 namespace PSEventViewer.PowerShell {
@@ -43,11 +41,6 @@ namespace PSEventViewer.PowerShell {
         [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
         public ParallelOption ParallelOption { get; set; } = ParallelOption.Parallel;
 
-        //[Parameter(Mandatory = true, ParameterSetName = "NamedEvents")]
-        //[ArgumentCompleter(typeof(NamedEventsCompleter))] public string[] Type;
-        //[Parameter(Mandatory = true, ParameterSetName = "NamedEvents")] public string[] Type;
-        //[Parameter(Mandatory = true, ParameterSetName = "NamedEvents")] public List<NamedEvents> Type;
-
         [Parameter(Mandatory = true, ParameterSetName = "NamedEvents")] public NamedEvents[] Type;
 
         protected override Task BeginProcessingAsync() {
@@ -60,13 +53,12 @@ namespace PSEventViewer.PowerShell {
         protected override Task ProcessRecordAsync() {
             if (Type != null) {
                 // let's find the events prepared for search
-                //var types = ParseNamedEvents(Type);
                 List<NamedEvents> typeList = Type.ToList();
                 foreach (var eventObject in EventSearchingTargeted.FindEventsByNamedEvents(typeList, MachineName)) {
                     WriteObject(eventObject);
                 }
             } else {
-                // Lets find the events by generic log name, event id, machine name, provider name, keywords, level, start time, end time, user id, and max events.
+                // Let's find the events by generic log name, event id, machine name, provider name, keywords, level, start time, end time, user id, and max events.
                 if (ParallelOption == ParallelOption.Disabled) {
                     if (MachineName == null) {
                         foreach (var eventObject in EventSearching.QueryLog(LogName, EventId, null, ProviderName, Keywords, Level, StartTime, EndTime, UserId, MaxEvents, EventRecordId)) {
@@ -84,51 +76,9 @@ namespace PSEventViewer.PowerShell {
                         WriteObject(eventObject);
                     }
                 }
-                //else if (Mode == Modes.ParallelForEach) {
-                //    var options = new ParallelOptions { MaxDegreeOfParallelism = NumberOfThreads };
-                //    Parallel.ForEach(MachineName, options, machine => {
-                //        foreach (var eventObject in EventSearching.QueryLog(LogName, EventId, machine, ProviderName, Keywords, Level, StartTime, EndTime, UserId, MaxEvents, EventRecordId)) {
-                //            WriteObject(eventObject);
-                //        }
-                //    });
-                //} else if (Mode == Modes.ParallelForEachBuiltin) {
-                //    foreach (var eventObject in EventSearching.QueryLogsParallelForEach(LogName, EventId, MachineName, ProviderName, Keywords, Level, StartTime, EndTime, UserId, MaxEvents, NumberOfThreads)) {
-                //        WriteObject(eventObject);
-                //    }
-                //}
             }
 
             return Task.CompletedTask;
         }
-
-        ///// <summary>
-        ///// Parses string to NamedEvents
-        ///// </summary>
-        ///// <param name="typeStrings"></param>
-        ///// <returns></returns>
-        //private List<NamedEvents> ParseNamedEvents(string[] typeStrings) {
-        //    var namedEvents = new List<NamedEvents>();
-        //    foreach (var typeString in typeStrings) {
-        //        if (Enum.TryParse(typeString, out NamedEvents namedEvent)) {
-        //            namedEvents.Add(namedEvent);
-        //        } else {
-        //            // Handle invalid values here
-        //        }
-        //    }
-        //    return namedEvents;
-        //}
-
-        ///// <summary>
-        ///// Provides auto-completion for NamedEvents from strings
-        ///// </summary>
-        //public class NamedEventsCompleter : IArgumentCompleter {
-        //    public IEnumerable<CompletionResult> CompleteArgument(string commandName, string parameterName, string wordToComplete, CommandAst commandAst, IDictionary fakeBoundParameters) {
-        //        foreach (var namedEvent in Enum.GetNames(typeof(NamedEvents))) {
-        //            if (namedEvent.StartsWith(wordToComplete, StringComparison.OrdinalIgnoreCase)) {
-        //                yield return new CompletionResult(namedEvent);
-        //            }
-        //        }
-        //    }
-        //}
     }
 }

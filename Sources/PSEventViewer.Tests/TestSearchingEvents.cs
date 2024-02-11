@@ -1,3 +1,5 @@
+global using Xunit;
+
 namespace PSEventViewer.Tests {
     public class TestSearchingEvents {
         [Fact]
