@@ -141,11 +141,11 @@ namespace PSEventViewer {
         private static string BuildQueryString(List<int> eventIds = null, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null) {
             StringBuilder queryString = new StringBuilder();
 
+            queryString.Append("<QueryList><Query Id='0' Path='Security'><Select Path='Security'>*[System[");
+
             // Add event IDs to the query
             if (eventIds != null && eventIds.Any()) {
-                queryString.AppendFormat("*[System[{0}]", string.Join(" or ", eventIds.Select(id => $"EventID={id}")));
-            } else {
-                queryString.Append("*[System[");
+                queryString.Append("(" + string.Join(" or ", eventIds.Select(id => $"EventID={id}")) + ")");
             }
 
             // Add provider name to the query
@@ -165,11 +165,11 @@ namespace PSEventViewer {
 
             // Add time range to the query
             if (startTime.HasValue && endTime.HasValue) {
-                queryString.AppendFormat(" and TimeCreated[@SystemTime>='{0:O}' and @SystemTime<='{1:O}']", startTime.Value, endTime.Value);
+                queryString.AppendFormat(" and TimeCreated[@SystemTime&gt;='{0:s}Z' and @SystemTime&lt;='{1:s}Z']", startTime.Value.ToString("s"), endTime.Value.ToString("s"));
             } else if (startTime.HasValue) {
-                queryString.AppendFormat(" and TimeCreated[@SystemTime>='{0:O}']", startTime.Value);
+                queryString.AppendFormat(" and TimeCreated[@SystemTime&gt;='{0:s}Z']", startTime.Value.ToString("s"));
             } else if (endTime.HasValue) {
-                queryString.AppendFormat(" and TimeCreated[@SystemTime<='{0:O}']", endTime.Value);
+                queryString.AppendFormat(" and TimeCreated[@SystemTime&lt;='{0:s}Z']", endTime.Value.ToString("s"));
             }
 
             // Add user ID to the query
@@ -177,10 +177,11 @@ namespace PSEventViewer {
                 queryString.AppendFormat(" and Security[@UserID='{0}']", userId);
             }
 
-            queryString.Append("]");
+            queryString.Append("]]</Select></Query></QueryList>");
 
             return queryString.ToString();
         }
+
 
         public static IEnumerable<EventObject> QueryLogsParallel(string logName, List<int> eventIds = null, List<string> machineNames = null, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null, int maxEvents = 0, int maxThreads = 8, List<long> eventRecordId = null, TimePeriod? timePeriod = null) {
             if (machineNames == null || !machineNames.Any()) {
