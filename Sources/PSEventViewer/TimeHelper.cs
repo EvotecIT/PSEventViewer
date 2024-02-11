@@ -30,7 +30,7 @@ namespace PSEventViewer {
 
     internal static class TimeHelper {
         internal static (DateTime? StartTime, DateTime? EndTime) GetTimePeriod(TimePeriod timePeriod) {
-            DateTime now = DateTime.Now;
+            DateTime now = DateTime.UtcNow;
             DateTime? startTime = null;
             DateTime? endTime = null;
 
