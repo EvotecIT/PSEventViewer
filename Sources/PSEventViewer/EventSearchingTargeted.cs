@@ -178,7 +178,7 @@ namespace PSEventViewer {
             }
         }
 
-        public static IEnumerable<EventObjectSlim> FindEventsByNamedEvents(List<NamedEvents> typeEventsList, List<string> machineNames = null) {
+        public static IEnumerable<EventObjectSlim> FindEventsByNamedEvents(List<NamedEvents> typeEventsList, List<string> machineNames = null, DateTime? startTime = null, DateTime? endTime = null, TimePeriod? timePeriod = null, int maxThreads = 8, int maxEvents = 0) {
             // Create a dictionary to store unique event IDs and log names
             var eventInfoDict = new Dictionary<string, HashSet<int>>();
 
@@ -204,7 +204,7 @@ namespace PSEventViewer {
                 var logName = kvp.Key;
                 var eventIds = kvp.Value.ToList();
 
-                foreach (var foundEvent in EventSearching.QueryLogsParallel(logName, eventIds, machineNames)) {
+                foreach (var foundEvent in EventSearching.QueryLogsParallel(logName, eventIds, machineNames, startTime: startTime, endTime: endTime, timePeriod: timePeriod, maxThreads: maxThreads, maxEvents: maxEvents)) {
                     _logger.WriteDebug($"Found event: {foundEvent.Id} {foundEvent.LogName} {foundEvent.ComputerName}");
                     // yield return BuildTargetEvents(foundEvent, typeEventsList);
                     var targetEvent = BuildTargetEvents(foundEvent, typeEventsList);
