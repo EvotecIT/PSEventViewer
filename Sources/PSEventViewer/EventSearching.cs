@@ -133,6 +133,7 @@ namespace PSEventViewer {
         /// <param name="userId"></param>
         /// <param name="tasks"></param>
         /// <param name="opcodes"></param>
+        /// <param name="timePeriod"></param>
         /// <returns></returns>
         private static string BuildQueryString(string logName, List<int> eventIds = null, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null, List<int> tasks = null, List<int> opcodes = null, TimePeriod? timePeriod = null) {
             TimeSpan? lastPeriod = null;
@@ -194,6 +195,12 @@ namespace PSEventViewer {
                 queryString.AppendFormat(" and Security[@UserID='{0}']", userId);
             }
 
+            // Check if any conditions were added to the query
+            if (queryString.ToString() == $"<QueryList><Query Id='0' Path='{logName}'><Select Path='{logName}'>*[System[") {
+                // If no conditions were added, return a query that selects all events
+                queryString.Append("*");
+            }
+
             queryString.Append("]]</Select></Query></QueryList>");
 
             return queryString.ToString();
@@ -203,11 +210,12 @@ namespace PSEventViewer {
         public static IEnumerable<EventObject> QueryLogsParallel(string logName, List<int> eventIds = null, List<string> machineNames = null, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null, int maxEvents = 0, int maxThreads = 8, List<long> eventRecordId = null, TimePeriod? timePeriod = null) {
             if (machineNames == null || !machineNames.Any()) {
                 machineNames = new List<string> { null };
+                _logger.WriteVerbose("No machine names provided, querying the local machine.");
+            } else {
+                _logger.WriteVerbose("Machine names provided. Creating tasks for each machine on the list: " + string.Join(", ", machineNames));
             }
             var semaphore = new SemaphoreSlim(maxThreads);
             var results = new BlockingCollection<EventObject>();
-
-            _logger.WriteVerbose("Creating tasks for each machine: " + string.Join(", ", machineNames));
 
             var tasks = new List<Task>();
             foreach (var machineName in machineNames) {
@@ -220,9 +228,7 @@ namespace PSEventViewer {
                     foreach (var chunk in eventIdsChunks) {
                         tasks.Add(CreateTask(machineName, logName, chunk, providerName, keywords, level, startTime, endTime, userId, maxEvents, semaphore, results, timePeriod: timePeriod));
                     }
-                }
-
-                if (eventRecordId != null) {
+                } else if (eventRecordId != null) {
                     var eventRecordIdChunks = eventRecordId.Select((x, i) => new { Index = i, Value = x })
                         .GroupBy(x => x.Index / 22)
                         .Select(x => x.Select(v => v.Value).ToList())
@@ -231,6 +237,9 @@ namespace PSEventViewer {
                     foreach (var chunk in eventRecordIdChunks) {
                         tasks.Add(CreateTask(machineName, logName, null, providerName, keywords, level, startTime, endTime, userId, maxEvents, semaphore, results, chunk, timePeriod: timePeriod));
                     }
+                } else {
+                    // event ids are null, so we don't need to chunk them
+                    tasks.Add(CreateTask(machineName, logName, eventIds, providerName, keywords, level, startTime, endTime, userId, maxEvents, semaphore, results, timePeriod: timePeriod));
                 }
             }
 
