@@ -16,4 +16,6 @@ using PSEventViewer.Examples;
 
 //Examples.QueryWithTasks();
 
-Examples.FindEventsTargetedPerType();
+//Examples.FindEventsTargetedPerType();
+
+Examples.QueryBasicEventLogList();
