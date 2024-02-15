@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 namespace PSEventViewer.PowerShell {
     [Cmdlet(VerbsLifecycle.Start, "EventWatching")]
     public sealed class CmdletStartEventWatching : AsyncPSCmdlet {
-        private EventWatching EventWatching { get; set; }
+        private WatchEvents EventWatching { get; set; }
 
         [Parameter(Mandatory = false, Position = 1)] public int NumberOfThreads { get; set; } = 8;
 
@@ -13,7 +13,7 @@ namespace PSEventViewer.PowerShell {
             var internalLogger = new InternalLogger(false);
             var internalLoggerPowerShell = new InternalLoggerPowerShell(internalLogger, this.WriteVerbose, this.WriteWarning, this.WriteDebug, this.WriteError, this.WriteProgress, this.WriteInformation);
 
-            EventWatching = new EventWatching(internalLogger) {
+            EventWatching = new WatchEvents(internalLogger) {
                 NumberOfThreads = NumberOfThreads
             };
             return Task.CompletedTask;
