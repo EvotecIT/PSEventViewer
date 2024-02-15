@@ -9,7 +9,7 @@ namespace PSEventViewer.Examples {
     internal partial class Examples {
 
         public static void QueryParallelSpeed() {
-            var eventSearching = new EventSearching {
+            var eventSearching = new SearchEvents {
                 Verbose = true,
                 Warning = true,
                 Error = true,
@@ -21,14 +21,14 @@ namespace PSEventViewer.Examples {
             var eventIds = new List<int> { 4932, 4933 }; // Add your event IDs here
 
             Parallel.ForEach(machineNames, machine => {
-                foreach (var eventObject in EventSearching.QueryLog("Security", eventIds, machine)) {
+                foreach (var eventObject in SearchEvents.QueryLog("Security", eventIds, machine)) {
 
                 }
             });
         }
 
         public static void QueryParallelCompare() {
-            var eventSearching = new EventSearching {
+            var eventSearching = new SearchEvents {
                 Verbose = true,
                 Warning = true,
                 Error = true,
@@ -41,7 +41,7 @@ namespace PSEventViewer.Examples {
             var stopwatch = Stopwatch.StartNew();
             int eventCount1 = 0;
             Parallel.ForEach(machineNames, machine => {
-                foreach (var eventObject in EventSearching.QueryLog("Security", eventIds, machine)) {
+                foreach (var eventObject in SearchEvents.QueryLog("Security", eventIds, machine)) {
                     eventCount1++;
                 }
             });
@@ -50,7 +50,7 @@ namespace PSEventViewer.Examples {
 
             stopwatch.Restart();
             int eventCount2 = 0;
-            foreach (var eventObject in EventSearching.QueryLogsParallel("Security", eventIds, machineNames)) {
+            foreach (var eventObject in SearchEvents.QueryLogsParallel("Security", eventIds, machineNames)) {
                 eventCount2++;
             }
             stopwatch.Stop();
@@ -58,7 +58,7 @@ namespace PSEventViewer.Examples {
 
             stopwatch.Restart();
             int eventCount3 = 0;
-            foreach (var eventObject in EventSearching.QueryLogsParallelForEach("Security", eventIds, machineNames)) {
+            foreach (var eventObject in SearchEvents.QueryLogsParallelForEach("Security", eventIds, machineNames)) {
                 eventCount3++;
             }
             stopwatch.Stop();

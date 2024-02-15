@@ -8,7 +8,7 @@ namespace PSEventViewer.Examples {
     internal partial class Examples {
 
         public static void EventWatchingBasic() {
-            EventWatching c1 = new EventWatching {
+            WatchEvents c1 = new WatchEvents {
                 Warning = true,
                 Verbose = true
             };

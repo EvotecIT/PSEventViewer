@@ -8,7 +8,7 @@ namespace PSEventViewer.Examples {
     internal partial class Examples {
 
         public static void QueryParallelWithCount() {
-            var eventSearching = new EventSearching {
+            var eventSearching = new SearchEvents {
                 Verbose = true,
                 Warning = true,
                 Error = true,
@@ -22,7 +22,7 @@ namespace PSEventViewer.Examples {
             // Initialize a dictionary to keep track of the number of events per server
             var eventCounts = new Dictionary<string, int>();
 
-            foreach (var eventObject in EventSearching.QueryLogsParallel("Security", eventIds, machineNames)) {
+            foreach (var eventObject in SearchEvents.QueryLogsParallel("Security", eventIds, machineNames)) {
                 // If the server is not yet in the dictionary, add it with a count of 1
                 if (!eventCounts.ContainsKey(eventObject.ComputerName)) {
                     eventCounts[eventObject.ComputerName] = 1;
