@@ -6,7 +6,7 @@ using System.Linq;
 using System.Threading;
 
 namespace PSEventViewer {
-    public class EventWatching : Settings {
+    public class WatchEvents : Settings {
         public static volatile int NumberOfEventsFound = 0;
         /// <summary>
         /// List of event IDs to watch for
@@ -20,7 +20,7 @@ namespace PSEventViewer {
 
         private string _machineName;
 
-        public EventWatching(InternalLogger internalLogger = null) {
+        public WatchEvents(InternalLogger internalLogger = null) {
             if (internalLogger != null) {
                 _logger = internalLogger;
             }
