@@ -9,12 +9,12 @@ using System.Threading;
 using System.Threading.Tasks;
 
 namespace PSEventViewer {
-    public class EventSearching : Settings {
+    public partial class SearchEvents : Settings {
         /// <summary>
         /// Initialize the EventSearching class with an internal logger
         /// </summary>
         /// <param name="internalLogger"></param>
-        public EventSearching(InternalLogger internalLogger = null) {
+        public SearchEvents(InternalLogger internalLogger = null) {
             if (internalLogger != null) {
                 _logger = internalLogger;
             }
