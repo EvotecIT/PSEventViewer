@@ -1,19 +1,38 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Text;
 
 namespace PSEventViewer {
     public partial class SearchEvents : Settings {
+
+        /// <summary>
+        /// Writes to EventLog, with optional replacement strings, but no raw data.
+        /// </summary>
+        /// <param name="source">The source.</param>
+        /// <param name="log">The log.</param>
+        /// <param name="message">The message.</param>
+        /// <param name="type">The type.</param>
+        /// <param name="eventId">The event identifier.</param>
+        /// <param name="machineName">Name of the machine.</param>
+        /// <param name="replacementStrings">The replacement strings.</param>
         public static void WriteToEventLog(string source, string log, string message, EventLogEntryType type, int eventId, string machineName, params string[] replacementStrings) {
             WriteToEventLog(source, log, message, type, eventId, machineName, null, replacementStrings);
         }
 
+        /// <summary>
+        /// Writes to EventLog, with replacement strings and/or raw data.
+        /// </summary>
+        /// <param name="source">The source.</param>
+        /// <param name="log">The log.</param>
+        /// <param name="message">The message.</param>
+        /// <param name="type">The type.</param>
+        /// <param name="eventId">The event identifier.</param>
+        /// <param name="machineName">Name of the machine.</param>
+        /// <param name="rawData">The raw data.</param>
+        /// <param name="replacementStrings">The replacement strings.</param>
         public static void WriteToEventLog(string source, string log, string message, EventLogEntryType type, int eventId, string machineName, byte[] rawData, params string[] replacementStrings) {
             // Check if the event source exists. If not, create it.
-            var sourceExists = SourceExistsCreate(source, log, machineName);
+            var sourceExists = CreateLogSource(source, log, machineName);
             if (sourceExists) {
-
                 // Create an EventInstance object for the event log entry.
                 EventInstance eventInstance = new EventInstance(eventId, 0, type);
 
@@ -30,11 +49,23 @@ namespace PSEventViewer {
             }
         }
 
-        private static bool SourceExistsCreate(string source, string log, string machineName) {
+        /// <summary>
+        /// Creates the log source.
+        /// </summary>
+        /// <param name="source">The source.</param>
+        /// <param name="log">The log.</param>
+        /// <param name="machineName">Name of the machine.</param>
+        /// <returns></returns>
+        public static bool CreateLogSource(string source, string log, string machineName = null) {
             try {
-                // Your code that may throw an exception
-                if (!EventLog.SourceExists(source, machineName)) {
-                    EventLog.CreateEventSource(new EventSourceCreationData(source, log) { MachineName = machineName });
+                if (machineName == null) {
+                    if (!EventLog.SourceExists(source)) {
+                        EventLog.CreateEventSource(source, log);
+                    }
+                } else {
+                    if (!EventLog.SourceExists(source, machineName)) {
+                        EventLog.CreateEventSource(new EventSourceCreationData(source, log) { MachineName = machineName });
+                    }
                 }
                 return true;
             } catch (System.Security.SecurityException ex) {
