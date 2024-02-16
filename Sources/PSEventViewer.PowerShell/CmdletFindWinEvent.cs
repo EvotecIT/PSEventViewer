@@ -3,13 +3,11 @@ using System;
 using System.Management.Automation;
 using System.Threading.Tasks;
 using System.Linq;
-using System.Diagnostics.Eventing.Reader;
 
 namespace PSEventViewer.PowerShell {
-
-    //[OutputType(typeof(EventRecord), ParameterSetName = new string[] { "GetLogSet", "GetProviderSet", "FileSet", "HashQuerySet", "XmlQuerySet" })]
-    //[OutputType(typeof(ProviderMetadata), ParameterSetName = new string[] { "ListProviderSet" })]
-    //[OutputType(typeof(EventLogConfiguration), ParameterSetName = new string[] { "ListLogSet" })]
+    [OutputType(typeof(EventObject), ParameterSetName = new string[] { "RecordId", "GenericEvents" })]
+    [OutputType(typeof(EventObjectSlim), ParameterSetName = new string[] { "NamedEvents" })]
+    [OutputType(typeof(EventLogDetails), ParameterSetName = new string[] { "ListLog" })]
     [Cmdlet(VerbsCommon.Find, "WinEvent", DefaultParameterSetName = "GenericEvents")]
     public sealed class CmdletFindEvent : AsyncPSCmdlet {
         [Parameter(Mandatory = true, Position = 0, ParameterSetName = "RecordId")]
@@ -69,13 +67,21 @@ namespace PSEventViewer.PowerShell {
         [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
         public ParallelOption ParallelOption = ParallelOption.Parallel;
 
+        [Parameter(Mandatory = false, ParameterSetName = "RecordId")]
+        [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
+        [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
+        public SwitchParameter Expand;
 
         [Parameter(Mandatory = true, ParameterSetName = "NamedEvents")]
         public NamedEvents[] Type;
 
-
+        /// <summary>
+        /// The list log parameter is used to list the logs on the machine.
+        /// You can use wildcards to search for logs.
+        /// When using wildcards, you can use the * character to match zero or more characters, and the ? character to match a single character.
+        /// </summary>
         [Parameter(Mandatory = true, ParameterSetName = "ListLog")]
-        public string[] ListLog { get; set; } = { "*" };
+        public string[] ListLog = { "*" };
 
 
         protected override Task BeginProcessingAsync() {
@@ -98,28 +104,61 @@ namespace PSEventViewer.PowerShell {
                         WriteObject(eventObject);
                     }
                 } else {
-                    // Let's find the events by generic log name, event id, machine name, provider name, keywords, level, start time, end time, user id, and max events.
-                    if (ParallelOption == ParallelOption.Disabled) {
-                        if (MachineName == null) {
-                            foreach (var eventObject in SearchEvents.QueryLog(LogName, EventId, null, ProviderName, Keywords, Level, StartTime, EndTime, UserId, MaxEvents, EventRecordId, TimePeriod)) {
-                                WriteObject(eventObject);
-                            }
-                        } else {
-                            foreach (var machine in MachineName) {
-                                foreach (var eventObject in SearchEvents.QueryLog(LogName, EventId, machine, ProviderName, Keywords, Level, StartTime, EndTime, UserId, MaxEvents, EventRecordId, TimePeriod)) {
+                    if (Expand == false) {
+                        // Let's find the events by generic log name, event id, machine name, provider name, keywords, level, start time, end time, user id, and max events.
+                        if (ParallelOption == ParallelOption.Disabled) {
+                            if (MachineName == null) {
+                                foreach (var eventObject in SearchEvents.QueryLog(LogName, EventId, null, ProviderName, Keywords, Level, StartTime, EndTime, UserId, MaxEvents, EventRecordId, TimePeriod)) {
                                     WriteObject(eventObject);
                                 }
+                            } else {
+                                foreach (var machine in MachineName) {
+                                    foreach (var eventObject in SearchEvents.QueryLog(LogName, EventId, machine, ProviderName, Keywords, Level, StartTime, EndTime, UserId, MaxEvents, EventRecordId, TimePeriod)) {
+                                        WriteObject(eventObject);
+                                    }
+                                }
+                            }
+                        } else if (ParallelOption == ParallelOption.Parallel) {
+                            foreach (var eventObject in SearchEvents.QueryLogsParallel(LogName, EventId, MachineName, ProviderName, Keywords, Level, StartTime, EndTime, UserId, MaxEvents, NumberOfThreads, EventRecordId, TimePeriod)) {
+                                WriteObject(eventObject);
                             }
                         }
-                    } else if (ParallelOption == ParallelOption.Parallel) {
-                        foreach (var eventObject in SearchEvents.QueryLogsParallel(LogName, EventId, MachineName, ProviderName, Keywords, Level, StartTime, EndTime, UserId, MaxEvents, NumberOfThreads, EventRecordId, TimePeriod)) {
-                            WriteObject(eventObject);
+                    } else {
+                        // Let's find objets, but we will expand the properties of the object from Data to the PSObject.
+                        if (ParallelOption == ParallelOption.Disabled) {
+                            if (MachineName == null) {
+                                foreach (var eventObject in SearchEvents.QueryLog(LogName, EventId, null, ProviderName, Keywords, Level, StartTime, EndTime, UserId, MaxEvents, EventRecordId, TimePeriod)) {
+                                    ReturnExpandedObject(eventObject);
+                                }
+                            } else {
+                                foreach (var machine in MachineName) {
+                                    foreach (var eventObject in SearchEvents.QueryLog(LogName, EventId, machine, ProviderName, Keywords, Level, StartTime, EndTime, UserId, MaxEvents, EventRecordId, TimePeriod)) {
+                                        ReturnExpandedObject(eventObject);
+                                    }
+                                }
+                            }
+                        } else if (ParallelOption == ParallelOption.Parallel) {
+                            foreach (var eventObject in SearchEvents.QueryLogsParallel(LogName, EventId, MachineName, ProviderName, Keywords, Level, StartTime, EndTime, UserId, MaxEvents, NumberOfThreads, EventRecordId, TimePeriod)) {
+                                ReturnExpandedObject(eventObject);
+                            }
                         }
                     }
                 }
             }
 
             return Task.CompletedTask;
+        }
+        /// <summary>
+        /// Returns the expanded object - it takes the EventObject and returns the PSObject with the properties expanded from the Data property.
+        /// </summary>
+        /// <param name="eventObject">The event object.</param>
+        private void ReturnExpandedObject(EventObject eventObject) {
+            PSObject outputObj = new(eventObject);
+            //PSObject outputObj = PSObject.AsPSObject(eventObject);
+            foreach (var property in eventObject.Data) {
+                outputObj.Properties.Add(new PSNoteProperty(property.Key, property.Value));
+            }
+            WriteObject(outputObj);
         }
     }
 }
