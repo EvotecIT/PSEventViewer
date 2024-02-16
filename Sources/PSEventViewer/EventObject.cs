@@ -208,7 +208,7 @@ namespace PSEventViewer {
         /// <summary>
         /// Parses the XML data of the event record into a dictionary converting it into a key value pair
         /// </summary>
-        /// <param name="xmlData"></param>
+        /// <param name="xmlData">The XML data.</param>
         /// <returns></returns>
         private Dictionary<string, string> ParseXML(string xmlData) {
             Dictionary<string, string> data = new Dictionary<string, string>();
