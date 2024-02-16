@@ -153,8 +153,8 @@ namespace PSEventViewer.PowerShell {
         /// </summary>
         /// <param name="eventObject">The event object.</param>
         private void ReturnExpandedObject(EventObject eventObject) {
-            PSObject outputObj = new(eventObject);
-            //PSObject outputObj = PSObject.AsPSObject(eventObject);
+            PSObject outputObj = new(eventObject); // => it's the preferred way to create a wrapper pso when you already know it's not a pso
+            // PSObject outputObj = PSObject.AsPSObject(eventObject); => this is the preferred way to convert from PSO to PSObject
             foreach (var property in eventObject.Data) {
                 outputObj.Properties.Add(new PSNoteProperty(property.Key, property.Value));
             }
