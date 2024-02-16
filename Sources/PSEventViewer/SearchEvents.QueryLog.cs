@@ -13,7 +13,7 @@ namespace PSEventViewer {
         /// <summary>
         /// Initialize the EventSearching class with an internal logger
         /// </summary>
-        /// <param name="internalLogger"></param>
+        /// <param name="internalLogger">The internal logger.</param>
         public SearchEvents(InternalLogger internalLogger = null) {
             if (internalLogger != null) {
                 _logger = internalLogger;
@@ -23,8 +23,8 @@ namespace PSEventViewer {
         /// <summary>
         /// Create an event log reader allowing for catching errors and logging them
         /// </summary>
-        /// <param name="query"></param>
-        /// <param name="machineName"></param>
+        /// <param name="query">The query.</param>
+        /// <param name="machineName">Name of the machine.</param>
         /// <returns></returns>
         private static EventLogReader CreateEventLogReader(EventLogQuery query, string machineName) {
             try {
@@ -51,19 +51,20 @@ namespace PSEventViewer {
 
 
         /// <summary>
-        /// Query a log for events
+        /// Queries the log.
         /// </summary>
-        /// <param name="logName"></param>
-        /// <param name="eventIds"></param>
-        /// <param name="machineName"></param>
-        /// <param name="providerName"></param>
-        /// <param name="keywords"></param>
-        /// <param name="level"></param>
-        /// <param name="startTime"></param>
-        /// <param name="endTime"></param>
-        /// <param name="userId"></param>
-        /// <param name="maxEvents"></param>
-        /// <param name="eventRecordId"></param>
+        /// <param name="logName">Name of the log.</param>
+        /// <param name="eventIds">The event ids.</param>
+        /// <param name="machineName">Name of the machine.</param>
+        /// <param name="providerName">Name of the provider.</param>
+        /// <param name="keywords">The keywords.</param>
+        /// <param name="level">The level.</param>
+        /// <param name="startTime">The start time.</param>
+        /// <param name="endTime">The end time.</param>
+        /// <param name="userId">The user identifier.</param>
+        /// <param name="maxEvents">The maximum events.</param>
+        /// <param name="eventRecordId">The event record identifier.</param>
+        /// <param name="timePeriod">The time period.</param>
         /// <returns></returns>
         public static IEnumerable<EventObject> QueryLog(string logName, List<int> eventIds = null, string machineName = null, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null, int maxEvents = 0, List<long> eventRecordId = null, TimePeriod? timePeriod = null) {
             string queryString;
@@ -123,17 +124,17 @@ namespace PSEventViewer {
         /// <summary>
         /// Build a query string for querying a log for events based on the provided parameters
         /// </summary>
-        /// <param name="logName"></param>
-        /// <param name="eventIds"></param>
-        /// <param name="providerName"></param>
-        /// <param name="keywords"></param>
-        /// <param name="level"></param>
-        /// <param name="startTime"></param>
-        /// <param name="endTime"></param>
-        /// <param name="userId"></param>
-        /// <param name="tasks"></param>
-        /// <param name="opcodes"></param>
-        /// <param name="timePeriod"></param>
+        /// <param name="logName">Name of the log.</param>
+        /// <param name="eventIds">The event ids.</param>
+        /// <param name="providerName">Name of the provider.</param>
+        /// <param name="keywords">The keywords.</param>
+        /// <param name="level">The level.</param>
+        /// <param name="startTime">The start time.</param>
+        /// <param name="endTime">The end time.</param>
+        /// <param name="userId">The user identifier.</param>
+        /// <param name="tasks">The tasks.</param>
+        /// <param name="opcodes">The opcodes.</param>
+        /// <param name="timePeriod">The time period.</param>
         /// <returns></returns>
         private static string BuildQueryString(string logName, List<int> eventIds = null, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null, List<int> tasks = null, List<int> opcodes = null, TimePeriod? timePeriod = null) {
             TimeSpan? lastPeriod = null;
@@ -149,54 +150,54 @@ namespace PSEventViewer {
 
             // Add event IDs to the query
             if (eventIds != null && eventIds.Any()) {
-                queryString.Append("(" + string.Join(" or ", eventIds.Select(id => $"EventID={id}")) + ")");
+                AddCondition(queryString, "(" + string.Join(" or ", eventIds.Select(id => $"EventID={id}")) + ")");
             }
 
             // Add provider name to the query
             if (!string.IsNullOrEmpty(providerName)) {
-                queryString.AppendFormat(" and Provider[@Name='{0}']", providerName);
+                AddCondition(queryString, $"Provider[@Name='{providerName}']");
             }
 
             // Add keywords to the query
             if (keywords.HasValue) {
-                queryString.AppendFormat(" and Keywords={0}", (long)keywords.Value);
+                AddCondition(queryString, $"Keywords={(long)keywords.Value}");
             }
 
             // Add level to the query
             if (level.HasValue) {
-                queryString.AppendFormat(" and Level={0}", (int)level.Value);
+                AddCondition(queryString, $"Level={(int)level.Value}");
             }
 
             // Add tasks to the query
             if (tasks != null && tasks.Any()) {
-                queryString.Append(" and (" + string.Join(" or ", tasks.Select(task => $"Task={task}")) + ")");
+                AddCondition(queryString, "(" + string.Join(" or ", tasks.Select(task => $"Task={task}")) + ")");
             }
 
             // Add opcodes to the query
             if (opcodes != null && opcodes.Any()) {
-                queryString.Append(" and (" + string.Join(" or ", opcodes.Select(opcode => $"Opcode={opcode}")) + ")");
+                AddCondition(queryString, "(" + string.Join(" or ", opcodes.Select(opcode => $"Opcode={opcode}")) + ")");
             }
 
             if (lastPeriod != null) {
-                queryString.AppendFormat(" and TimeCreated[timediff(@SystemTime) &lt;= {0}]", lastPeriod.Value.TotalMilliseconds);
+                AddCondition(queryString, $"TimeCreated[timediff(@SystemTime) &lt;= {lastPeriod.Value.TotalMilliseconds}]");
             } else {
                 // Add time range to the query
                 if (startTime.HasValue && endTime.HasValue) {
-                    queryString.AppendFormat(" and TimeCreated[@SystemTime&gt;='{0:s}Z' and @SystemTime&lt;='{1:s}Z']", startTime.Value.ToString("s"), endTime.Value.ToString("s"));
+                    AddCondition(queryString, $"TimeCreated[@SystemTime&gt;='{startTime.Value:s}Z' and @SystemTime&lt;='{endTime.Value:s}Z']");
                 } else if (startTime.HasValue) {
-                    queryString.AppendFormat(" and TimeCreated[@SystemTime&gt;='{0:s}Z']", startTime.Value.ToString("s"));
+                    AddCondition(queryString, $"TimeCreated[@SystemTime&gt;='{startTime.Value:s}Z']");
                 } else if (endTime.HasValue) {
-                    queryString.AppendFormat(" and TimeCreated[@SystemTime&lt;='{0:s}Z']", endTime.Value.ToString("s"));
+                    AddCondition(queryString, $"TimeCreated[@SystemTime&lt;='{endTime.Value:s}Z']");
                 }
             }
 
             // Add user ID to the query
             if (!string.IsNullOrEmpty(userId)) {
-                queryString.AppendFormat(" and Security[@UserID='{0}']", userId);
+                AddCondition(queryString, $"Security[@UserID='{userId}']");
             }
 
             // Check if any conditions were added to the query
-            if (queryString.ToString() == $"<QueryList><Query Id='0' Path='{logName}'><Select Path='{logName}'>*[System[") {
+            if (queryString.ToString().EndsWith("[System[")) {
                 // If no conditions were added, return a query that selects all events
                 queryString.Append("*");
             }
@@ -206,6 +207,12 @@ namespace PSEventViewer {
             return queryString.ToString();
         }
 
+        private static void AddCondition(StringBuilder queryString, string condition) {
+            if (!queryString.ToString().EndsWith("[System[")) {
+                queryString.Append(" and ");
+            }
+            queryString.Append(condition);
+        }
 
         public static IEnumerable<EventObject> QueryLogsParallel(string logName, List<int> eventIds = null, List<string> machineNames = null, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null, int maxEvents = 0, int maxThreads = 8, List<long> eventRecordId = null, TimePeriod? timePeriod = null) {
             if (machineNames == null || !machineNames.Any()) {
