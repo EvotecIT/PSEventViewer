@@ -45,10 +45,9 @@ namespace PSEventViewer {
         /// Get the fully qualified domain name of the machine
         /// </summary>
         /// <returns></returns>
-        public static string GetFQDN() {
+        private static string GetFQDN() {
             return Dns.GetHostEntry("").HostName;
         }
-
 
         /// <summary>
         /// Queries the log.
