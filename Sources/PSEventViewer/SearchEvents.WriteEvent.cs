@@ -14,8 +14,8 @@ namespace PSEventViewer {
         /// <param name="eventId">The event identifier.</param>
         /// <param name="machineName">Name of the machine.</param>
         /// <param name="replacementStrings">The replacement strings.</param>
-        public static void WriteToEventLog(string source, string log, string message, EventLogEntryType type, int eventId, string machineName, params string[] replacementStrings) {
-            WriteToEventLog(source, log, message, type, eventId, machineName, null, replacementStrings);
+        public static void WriteEvent(string source, string log, string message, EventLogEntryType type, int eventId, string machineName, params string[] replacementStrings) {
+            WriteEvent(source, log, message, type, eventId, machineName, null, replacementStrings);
         }
 
         /// <summary>
@@ -29,7 +29,7 @@ namespace PSEventViewer {
         /// <param name="machineName">Name of the machine.</param>
         /// <param name="rawData">The raw data.</param>
         /// <param name="replacementStrings">The replacement strings.</param>
-        public static void WriteToEventLog(string source, string log, string message, EventLogEntryType type, int eventId, string machineName, byte[] rawData, params string[] replacementStrings) {
+        public static void WriteEvent(string source, string log, string message, EventLogEntryType type, int eventId, string machineName, byte[] rawData, params string[] replacementStrings) {
             // Check if the event source exists. If not, create it.
             var sourceExists = CreateLogSource(source, log, machineName);
             if (sourceExists) {
