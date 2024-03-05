@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace PSEventViewer.Rules.Windows {
+namespace EventViewer.Rules.Windows {
     /// <summary>
     /// OS Startup, Shutdown, Crash
     /// 12: Windows is starting up
@@ -85,6 +85,35 @@ namespace PSEventViewer.Rules.Windows {
             ActionDetailsDate = _eventObject.GetValueFromDataDictionary("NoNameA1");
             ActionDetailsTime = _eventObject.GetValueFromDataDictionary("NoNameA0");
 
+            When = _eventObject.TimeCreated;
+        }
+    }
+
+    /// <summary>
+    /// OS Time Change
+    /// 4616: The system time was changed
+    /// </summary>
+    /// <seealso cref="PSEventViewer.EventObjectSlim" />
+    public class OSTimeChange : EventObjectSlim {
+        public string Computer;
+        public string Action;
+        public string ObjectAffected;
+        public string PreviousTime;
+        public string NewTime;
+        public string Who;
+        public DateTime When;
+
+        public OSTimeChange(EventObject eventObject) : base(eventObject) {
+            _eventObject = eventObject;
+
+            Type = "OSTimeChange";
+            Computer = _eventObject.ComputerName;
+            Action = _eventObject.MessageSubject;
+            ObjectAffected = _eventObject.MachineName;
+            PreviousTime = _eventObject.GetValueFromDataDictionary("PreviousTime");
+            NewTime = _eventObject.GetValueFromDataDictionary("NewTime");
+
+            Who = _eventObject.GetValueFromDataDictionary("SubjectUserName", "SubjectDomainName", "\\", reverseOrder: true);
             When = _eventObject.TimeCreated;
         }
     }
