@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace PSEventViewer {
+namespace EventViewer {
     /// <summary>
     /// Internal logger that allows to write to console, error or wherever else is needed
     /// </summary>

@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace PSEventViewer.Rules.ActiveDirectory {
+namespace EventViewer.Rules.ActiveDirectory {
     /// <summary>
     /// Includes users added or modified in Active Directory
     /// 4720: A user account was created

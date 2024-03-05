@@ -8,7 +8,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace PSEventViewer {
+namespace EventViewer {
     public partial class SearchEvents : Settings {
         /// <summary>
         /// Initialize the EventSearching class with an internal logger

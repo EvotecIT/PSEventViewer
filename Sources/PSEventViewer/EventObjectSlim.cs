@@ -1,6 +1,6 @@
 ﻿using System.Collections.Generic;
 
-namespace PSEventViewer {
+namespace EventViewer {
     public class EventObjectSlim {
         internal EventObject _eventObject;
         public int EventID; // = _eventObject.Id;

@@ -16,6 +16,6 @@
 		<PackageReference Include="PowerShellStandard.Library" Version="5.1.1" PrivateAssets="all" />
 	</ItemGroup>
 	<ItemGroup>
-	  <ProjectReference Include="..\PSEventViewer\PSEventViewer.csproj" />
+	  <ProjectReference Include="..\PSEventViewer\EventViewer.csproj" />
 	</ItemGroup>
 </Project>

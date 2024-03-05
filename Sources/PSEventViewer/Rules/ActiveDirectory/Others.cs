@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace PSEventViewer.Rules.ActiveDirectory {
+namespace EventViewer.Rules.ActiveDirectory {
 
     /// <summary>
     /// Active Directory Other Change Detailed

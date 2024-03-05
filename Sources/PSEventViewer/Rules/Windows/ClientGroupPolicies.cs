@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace PSEventViewer.Rules.Windows {
+namespace EventViewer.Rules.Windows {
     internal class ClientGroupPolicies {
         //Log Name:      Application
         // Source:        Group Policy Files

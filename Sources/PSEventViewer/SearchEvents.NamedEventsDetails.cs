@@ -1,10 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
-using PSEventViewer.Rules.ActiveDirectory;
-using PSEventViewer.Rules.Logs;
-using PSEventViewer.Rules.Windows;
+using EventViewer.Rules.ActiveDirectory;
+using EventViewer.Rules.Logs;
+using EventViewer.Rules.Windows;
 
-namespace PSEventViewer {
+namespace EventViewer {
     /// <summary>
     /// Defines the named events that can be searched for
     /// </summary>
@@ -39,6 +39,7 @@ namespace PSEventViewer {
 
         OSCrash,
         OSStartupShutdownCrash,
+        OSTimeChange,
     }
 
     public partial class SearchEvents : Settings {
@@ -79,6 +80,7 @@ namespace PSEventViewer {
             // windows OS
             { NamedEvents.OSCrash, (new List<int> { 6008 }, "System") },
             { NamedEvents.OSStartupShutdownCrash,  (new List<int> { 12, 13, 41, 4608, 4621, 6008 }, "System") },
+            { NamedEvents.OSTimeChange, (new List<int> { 4616 }, "Security") },
         };
         /// <summary>
         /// Builds the appropriate event object based on the NamedEvents value
@@ -171,6 +173,10 @@ namespace PSEventViewer {
                             return new LogsClearedOther(eventObject);
                         case NamedEvents.OSCrash:
                             return new OSCrash(eventObject);
+                        case NamedEvents.OSStartupShutdownCrash:
+                            return new OSStartupShutdownCrash(eventObject);
+                        case NamedEvents.OSTimeChange:
+                            return new OSTimeChange(eventObject);
                         default:
                             throw new ArgumentException($"Invalid NamedEvents value: {typeEvents}");
                     }

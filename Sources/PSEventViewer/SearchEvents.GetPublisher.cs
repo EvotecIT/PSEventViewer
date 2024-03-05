@@ -6,7 +6,7 @@ using System.Linq;
 using System.Reflection.Emit;
 using System.Runtime.InteropServices;
 
-namespace PSEventViewer {
+namespace EventViewer {
     public partial class SearchEvents : Settings {
 
         public static IEnumerable<Metadata> GetProviders() {

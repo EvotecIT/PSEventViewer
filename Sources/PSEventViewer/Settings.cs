@@ -1,4 +1,4 @@
-namespace PSEventViewer {
+namespace EventViewer {
 
     public class Settings {
         protected static InternalLogger _logger = new InternalLogger();

@@ -5,7 +5,7 @@ using System.Diagnostics.Eventing.Reader;
 using System.Linq;
 using System.Threading;
 
-namespace PSEventViewer {
+namespace EventViewer {
     public class WatchEvents : Settings {
         public static volatile int NumberOfEventsFound = 0;
         /// <summary>

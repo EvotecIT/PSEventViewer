@@ -9,7 +9,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\PSEventViewer\PSEventViewer.csproj" />
+    <ProjectReference Include="..\PSEventViewer\EventViewer.csproj" />
   </ItemGroup>
 
 </Project>

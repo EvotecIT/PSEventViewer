@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Diagnostics;
 
-namespace PSEventViewer {
+namespace EventViewer {
     public partial class SearchEvents : Settings {
 
         /// <summary>

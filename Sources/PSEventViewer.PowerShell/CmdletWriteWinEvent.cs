@@ -1,5 +1,6 @@
 ﻿using System.Management.Automation;
 using System.Threading.Tasks;
+using EventViewer;
 
 namespace PSEventViewer.PowerShell {
     [Cmdlet(VerbsCommunications.Write, "WinEvent")]

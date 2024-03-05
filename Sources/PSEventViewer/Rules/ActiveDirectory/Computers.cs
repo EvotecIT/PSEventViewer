@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace PSEventViewer.Rules.ActiveDirectory {
+namespace EventViewer.Rules.ActiveDirectory {
     /// Active Directory Computer Change Detailed
     /// 5136: A directory service object was modified
     /// 5137: A directory service object was created

@@ -5,7 +5,7 @@ using System.Linq;
 using System.Security.Principal;
 using System.Xml.Linq;
 
-namespace PSEventViewer {
+namespace EventViewer {
     public enum ParallelOption {
         Disabled,
         Parallel

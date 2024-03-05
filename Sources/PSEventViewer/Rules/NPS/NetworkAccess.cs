@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace PSEventViewer.Rules.NPS {
+namespace EventViewer.Rules.NPS {
     /// <summary>
     /// Network Access Authentication Policy
     /// 6272: Network Policy Server granted access to a user

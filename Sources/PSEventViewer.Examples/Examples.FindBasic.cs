@@ -1,5 +1,6 @@
-﻿using PSEventViewer.Rules.ActiveDirectory;
-using PSEventViewer.Rules.Windows;
+﻿using EventViewer;
+using EventViewer.Rules.ActiveDirectory;
+using EventViewer.Rules.Windows;
 
 namespace PSEventViewer.Examples {
     internal partial class Examples {

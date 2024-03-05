@@ -3,6 +3,7 @@ using System;
 using System.Management.Automation;
 using System.Threading.Tasks;
 using System.Linq;
+using EventViewer;
 
 namespace PSEventViewer.PowerShell {
     [OutputType(typeof(EventObject), ParameterSetName = new string[] { "RecordId", "GenericEvents" })]

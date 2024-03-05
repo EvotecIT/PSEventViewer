@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace PSEventViewer.Rules.Logs {
+namespace EventViewer.Rules.Logs {
     /// <summary>
     /// Logs Cleared Security
     /// 1102: The audit log was cleared

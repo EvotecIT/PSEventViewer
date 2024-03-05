@@ -1,4 +1,5 @@
 global using Xunit;
+global using EventViewer;
 
 namespace PSEventViewer.Tests {
     public class TestSearchingEvents {

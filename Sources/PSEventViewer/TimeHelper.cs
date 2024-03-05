@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace PSEventViewer {
+namespace EventViewer {
     public enum TimePeriod {
         PastHour,
         CurrentHour,

@@ -1,4 +1,6 @@
-﻿namespace PSEventViewer.Examples {
+﻿using EventViewer;
+
+namespace PSEventViewer.Examples {
     internal partial class Examples {
 
         public static void QueryBasic() {

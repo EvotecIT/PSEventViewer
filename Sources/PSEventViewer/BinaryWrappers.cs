@@ -3,7 +3,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 
-namespace PSEventViewer {
+namespace EventViewer {
     public class BinaryWrappers {
 
         public static void ImportManifest(string manifestPath) {
