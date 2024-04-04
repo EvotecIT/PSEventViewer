@@ -5,21 +5,14 @@ $Classes = @( Get-ChildItem -Path $PSScriptRoot\Classes\*.ps1 -ErrorAction Silen
 $Enums = @( Get-ChildItem -Path $PSScriptRoot\Enums\*.ps1 -ErrorAction SilentlyContinue -Recurse -File)
 # Get all assemblies
 $AssemblyFolders = Get-ChildItem -Path $PSScriptRoot\Lib -Directory -ErrorAction SilentlyContinue -File
-$AssemblyFolders = Get-ChildItem -Path "C:\Support\GitHub\PSEventViewer\Sources\PSEventViewer.PowerShell\bin\Debug\net472" -File -ErrorAction SilentlyContinue
 
 # to speed up development adding direct path to binaries, instead of the the Lib folder
 $Development = $true
-$BinaryDev = @(
-    if ($PSEdition -eq 'Core') {
-        "$PSScriptRoot\Sources\PSEventViewer.PowerShell\bin\Debug\netstandard2.0\PSEventViewer.PowerShell.dll"
-        Write-Warning "Development mode: Using binaries from $PSScriptRoot\Sources\PSEventViewer.PowerShell\bin\Debug\netstandard2.0"
-    } else {
-        "$PSScriptRoot\Sources\PSEventViewer.PowerShell\bin\Debug\net472\PSEventViewer.PowerShell.dll"
-        Write-Warning "Development mode: Using binaries from $PSScriptRoot\Sources\PSEventViewer.PowerShell\bin\Debug\net472"
-    }
-)
+$DevelopmentPath = "$PSScriptRoot\Sources\PSEventViewer\bin\Debug"
+$DevelopmentFolderCore = "netstandard2.0"
+$DevelopmentFolderDefault = "net472"
 $BinaryModules = @(
-    "PSEventViewer.PowerShell.dll"
+    "PSEventViewer.dll"
 )
 
 # Lets find which libraries we need to load
@@ -61,11 +54,31 @@ if ($Standard -and $Core -and $Default) {
 }
 
 $Assembly = @(
-    if ($Framework -and $PSEdition -eq 'Core') {
-        Get-ChildItem -Path $PSScriptRoot\Lib\$Framework\*.dll -ErrorAction SilentlyContinue -Recurse
+    if ($Development) {
+        if ($PSEdition -eq 'Core') {
+            Get-ChildItem -Path $DevelopmentPath\$DevelopmentFolderCore\*.dll -ErrorAction SilentlyContinue -Recurse
+        } else {
+            Get-ChildItem -Path $DevelopmentPath\$DevelopmentFolderDefault\*.dll -ErrorAction SilentlyContinue -Recurse
+        }
+    } else {
+        if ($Framework -and $PSEdition -eq 'Core') {
+            Get-ChildItem -Path $PSScriptRoot\Lib\$Framework\*.dll -ErrorAction SilentlyContinue -Recurse
+        }
+        if ($FrameworkNet -and $PSEdition -ne 'Core') {
+            Get-ChildItem -Path $PSScriptRoot\Lib\$FrameworkNet\*.dll -ErrorAction SilentlyContinue -Recurse
+        }
     }
-    if ($FrameworkNet -and $PSEdition -ne 'Core') {
-        Get-ChildItem -Path $PSScriptRoot\Lib\$FrameworkNet\*.dll -ErrorAction SilentlyContinue -Recurse
+)
+
+$BinaryDev = @(
+    foreach ($BinaryModule in $BinaryModules) {
+        if ($PSEdition -eq 'Core') {
+            $Variable = Resolve-Path "$DevelopmentPath\$DevelopmentFolderCore\$BinaryModule"
+        } else {
+            $Variable = Resolve-Path "$DevelopmentPath\$DevelopmentFolderDefault\$BinaryModule"
+        }
+        $Variable
+        Write-Warning "Development mode: Using binaries from $Variable"
     }
 )
 
