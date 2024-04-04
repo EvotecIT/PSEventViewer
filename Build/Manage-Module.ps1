@@ -1,5 +1,7 @@
 Clear-Host
 
+Import-Module C:\Support\GitHub\PSPublishModule\PSPublishModule.psd1 -Force
+
 Build-Module -ModuleName 'PSEventViewer' {
     # Usual defaults as per standard module
     $Manifest = [ordered] @{
@@ -52,7 +54,7 @@ Build-Module -ModuleName 'PSEventViewer' {
         PlaceOpenBraceIgnoreOneLineBlock            = $false
 
         PlaceCloseBraceEnable                       = $true
-        PlaceCloseBraceNewLineAfter                 = $true
+        PlaceCloseBraceNewLineAfter                 = $false
         PlaceCloseBraceIgnoreOneLineBlock           = $false
         PlaceCloseBraceNoEmptyLineBefore            = $true
 
@@ -86,7 +88,7 @@ Build-Module -ModuleName 'PSEventViewer' {
     # configuration for documentation, at the same time it enables documentation processing
     New-ConfigurationDocumentation -Enable:$false -StartClean -UpdateWhenNew -PathReadme 'Docs\Readme.md' -Path 'Docs'
 
-    New-ConfigurationImportModule -ImportSelf -ImportRequiredModules
+   # New-ConfigurationImportModule -ImportSelf
 
     $newConfigurationBuildSplat = @{
         Enable                            = $true
