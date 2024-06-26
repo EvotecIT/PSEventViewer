@@ -15,6 +15,7 @@ namespace PSEventViewer {
         [Parameter(Mandatory = true, Position = 0, ParameterSetName = "GenericEvents")]
         public string LogName;
 
+        [Alias("Id")]
         [Parameter(Mandatory = false, Position = 1, ParameterSetName = "GenericEvents")]
         public List<int> EventId = null;
 
@@ -38,10 +39,12 @@ namespace PSEventViewer {
         [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
         public Level? Level;
 
+        [Alias("DateFrom")]
         [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
         [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
         public DateTime? StartTime;
 
+        [Alias("DateTo")]
         [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
         [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
         public DateTime? EndTime;
@@ -157,6 +160,15 @@ namespace PSEventViewer {
             PSObject outputObj = new(eventObject); // => it's the preferred way to create a wrapper pso when you already know it's not a pso
             // PSObject outputObj = PSObject.AsPSObject(eventObject); => this is the preferred way to convert from PSO to PSObject
             foreach (var property in eventObject.Data) {
+                //// if the property already exists, add it as new property with +1
+                //if (outputObj.Properties[property.Key] != null) {
+                //    outputObj.Properties.Add(new PSNoteProperty(property.Key + "1", property.Value));
+                //} else {
+                //    outputObj.Properties.Add(new PSNoteProperty(property.Key, property.Value));
+                //}
+                //if (outputObj.Properties[property.Key] != null) {
+                //    outputObj.Properties.Remove(property.Key);
+                //}
                 outputObj.Properties.Add(new PSNoteProperty(property.Key, property.Value));
             }
             WriteObject(outputObj);
