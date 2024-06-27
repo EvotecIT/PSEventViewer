@@ -19,6 +19,6 @@
 
 //Examples.QueryBasicEventLogList();
 //Examples.WriteBasic();
-//Examples.WriteAdvanced();
+Examples.WriteAdvanced();
 
-Examples.GetProviders();
+//Examples.GetProviders();
