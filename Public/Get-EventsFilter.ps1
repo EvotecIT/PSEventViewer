@@ -4,6 +4,7 @@ function Get-EventsFilter {
     This function generates an xpath filter that can be used with the -FilterXPath
     parameter of Get-WinEvent.  It may also be used inside the <Select></Select tags
     of a Custom View in Event Viewer.
+
     .DESCRIPTION
     This function generates an xpath filter that can be used with the -FilterXPath
     parameter of Get-WinEvent.  It may also be used inside the <Select></Select tags
@@ -15,14 +16,17 @@ function Get-EventsFilter {
 
     XPath is case sensetive and the data passed to the parameters here must
     match the case of the data in the event's XML.
+
     .NOTES
     Original Code by https://community.spiceworks.com/scripts/show/3238-powershell-xpath-generator-for-windows-events
     Extended by Justin Grote
     Extended by Przemyslaw Klys
+
     .LINK
 
     .PARAMETER ID
     This parameter accepts and array of event ids to include in the xpath filter.
+
     .PARAMETER StartTime
     This parameter sets the oldest event that may be returned by the xpath.
 
@@ -30,6 +34,7 @@ function Get-EventsFilter {
     time the xpath is generated.  XPath uses a time difference method to select
     events by time; that time difference being the number of milliseconds between
     the time and now.
+
     .PARAMETER EndTime
     This parameter sets the newest event that may be returned by the xpath.
 
@@ -37,12 +42,15 @@ function Get-EventsFilter {
     time the xpath is generated.  XPath uses a time difference method to select
     events by time; that time difference being the number of milliseconds between
     the time and now.
+
     .PARAMETER Data
     This parameter will accept an array of values that may be found in the data
     section of the event's XML.
+
     .PARAMETER ProviderName
     This parameter will accept an array of values that select events from event
     providers.
+
     .PARAMETER Level
     This parameter will accept an array of values that specify the severity
     rating of the events to be returned.
@@ -55,12 +63,15 @@ function Get-EventsFilter {
     'LogAlways',
     'Verbose',
     'Warning'
+
     .PARAMETER Keywords
     This parameter accepts and array of long integer keywords. You must
     pass this parameter the long integer value of the keywords you want
     to search and not the keyword description.
+
     .PARAMETER UserID
     This parameter will accept an array of SIDs or domain accounts.
+
     .PARAMETER NamedDataFilter
     This parameter will accept and array of hashtables that define the key
     value pairs for which you want to filter against the event's named data
@@ -90,6 +101,7 @@ function Get-EventsFilter {
     the following
 
     (@{'SubjectUserName'='john.doe'},@{'TargetUserName'='jane.doe'})
+
     .EXAMPLE
     Get-EventsFilter -ID 4663 -NamedDataFilter @{'SubjectUserName'='john.doe'} -LogName 'ForwardedEvents'
 
@@ -164,7 +176,6 @@ function Get-EventsFilter {
             </Select>
         </Query>
     </QueryList>
-
 
     .EXAMPLE
     Get-EventsFilter -LogName 'System' -id 7040 -NamedDataExcludeFilter  @{ param4 = ('TrustedInstaller','BITS') }

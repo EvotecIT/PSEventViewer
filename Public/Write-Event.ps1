@@ -1,4 +1,45 @@
 ﻿function Write-Event {
+    <#
+    .SYNOPSIS
+    Writes an event to the specified event log.
+
+    .DESCRIPTION
+    This function writes an event to the specified event log on the local or remote computer.
+
+    .PARAMETER Computer
+    Specifies the name of the computer(s) where the event log is located.
+
+    .PARAMETER LogName
+    Specifies the name of the event log.
+
+    .PARAMETER Source
+    Specifies the source of the event.
+
+    .PARAMETER Category
+    Specifies the category of the event.
+
+    .PARAMETER EntryType
+    Specifies the type of event entry. Default is Information.
+
+    .PARAMETER ID
+    Specifies the ID of the event.
+
+    .PARAMETER Message
+    Specifies the message to be logged.
+
+    .PARAMETER AdditionalFields
+    Specifies additional fields to include in the event log.
+
+    .EXAMPLE
+    Write-Event -LogName "Application" -Source "MyApp" -ID 1001 -Message "An error occurred."
+
+    Writes an event with ID 1001 and the message "An error occurred" to the Application event log with the source "MyApp".
+
+    .EXAMPLE
+    Write-Event -Computer "Server01" -LogName "System" -Source "SystemApp" -ID 2001 -Message "A warning occurred."
+
+    Writes an event with ID 2001 and the message "A warning occurred" to the System event log on the remote computer "Server01" with the source "SystemApp".
+    #>
     [alias('Write-WinEvent', 'Write-Events')]
     [cmdletBinding()]
     param(
