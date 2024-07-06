@@ -1,4 +1,19 @@
 ﻿function Set-EventsSettings {
+    <#
+    .SYNOPSIS
+    Set-EventsSettings updates the settings of a specified event log.
+
+    .DESCRIPTION
+    Set-EventsSettings allows you to modify various settings of a specified event log, such as log mode, maximum size, and event action.
+
+    .EXAMPLE
+    Set-EventsSettings -LogName 'Application' -EventAction 'ArchiveTheLogWhenFullDoNotOverwrite'
+    Updates the 'Application' event log to archive the log when full without overwriting.
+
+    .EXAMPLE
+    Set-EventsSettings -LogName 'Security' -MaximumSizeMB 100 -Mode Circular
+    Sets the 'Security' event log to have a maximum size of 100 MB and log mode as Circular.
+    #>
     [cmdletBinding(SupportsShouldProcess)]
     param(
         [Parameter(Mandatory)][string] $LogName,

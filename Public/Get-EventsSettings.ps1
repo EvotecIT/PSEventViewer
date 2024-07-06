@@ -1,4 +1,20 @@
 ﻿function Get-EventsSettings {
+    <#
+    .SYNOPSIS
+    Get-EventsSettings retrieves information about a specified event log.
+
+    .DESCRIPTION
+    Get-EventsSettings retrieves detailed information about a specified event log, including log properties and settings.
+
+    .EXAMPLE
+    Get-EventsSettings -LogName 'Application'
+    Retrieves information about the 'Application' event log.
+
+    .EXAMPLE
+    Get-EventsSettings -LogName 'Security' -ComputerName 'Server01'
+    Retrieves information about the 'Security' event log on the remote computer 'Server01'.
+
+    #>
     [cmdletBinding()]
     param(
         [parameter(Mandatory)][string] $LogName,
