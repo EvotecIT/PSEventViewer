@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
-		<TargetFrameworks>net472;netstandard2.0</TargetFrameworks>
+		<TargetFrameworks>net472;netstandard2.0;net6.0;net7.0;net8.0</TargetFrameworks>
 		<Description>PowerShell Module for working with Event Logs</Description>
 		<AssemblyName>PSEventViewer</AssemblyName>
 		<AssemblyTitle>PSEventViewer</AssemblyTitle>
@@ -17,5 +17,21 @@
 	</ItemGroup>
 	<ItemGroup>
 		<ProjectReference Include="..\EventViewerX\EventViewerX.csproj" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<Using Include="System.Collections" />
+		<Using Include="System.Management.Automation" />
+		<Using Include="System.Threading.Tasks" />
+		<Using Include="System.Collections.Concurrent" />
+		<Using Include="System.Threading" />
+		<Using Include="System" />
+		<Using Include="System.Collections.Generic" />
+		<Using Include="System.Linq" />
+		<Using Include="System.Text" />
+		<Using Include="System.IO" />
+		<Using Include="System.Net" />
+		<Using Include="System.Diagnostics" />
+		<Using Include="EventViewerX" />
 	</ItemGroup>
 </Project>
