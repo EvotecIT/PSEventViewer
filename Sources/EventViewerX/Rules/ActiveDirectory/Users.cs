@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace EventViewerX.Rules.ActiveDirectory {
+﻿namespace EventViewerX.Rules.ActiveDirectory {
     /// <summary>
     /// Includes users added or modified in Active Directory
     /// 4720: A user account was created
@@ -180,10 +178,10 @@ namespace EventViewerX.Rules.ActiveDirectory {
         public string Who;
         public DateTime When;
         public string LogonProcessName;
-        public string ImpersonationLevel;
-        public string VirtualAccount;
-        public string ElevatedToken;
-        public string LogonType;
+        public ImpersonationLevel? ImpersonationLevel;
+        public VirtualAccount? VirtualAccount;
+        public ElevatedToken? ElevatedToken;
+        public LogonType? LogonType;
 
         public ADUserLogon(EventObject eventObject) : base(eventObject) {
             _eventObject = eventObject;
@@ -195,10 +193,10 @@ namespace EventViewerX.Rules.ActiveDirectory {
             IpAddress = _eventObject.GetValueFromDataDictionary("IpAddress");
             IpPort = _eventObject.GetValueFromDataDictionary("IpPort");
             LogonProcessName = _eventObject.GetValueFromDataDictionary("LogonProcessName");
-            ImpersonationLevel = _eventObject.GetValueFromDataDictionary("ImpersonationLevel");
-            VirtualAccount = _eventObject.GetValueFromDataDictionary("VirtualAccount");
-            ElevatedToken = _eventObject.GetValueFromDataDictionary("ElevatedToken");
-            LogonType = _eventObject.GetValueFromDataDictionary("LogonType");
+            ImpersonationLevel = EventsHelper.GetImpersonationLevel(_eventObject.GetValueFromDataDictionary("ImpersonationLevel"));
+            VirtualAccount = EventsHelper.GetVirtualAccount(_eventObject.GetValueFromDataDictionary("VirtualAccount"));
+            ElevatedToken = EventsHelper.GetElevatedToken(_eventObject.GetValueFromDataDictionary("ElevatedToken"));
+            LogonType = EventsHelper.GetLogonType(_eventObject.GetValueFromDataDictionary("LogonType"));
 
             ObjectAffected = _eventObject.GetValueFromDataDictionary("TargetUserName", "TargetDomainName", "\\", reverseOrder: true);
 
