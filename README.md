@@ -30,6 +30,25 @@ The project was split into 2 parts:
 - `PSEventViewer` - this module.
 - [PSWinReporting](https://github.com/EvotecIT/PSWinReporting) - reporting on Active Directory Events, Windows Events...
 
+### Why PSEventViewer?
+
+By default in PowerShell we have couple of cmdlets that let you do different things:
+
+- [x] Microsoft.PowerShell.Diagnostics
+    - [x] `Get-WinEvent`
+    - [x] `New-WinEvent`
+
+- [x] Microsoft.PowerShell.Management - The cmdlets that contain the EventLog noun, the EventLog cmdlets, work only on classic event logs. 
+    - [x] `Clear-EventLog` - Clears all of the entries from the specified event logs on the local or remote computers.  
+    - [x] `Get-EventLog -list` - alternative to `Get-WmiObject win32_nteventlogfile` - lists event logs 
+    - [x] `Get-EventLog` - Gets the events in the event log that match the specified criteria.
+    - [x] `Limit-EventLog` - Sets the event log properties that limit the size of the event log and the age of its entries.
+    - [x] `New-EventLog` - Creates a new event log and a new event source on a local or remote computer.
+    - [x] `Remove-EventLog` - Deletes an event log or unregisters an event source.
+    - [x] `Show-EventLog` - Displays the event logs of the local or a remote computer in Event Viewer.
+
+Our module tries to improve on that by providing a bit more flexibility and speed, and also by providing a bit more information about the events.
+
 ### Recommended read
 
 - [Documentation for PSEventViewer (overview)](https://evotec.xyz/hub/scripts/pseventviewer-powershell-module/)

@@ -809,7 +809,7 @@ $Script:ScriptBlock = {
             $Event.PSObject.Properties.Add([System.Management.Automation.PSNoteProperty]::new('Action', $MessageSubject))
 
             # Level value is not needed because there is actually LevelDisplayName
-            #Add-Member -InputObject $Event -MemberType NoteProperty -Name 'LevelTranslated' -Value ([PSEventViewer.Level] $Event.Level)
+            #Add-Member -InputObject $Event -MemberType NoteProperty -Name 'LevelTranslated' -Value ([EventViewerX.Level] $Event.Level)
 
             # Overwrite value - the old value is collection
             # Add-Member -InputObject $Event -MemberType NoteProperty -Name 'KeywordDisplayName' -Value ($Event.KeywordsDisplayNames -join ',') -Force

@@ -1,5 +1,9 @@
 ﻿### Changelog
 
+#### 2.0.0 - 2024.07.21 *EXPERIMENTAL*
+- Converted `Write-Event` to `Write-WinEvent` as binary cmdlet now
+- Added `Find-WinEvent` binary cmdlet which is a replacement for `Get-Events`. It's complete rewrite of `Get-Events`, it's much faster and provides unique features known from `PSWinReporting` module as offered by `Find-Events` function
+
 #### 1.0.22 - 2022.05.26
 - Fixed `Set-EventsSettings` not setting values as required
 

@@ -147,16 +147,22 @@ function Get-EventsInformation {
     if ($PSCmdlet.MyInvocation.BoundParameters["Verbose"].IsPresent) { $Verbose = $true } else { $Verbose = $false }
 
     $Time = Start-TimeLog
-    $Pool = New-Runspace -MaxRunspaces $maxRunspaces -Verbose:$Verbose
+    $Pool = New-Runspace -maxRunspaces $maxRunspaces -Verbose:$Verbose
 
     if ($RunAgainstDC) {
-        Write-Verbose 'Get-EventsInformation - scanning for domain controllers'
-        $ForestInformation = Get-WinADForestControllers
-        $MachineWithErrors = $ForestInformation | Where-Object { $_.HostName -eq '' }
-        foreach ($Computer in $MachineWithErrors) {
-            Write-Warning "Get-EventsInformation - Error scanning forest $($Computer.Forest) (domain: $($Computer.Domain)) error: $($Computer.Comment)"
+        # we only allow that if AD module is available
+        if (Get-Module -ListAvailable ActiveDirectory) {
+            Write-Verbose 'Get-EventsInformation - scanning for domain controllers'
+            $ForestInformation = Get-WinADForestControllers
+            $MachineWithErrors = $ForestInformation | Where-Object { $_.HostName -eq '' }
+            foreach ($Computer in $MachineWithErrors) {
+                Write-Warning "Get-EventsInformation - Error scanning forest $($Computer.Forest) (domain: $($Computer.Domain)) error: $($Computer.Comment)"
+            }
+            $Machine = ($ForestInformation | Where-Object { $_.HostName -ne '' }).HostName
+        } else {
+            Write-Warning 'Get-EventsInformation - ActiveDirectory module is not available. Cannot scan for domain controllers'
+            return
         }
-        $Machine = ($ForestInformation | Where-Object { $_.HostName -ne '' }).HostName
     }
 
     $RunSpaces = @(

@@ -3,7 +3,7 @@ Import-Module PSEventViewer -Force
 #$WrongCredentials = (Get-Credential)
 $Credentials = (Get-Credential)
 
-$AllEvents = Get-Events -LogName 'Application' -ID 16384 -Machine 'AD1' -MaxEvents 3 -Verbose -ErrorVariable Test -Credential $Credentials
+$AllEvents = Get-Events -LogName 'Application' -ID 16384 -Machine 'AD1' -MaxEvents 3 -Verbose -ErrorVariable Test #-Credential $Credentials
 
 $AllEvents | Format-Table -a
 

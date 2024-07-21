@@ -135,7 +135,7 @@ function Get-Events {
         [hashtable] $NamedDataFilter,
         [hashtable] $NamedDataExcludeFilter,
         [string[]] $UserID,
-        [PSEventViewer.Level[]] $Level = $null,
+        [EventViewerX.Level[]] $Level = $null,
         [string] $UserSID = $null,
         [string[]]$Data = $null,
         [int] $MaxEvents = $null,
@@ -145,7 +145,7 @@ function Get-Events {
         [System.Management.Automation.Credential()]$Credential = [System.Management.Automation.PSCredential]::Empty,
 
         [string] $Path = $null,
-        [PSEventViewer.Keywords[]] $Keywords = $null,
+        [EventViewerX.Keywords[]] $Keywords = $null,
         [alias("EventRecordID")][int64] $RecordID,
         [int] $MaxRunspaces = [int]$env:NUMBER_OF_PROCESSORS + 1,
         [switch] $Oldest,
@@ -171,10 +171,10 @@ function Get-Events {
                 $Comp = $EventEntry.Server
             }
             $ConvertedLevels = foreach ($DataLevel in $EventEntry.Level) {
-                ([PSEventViewer.Level]::$DataLevel).value__
+                ([EventViewerX.Level]::$DataLevel).value__
             }
             $ConvertedKeywords = foreach ($DataKeyword in $EventEntry.Keywords) {
-                ([PSEventViewer.Keywords]::$DataKeyword).value__
+                ([EventViewerX.Keywords]::$DataKeyword).value__
             }
             Add-ToHashTable -Hashtable $EventFilter -Key "LogName" -Value $EventEntry.LogName
             Add-ToHashTable -Hashtable $EventFilter -Key "StartTime" -Value $EventEntry.DateFrom
