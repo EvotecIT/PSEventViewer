@@ -1,37 +1,42 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
-	<PropertyGroup>
-		<TargetFrameworks>net472;netstandard2.0;net6.0;net7.0;net8.0</TargetFrameworks>
-		<Description>PowerShell Module for working with Event Logs</Description>
-		<AssemblyName>PSEventViewer</AssemblyName>
-		<AssemblyTitle>PSEventViewer</AssemblyTitle>
-		<VersionPrefix>0.1.0</VersionPrefix>
-		<GeneratePackageOnBuild>false</GeneratePackageOnBuild>
-		<Company>Evotec</Company>
-		<Authors>Przemyslaw Klys</Authors>
-		<LangVersion>latest</LangVersion>
+    <PropertyGroup>
+        <TargetFrameworks>net472;netstandard2.0;net6.0;net7.0;net8.0</TargetFrameworks>
+        <Description>PowerShell Module for working with Event Logs</Description>
+        <AssemblyName>PSEventViewer</AssemblyName>
+        <AssemblyTitle>PSEventViewer</AssemblyTitle>
+        <VersionPrefix>2.0.0</VersionPrefix>
+        <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+        <Company>Evotec</Company>
+        <Authors>Przemyslaw Klys</Authors>
+        <LangVersion>latest</LangVersion>
 
-	</PropertyGroup>
-	<ItemGroup>
-		<PackageReference Include="PowerShellStandard.Library" Version="5.1.1" PrivateAssets="all" />
-	</ItemGroup>
-	<ItemGroup>
-		<ProjectReference Include="..\EventViewerX\EventViewerX.csproj" />
-	</ItemGroup>
+    </PropertyGroup>
+    <ItemGroup>
+        <PackageReference Include="PowerShellStandard.Library" Version="5.1.1" PrivateAssets="all" />
+    </ItemGroup>
+    <ItemGroup>
+        <ProjectReference Include="..\EventViewerX\EventViewerX.csproj" />
+    </ItemGroup>
 
-	<ItemGroup>
-		<Using Include="System.Collections" />
-		<Using Include="System.Management.Automation" />
-		<Using Include="System.Threading.Tasks" />
-		<Using Include="System.Collections.Concurrent" />
-		<Using Include="System.Threading" />
-		<Using Include="System" />
-		<Using Include="System.Collections.Generic" />
-		<Using Include="System.Linq" />
-		<Using Include="System.Text" />
-		<Using Include="System.IO" />
-		<Using Include="System.Net" />
-		<Using Include="System.Diagnostics" />
-		<Using Include="EventViewerX" />
-	</ItemGroup>
+    <!-- Make sure the output DLL's from library are included in the output -->
+    <PropertyGroup>
+        <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <Using Include="System.Collections" />
+        <Using Include="System.Management.Automation" />
+        <Using Include="System.Threading.Tasks" />
+        <Using Include="System.Collections.Concurrent" />
+        <Using Include="System.Threading" />
+        <Using Include="System" />
+        <Using Include="System.Collections.Generic" />
+        <Using Include="System.Linq" />
+        <Using Include="System.Text" />
+        <Using Include="System.IO" />
+        <Using Include="System.Net" />
+        <Using Include="System.Diagnostics" />
+        <Using Include="EventViewerX" />
+    </ItemGroup>
 </Project>

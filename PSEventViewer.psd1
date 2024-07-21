@@ -1,7 +1,7 @@
 ﻿@{
-    AliasesToExport      = @()
+    AliasesToExport      = @('Write-Event')
     Author               = 'Przemyslaw Klys'
-    CmdletsToExport      = @('Find-WinEvent', 'Write-WinEvent', 'Start-EventWatching')
+    CmdletsToExport      = @('Find-WinEvent', 'Start-EventWatching', 'Write-WinEvent')
     CompanyName          = 'Evotec'
     CompatiblePSEditions = @('Desktop', 'Core')
     Copyright            = '(c) 2011 - 2024 Przemyslaw Klys @ Evotec. All rights reserved.'
