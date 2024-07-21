@@ -28,7 +28,7 @@ Build-Module -ModuleName 'PSEventViewer' {
 
         PowerShellVersion    = '5.1'
     }
-    New-ConfigurationManifest @Manifest
+    New-ConfigurationManifest @Manifest #-CmdletsToExport 'Find-WinEvent', 'Write-WinEvent', 'Start-EventWatching'
 
     # Add standard module dependencies (directly, but can be used with loop as well)
     New-ConfigurationModule -Type RequiredModule -Name 'PSSharedGoods' -Guid 'Auto' -Version 'Latest'
@@ -88,7 +88,22 @@ Build-Module -ModuleName 'PSEventViewer' {
     # configuration for documentation, at the same time it enables documentation processing
     New-ConfigurationDocumentation -Enable:$false -StartClean -UpdateWhenNew -PathReadme 'Docs\Readme.md' -Path 'Docs'
 
-   # New-ConfigurationImportModule -ImportSelf
+    # New-ConfigurationImportModule -ImportSelf
+
+    # $newConfigurationBuildSplat = @{
+    #     Enable                            = $true
+    #     SignModule                        = $true
+    #     MergeModuleOnBuild                = $true
+    #     MergeFunctionsFromApprovedModules = $true
+    #     CertificateThumbprint             = '483292C9E317AA13B07BB7A96AE9D1A5ED9E7703'
+    #     ResolveBinaryConflicts            = $false
+    #     ResolveBinaryConflictsName        = 'PSEventViewer.PowerShell'
+    #     NETProjectName                    = 'PSEventViewer.PowerShell'
+    #     NETBinaryModule                   = 'PSEventViewer.PowerShell.dll'
+    #     NETConfiguration                  = 'Release'
+    #     NETFramework                      = 'netstandard2.0', 'net472'
+    #     DotSourceLibraries                = $true
+    # }
 
     $newConfigurationBuildSplat = @{
         Enable                            = $true
@@ -96,13 +111,16 @@ Build-Module -ModuleName 'PSEventViewer' {
         MergeModuleOnBuild                = $true
         MergeFunctionsFromApprovedModules = $true
         CertificateThumbprint             = '483292C9E317AA13B07BB7A96AE9D1A5ED9E7703'
-        ResolveBinaryConflicts            = $false
-        ResolveBinaryConflictsName        = 'PSEventViewer.PowerShell'
-        NETProjectName                    = 'PSEventViewer.PowerShell'
-        NETBinaryModule                   = 'PSEventViewer.PowerShell.dll'
+        ResolveBinaryConflicts            = $true
+        ResolveBinaryConflictsName        = 'PSEventViewer'
+        NETProjectName                    = 'PSEventViewer'
         NETConfiguration                  = 'Release'
-        NETFramework                      = 'netstandard2.0','net472'
+        NETFramework                      = 'net6.0', 'net472'
+        NETHandleAssemblyWithSameName     = $true
+        #NETMergeLibraryDebugging          = $true
         DotSourceLibraries                = $true
+        DotSourceClasses                  = $true
+        DeleteTargetModuleBeforeBuild     = $true
     }
 
     New-ConfigurationBuild @newConfigurationBuildSplat
