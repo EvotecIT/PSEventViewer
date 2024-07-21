@@ -144,6 +144,8 @@ namespace EventViewerX {
                             return new ADUserLockouts(eventObject);
                         case NamedEvents.ADUserLogon:
                             return new ADUserLogon(eventObject);
+                        case NamedEvents.ADUserLogonKerberos:
+                            return new ADUserLogonKerberos(eventObject);
                         case NamedEvents.ADUserUnlocked:
                             return new ADUserUnlocked(eventObject);
 
@@ -178,7 +180,7 @@ namespace EventViewerX {
                         case NamedEvents.OSTimeChange:
                             return new OSTimeChange(eventObject);
                         default:
-                            throw new ArgumentException($"Invalid NamedEvents value: {typeEvents}");
+                            throw new ArgumentException($"You forgot to add NamedEvents value properly: {typeEvents}");
                     }
                 }
             }
