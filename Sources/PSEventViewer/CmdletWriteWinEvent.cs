@@ -18,6 +18,7 @@ public sealed class CmdletWriteWinEvent : AsyncPSCmdlet {
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
     public int Category;
 
+    [Alias("EntryType")]
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
     public System.Diagnostics.EventLogEntryType EventLogEntryType = System.Diagnostics.EventLogEntryType.Information;
 
