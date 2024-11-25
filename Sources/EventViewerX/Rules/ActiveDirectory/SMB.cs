@@ -26,7 +26,6 @@ namespace EventViewerX.Rules.ActiveDirectory {
             Action = _eventObject.MessageSubject;
             ClientAddress = _eventObject.GetValueFromDataDictionary("ClientName");
             When = _eventObject.TimeCreated;
-
             InitializeClientDNSNameAsync().Wait();
         }
 
@@ -34,8 +33,17 @@ namespace EventViewerX.Rules.ActiveDirectory {
             if (string.IsNullOrEmpty(clientAddress)) {
                 return null;
             }
-            var result = await ClientX.QueryDns(clientAddress, DnsRecordType.PTR);
-            return string.Join(", ", result.AnswersMinimal.Select(answer => answer.Data));
+
+            try {
+                Settings._logger.WriteVerbose($"Querying DNS for address: {clientAddress}");
+                var result = await ClientX.QueryDns(clientAddress, DnsRecordType.PTR);
+                var resolvedNames = string.Join(", ", result.AnswersMinimal.Select(answer => answer.Data));
+                Settings._logger.WriteVerbose($"Resolved names: {resolvedNames}");
+                return resolvedNames;
+            } catch (Exception ex) {
+                Settings._logger.WriteWarning($"Querying DNS for address: {clientAddress} failed: {ex.Message}");
+                return null;
+            }
         }
 
         private async Task InitializeClientDNSNameAsync() {
