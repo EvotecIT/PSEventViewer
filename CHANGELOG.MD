@@ -1,5 +1,10 @@
 ﻿### Changelog
 
+#### 2.2.0 - 2024.11.25 *EXPERIMENTAL*
+* Add smbv1 by @PrzemyslawKlys in https://github.com/EvotecIT/PSEventViewer/pull/21
+
+**Full Changelog**: https://github.com/EvotecIT/PSEventViewer/compare/v2.1.0...v2.2.0
+
 #### 2.1.0 - 2024.08.30 *EXPERIMENTAL*
 - Fixes missing alias for `Write-WinEvent` for one of properties
 
