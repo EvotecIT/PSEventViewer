@@ -1,5 +1,10 @@
 ﻿### Changelog
 
+#### 2.3.0 - 2024.11.25 *EXPERIMENTAL*
+- Fix for SMBv1
+
+**Full Changelog**: https://github.com/EvotecIT/PSEventViewer/compare/v2.2.0...v2.3.0
+
 #### 2.2.0 - 2024.11.25 *EXPERIMENTAL*
 * Add smbv1 by @PrzemyslawKlys in https://github.com/EvotecIT/PSEventViewer/pull/21
 
