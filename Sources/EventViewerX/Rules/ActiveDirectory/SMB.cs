@@ -1,7 +1,4 @@
-﻿
-using System;
-
-namespace EventViewerX.Rules.ActiveDirectory {
+﻿namespace EventViewerX.Rules.ActiveDirectory {
     /// <summary>
     /// SMB Server Audit
     /// 3000: SMB1 access
@@ -16,8 +13,8 @@ namespace EventViewerX.Rules.ActiveDirectory {
     public class SMBServerAudit : EventObjectSlim {
         public string Computer;
         public string Action;
-        public string ClientName;
         public string ClientAddress;
+        //public string ClientDNSName;
         public DateTime When;
 
         public SMBServerAudit(EventObject eventObject) : base(eventObject) {
@@ -26,7 +23,8 @@ namespace EventViewerX.Rules.ActiveDirectory {
 
             Computer = _eventObject.ComputerName;
             Action = _eventObject.MessageSubject;
-            ClientAddress = _eventObject.GetValueFromDataDictionary("Client Address");
+            ClientAddress = _eventObject.GetValueFromDataDictionary("ClientName");
+            // ClientDNSName = await ClientX.QueryDns(ClientAddress, DnsRecordType.PTR);
             When = _eventObject.TimeCreated;
         }
     }
