@@ -1,4 +1,6 @@
-﻿namespace EventViewerX.Rules.ActiveDirectory {
+﻿using DnsClientX;
+
+namespace EventViewerX.Rules.ActiveDirectory {
     /// <summary>
     /// SMB Server Audit
     /// 3000: SMB1 access
@@ -14,18 +16,30 @@
         public string Computer;
         public string Action;
         public string ClientAddress;
-        //public string ClientDNSName;
+        public string ClientDNSName;
         public DateTime When;
 
         public SMBServerAudit(EventObject eventObject) : base(eventObject) {
             _eventObject = eventObject;
             Type = "ADSMBServerAuditV1";
-
             Computer = _eventObject.ComputerName;
             Action = _eventObject.MessageSubject;
             ClientAddress = _eventObject.GetValueFromDataDictionary("ClientName");
-            // ClientDNSName = await ClientX.QueryDns(ClientAddress, DnsRecordType.PTR);
             When = _eventObject.TimeCreated;
+
+            InitializeClientDNSNameAsync().Wait();
+        }
+
+        private static async Task<string> QueryDnsAsync(string clientAddress) {
+            if (string.IsNullOrEmpty(clientAddress)) {
+                return null;
+            }
+            var result = await ClientX.QueryDns(clientAddress, DnsRecordType.PTR);
+            return string.Join(", ", result.AnswersMinimal.Select(answer => answer.Data));
+        }
+
+        private async Task InitializeClientDNSNameAsync() {
+            ClientDNSName = await QueryDnsAsync(ClientAddress);
         }
     }
 }
