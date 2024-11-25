@@ -16,7 +16,7 @@ namespace EventViewerX.Rules.ActiveDirectory {
         public DateTime When;
 
         public string LogName = "Directory Service";
-        public List<int> EventID = [2887];
+        //public List<int> EventID = [2887];
 
         public ADLdapBindingSummary(EventObject eventObject) : base(eventObject) {
             _eventObject = eventObject;
@@ -45,7 +45,7 @@ namespace EventViewerX.Rules.ActiveDirectory {
         public DateTime When;
 
         public string LogName = "Directory Service";
-        public List<int> EventID = [2889];
+        //public List<int> EventID = [2889];
 
 
         public ADLdapBindingDetails(EventObject eventObject) : base(eventObject) {
