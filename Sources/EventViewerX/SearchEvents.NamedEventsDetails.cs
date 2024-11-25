@@ -40,6 +40,8 @@ namespace EventViewerX {
         OSCrash,
         OSStartupShutdownCrash,
         OSTimeChange,
+
+        ADSMBServerAuditV1,
     }
 
     public partial class SearchEvents : Settings {
@@ -71,6 +73,8 @@ namespace EventViewerX {
             // ldap events
             { NamedEvents.ADLdapBindingSummary, (new List<int> { 2887 }, "Directory Service") },
             { NamedEvents.ADLdapBindingDetails,(new List<int> { 2889 }, "Directory Service") },
+            // samba
+            { NamedEvents.ADSMBServerAuditV1, (new List<int> { 3000 }, "Microsoft-Windows-SMBServer/Audit") },
             // logs cleared
             { NamedEvents.LogsClearedSecurity, (new List<int> { 1102,1105 }, "Security") },
             { NamedEvents.LogsClearedOther,(new List<int> { 104 }, "System") },
@@ -179,6 +183,8 @@ namespace EventViewerX {
                             return new OSStartupShutdownCrash(eventObject);
                         case NamedEvents.OSTimeChange:
                             return new OSTimeChange(eventObject);
+                        case NamedEvents.ADSMBServerAuditV1:
+                            return new SMBServerAudit(eventObject);
                         default:
                             throw new ArgumentException($"You forgot to add NamedEvents value properly: {typeEvents}");
                     }
