@@ -62,9 +62,9 @@ public class EventObjectSlim {
         if (hexValue == null || hexValue.Trim() == "-") {
             return "";
         }
-        // <Data Name="OldUacValue">0x10</Data> 
-        // <Data Name="NewUacValue">0x11</Data> 
-        // <Data Name="UserAccountControl">%%2080</Data> 
+        // <Data Name="OldUacValue">0x10</Data>
+        // <Data Name="NewUacValue">0x11</Data>
+        // <Data Name="UserAccountControl">%%2080</Data>
 
         // Convert the hexadecimal value to an integer
         int uacValue = int.Parse(hexValue, System.Globalization.NumberStyles.HexNumber);

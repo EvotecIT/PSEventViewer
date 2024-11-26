@@ -184,7 +184,7 @@ namespace EventViewerX {
                         case NamedEvents.OSTimeChange:
                             return new OSTimeChange(eventObject);
                         case NamedEvents.ADSMBServerAuditV1:
-                            return new SMBServerAudit(eventObject);
+                            return SMBServerAudit.Create(eventObject);
                         default:
                             throw new ArgumentException($"You forgot to add NamedEvents value properly: {typeEvents}");
                     }

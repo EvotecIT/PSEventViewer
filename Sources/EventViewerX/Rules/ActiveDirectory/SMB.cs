@@ -13,21 +13,33 @@ namespace EventViewerX.Rules.ActiveDirectory {
     /// AuditSmb1Access => REG_DWORD => 1
     /// </summary>
     public class SMBServerAudit : EventObjectSlim {
+       // public EventObject EventObject { get; }
         public string Computer;
         public string Action;
         public string ClientAddress;
-        public string ClientDNSName;
+        public string ClientDNSName = string.Empty;
         public DateTime When;
 
-        public SMBServerAudit(EventObject eventObject) : base(eventObject) {
+        // private ctor that performs partial initialization
+        private SMBServerAudit(EventObject eventObject) : base(eventObject) {
+            //EventObject = eventObject;
+
             _eventObject = eventObject;
             Type = "ADSMBServerAuditV1";
             Computer = _eventObject.ComputerName;
             Action = _eventObject.MessageSubject;
             ClientAddress = _eventObject.GetValueFromDataDictionary("ClientName");
             When = _eventObject.TimeCreated;
-            InitializeClientDNSNameAsync().Wait();
         }
+
+        // static instance creation method to hide the async initialization
+        public static SMBServerAudit Create(EventObject eventObject) {
+            var smbAudit = new SMBServerAudit(eventObject);
+            // smbAudit.ClientDNSName = QueryDnsAsync(smbAudit.ClientAddress).ConfigureAwait(false).GetAwaiter().GetResult();
+            smbAudit.ClientDNSName = Task.Run(() => QueryDnsAsync(smbAudit.ClientAddress)).Result;
+            return smbAudit;
+        }
+
 
         private static async Task<string> QueryDnsAsync(string clientAddress) {
             if (string.IsNullOrEmpty(clientAddress)) {
@@ -44,10 +56,6 @@ namespace EventViewerX.Rules.ActiveDirectory {
                 Settings._logger.WriteWarning($"Querying DNS for address: {clientAddress} failed: {ex.Message}");
                 return null;
             }
-        }
-
-        private async Task InitializeClientDNSNameAsync() {
-            ClientDNSName = await QueryDnsAsync(ClientAddress);
         }
     }
 }

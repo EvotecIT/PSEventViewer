@@ -1,4 +1,5 @@
-﻿using System;
+﻿//using DnsClientX;
+using System;
 
 namespace EventViewerX.Rules.ActiveDirectory {
     /// Active Directory Computer Change Detailed
@@ -17,6 +18,12 @@ namespace EventViewerX.Rules.ActiveDirectory {
         public string FieldChanged;
         public string FieldValue;
 
+        //public string ClientDNSName;
+
+        /// <summary>
+        /// Active Directory Computer Change Detailed
+        /// </summary>
+        /// <param name="eventObject"></param>
         public ADComputerChangeDetailed(EventObject eventObject) : base(eventObject) {
             // common fields
             _eventObject = eventObject;
@@ -26,7 +33,7 @@ namespace EventViewerX.Rules.ActiveDirectory {
             Action = _eventObject.MessageSubject;
             Who = _eventObject.GetValueFromDataDictionary("SubjectUserName", "SubjectDomainName", "\\", reverseOrder: true);
             When = _eventObject.TimeCreated;
-            // 
+            //
             OperationType = ConvertFromOperationType(_eventObject.Data["OperationType"]);
             ComputerObject = _eventObject.GetValueFromDataDictionary("ObjectDN");
             FieldChanged = _eventObject.GetValueFromDataDictionary("AttributeLDAPDisplayName");
@@ -35,7 +42,25 @@ namespace EventViewerX.Rules.ActiveDirectory {
             ComputerObject = OverwriteByField(Action, "A directory service object was moved.", ComputerObject, _eventObject.GetValueFromDataDictionary("OldObjectDN"));
             FieldValue = OverwriteByField(Action, "A directory service object was moved.", FieldValue, _eventObject.GetValueFromDataDictionary("NewObjectDN"));
 
+            //ClientDNSName = QueryDnsAsync("1.1.1.1").ConfigureAwait(false).GetAwaiter().GetResult();
         }
+
+        //private static async Task<string> QueryDnsAsync(string clientAddress) {
+        //    if (string.IsNullOrEmpty(clientAddress)) {
+        //        return null;
+        //    }
+
+        //    try {
+        //        Settings._logger.WriteVerbose($"Querying DNS for address: {clientAddress}");
+        //        var result = await ClientX.QueryDns(clientAddress, DnsRecordType.PTR);
+        //        var resolvedNames = string.Join(", ", result.AnswersMinimal.Select(answer => answer.Data));
+        //        Settings._logger.WriteVerbose($"Resolved names: {resolvedNames}");
+        //        return resolvedNames;
+        //    } catch (Exception ex) {
+        //        Settings._logger.WriteWarning($"Querying DNS for address: {clientAddress} failed: {ex.Message}");
+        //        return null;
+        //    }
+        //}
     }
 
     /// <summary>
