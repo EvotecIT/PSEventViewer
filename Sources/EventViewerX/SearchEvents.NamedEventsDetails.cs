@@ -27,6 +27,7 @@ namespace EventViewerX {
         ADUserLockouts,
         ADUserLogon,
         ADUserLogonKerberos,
+        ADUserLogonFailed,
         ADUserUnlocked,
         ADOrganizationalUnitChangeDetailed,
         ADOtherChangeDetailed,
@@ -66,6 +67,7 @@ namespace EventViewerX {
             { NamedEvents.ADOrganizationalUnitChangeDetailed, (new List<int> { 5136, 5137, 5139, 5141 }, "Security") },
             { NamedEvents.ADUserLockouts, (new List<int> { 4740 }, "Security") },
             { NamedEvents.ADUserLogon, (new List<int> { 4624 }, "Security") },
+            { NamedEvents.ADUserLogonFailed, (new List<int> { 4625}, "Security")},
             { NamedEvents.ADUserLogonKerberos, (new List<int> { 4768 }, "Security") },
             { NamedEvents.ADUserUnlocked, (new List<int> { 4767 }, "Security") },
             // other based events
@@ -150,6 +152,8 @@ namespace EventViewerX {
                             return new ADUserLogon(eventObject);
                         case NamedEvents.ADUserLogonKerberos:
                             return new ADUserLogonKerberos(eventObject);
+                        case NamedEvents.ADUserLogonFailed:
+                            return new ADUserLogonFailed(eventObject);
                         case NamedEvents.ADUserUnlocked:
                             return new ADUserUnlocked(eventObject);
 
