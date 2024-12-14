@@ -123,7 +123,7 @@ public sealed class CmdletFindEvent : AsyncPSCmdlet {
                         }
                     }
                 } else {
-                    // Let's find objets, but we will expand the properties of the object from Data to the PSObject.
+                    // Let's find objects, but we will expand the properties of the object from Data to the PSObject.
                     if (ParallelOption == ParallelOption.Disabled) {
                         if (MachineName == null) {
                             foreach (var eventObject in SearchEvents.QueryLog(LogName, EventId, null, ProviderName, Keywords, Level, StartTime, EndTime, UserId, MaxEvents, EventRecordId, TimePeriod)) {
