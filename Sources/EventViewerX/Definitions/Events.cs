@@ -60,3 +60,38 @@ public enum TicketEncryptionType {
 public enum PreAuthType {
     // Add appropriate values here
 }
+
+public enum FailureReason {
+    None = 0,
+    // Common failure reasons (prefixed with %%)
+    UnknownUserNameOrBadPassword = 2304,
+    AccountRestrictions = 2305,
+    AccountLockedOut = 2307,
+    AccountExpired = 2306,
+    LogonTypeNotGranted = 2309,
+    PasswordExpired = 2308
+}
+
+public enum StatusCode : uint {
+    None = 0x0,
+    // NTSTATUS codes for logon failures
+    StatusLogonFailure = 0xC000006D,           // Unknown username or bad password
+    StatusAccountRestriction = 0xC000006E,     // User account restrictions
+    StatusInvalidLogonHours = 0xC000006F,      // Invalid logon hours
+    StatusInvalidWorkstation = 0xC0000070,     // Invalid workstation
+    StatusPasswordExpired = 0xC0000071,        // Password expired
+    StatusAccountDisabled = 0xC0000072,        // Account disabled
+    StatusAccountLockedOut = 0xC0000234,       // Account locked out
+    StatusAccountExpired = 0xC0000193,         // Account expired
+    StatusLogonTypeNotGranted = 0xC000015B,    // Logon type not granted
+    StatusNoTrust = 0xC000005E                 // No trust SAM account
+}
+
+public enum SubStatusCode : uint {
+    None = 0x0,
+    // Add any specific substatus codes as they are discovered
+    StatusInvalidLogonHours = 0xC000006F,
+    StatusInvalidWorkstation = 0xC0000070,
+    StatusPasswordExpired = 0xC0000071,
+    StatusAccountDisabled = 0xC0000072
+}
