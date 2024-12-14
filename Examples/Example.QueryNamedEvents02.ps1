@@ -2,9 +2,10 @@
 Import-Module $PSScriptRoot\..\PSEventViewer.psd1 -Force
 
 $findWinEventSplat = @{
-    Type        = 'ADComputerChangeDetailed', 'ADUserChangeDetailed', 'ADGroupChange', 'ADGroupCreateDelete', 'ADGroupMembershipChange'
-    MachineName = 'AD1', 'AD2', 'AD0'
+    Type        = 'ADUserLogonFailed'  # 'ADComputerChangeDetailed', 'ADUserChangeDetailed', 'ADGroupChange', 'ADGroupCreateDelete', 'ADGroupMembershipChange'
+    MachineName = 'AD1', 'AD2', 'AD0', 'ADCS'
     Verbose     = $true
 }
 
-Find-WinEvent @findWinEventSplat -TimePeriod Today | Format-Table
+Find-WinEvent @findWinEventSplat -TimePeriod CurrentDay | Format-List
+##Test | Format-Table
