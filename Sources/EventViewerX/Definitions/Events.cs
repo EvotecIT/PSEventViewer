@@ -37,8 +37,6 @@ public enum LogonType {
     CachedInteractive = 11
 }
 
-
-// Enums for the new methods
 public enum TicketOptions {
     // Add appropriate values here
 }
