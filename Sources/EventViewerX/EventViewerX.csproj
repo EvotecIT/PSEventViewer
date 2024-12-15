@@ -30,4 +30,7 @@
 		<Using Include="System.Net" />
 		<Using Include="System.Diagnostics" />
 	</ItemGroup>
+	<ItemGroup>
+	  <Folder Include="Rules\CertificateAuthority\" />
+	</ItemGroup>
 </Project>
