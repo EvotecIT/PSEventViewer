@@ -67,7 +67,7 @@ namespace EventViewerX {
             { NamedEvents.ADGroupChangeDetailed, (new List<int> { 5136, 5137, 5139, 5141 }, "Security") },
             // group policy events
             { NamedEvents.ADGroupPolicyChanges, ([5136, 5137, 5141], "Security")},
-            { NamedEvents.ADGroupPolicyChangesDetailed, ([5136, 5137, 5141], "Security")},
+            //{ NamedEvents.ADGroupPolicyChangesDetailed, ([5136, 5137, 5141], "Security")},
             { NamedEvents.ADGroupPolicyEdits, ([5136, 5137, 5141], "Security")},
             { NamedEvents.ADGroupPolicyLinks, ([5136, 5137, 5141], "Security")},
             // user based events
@@ -166,10 +166,9 @@ namespace EventViewerX {
                             return new ADUserLogonFailed(eventObject);
                         case NamedEvents.ADUserUnlocked:
                             return new ADUserUnlocked(eventObject);
-
                         // organizational unit and other events
                         case NamedEvents.ADOrganizationalUnitChangeDetailed:
-                            if (eventObject.Data["ObjectClass"] == "organizationalUnit") {
+                            if (eventObject.Data["ObjectClass"] == "organizationalUnit" && eventObject.Data["AttributeLDAPDisplayName"] != "qPLik") {
                                 return new ADOrganizationalUnitChangeDetailed(eventObject);
                             }
                             break;
@@ -200,13 +199,28 @@ namespace EventViewerX {
                         case NamedEvents.ADSMBServerAuditV1:
                             return SMBServerAudit.Create(eventObject);
                         case NamedEvents.ADGroupPolicyChanges:
-                            return new ADGroupPolicyChanges(eventObject);
-                        case NamedEvents.ADGroupPolicyChangesDetailed:
-                            return new ADGroupPolicyChangesDetailed(eventObject);
-                        case NamedEvents.ADGroupPolicyEdits:
-                            return new ADGroupPolicyEdits(eventObject);
+                            if (eventObject.Data["ObjectClass"] == "groupPolicyContainer") {
+                                return new ADGroupPolicyChanges(eventObject);
+                            }
+                            break;
+                        //case NamedEvents.ADGroupPolicyChangesDetailed:
+                        //    if (eventObject.Data["ObjectClass"] == "groupPolicyContainer") {
+                        //        return new ADGroupPolicyChangesDetailed(eventObject);
+                        //    }
+                        //    break;
                         case NamedEvents.ADGroupPolicyLinks:
-                            return new ADGroupPolicyLinks(eventObject);
+                            if ((eventObject.Data["ObjectClass"] == "domainDNS" || eventObject.Data["ObjectClass"] == "organizationalUnit")
+                                && eventObject.Data["AttributeLDAPDisplayName"] == "gPLink") {
+                                return new ADGroupPolicyLinks(eventObject);
+                            }
+                            break;
+                        case NamedEvents.ADGroupPolicyEdits:
+                            if (eventObject.Data["ObjectClass"] == "groupPolicyContainer"
+                                && eventObject.Data["AttributeLDAPDisplayName"] == "versionNumber") {
+                                return new ADGroupPolicyEdits(eventObject);
+                            }
+                            break;
+
                         default:
                             throw new ArgumentException($"You forgot to add NamedEvents value properly: {typeEvents}");
                     }
