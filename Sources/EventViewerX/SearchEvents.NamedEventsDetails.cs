@@ -20,7 +20,6 @@ namespace EventViewerX {
         ADGroupChangeDetailed,
 
         ADGroupPolicyChanges,
-        ADGroupPolicyChangesDetailed,
         ADGroupPolicyEdits,
         ADGroupPolicyLinks,
 
@@ -67,7 +66,6 @@ namespace EventViewerX {
             { NamedEvents.ADGroupChangeDetailed, (new List<int> { 5136, 5137, 5139, 5141 }, "Security") },
             // group policy events
             { NamedEvents.ADGroupPolicyChanges, ([5136, 5137, 5141], "Security")},
-            //{ NamedEvents.ADGroupPolicyChangesDetailed, ([5136, 5137, 5141], "Security")},
             { NamedEvents.ADGroupPolicyEdits, ([5136, 5137, 5141], "Security")},
             { NamedEvents.ADGroupPolicyLinks, ([5136, 5137, 5141], "Security")},
             // user based events
@@ -203,13 +201,8 @@ namespace EventViewerX {
                                 return new ADGroupPolicyChanges(eventObject);
                             }
                             break;
-                        //case NamedEvents.ADGroupPolicyChangesDetailed:
-                        //    if (eventObject.Data["ObjectClass"] == "groupPolicyContainer") {
-                        //        return new ADGroupPolicyChangesDetailed(eventObject);
-                        //    }
-                        //    break;
                         case NamedEvents.ADGroupPolicyLinks:
-                            if ((eventObject.Data["ObjectClass"] == "domainDNS" || eventObject.Data["ObjectClass"] == "organizationalUnit")
+                            if ((eventObject.Data["ObjectClass"] == "domainDNS" || eventObject.Data["ObjectClass"] == "organizationalUnit" || eventObject.Data["ObjectClass"] == "site")
                                 && eventObject.Data["AttributeLDAPDisplayName"] == "gPLink") {
                                 return new ADGroupPolicyLinks(eventObject);
                             }
