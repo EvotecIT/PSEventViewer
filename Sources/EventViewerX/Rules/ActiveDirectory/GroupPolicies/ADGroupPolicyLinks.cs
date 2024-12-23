@@ -1,4 +1,14 @@
-﻿namespace EventViewerX.Rules.ActiveDirectory;
+﻿using EventViewerX.Helpers.ActiveDirectory;
+
+namespace EventViewerX.Rules.ActiveDirectory;
+
+public class GpoLink
+{
+    public string GpoGuid { get; set; } = string.Empty;
+    public string FullDn { get; set; } = string.Empty;
+    public string GpoName { get; set; } = string.Empty;
+    public bool IsEnabled { get; set; }
+}
 
 public class ADGroupPolicyLinks : EventObjectSlim {
     public string Computer;
@@ -11,6 +21,8 @@ public class ADGroupPolicyLinks : EventObjectSlim {
     public string OrganizationalUnit;
     public string AttributeLDAPDisplayName;
     public string AttributeValue;
+    public List<GpoLink> GposLinked { get; set; } = new();
+    public List<GpoLink> GposUnlinked { get; set; } = new();
 
     public ADGroupPolicyLinks(EventObject eventObject) : base(eventObject) {
         _eventObject = eventObject;
@@ -25,9 +37,42 @@ public class ADGroupPolicyLinks : EventObjectSlim {
         OrganizationalUnit = _eventObject.GetValueFromDataDictionary("ObjectDN");
         AttributeLDAPDisplayName = _eventObject.GetValueFromDataDictionary("AttributeLDAPDisplayName");
         AttributeValue = _eventObject.GetValueFromDataDictionary("AttributeValue");
+        var gpoLinks = ExtractGpoLinks(AttributeValue);
 
-// AttributeValue           : [LDAP://cn={E6422062-F0B5-4760-ABCC-4075DA2D4094},cn=policies,cn=system,DC=ad,DC=evotec,DC=xyz;0][LDAP://cn={1D011660-6649-4151-B87E-E24487032776},cn=policies,cn=system,DC=ad,DC=evotec,DC=xyz;0]
+        if (OperationType.Contains("Value Added")) {
+            GposLinked = gpoLinks;
+        } else if (OperationType.Contains("Value Deleted")) {
+            GposUnlinked = gpoLinks;
+        }
+    }
 
+    private static List<GpoLink> ExtractGpoLinks(string ldapString) {
+        var links = new List<GpoLink>();
+        if (!string.IsNullOrEmpty(ldapString)) {
+            // e.g. [LDAP://cn={E6422062-F0B5-4760-ABCC-4075DA2D4094},cn=policies,...;0]
+            var pattern = @"\[LDAP://(?<dn>[^;]+);(?<flag>\d+)\]";
+            var matches = System.Text.RegularExpressions.Regex.Matches(ldapString, pattern);
+            foreach (System.Text.RegularExpressions.Match match in matches) {
+                if (match.Success) {
+                    var gpoLink = new GpoLink {
+                        FullDn = match.Groups["dn"].Value,
+                        IsEnabled = match.Groups["flag"].Value == "0"
+                    };
+                    // parse out the GUID from the DN
+                    var guidPattern = @"cn=\{(?<guid>[0-9A-Fa-f-]+)\}";
+                    var guidMatch = System.Text.RegularExpressions.Regex.Match(gpoLink.FullDn, guidPattern);
+                    if (guidMatch.Success) {
+                        gpoLink.GpoGuid = guidMatch.Groups["guid"].Value;
+                        var foundGpo = GroupPolicies.QueryGroupPolicyById(gpoLink.GpoGuid);
+                        if (foundGpo != null) {
+                            gpoLink.GpoName = foundGpo.GpoName;
+                        }
+                    }
+                    links.Add(gpoLink);
+                }
+            }
+        }
+        return links;
     }
 }
 
@@ -37,7 +82,7 @@ public class ADGroupPolicyLinks : EventObjectSlim {
 //   <Provider Name="Microsoft-Windows-Security-Auditing" Guid="{54849625-5478-4994-a5ba-3e3b0328c30d}" />
 //   <EventID>5136</EventID>
 //   <Version>0</Version>
-//   <Level>0</Level>
+//   <Level>0</Version>
 //   <Task>14081</Task>
 //   <Opcode>0</Opcode>
 //   <Keywords>0x8020000000000000</Keywords>
@@ -72,7 +117,7 @@ public class ADGroupPolicyLinks : EventObjectSlim {
 //   <Provider Name="Microsoft-Windows-Security-Auditing" Guid="{54849625-5478-4994-a5ba-3e3b0328c30d}" />
 //   <EventID>5136</EventID>
 //   <Version>0</Version>
-//   <Level>0</Level>
+//   <Level>0</Version>
 //   <Task>14081</Task>
 //   <Opcode>0</Opcode>
 //   <Keywords>0x8020000000000000</Keywords>
