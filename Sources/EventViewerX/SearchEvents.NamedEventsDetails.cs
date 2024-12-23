@@ -19,6 +19,11 @@ namespace EventViewerX {
         ADGroupCreateDelete,
         ADGroupChangeDetailed,
 
+        ADGroupPolicyChanges,
+        ADGroupPolicyChangesDetailed,
+        ADGroupPolicyEdits,
+        ADGroupPolicyLinks,
+
         ADLdapBindingSummary,
         ADLdapBindingDetails,
         ADUserCreateChange,
@@ -32,6 +37,8 @@ namespace EventViewerX {
         ADOrganizationalUnitChangeDetailed,
         ADOtherChangeDetailed,
 
+        ADSMBServerAuditV1,
+
         LogsClearedSecurity,
         LogsClearedOther,
         LogsFullSecurity,
@@ -41,8 +48,6 @@ namespace EventViewerX {
         OSCrash,
         OSStartupShutdownCrash,
         OSTimeChange,
-
-        ADSMBServerAuditV1,
     }
 
     public partial class SearchEvents : Settings {
@@ -60,6 +65,11 @@ namespace EventViewerX {
             { NamedEvents.ADGroupChange, (new List<int> { 4735, 4737, 4745, 4750, 4760, 4764, 4784, 4791 }, "Security") },
             { NamedEvents.ADGroupCreateDelete, (new List<int> { 4727, 4730, 4731, 4734, 4744, 4748, 4749, 4753, 4754, 4758, 4759, 4763 }, "Security") },
             { NamedEvents.ADGroupChangeDetailed, (new List<int> { 5136, 5137, 5139, 5141 }, "Security") },
+            // group policy events
+            { NamedEvents.ADGroupPolicyChanges, ([5136, 5137, 5141], "Security")},
+            { NamedEvents.ADGroupPolicyChangesDetailed, ([5136, 5137, 5141], "Security")},
+            { NamedEvents.ADGroupPolicyEdits, ([5136, 5137, 5141], "Security")},
+            { NamedEvents.ADGroupPolicyLinks, ([5136, 5137, 5141], "Security")},
             // user based events
             { NamedEvents.ADUserCreateChange, ([4720, 4738], "Security") },
             { NamedEvents.ADUserStatus, ([4722, 4725, 4723, 4724, 4726], "Security") },
