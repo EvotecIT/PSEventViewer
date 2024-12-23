@@ -199,6 +199,14 @@ namespace EventViewerX {
                             return new OSTimeChange(eventObject);
                         case NamedEvents.ADSMBServerAuditV1:
                             return SMBServerAudit.Create(eventObject);
+                        case NamedEvents.ADGroupPolicyChanges:
+                            return new ADGroupPolicyChanges(eventObject);
+                        case NamedEvents.ADGroupPolicyChangesDetailed:
+                            return new ADGroupPolicyChangesDetailed(eventObject);
+                        case NamedEvents.ADGroupPolicyEdits:
+                            return new ADGroupPolicyEdits(eventObject);
+                        case NamedEvents.ADGroupPolicyLinks:
+                            return new ADGroupPolicyLinks(eventObject);
                         default:
                             throw new ArgumentException($"You forgot to add NamedEvents value properly: {typeEvents}");
                     }
