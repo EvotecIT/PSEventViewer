@@ -1,6 +1,5 @@
 using System.DirectoryServices;
 using System.DirectoryServices.ActiveDirectory;
-#pragma warning disable CA1416
 
 namespace EventViewerX.Helpers.ActiveDirectory;
 
