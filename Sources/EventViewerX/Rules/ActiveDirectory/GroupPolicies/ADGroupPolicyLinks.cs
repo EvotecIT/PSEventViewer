@@ -111,7 +111,7 @@ public class ADGroupPolicyLinks : EventObjectSlim {
                     var guidMatch = System.Text.RegularExpressions.Regex.Match(gpoLink.DistinguishedName, guidPattern);
                     if (guidMatch.Success) {
                         gpoLink.Guid = guidMatch.Groups["guid"].Value;
-                        var foundGpo = GroupPolicies.QueryGroupPolicyByDistinguishedName(gpoLink.DistinguishedName);
+                        var foundGpo = GroupPolicyHelpers.QueryGroupPolicyByDistinguishedName(gpoLink.DistinguishedName);
                         if (foundGpo != null) {
                             gpoLink.DisplayName = foundGpo.GpoName;
                         }
