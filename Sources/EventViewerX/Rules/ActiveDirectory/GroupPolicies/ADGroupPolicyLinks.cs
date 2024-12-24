@@ -2,47 +2,43 @@
 
 namespace EventViewerX.Rules.ActiveDirectory;
 
-public class GpoLink
-{
-    public string GpoGuid { get; set; } = string.Empty;
-    public string FullDn { get; set; } = string.Empty;
-    public string GpoName { get; set; } = string.Empty;
-    public bool IsEnabled { get; set; }
-}
-
 public class ADGroupPolicyLinks : EventObjectSlim {
     public string Computer;
     public string Action;
-    //public string ObjectClass;
     public string OperationType;
     public string Who;
     public DateTime When;
     public string DomainName;
-    public string OrganizationalUnit;
-    public string AttributeLDAPDisplayName;
-    public string AttributeValue;
-    public List<GpoLink> GposLinked { get; set; } = new();
-    public List<GpoLink> GposUnlinked { get; set; } = new();
+    public string LinkedToType;
+    public string LinkedTo;
+    // public string AttributeLDAPDisplayName;
+    // public string AttributeValue;
+    public List<string> GroupPolicyNames { get; set; } = new();
+    public List<GpoLink> GroupPolicyLink { get; set; } = new();
+    public List<GpoLink> GroupPolicyUnlink { get; set; } = new();
 
     public ADGroupPolicyLinks(EventObject eventObject) : base(eventObject) {
         _eventObject = eventObject;
         Type = "ADGroupPolicyLinks";
         Computer = _eventObject.ComputerName;
-        Action = _eventObject.MessageSubject;
-        //ObjectClass = _eventObject.GetValueFromDataDictionary("ObjectClass");
+        //Action = _eventObject.MessageSubject;
+        LinkedToType = _eventObject.GetValueFromDataDictionary("ObjectClass");
         OperationType = ConvertFromOperationType(_eventObject.Data["OperationType"]);
         Who = _eventObject.GetValueFromDataDictionary("SubjectUserName", "SubjectDomainName", "\\", reverseOrder: true);
         When = _eventObject.TimeCreated;
         DomainName = _eventObject.GetValueFromDataDictionary("DSName");
-        OrganizationalUnit = _eventObject.GetValueFromDataDictionary("ObjectDN");
-        AttributeLDAPDisplayName = _eventObject.GetValueFromDataDictionary("AttributeLDAPDisplayName");
-        AttributeValue = _eventObject.GetValueFromDataDictionary("AttributeValue");
-        var gpoLinks = ExtractGpoLinks(AttributeValue);
-
+        LinkedTo = _eventObject.GetValueFromDataDictionary("ObjectDN");
+        // AttributeLDAPDisplayName = _eventObject.GetValueFromDataDictionary("AttributeLDAPDisplayName");
+        var attributeValue = _eventObject.GetValueFromDataDictionary("AttributeValue");
+        var gpoLinks = ExtractGpoLinks(attributeValue);
         if (OperationType.Contains("Value Added")) {
-            GposLinked = gpoLinks;
+            Action = "Group Policies were linked";
+            GroupPolicyLink = gpoLinks;
+            GroupPolicyNames = gpoLinks.Select(x => x.DisplayName).ToList();
         } else if (OperationType.Contains("Value Deleted")) {
-            GposUnlinked = gpoLinks;
+            Action = "Group Policies were unlinked";
+            GroupPolicyUnlink = gpoLinks;
+            GroupPolicyNames = gpoLinks.Select(x => x.DisplayName).ToList();
         }
     }
 
@@ -55,17 +51,17 @@ public class ADGroupPolicyLinks : EventObjectSlim {
             foreach (System.Text.RegularExpressions.Match match in matches) {
                 if (match.Success) {
                     var gpoLink = new GpoLink {
-                        FullDn = match.Groups["dn"].Value,
+                        DistinguishedName = match.Groups["dn"].Value,
                         IsEnabled = match.Groups["flag"].Value == "0"
                     };
                     // parse out the GUID from the DN
                     var guidPattern = @"cn=\{(?<guid>[0-9A-Fa-f-]+)\}";
-                    var guidMatch = System.Text.RegularExpressions.Regex.Match(gpoLink.FullDn, guidPattern);
+                    var guidMatch = System.Text.RegularExpressions.Regex.Match(gpoLink.DistinguishedName, guidPattern);
                     if (guidMatch.Success) {
-                        gpoLink.GpoGuid = guidMatch.Groups["guid"].Value;
-                        var foundGpo = GroupPolicies.QueryGroupPolicyById(gpoLink.GpoGuid);
+                        gpoLink.Guid = guidMatch.Groups["guid"].Value;
+                        var foundGpo = GroupPolicies.QueryGroupPolicyByDn(gpoLink.DistinguishedName);
                         if (foundGpo != null) {
-                            gpoLink.GpoName = foundGpo.GpoName;
+                            gpoLink.DisplayName = foundGpo.GpoName;
                         }
                     }
                     links.Add(gpoLink);
