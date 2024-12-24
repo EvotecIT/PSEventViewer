@@ -13,36 +13,36 @@ namespace EventViewerX.Rules.ActiveDirectory;
 ///     <Provider Name="Microsoft-Windows-Security-Auditing" />
 ///     <!-- ...existing XML elements... -->
 ///     <EventID>5136</EventID>
-//      <Version>0</Version>
-//      <Level>0</Version>
-//      <Task>14081</Task>
-//      <Opcode>0</Opcode>
-//      <Keywords>0x8020000000000000</Keywords>
-//      <TimeCreated SystemTime="2024-12-23T18:21:28.8564009Z" />
-//      <EventRecordID>164206417</EventRecordID>
-//      <Correlation ActivityID="{3297f744-34cb-48ae-9913-24eced7ef9c5}" />
-//      <Execution ProcessID="712" ThreadID="5136" />
-//      <Channel>Security</Channel>
-//      <Computer>AD1.ad.evotec.xyz</Computer>
+///     <Version>0</Version>
+///     <Level>0</Version>
+///     <Task>14081</Task>
+///     <Opcode>0</Opcode>
+///     <Keywords>0x8020000000000000</Keywords>
+///     <TimeCreated SystemTime="2024-12-23T18:21:28.8564009Z" />
+///     <EventRecordID>164206417</EventRecordID>
+///     <Correlation ActivityID="{3297f744-34cb-48ae-9913-24eced7ef9c5}" />
+///     <Execution ProcessID="712" ThreadID="5136" />
+///     <Channel>Security</Channel>
+///     <Computer>AD1.ad.evotec.xyz</Computer>
 ///     <!-- ...existing XML elements... -->
 ///   </System>
 ///   <EventData>
 ///     <!-- ...existing XML elements... -->
-//      <Data Name="OpCorrelationID">{8dd5dab8-8766-4449-80a2-2a34f73376ae}</Data>
-//      <Data Name="AppCorrelationID">-</Data>
-//      <Data Name="SubjectUserSid">S-1-5-21-853615985-2870445339-3163598659-1105</Data>
-//      <Data Name="SubjectUserName">przemyslaw.klys</Data>
-//      <Data Name="SubjectDomainName">EVOTEC</Data>
-//      <Data Name="SubjectLogonId">0x13936d16</Data>
-//      <Data Name="DSName">ad.evotec.xyz</Data>
-//      <Data Name="DSType">%%14676</Data>
-//      <Data Name="ObjectDN">OU=Tier2_Option4,DC=ad,DC=evotec,DC=xyz</Data>
-//      <Data Name="ObjectGUID">{2433070c-472b-49f0-993b-fc4012ca9074}</Data>
-//      <Data Name="ObjectClass">organizationalUnit</Data>
-//      <Data Name="AttributeLDAPDisplayName">gPLink</Data>
-//      <Data Name="AttributeSyntaxOID">2.5.5.12</Data>
-//      <Data Name="AttributeValue">[LDAP://cn={E6422062-F0B5-4760-ABCC-4075DA2D4094},cn=policies,cn=system,DC=ad,DC=evotec,DC=xyz;0][LDAP://cn={1D011660-6649-4151-B87E-E24487032776},cn=policies,cn=system,DC=ad,DC=evotec,DC=xyz;0]</Data>
-//      <Data Name="OperationType">%%14674</Data>
+///     <Data Name="OpCorrelationID">{8dd5dab8-8766-4449-80a2-2a34f73376ae}</Data>
+///     <Data Name="AppCorrelationID">-</Data>
+///     <Data Name="SubjectUserSid">S-1-5-21-853615985-2870445339-3163598659-1105</Data>
+///     <Data Name="SubjectUserName">przemyslaw.klys</Data>
+///     <Data Name="SubjectDomainName">EVOTEC</Data>
+///     <Data Name="SubjectLogonId">0x13936d16</Data>
+///     <Data Name="DSName">ad.evotec.xyz</Data>
+///     <Data Name="DSType">%%14676</Data>
+///     <Data Name="ObjectDN">OU=Tier2_Option4,DC=ad,DC=evotec,DC=xyz</Data>
+///     <Data Name="ObjectGUID">{2433070c-472b-49f0-993b-fc4012ca9074}</Data>
+///     <Data Name="ObjectClass">organizationalUnit</Data>
+///     <Data Name="AttributeLDAPDisplayName">gPLink</Data>
+///     <Data Name="AttributeSyntaxOID">2.5.5.12</Data>
+///     <Data Name="AttributeValue">[LDAP://cn={E6422062-F0B5-4760-ABCC-4075DA2D4094},cn=policies,cn=system,DC=ad,DC=evotec,DC=xyz;0][LDAP://cn={1D011660-6649-4151-B87E-E24487032776},cn=policies,cn=system,DC=ad,DC=evotec,DC=xyz;0]</Data>
+///     <Data Name="OperationType">%%14674</Data>
 ///     <!-- ...existing XML elements... -->
 ///   </EventData>
 /// </Event>
@@ -111,7 +111,7 @@ public class ADGroupPolicyLinks : EventObjectSlim {
                     var guidMatch = System.Text.RegularExpressions.Regex.Match(gpoLink.DistinguishedName, guidPattern);
                     if (guidMatch.Success) {
                         gpoLink.Guid = guidMatch.Groups["guid"].Value;
-                        var foundGpo = GroupPolicies.QueryGroupPolicyByDn(gpoLink.DistinguishedName);
+                        var foundGpo = GroupPolicies.QueryGroupPolicyByDistinguishedName(gpoLink.DistinguishedName);
                         if (foundGpo != null) {
                             gpoLink.DisplayName = foundGpo.GpoName;
                         }
