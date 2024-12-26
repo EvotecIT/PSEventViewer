@@ -60,8 +60,8 @@ public class ADGroupPolicyLinks : EventObjectSlim {
     // public string AttributeLDAPDisplayName;
     // public string AttributeValue;
     public List<string> GroupPolicyNames { get; set; } = new();
-    public List<GpoLink> GroupPolicyLink { get; set; } = new();
-    public List<GpoLink> GroupPolicyUnlink { get; set; } = new();
+    public List<GroupPolicyLinks> GroupPolicyLink { get; set; } = new();
+    public List<GroupPolicyLinks> GroupPolicyUnlink { get; set; } = new();
 
     /// <summary>
     /// Initializes a new instance of the ADGroupPolicyLinks class using a specified event object.
@@ -94,15 +94,15 @@ public class ADGroupPolicyLinks : EventObjectSlim {
     /// <summary>
     /// Parses the specified LDAP string to extract associated GPO links.
     /// </summary>
-    private static List<GpoLink> ExtractGpoLinks(string ldapString) {
-        var links = new List<GpoLink>();
+    private static List<GroupPolicyLinks> ExtractGpoLinks(string ldapString) {
+        var links = new List<GroupPolicyLinks>();
         if (!string.IsNullOrEmpty(ldapString)) {
             // e.g. [LDAP://cn={E6422062-F0B5-4760-ABCC-4075DA2D4094},cn=policies,...;0]
             var pattern = @"\[LDAP://(?<dn>[^;]+);(?<flag>\d+)\]";
             var matches = System.Text.RegularExpressions.Regex.Matches(ldapString, pattern);
             foreach (System.Text.RegularExpressions.Match match in matches) {
                 if (match.Success) {
-                    var gpoLink = new GpoLink {
+                    var gpoLink = new GroupPolicyLinks {
                         DistinguishedName = match.Groups["dn"].Value,
                         IsEnabled = match.Groups["flag"].Value == "0"
                     };
