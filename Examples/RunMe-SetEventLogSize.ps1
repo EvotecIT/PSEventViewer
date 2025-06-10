@@ -9,6 +9,6 @@ Get-PSRegistry -RegistryPath 'HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\Curr
 
 Get-EventsSettings -LogName 'Application' | Format-Table
 
-Set-EventsSettings -LogName 'Application' -MaximumSizeMB 15 -Mode Circular -WhatIf
+Set-WinEventSettings -LogName 'Application' -MaximumSizeMB 15 -Mode Circular -WhatIf
 
 Get-EventsSettings -LogName 'Application' | Format-Table

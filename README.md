@@ -176,7 +176,7 @@ Using following cmdlets can help
 
 ```powershell
 Get-EventsSettings -LogName 'Application'
-Set-EventsSettings -LogName 'Application' -MaximumSizeMB 15 -Mode AutoBackup -WhatIf
+Set-WinEventSettings -LogName 'Application' -MaximumSizeMB 15 -Mode AutoBackup -WhatIf
 ```
 
 **Registry reference table:**
