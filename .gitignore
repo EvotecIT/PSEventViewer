@@ -773,3 +773,5 @@ FodyWeavers.xsd
 .vscode/*
 
 /.idea/
+dotnet-install.sh
+packages-microsoft-prod.deb
