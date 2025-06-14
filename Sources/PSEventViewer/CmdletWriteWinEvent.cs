@@ -5,6 +5,10 @@
 public sealed class CmdletWriteWinEvent : AsyncPSCmdlet {
     [Alias("ComputerName", "ServerName")]
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
+    [AllowNull]
+    [AllowEmptyString]
+    // When not provided or empty, events are written to the local machine.
+    // SearchEvents.WriteEvent and CreateLogSource handle null/empty strings.
     public string MachineName;
 
     [Parameter(Mandatory = true, Position = 0, ParameterSetName = "RecordId")]
