@@ -5,7 +5,7 @@ online version:
 schema: 2.0.0
 ---
 
-# Get-EventsInformation
+# Get-WinEventInformation
 
 ## SYNOPSIS
 Small wrapper against Get-WinEvent providing easy way to gather statistics for Event Logs.
@@ -13,7 +13,7 @@ Small wrapper against Get-WinEvent providing easy way to gather statistics for E
 ## SYNTAX
 
 ```
-Get-EventsInformation [[-Machine] <String[]>] [[-FilePath] <String[]>] [[-LogName] <String[]>]
+Get-WinEventInformation [[-Machine] <String[]>] [[-FilePath] <String[]>] [[-LogName] <String[]>]
  [[-MaxRunspaces] <Int32>] [-RunAgainstDC] [<CommonParameters>]
 ```
 
@@ -32,7 +32,7 @@ $Computer = 'EVO1','AD1','AD2'
 
 $LogName = 'Security'
 
-$Size = Get-EventsInformation -Computer $Computer -LogName $LogName
+$Size = Get-WinEventInformation -Computer $Computer -LogName $LogName
 $Size | ft -A
 
 Output:
@@ -52,22 +52,22 @@ $LogName = 'Security'
 
 $EventLogsDirectory = Get-ChildItem -Path 'C:\MyEvents'
 
-$Size = Get-EventsInformation -FilePath $EventLogsDirectory.FullName -Computer $Computers -LogName 'Security'
+$Size = Get-WinEventInformation -FilePath $EventLogsDirectory.FullName -Computer $Computers -LogName 'Security'
 $Size | ft -a
 
 Output:
 
-VERBOSE: Get-EventsInformation - processing start
-VERBOSE: Get-EventsInformation - Setting up runspace for EVO1
-VERBOSE: Get-EventsInformation - Setting up runspace for AD1
-VERBOSE: Get-EventsInformation - Setting up runspace for AD2
-VERBOSE: Get-EventsInformation - Setting up runspace for C:\MyEvents\Archive-Security-2018-08-21-23-49-19-424.evtx
-VERBOSE: Get-EventsInformation - Setting up runspace for C:\MyEvents\Archive-Security-2018-09-08-02-53-53-711.evtx
-VERBOSE: Get-EventsInformation - Setting up runspace for C:\MyEvents\Archive-Security-2018-09-14-22-13-07-710.evtx
-VERBOSE: Get-EventsInformation - Setting up runspace for C:\MyEvents\Archive-Security-2018-09-15-09-27-52-679.evtx
+VERBOSE: Get-WinEventInformation - processing start
+VERBOSE: Get-WinEventInformation - Setting up runspace for EVO1
+VERBOSE: Get-WinEventInformation - Setting up runspace for AD1
+VERBOSE: Get-WinEventInformation - Setting up runspace for AD2
+VERBOSE: Get-WinEventInformation - Setting up runspace for C:\MyEvents\Archive-Security-2018-08-21-23-49-19-424.evtx
+VERBOSE: Get-WinEventInformation - Setting up runspace for C:\MyEvents\Archive-Security-2018-09-08-02-53-53-711.evtx
+VERBOSE: Get-WinEventInformation - Setting up runspace for C:\MyEvents\Archive-Security-2018-09-14-22-13-07-710.evtx
+VERBOSE: Get-WinEventInformation - Setting up runspace for C:\MyEvents\Archive-Security-2018-09-15-09-27-52-679.evtx
 VERBOSE: AD2 Reading Event Log (Security) size failed.
 Error occured: The RPC server is unavailable
-VERBOSE: Get-EventsInformation - processing end - 0 days, 0 hours, 0 minutes, 22 seconds, 648 milliseconds
+VERBOSE: Get-WinEventInformation - processing end - 0 days, 0 hours, 0 minutes, 22 seconds, 648 milliseconds
 
 EventNewest         EventOldest          FileSize FileSizeCurrentGB FileSizeMaximumGB IsClassicLog IsEnabled IsLogFull LastAccessTime      LastWriteTime
 -----------         -----------          -------- ----------------- ----------------- ------------ --------- --------- --------------      -------------
@@ -87,20 +87,20 @@ $LogName = 'Security'
 
 $EventLogsDirectory = Get-ChildItem -Path 'C:\MyEvents'
 
-$Size = Get-EventsInformation -FilePath $EventLogsDirectory.FullName -Computer $Computers -LogName 'Security' -Verbose
+$Size = Get-WinEventInformation -FilePath $EventLogsDirectory.FullName -Computer $Computers -LogName 'Security' -Verbose
 $Size | ft -a Source, EventNewest, EventOldest,FileSize, FileSizeCurrentGB, FileSizeMaximumGB, IsEnabled, IsLogFull, LastAccessTime, LastWriteTime
 
 Output:
 
-VERBOSE: Get-EventsInformation - processing start
-VERBOSE: Get-EventsInformation - Setting up runspace for EVO1
-VERBOSE: Get-EventsInformation - Setting up runspace for AD1
-VERBOSE: Get-EventsInformation - Setting up runspace for AD1
-VERBOSE: Get-EventsInformation - Setting up runspace for C:\MyEvents\Archive-Security-2018-08-21-23-49-19-424.evtx
-VERBOSE: Get-EventsInformation - Setting up runspace for C:\MyEvents\Archive-Security-2018-09-08-02-53-53-711.evtx
-VERBOSE: Get-EventsInformation - Setting up runspace for C:\MyEvents\Archive-Security-2018-09-14-22-13-07-710.evtx
-VERBOSE: Get-EventsInformation - Setting up runspace for C:\MyEvents\Archive-Security-2018-09-15-09-27-52-679.evtx
-VERBOSE: Get-EventsInformation - processing end - 0 days, 0 hours, 0 minutes, 1 seconds, 739 milliseconds
+VERBOSE: Get-WinEventInformation - processing start
+VERBOSE: Get-WinEventInformation - Setting up runspace for EVO1
+VERBOSE: Get-WinEventInformation - Setting up runspace for AD1
+VERBOSE: Get-WinEventInformation - Setting up runspace for AD1
+VERBOSE: Get-WinEventInformation - Setting up runspace for C:\MyEvents\Archive-Security-2018-08-21-23-49-19-424.evtx
+VERBOSE: Get-WinEventInformation - Setting up runspace for C:\MyEvents\Archive-Security-2018-09-08-02-53-53-711.evtx
+VERBOSE: Get-WinEventInformation - Setting up runspace for C:\MyEvents\Archive-Security-2018-09-14-22-13-07-710.evtx
+VERBOSE: Get-WinEventInformation - Setting up runspace for C:\MyEvents\Archive-Security-2018-09-15-09-27-52-679.evtx
+VERBOSE: Get-WinEventInformation - processing end - 0 days, 0 hours, 0 minutes, 1 seconds, 739 milliseconds
 
 Source EventNewest         EventOldest          FileSize FileSizeCurrentGB FileSizeMaximumGB IsEnabled IsLogFull LastAccessTime      LastWriteTime
 ------ -----------         -----------          -------- ----------------- ----------------- --------- --------- --------------      -------------
@@ -119,17 +119,17 @@ $Computers = 'EVO1', 'AD1'
 
 $EventLogsDirectory = Get-ChildItem -Path 'C:\MyEvents'
 
-$Size = Get-EventsInformation -FilePath $EventLogsDirectory.FullName -Computer $Computers -LogName 'Security','System' -Verbose
+$Size = Get-WinEventInformation -FilePath $EventLogsDirectory.FullName -Computer $Computers -LogName 'Security','System' -Verbose
 $Size | ft -a Source, EventNewest, EventOldest,FileSize, FileSizeCurrentGB, FileSizeMaximumGB, IsEnabled, IsLogFull, LastAccessTime, LastWriteTime, LogFilePath, LOgName
 
-VERBOSE: Get-EventsInformation - processing start
-VERBOSE: Get-EventsInformation - Setting up runspace for EVO1
-VERBOSE: Get-EventsInformation - Setting up runspace for AD1
-VERBOSE: Get-EventsInformation - Setting up runspace for C:\MyEvents\Archive-Security-2018-08-21-23-49-19-424.evtx
-VERBOSE: Get-EventsInformation - Setting up runspace for C:\MyEvents\Archive-Security-2018-09-08-02-53-53-711.evtx
-VERBOSE: Get-EventsInformation - Setting up runspace for C:\MyEvents\Archive-Security-2018-09-14-22-13-07-710.evtx
-VERBOSE: Get-EventsInformation - Setting up runspace for C:\MyEvents\Archive-Security-2018-09-15-09-27-52-679.evtx
-VERBOSE: Get-EventsInformation - processing end - 0 days, 0 hours, 0 minutes, 0 seconds, 137 milliseconds
+VERBOSE: Get-WinEventInformation - processing start
+VERBOSE: Get-WinEventInformation - Setting up runspace for EVO1
+VERBOSE: Get-WinEventInformation - Setting up runspace for AD1
+VERBOSE: Get-WinEventInformation - Setting up runspace for C:\MyEvents\Archive-Security-2018-08-21-23-49-19-424.evtx
+VERBOSE: Get-WinEventInformation - Setting up runspace for C:\MyEvents\Archive-Security-2018-09-08-02-53-53-711.evtx
+VERBOSE: Get-WinEventInformation - Setting up runspace for C:\MyEvents\Archive-Security-2018-09-14-22-13-07-710.evtx
+VERBOSE: Get-WinEventInformation - Setting up runspace for C:\MyEvents\Archive-Security-2018-09-15-09-27-52-679.evtx
+VERBOSE: Get-WinEventInformation - processing end - 0 days, 0 hours, 0 minutes, 0 seconds, 137 milliseconds
 
 Source EventNewest         EventOldest          FileSize FileSizeCurrentGB FileSizeMaximumGB IsEnabled IsLogFull LastAccessTime      LastWriteTime       LogFilePath                                               LogName
 ------ -----------         -----------          -------- ----------------- ----------------- --------- --------- --------------      -------------       -----------                                               -------

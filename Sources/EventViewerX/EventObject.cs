@@ -244,5 +244,17 @@ namespace EventViewerX {
                 return "";
             }
         }
+
+        internal bool ValueMatches(string key, string expectedValue) {
+            if (key != null && Data.ContainsKey(key)) {
+                if (Data[key].Equals(expectedValue, StringComparison.OrdinalIgnoreCase)) {
+                    return true;
+                } else {
+                    return false;
+                }
+            }
+
+            return false;
+        }
     }
 }
