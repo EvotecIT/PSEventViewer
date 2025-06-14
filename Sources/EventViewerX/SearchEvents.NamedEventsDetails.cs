@@ -197,19 +197,21 @@ namespace EventViewerX {
                         case NamedEvents.ADSMBServerAuditV1:
                             return SMBServerAudit.Create(eventObject);
                         case NamedEvents.ADGroupPolicyChanges:
-                            if (eventObject.Data["ObjectClass"] == "groupPolicyContainer") {
+                            if (eventObject.Data["ObjectClass"] == "groupPolicyContainer" || eventObject.Data["ObjectClass"] == "container") {
                                 return new ADGroupPolicyChanges(eventObject);
                             }
                             break;
                         case NamedEvents.ADGroupPolicyLinks:
                             if ((eventObject.Data["ObjectClass"] == "domainDNS" || eventObject.Data["ObjectClass"] == "organizationalUnit" || eventObject.Data["ObjectClass"] == "site")
-                                && eventObject.Data["AttributeLDAPDisplayName"] == "gPLink") {
+                                 && eventObject.ValueMatches("AttributeLDAPDisplayName", "gpLink")) {
                                 return new ADGroupPolicyLinks(eventObject);
                             }
                             break;
                         case NamedEvents.ADGroupPolicyEdits:
                             if (eventObject.Data["ObjectClass"] == "groupPolicyContainer"
-                                && eventObject.Data["AttributeLDAPDisplayName"] == "versionNumber") {
+                                && eventObject.Data.TryGetValue("AttributeLDAPDisplayName", out var ldapDisplayObjName)
+                                && ldapDisplayObjName is string ldapDisplayNameValue
+                                && ldapDisplayNameValue == "versionNumber") {
                                 return new ADGroupPolicyEdits(eventObject);
                             }
                             break;
