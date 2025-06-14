@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Management.Automation;
 using System.Threading.Tasks;
 using EventViewerX;
@@ -40,14 +39,7 @@ namespace PSEventViewer {
         protected override Task ProcessRecordAsync() {
             var machines = Machine ?? new List<string>();
             if (RunAgainstDC.IsPresent) {
-                try {
-                    var forest = System.DirectoryServices.ActiveDirectory.Forest.GetCurrentForest();
-                    machines = forest.Domains.Cast<System.DirectoryServices.ActiveDirectory.Domain>()
-                        .SelectMany(d => d.DomainControllers.Cast<System.DirectoryServices.ActiveDirectory.DomainController>())
-                        .Select(dc => dc.Name).Distinct().ToList();
-                } catch {
-                    // ignored
-                }
+                machines = SearchEvents.GetDomainControllers();
             }
 
             foreach (var info in SearchEvents.GetWinEventInformation(LogName?.ToArray(), machines, FilePath, MaxRunspaces)) {

@@ -211,7 +211,9 @@ Accept wildcard characters: False
 ```
 
 ### -RunAgainstDC
-{{ Fill RunAgainstDC Description }}
+Queries all domain controllers within the current forest. If Active Directory
+cannot be contacted the cmdlet falls back to the `LOGONSERVER` environment
+variable when present.
 
 ```yaml
 Type: SwitchParameter
