@@ -56,16 +56,31 @@ public partial class SearchEvents : Settings {
                 if (!String.IsNullOrEmpty(machineName)) {
                     eventLog.MachineName = machineName;
                 }
-                if (rawData == null && (replacementStrings == null || replacementStrings.Length == 0)) {
-                    // If rawData and replacementStrings are not provided, write a simple message to the event log.
-                    eventLog.WriteEntry(message, type, eventId, (short)category);
-                } else {
-                    var joinedMessage = replacementStrings.Prepend(message).ToArray();
-                    // If rawData and/or replacementStrings are provided, write them to the event log.
-                    eventLog.WriteEvent(eventInstance, rawData, joinedMessage);
+
+                try {
+                    if (rawData == null && (replacementStrings == null || replacementStrings.Length == 0)) {
+                        // If rawData and replacementStrings are not provided, write a simple message to the event log.
+                        LoggingMessages.Logger.WriteVerbose($"Writing event '{eventId}' of type '{type}' of category '{category}' to EventLog: '{message}'");
+                        eventLog.WriteEntry(message, type, eventId, (short)category);
+                    } else {
+                        var joinedMessage = replacementStrings.Prepend(message).ToArray();
+                        // If rawData and/or replacementStrings are provided, write them to the event log.
+                        LoggingMessages.Logger.WriteVerbose($"Writing event '{eventId}' of type '{type}' of category '{category}' to EventLog: '{joinedMessage}'");
+                        eventLog.WriteEvent(eventInstance, rawData, joinedMessage);
+                    }
+                } catch (System.Security.SecurityException ex) {
+                    // Handle the security exception
+                    LoggingMessages.Logger.WriteWarning("Couldn't write to event log. Error: " + ex.Message);
+                } catch (System.ArgumentException ex) {
+                    // Handle argument exception
+                    LoggingMessages.Logger.WriteWarning("Couldn't write to event log. Error: " + ex.Message);
+                } catch (Exception ex) {
+                    // Handle any other type of exception
+                    LoggingMessages.Logger.WriteWarning("Couldn't write to event log. Error: " + ex.Message);
                 }
             }
-
+        } else {
+            LoggingMessages.Logger.WriteWarning($"Event source {source} does not exist. Write to event log unsuccessful.");
         }
     }
 
@@ -80,23 +95,25 @@ public partial class SearchEvents : Settings {
         try {
             if (string.IsNullOrEmpty(machineName)) {
                 if (!EventLog.SourceExists(source)) {
+                    LoggingMessages.Logger.WriteVerbose($"Creating event source {source}.");
                     EventLog.CreateEventSource(source, log);
                 }
             } else {
                 if (!EventLog.SourceExists(source, machineName)) {
+                    LoggingMessages.Logger.WriteVerbose($"Creating event source {source} on machine {machineName}.");
                     EventLog.CreateEventSource(new EventSourceCreationData(source, log) { MachineName = machineName });
                 }
             }
             return true;
         } catch (System.Security.SecurityException ex) {
             // Handle the security exception
-            _logger.WriteWarning("Couldn't create event log. Error: " + ex.Message);
+            LoggingMessages.Logger.WriteWarning("Couldn't create event log. Error: " + ex.Message);
         } catch (System.ArgumentException ex) {
             // Handle argument exception
-            _logger.WriteWarning("Couldn't create event log. Error: " + ex.Message);
+            LoggingMessages.Logger.WriteWarning("Couldn't create event log. Error: " + ex.Message);
         } catch (Exception ex) {
             // Handle any other type of exception
-            _logger.WriteWarning("Couldn't create event log. Error: " + ex.Message);
+            LoggingMessages.Logger.WriteWarning("Couldn't create event log. Error: " + ex.Message);
         }
 
         return false;
