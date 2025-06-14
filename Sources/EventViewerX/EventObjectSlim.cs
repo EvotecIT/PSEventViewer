@@ -1,7 +1,7 @@
 ﻿namespace EventViewerX;
 
 public class EventObjectSlim {
-    internal EventObject _eventObject;
+    public EventObject _eventObject;
     public int EventID; // = _eventObject.Id;
     public long? RecordID; // = _eventObject.RecordId;
     public string GatheredFrom; // = _eventObject.MachineName;
