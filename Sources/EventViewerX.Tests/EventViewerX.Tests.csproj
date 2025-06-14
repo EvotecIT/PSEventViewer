@@ -27,6 +27,7 @@
 
     <ItemGroup>
         <ProjectReference Include="..\EventViewerX\EventViewerX.csproj" />
+        <ProjectReference Include="..\PSEventViewer\PSEventViewer.csproj" />
     </ItemGroup>
 
 </Project>
