@@ -1,8 +1,13 @@
 namespace PSEventViewer;
 
-[Cmdlet(VerbsCommon.Get, "WinEventFilter")]
+/// <summary>
+/// Generates XPath filters for Windows Event Log queries.
+/// Creates filters compatible with Get-WinEvent -FilterXPath and Event Viewer Custom Views.
+/// </summary>
+[Cmdlet(VerbsCommon.Get, "EVXFilter")]
+[Alias("Get-EventViewerXFilter", "Get-WinEventFilter", "Get-EventsFilter")]
 [OutputType(typeof(string))]
-public sealed class CmdletGetWinEventFilter : AsyncPSCmdlet {
+public sealed class CmdletGetEVXFilter : AsyncPSCmdlet {
     [Parameter]
     public string[] ID;
 
