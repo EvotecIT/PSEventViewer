@@ -1,8 +1,13 @@
 ﻿namespace PSEventViewer;
 
-[Alias("Write-Event")]
-[Cmdlet(VerbsCommunications.Write, "WinEvent")]
-public sealed class CmdletWriteWinEvent : AsyncPSCmdlet {
+/// <summary>
+/// Writes custom events to Windows Event Logs for testing, debugging, or application logging.
+/// Supports creating events with custom data, providers, and event IDs.
+/// </summary>
+[Cmdlet(VerbsCommunications.Write, "EVXEntry")]
+[Alias("Write-EventViewerXEntry", "Write-WinEvent")]
+[OutputType(typeof(bool))]
+public sealed class CmdletWriteEVXEntry : AsyncPSCmdlet {
     [Alias("ComputerName", "ServerName")]
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
     public string MachineName;
