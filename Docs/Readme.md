@@ -23,8 +23,8 @@ Locale: en-US
 ### [Get-EventsSettings](Get-EventsSettings.md)
 {{ Fill in the Description }}
 
-### [Set-EventsSettings](Set-EventsSettings.md)
-{{ Fill in the Description }}
+### [Set-WinEventSettings](Set-EventsSettings.md)
+Updates properties of an event log.
 
 ### [Write-Event](Write-Event.md)
 {{ Fill in the Description }}

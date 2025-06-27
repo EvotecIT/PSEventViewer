@@ -1,12 +1,12 @@
 ﻿@{
     AliasesToExport      = @('Write-Event')
     Author               = 'Przemyslaw Klys'
-    CmdletsToExport      = @('Find-WinEvent', 'Start-EventWatching', 'Write-WinEvent')
+    CmdletsToExport      = @('Find-WinEvent', 'Start-EventWatching', 'Write-WinEvent', 'Get-WinEventInformation')
     CompanyName          = 'Evotec'
     CompatiblePSEditions = @('Desktop', 'Core')
     Copyright            = '(c) 2011 - 2025 Przemyslaw Klys @ Evotec. All rights reserved.'
     Description          = 'Simple module allowing parsing of event logs. Has its own quirks...'
-    FunctionsToExport    = @('Get-Events', 'Get-EventsFilter', 'Get-EventsInformation', 'Get-EventsSettings', 'Set-EventsSettings')
+    FunctionsToExport    = @('Get-Events', 'Get-EventsFilter', 'Get-EventsSettings', 'Set-EventsSettings')
     GUID                 = '5df72a79-cdf6-4add-b38d-bcacf26fb7bc'
     ModuleVersion        = '2.4.4'
     PowerShellVersion    = '5.1'

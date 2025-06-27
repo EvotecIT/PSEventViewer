@@ -5,20 +5,22 @@ online version:
 schema: 2.0.0
 ---
 
-# Get-EventsSettings
+# Get-WinEventSettings
 
 ## SYNOPSIS
-{{ Fill in the Synopsis }}
+Retrieves settings for a Windows event log.
 
 ## SYNTAX
 
 ```
-Get-EventsSettings [[-LogName] <String>] [[-ComputerName] <String>] [[-MaximumSize] <Int32>]
+Get-WinEventSettings [-LogName] <String> [[-ComputerName] <String>]
  [<CommonParameters>]
 ```
 
 ## DESCRIPTION
-{{ Fill in the Description }}
+Get-WinEventSettings uses the underlying EventViewerX library to read
+configuration information for a given Windows event log. It exposes
+properties such as log mode and maximum size.
 
 ## EXAMPLES
 
@@ -32,7 +34,7 @@ PS C:\> {{ Add example code here }}
 ## PARAMETERS
 
 ### -ComputerName
-{{ Fill ComputerName Description }}
+Remote computer name. If not specified, the local computer is used.
 
 ```yaml
 Type: String
@@ -47,7 +49,7 @@ Accept wildcard characters: False
 ```
 
 ### -LogName
-{{ Fill LogName Description }}
+Name of the event log to query. This parameter is mandatory.
 
 ```yaml
 Type: String
@@ -56,21 +58,6 @@ Aliases:
 
 Required: False
 Position: 0
-Default value: None
-Accept pipeline input: False
-Accept wildcard characters: False
-```
-
-### -MaximumSize
-{{ Fill MaximumSize Description }}
-
-```yaml
-Type: Int32
-Parameter Sets: (All)
-Aliases:
-
-Required: False
-Position: 2
 Default value: None
 Accept pipeline input: False
 Accept wildcard characters: False
@@ -85,7 +72,7 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 
 ## OUTPUTS
 
-### System.Object
+### EventViewerX.EventLogDetails
 ## NOTES
 
 ## RELATED LINKS

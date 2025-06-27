@@ -4,6 +4,7 @@ namespace EventViewerX.Tests {
     public class TestSearchingEvents {
         [Fact]
         public void QuerySecurityEvents4932and4933() {
+            if (!OperatingSystem.IsWindows()) return;
             var fields = new List<string>() { "DestinationDRA", "SourceDRA", "NamingContext", "Options", "SessionID", "EndUSN", "StatusCode", "StartUSN" };
             foreach (var eventObject in SearchEvents.QueryLog("Security", [4932, 4933], "AD1")) {
                 Assert.True(eventObject.Id == 4932 || eventObject.Id == 4933);
@@ -16,6 +17,7 @@ namespace EventViewerX.Tests {
         }
         [Fact]
         public void QuerySetupEventID2() {
+            if (!OperatingSystem.IsWindows()) return;
             var fields = new List<string>() { "PackageIdentifier" };
             foreach (var eventObject in SearchEvents.QueryLog("Setup", [2])) {
                 Assert.True(eventObject.Id == 2);
@@ -29,6 +31,7 @@ namespace EventViewerX.Tests {
         }
         [Fact]
         public void QuerySetupEventID1() {
+            if (!OperatingSystem.IsWindows()) return;
             var fields = new List<string>() { "PackageIdentifier", "InitialPackageState" };
             foreach (var eventObject in SearchEvents.QueryLog("Setup", [1])) {
                 Assert.True(eventObject.Id == 1);
@@ -42,6 +45,7 @@ namespace EventViewerX.Tests {
         }
         [Fact]
         public void QuerySystemEventID566() {
+            if (!OperatingSystem.IsWindows()) return;
             var fields = new List<string>() { "BootId", "Reason", "MonitorReason" };
             foreach (var eventObject in SearchEvents.QueryLog("System", [566])) {
                 Assert.True(eventObject.Id == 566);
@@ -56,6 +60,7 @@ namespace EventViewerX.Tests {
 
         [Fact]
         public void QueryApplicationEvent10005() {
+            if (!OperatingSystem.IsWindows()) return;
             var fields = new List<string>() { "RmSessionId", "nApplications", "RebootReasons", "Applications" };
             foreach (var eventObject in SearchEvents.QueryLog("Application", [10005])) {
                 Assert.True(eventObject.Id == 10005);
@@ -68,6 +73,7 @@ namespace EventViewerX.Tests {
         }
         [Fact]
         public void QueryApplicationEvent100() {
+            if (!OperatingSystem.IsWindows()) return;
             var fields = new List<string>() { "NoNameA0" };
             foreach (var eventObject in SearchEvents.QueryLog("Application", [100])) {
                 Assert.True(eventObject.Id == 100);
