@@ -1,14 +1,14 @@
 ﻿@{
-    AliasesToExport      = @('Set-EventsSettings', 'Write-Event')
+    AliasesToExport      = @('Get-EventViewerXEvent', 'Find-WinEvent', 'Get-Events', 'Get-EventViewerXFilter', 'Get-WinEventFilter', 'Get-EventsFilter', 'Set-EventViewerXInfo', 'Set-EventsInformation', 'Set-EventsSettings', 'Start-EventViewerXWatcher', 'Start-EventWatching', 'Get-EventViewerXInfo', 'Get-EventsSettings', 'Get-EventsInformation', 'Write-EventViewerXEntry', 'Write-WinEvent')
     Author               = 'Przemyslaw Klys'
-    CmdletsToExport      = @('Find-WinEvent', 'Get-WinEventFilter', 'Get-WinEventInformation', 'Get-WinEventSettings', 'Set-WinEventSettings', 'Start-EventWatching', 'Write-WinEvent')
+    CmdletsToExport      = @('Get-EVXEvent', 'Get-EVXFilter', 'Set-EVXInfo', 'Start-EVXWatcher', 'Get-EVXInfo', 'Write-EVXEntry')
     CompanyName          = 'Evotec'
     CompatiblePSEditions = @('Desktop', 'Core')
     Copyright            = '(c) 2011 - 2025 Przemyslaw Klys @ Evotec. All rights reserved.'
     Description          = 'Simple module allowing parsing of event logs. Has its own quirks...'
-    FunctionsToExport    = @('Get-Events', 'Get-EventsFilter', 'Get-EventsSettings')
+    FunctionsToExport    = @()
     GUID                 = '5df72a79-cdf6-4add-b38d-bcacf26fb7bc'
-    ModuleVersion        = '2.4.4'
+    ModuleVersion        = '3.0.0'
     PowerShellVersion    = '5.1'
     PrivateData          = @{
         PSData = @{
