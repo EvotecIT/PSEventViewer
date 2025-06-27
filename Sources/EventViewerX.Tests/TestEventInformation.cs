@@ -18,7 +18,7 @@ namespace EventViewerX.Tests {
         [Fact]
         public void QueryFileInformation() {
             if (!OperatingSystem.IsWindows()) return;
-            var path = Path.Combine("..", "..", "..", "..", "Tests", "Logs", "Active Directory Web Services.evtx");
+            var path = Path.Combine("..", "..", "..", "..", "..", "Tests", "Logs", "Active Directory Web Services.evtx");
             var result = SearchEvents.GetWinEventInformation(null, null, new List<string> { path }, 1).ToList();
             Assert.Single(result);
             Assert.Equal("File", result[0].Source);
