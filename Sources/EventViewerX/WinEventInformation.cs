@@ -18,6 +18,7 @@ namespace EventViewerX {
         public long MaximumSizeInBytes { get; set; }
         public string LogFilePath { get; set; }
         public string LogMode { get; set; }
+        public string EventAction { get; set; }
         public string OwningProviderName { get; set; }
         public List<string> ProviderNames { get; set; }
         public string ProviderNamesExpanded { get; set; }
@@ -35,6 +36,8 @@ namespace EventViewerX {
         public long? FileSizeMaximum { get; set; }
         public double? FileSizeCurrentMB { get; set; }
         public double? FileSizeMaximumMB { get; set; }
+        public double? FileSizeMB { get; set; }
+        public double? MaximumSizeMB { get; set; }
         public long? RecordCount { get; set; }
         public long? OldestRecordNumber { get; set; }
         public string SecurityDescriptor { get; set; }
