@@ -113,6 +113,16 @@ namespace EventViewerX {
         public string QueriedMachine;
 
         /// <summary>
+        /// Source where the event was gathered from (computer name or file path)
+        /// </summary>
+        public string GatheredFrom;
+
+        /// <summary>
+        /// Log name where the event was gathered from
+        /// </summary>
+        public string GatheredLogName;
+
+        /// <summary>
         /// Original event record
         /// </summary>
         public readonly EventRecord _eventRecord;
@@ -124,6 +134,17 @@ namespace EventViewerX {
             _eventRecord = eventRecord;
 
             ContainerLog = ((EventLogRecord)_eventRecord).ContainerLog;
+
+            // Set GatheredFrom and GatheredLogName to match Get-Events functionality
+            // GatheredFrom is the file path if querying from file, otherwise computer name
+            if (queriedMachine != null && (queriedMachine.EndsWith(".evtx", StringComparison.OrdinalIgnoreCase) || queriedMachine.Contains("\\"))) {
+                // This looks like a file path
+                GatheredFrom = queriedMachine;
+            } else {
+                // This is a computer name or null (local machine)
+                GatheredFrom = queriedMachine ?? Environment.MachineName;
+            }
+            GatheredLogName = eventRecord.LogName;
 
             XMLData = eventRecord.ToXml();
             // Create a dictionary to hold the xml data
