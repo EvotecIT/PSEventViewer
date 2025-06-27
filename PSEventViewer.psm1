@@ -1,6 +1,6 @@
 ﻿# to speed up development adding direct path to binaries, instead of the the Lib folder
 $Development = $true
-$DevelopmentPath = "$PSScriptRoot\Sources\Mailozaurr.PowerShell\bin\Debug"
+$DevelopmentPath = "$PSScriptRoot\Sources\PSEventViewer\bin\Debug"
 $DevelopmentFolderCore = "net8.0"
 $DevelopmentFolderDefault = "net472"
 $BinaryModules = @(
