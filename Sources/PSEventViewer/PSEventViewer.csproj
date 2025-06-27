@@ -40,4 +40,31 @@
         <Using Include="System.Diagnostics" />
         <Using Include="EventViewerX" />
     </ItemGroup>
+
+    <!-- We need to remove PowerShell conflicting libraries as it will break output -->
+    <Target Name="RemoveFilesAfterBuild" AfterTargets="Build">
+        <Delete Files="$(OutDir)System.Management.Automation.dll" />
+        <Delete Files="$(OutDir)System.Management.dll" />
+    </Target>
+
+    <PropertyGroup>
+        <!-- This is needed for XmlDoc2CmdletDoc to generate a PowerShell documentation file. -->
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <!-- This is needed for XmlDoc2CmdletDoc to generate a PowerShell documentation file. -->
+        <PackageReference Include="MatejKafka.XmlDoc2CmdletDoc" Version="0.6.0">
+            <PrivateAssets>all</PrivateAssets>
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </PackageReference>
+    </ItemGroup>
+
+    <!-- Copy help documentation to publish output after publish -->
+    <Target Name="CopyHelpDocumentationToPublishOutput" AfterTargets="Publish">
+        <Copy SourceFiles="$(OutputPath)$(AssemblyName).dll-Help.xml"
+            DestinationFiles="$(PublishDir)$(AssemblyName).dll-Help.xml"
+            Condition="Exists('$(OutputPath)$(AssemblyName).dll-Help.xml')" />
+    </Target>
+
 </Project>

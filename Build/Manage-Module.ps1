@@ -1,6 +1,6 @@
 Clear-Host
 
-Import-Module C:\Support\GitHub\PSPublishModule\PSPublishModule.psd1 -Force
+Import-Module PSPublishModule -Force
 
 Build-Module -ModuleName 'PSEventViewer' {
     # Usual defaults as per standard module
@@ -122,6 +122,7 @@ Build-Module -ModuleName 'PSEventViewer' {
         DotSourceLibraries                = $true
         DotSourceClasses                  = $true
         DeleteTargetModuleBeforeBuild     = $true
+        RefreshPSD1Only                   = $true
     }
 
     New-ConfigurationBuild @newConfigurationBuildSplat
