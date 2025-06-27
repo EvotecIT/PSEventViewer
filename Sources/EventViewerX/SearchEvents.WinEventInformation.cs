@@ -59,6 +59,18 @@ namespace EventViewerX {
                 Source = details.MachineName
             };
 
+            // Map LogMode to human-readable EventAction
+            info.EventAction = details.LogMode switch {
+                "AutoBackup" => "ArchiveTheLogWhenFullDoNotOverwrite",
+                "Circular" => "OverwriteEventsAsNeededOldestFirst",
+                "Retain" => "DoNotOverwriteEventsClearLogManually",
+                _ => "Unknown"
+            };
+
+            // Additional size properties for compatibility
+            info.FileSizeMB = details.FileSizeCurrentMB;
+            info.MaximumSizeMB = details.FileSizeMaximumMB;
+
             info.ProviderNamesExpanded = string.Join(", ", details.ProviderNames);
             if (!string.IsNullOrEmpty(details.SecurityDescriptor)) {
                 try {
@@ -148,6 +160,14 @@ namespace EventViewerX {
                 SecurityDescriptor = null,
                 Source = "File"
             };
+
+            // Set EventAction for files
+            info.EventAction = "N/A";
+
+            // Additional size properties for compatibility
+            info.FileSizeMB = ConvertSize(fi.Length);
+            info.MaximumSizeMB = ConvertSize(fi.Length);
+
             return info;
         }
 
