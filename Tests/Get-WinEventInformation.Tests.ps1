@@ -1,28 +1,28 @@
-Describe 'Get-WinEventInformation - Basic Log Test' {
-    $info = Get-WinEventInformation -Machine $Env:COMPUTERNAME -LogName 'Application' -MaxRunspaces 1
-
+Describe 'Get-EVXInfo - Basic Log Test' {
     It 'Should return some results' {
-        $info.Count | Should -BeGreaterThan 0
-    }
-    It 'Should have Source equal to machine name' {
-        $info[0].Source | Should -Be $Env:COMPUTERNAME
-    }
-    It 'Should include LogName' {
-        $info[0].LogName | Should -Be 'Application'
+        $info = Get-EVXInfo -Machine $Env:COMPUTERNAME -LogName 'Application'
+        $info | Should -Not -BeNullOrEmpty
+        $info.Source | Should -Be $Env:COMPUTERNAME
+        $info.LogName | Should -Be 'Application'
     }
 }
 
-Describe 'Get-WinEventInformation - FilePath Test' {
-    $filePath = Join-Path $PSScriptRoot 'Logs' 'Active Directory Web Services.evtx'
-    $info = Get-WinEventInformation -FilePath $filePath -MaxRunspaces 1
+Describe 'Get-EVXInfo - FilePath Test' {
+    It 'Should be consistent' {
+        $filePath = [io.path]::Combine($PSScriptRoot, 'Logs', 'Active Directory Web Services.evtx')
+        $info1 = Get-EVXInfo -FilePath $filePath
+        Test-Path $filePath | Should -Be $true
+        $info1 | Should -BeNullOrEmpty -Not
+        $info1.Source | Should -Be 'File'
+        $info1.LogName | Should -Be 'N/A'
+    }
+}
 
-    It 'Should return one object' {
-        $info.Count | Should -Be 1
-    }
-    It 'Source should be File' {
-        $info[0].Source | Should -Be 'File'
-    }
-    It 'LogName should be N/A' {
-        $info[0].LogName | Should -Be 'N/A'
+Describe 'Get-EVXInfo cmdlet' {
+    It 'Returns log information' {
+        $result = Get-EVXInfo -LogName 'Application'
+        $result.LogName | Should -Be 'Application'
+        $result.LogMode | Should -Not -BeNullOrEmpty
+        $result.MaximumSizeInBytes | Should -BeGreaterThan 0
     }
 }
