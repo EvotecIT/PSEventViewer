@@ -97,6 +97,11 @@ namespace EventViewerX {
         public Dictionary<string, string> Data { get; private set; }
 
         /// <summary>
+        /// NIC identifiers extracted from event data
+        /// </summary>
+        public List<string> NicIdentifiers { get; private set; }
+
+        /// <summary>
         /// Data available in the message converted to a dictionary
         /// </summary>
         public Dictionary<string, string> MessageData { get; private set; }
@@ -156,6 +161,7 @@ namespace EventViewerX {
                 MessageData = new Dictionary<string, string>();
                 //_logger.WriteError("Error parsing message");
             }
+            NicIdentifiers = ExtractNicIdentifiers();
         }
 
         /// <summary>
@@ -318,6 +324,23 @@ namespace EventViewerX {
             }
 
             return false;
+        }
+
+        private List<string> ExtractNicIdentifiers() {
+            var nics = new List<string>();
+            foreach (var kvp in Data) {
+                var key = kvp.Key;
+                if (key.IndexOf("nic", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    key.IndexOf("nasidentifier", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    key.IndexOf("calledstationid", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    key.IndexOf("callingstationid", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    key.IndexOf("mac", StringComparison.OrdinalIgnoreCase) >= 0) {
+                    if (!string.IsNullOrEmpty(kvp.Value)) {
+                        nics.Add(kvp.Value);
+                    }
+                }
+            }
+            return nics;
         }
     }
 }
