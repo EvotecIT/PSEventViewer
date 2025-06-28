@@ -31,6 +31,11 @@ public partial class SearchEvents {
         }
     }
 
+    /// <summary>
+    /// Cache for translated user identifiers to avoid repeated lookups
+    /// </summary>
+    private static readonly ConcurrentDictionary<string, string> userSidCache = new ConcurrentDictionary<string, string>();
+
     public static string BuildWinEventFilter(
         string[]? id = null,
         string[]? eventRecordId = null,
@@ -87,13 +92,17 @@ public partial class SearchEvents {
         if (userId != null && userId.Length > 0) {
             var sids = new List<string>();
             foreach (var item in userId) {
-                try {
-                    var sid = new System.Security.Principal.SecurityIdentifier(item);
-                    sids.Add(sid.Translate(typeof(System.Security.Principal.SecurityIdentifier)).ToString());
-                } catch {
-                    var user = new System.Security.Principal.NTAccount(item);
-                    sids.Add(user.Translate(typeof(System.Security.Principal.SecurityIdentifier)).ToString());
+                if (!userSidCache.TryGetValue(item, out var sidString)) {
+                    try {
+                        var sid = new System.Security.Principal.SecurityIdentifier(item);
+                        sidString = sid.Translate(typeof(System.Security.Principal.SecurityIdentifier)).ToString();
+                    } catch {
+                        var user = new System.Security.Principal.NTAccount(item);
+                        sidString = user.Translate(typeof(System.Security.Principal.SecurityIdentifier)).ToString();
+                    }
+                    userSidCache[item] = sidString;
                 }
+                sids.Add(sidString);
             }
             filter = JoinXPathFilter(InitializeXPathFilter(sids, "@UserID='{0}'", "*[System[Security[{0}]]]"), filter);
         }
