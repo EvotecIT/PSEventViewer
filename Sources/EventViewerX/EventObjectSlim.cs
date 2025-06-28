@@ -50,20 +50,21 @@ public class EventObjectSlim {
     }
 
     internal static string ConvertToObjectAffected(EventObject eventObject) {
-        if (eventObject.Data.ContainsKey("TargetUserName") && eventObject.Data.ContainsKey("TargetDomainName")) {
-            return eventObject.Data["TargetDomainName"] + "\\" + eventObject.Data["TargetUserName"];
-        } else if (eventObject.Data.ContainsKey("TargetUserName")) {
-            return eventObject.Data["TargetUserName"];
-        } else {
-            return "";
+        if (eventObject.Data.TryGetValue("TargetUserName", out var targetUserName)) {
+            if (eventObject.Data.TryGetValue("TargetDomainName", out var targetDomainName)) {
+                return targetDomainName + "\\" + targetUserName;
+            }
+
+            return targetUserName;
         }
+
+        return string.Empty;
     }
+
     internal static string ConvertToSamAccountName(EventObject eventObject) {
-        if (eventObject.Data.ContainsKey("SamAccountName")) {
-            return eventObject.Data["SamAccountName"];
-        } else {
-            return "";
-        }
+        return eventObject.Data.TryGetValue("SamAccountName", out var samAccountName)
+            ? samAccountName
+            : string.Empty;
     }
     internal string ConvertFromOperationType(string s) {
         if (OperationTypeLookup.ContainsKey(s)) {
