@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Concurrent;
 using System.Management.Automation;
 using System.Threading;
@@ -238,6 +238,45 @@ public abstract class AsyncPSCmdlet : PSCmdlet, IDisposable {
         if (_cancelSource.IsCancellationRequested) {
             throw new PipelineStoppedException();
         }
+    }
+
+    /// <summary>
+    /// Returns the effective <see cref="ActionPreference"/> for the current cmdlet.
+    /// </summary>
+    /// <returns>The user-specified or session error action preference.</returns>
+    protected ActionPreference GetErrorActionPreference() {
+        var preference = (ActionPreference)SessionState.PSVariable.GetValue("ErrorActionPreference");
+        if (MyInvocation.BoundParameters.ContainsKey("ErrorAction")) {
+            string? errorActionString = MyInvocation.BoundParameters["ErrorAction"]?.ToString();
+            if (!string.IsNullOrWhiteSpace(errorActionString) && Enum.TryParse(errorActionString, true, out ActionPreference parsed)) {
+                preference = parsed;
+            }
+        }
+        return preference;
+    }
+
+    /// <summary>
+    /// Verifies that the specified file exists and handles errors according to the
+    /// provided <paramref name="errorAction"/>.
+    /// </summary>
+    /// <param name="path">Path to the file.</param>
+    /// <param name="errorAction">Action preference to follow when the file does not exist.</param>
+    /// <returns>True when the file exists; otherwise, false.</returns>
+    protected bool EnsureFileExists(string path, ActionPreference errorAction) {
+        if (File.Exists(path)) {
+            return true;
+        }
+
+        string message = $"{MyInvocation.InvocationName} - The specified file does not exist: {path}";
+        LoggingMessages.Logger.WriteWarning(message);
+        if (errorAction == ActionPreference.Stop) {
+            var ex = new FileNotFoundException("The specified file does not exist.", path);
+            ThrowTerminatingError(new ErrorRecord(ex, "FileNotFound", ErrorCategory.ObjectNotFound, path));
+        } else {
+            WriteWarning(message);
+        }
+
+        return false;
     }
 
     /// <summary>
