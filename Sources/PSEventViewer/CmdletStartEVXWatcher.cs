@@ -1,6 +1,7 @@
 ﻿using EventViewerX;
 using System.Management.Automation;
 using System.Threading.Tasks;
+using System.Linq;
 
 namespace PSEventViewer {
     /// <summary>
@@ -13,7 +14,20 @@ namespace PSEventViewer {
     public sealed class CmdletStartEVXWatcher : AsyncPSCmdlet {
         private WatchEvents EventWatching { get; set; }
 
-        [Parameter(Mandatory = false, Position = 1)] public int NumberOfThreads { get; set; } = 8;
+        [Parameter(Mandatory = true, Position = 0)]
+        public string MachineName { get; set; }
+
+        [Parameter(Mandatory = true, Position = 1)]
+        public string LogName { get; set; }
+
+        [Parameter(Mandatory = true, Position = 2)]
+        public int[] EventId { get; set; }
+
+        [Parameter(Mandatory = true, Position = 3)]
+        public ScriptBlock Action { get; set; }
+
+        [Parameter(Mandatory = false)]
+        public int NumberOfThreads { get; set; } = 8;
 
         protected override Task BeginProcessingAsync() {
             // Initialize the logger to be able to see verbose, warning, debug, error, progress, and information messages.
@@ -26,7 +40,7 @@ namespace PSEventViewer {
             return Task.CompletedTask;
         }
         protected override Task ProcessRecordAsync() {
-
+            EventWatching.Watch(MachineName, LogName, EventId.ToList(), e => Action.Invoke(e));
             return Task.CompletedTask;
         }
         protected override Task EndProcessingAsync() {
