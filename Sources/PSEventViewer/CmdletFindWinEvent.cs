@@ -1,16 +1,28 @@
-﻿namespace PSEventViewer;
+﻿using System.Collections;
 
-[OutputType(typeof(EventObject), ParameterSetName = new string[] { "RecordId", "GenericEvents" })]
+namespace PSEventViewer;
+
+/// <summary>
+/// Enhanced event querying cmdlet that replaces and extends Get-WinEvent functionality.
+/// Provides powerful filtering, parallel processing, and advanced event retrieval capabilities.
+/// </summary>
+[OutputType(typeof(EventObject), ParameterSetName = new string[] { "GenericEvents" })]
+[OutputType(typeof(EventObject), ParameterSetName = new string[] { "PathEvents" })]
 [OutputType(typeof(EventObjectSlim), ParameterSetName = new string[] { "NamedEvents" })]
 [OutputType(typeof(EventLogDetails), ParameterSetName = new string[] { "ListLog" })]
-[Cmdlet(VerbsCommon.Find, "WinEvent", DefaultParameterSetName = "GenericEvents")]
-public sealed class CmdletFindEvent : AsyncPSCmdlet {
+[Cmdlet(VerbsCommon.Get, "EVXEvent", DefaultParameterSetName = "GenericEvents")]
+[Alias("Get-EventViewerXEvent", "Find-WinEvent", "Get-Events")]
+public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
     [Parameter(Mandatory = true, Position = 0, ParameterSetName = "RecordId")]
     [Parameter(Mandatory = true, Position = 0, ParameterSetName = "GenericEvents")]
     public string LogName;
 
+    [Parameter(Mandatory = true, ParameterSetName = "PathEvents")]
+    public string Path;
+
     [Alias("Id")]
     [Parameter(Mandatory = false, Position = 1, ParameterSetName = "GenericEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
     public List<int> EventId = null;
 
     [Alias("RecordId")]
@@ -37,11 +49,13 @@ public sealed class CmdletFindEvent : AsyncPSCmdlet {
     [Alias("DateFrom")]
     [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
     public DateTime? StartTime;
 
     [Alias("DateTo")]
     [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
     public DateTime? EndTime;
 
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
@@ -59,17 +73,39 @@ public sealed class CmdletFindEvent : AsyncPSCmdlet {
     [Parameter(Mandatory = false, ParameterSetName = "RecordId")]
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
     public int MaxEvents = 0;
 
     [Parameter(Mandatory = false, ParameterSetName = "RecordId")]
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
     public ParallelOption ParallelOption = ParallelOption.Parallel;
 
     [Parameter(Mandatory = false, ParameterSetName = "RecordId")]
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
     public SwitchParameter Expand;
+
+    [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
+    public SwitchParameter Oldest;
+
+    [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
+    public Hashtable NamedDataFilter;
+
+    [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
+    public Hashtable NamedDataExcludeFilter;
+
+    [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
+    public SwitchParameter DisableParallel;
+
+    [Parameter(Mandatory = false, ParameterSetName = "RecordId")]
+    [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "ListLog")]
+    public SwitchParameter AsArray;
 
     [Parameter(Mandatory = true, ParameterSetName = "NamedEvents")]
     public NamedEvents[] Type;
@@ -91,16 +127,45 @@ public sealed class CmdletFindEvent : AsyncPSCmdlet {
         return Task.CompletedTask;
     }
     protected override Task ProcessRecordAsync() {
+        var results = AsArray ? new List<object>() : null;
+
         if (ParameterSetName == "ListLog") {
             foreach (var log in SearchEvents.DisplayEventLogsParallel(ListLog, MachineName, NumberOfThreads)) {
-                WriteObject(log);
+                if (AsArray) {
+                    results.Add(log);
+                } else {
+                    WriteObject(log);
+                }
+            }
+        } else if (ParameterSetName == "PathEvents") {
+            // Handle file path queries
+            if (Expand == false) {
+                foreach (var eventObject in SearchEvents.QueryLogFile(Path, EventId, ProviderName, Keywords, Level, StartTime, EndTime, UserId, MaxEvents, null, TimePeriod, Oldest, NamedDataFilter, NamedDataExcludeFilter)) {
+                    if (AsArray) {
+                        results.Add(eventObject);
+                    } else {
+                        WriteObject(eventObject);
+                    }
+                }
+            } else {
+                foreach (var eventObject in SearchEvents.QueryLogFile(Path, EventId, ProviderName, Keywords, Level, StartTime, EndTime, UserId, MaxEvents, null, TimePeriod, Oldest, NamedDataFilter, NamedDataExcludeFilter)) {
+                    if (AsArray) {
+                        results.Add(GetExpandedObject(eventObject));
+                    } else {
+                        ReturnExpandedObject(eventObject);
+                    }
+                }
             }
         } else {
             if (Type != null) {
                 // let's find the events prepared for search
                 List<NamedEvents> typeList = Type.ToList();
                 foreach (var eventObject in SearchEvents.FindEventsByNamedEvents(typeList, MachineName, StartTime, EndTime, TimePeriod, maxThreads: NumberOfThreads, maxEvents: MaxEvents)) {
-                    WriteObject(eventObject);
+                    if (AsArray) {
+                        results.Add(eventObject);
+                    } else {
+                        WriteObject(eventObject);
+                    }
                 }
             } else {
                 if (Expand == false) {
@@ -108,18 +173,30 @@ public sealed class CmdletFindEvent : AsyncPSCmdlet {
                     if (ParallelOption == ParallelOption.Disabled) {
                         if (MachineName == null) {
                             foreach (var eventObject in SearchEvents.QueryLog(LogName, EventId, null, ProviderName, Keywords, Level, StartTime, EndTime, UserId, MaxEvents, EventRecordId, TimePeriod)) {
-                                WriteObject(eventObject);
+                                if (AsArray) {
+                                    results.Add(eventObject);
+                                } else {
+                                    WriteObject(eventObject);
+                                }
                             }
                         } else {
                             foreach (var machine in MachineName) {
                                 foreach (var eventObject in SearchEvents.QueryLog(LogName, EventId, machine, ProviderName, Keywords, Level, StartTime, EndTime, UserId, MaxEvents, EventRecordId, TimePeriod)) {
-                                    WriteObject(eventObject);
+                                    if (AsArray) {
+                                        results.Add(eventObject);
+                                    } else {
+                                        WriteObject(eventObject);
+                                    }
                                 }
                             }
                         }
                     } else if (ParallelOption == ParallelOption.Parallel) {
                         foreach (var eventObject in SearchEvents.QueryLogsParallel(LogName, EventId, MachineName, ProviderName, Keywords, Level, StartTime, EndTime, UserId, MaxEvents, NumberOfThreads, EventRecordId, TimePeriod)) {
-                            WriteObject(eventObject);
+                            if (AsArray) {
+                                results.Add(eventObject);
+                            } else {
+                                WriteObject(eventObject);
+                            }
                         }
                     }
                 } else {
@@ -127,22 +204,39 @@ public sealed class CmdletFindEvent : AsyncPSCmdlet {
                     if (ParallelOption == ParallelOption.Disabled) {
                         if (MachineName == null) {
                             foreach (var eventObject in SearchEvents.QueryLog(LogName, EventId, null, ProviderName, Keywords, Level, StartTime, EndTime, UserId, MaxEvents, EventRecordId, TimePeriod)) {
-                                ReturnExpandedObject(eventObject);
+                                if (AsArray) {
+                                    results.Add(GetExpandedObject(eventObject));
+                                } else {
+                                    ReturnExpandedObject(eventObject);
+                                }
                             }
                         } else {
                             foreach (var machine in MachineName) {
                                 foreach (var eventObject in SearchEvents.QueryLog(LogName, EventId, machine, ProviderName, Keywords, Level, StartTime, EndTime, UserId, MaxEvents, EventRecordId, TimePeriod)) {
-                                    ReturnExpandedObject(eventObject);
+                                    if (AsArray) {
+                                        results.Add(GetExpandedObject(eventObject));
+                                    } else {
+                                        ReturnExpandedObject(eventObject);
+                                    }
                                 }
                             }
                         }
                     } else if (ParallelOption == ParallelOption.Parallel) {
                         foreach (var eventObject in SearchEvents.QueryLogsParallel(LogName, EventId, MachineName, ProviderName, Keywords, Level, StartTime, EndTime, UserId, MaxEvents, NumberOfThreads, EventRecordId, TimePeriod)) {
-                            ReturnExpandedObject(eventObject);
+                            if (AsArray) {
+                                results.Add(GetExpandedObject(eventObject));
+                            } else {
+                                ReturnExpandedObject(eventObject);
+                            }
                         }
                     }
                 }
             }
+        }
+
+        // If AsArray is specified, output all results as an array
+        if (AsArray && results != null) {
+            WriteObject(results.ToArray(), false);
         }
 
         return Task.CompletedTask;
@@ -152,6 +246,16 @@ public sealed class CmdletFindEvent : AsyncPSCmdlet {
     /// </summary>
     /// <param name="eventObject">The event object.</param>
     private void ReturnExpandedObject(EventObject eventObject) {
+        PSObject outputObj = GetExpandedObject(eventObject);
+        WriteObject(outputObj);
+    }
+
+    /// <summary>
+    /// Creates an expanded PSObject from EventObject with properties expanded from the Data property.
+    /// </summary>
+    /// <param name="eventObject">The event object.</param>
+    /// <returns>PSObject with expanded properties.</returns>
+    private PSObject GetExpandedObject(EventObject eventObject) {
         PSObject outputObj = new(eventObject); // => it's the preferred way to create a wrapper pso when you already know it's not a pso
                                                // PSObject outputObj = PSObject.AsPSObject(eventObject); => this is the preferred way to convert from PSO to PSObject
         foreach (var property in eventObject.Data) {
@@ -166,6 +270,6 @@ public sealed class CmdletFindEvent : AsyncPSCmdlet {
             //}
             outputObj.Properties.Add(new PSNoteProperty(property.Key, property.Value));
         }
-        WriteObject(outputObj);
+        return outputObj;
     }
 }
