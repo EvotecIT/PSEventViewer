@@ -1,5 +1,6 @@
 ﻿using System.Diagnostics.Eventing.Reader;
 using System.IO;
+using System.Net;
 
 namespace EventViewerX;
 
@@ -40,7 +41,12 @@ public partial class SearchEvents : Settings {
     /// </summary>
     /// <returns></returns>
     private static string GetFQDN() {
-        return Dns.GetHostEntry("").HostName;
+        try {
+            return Dns.GetHostEntry("").HostName;
+        } catch (Exception ex) {
+            _logger.WriteVerbose($"Failed to resolve FQDN via DNS: {ex.Message}. Falling back to machine name.");
+            return Environment.MachineName;
+        }
     }
 
     /// <summary>
@@ -63,13 +69,18 @@ public partial class SearchEvents : Settings {
     /// <returns>An enumerable collection of EventObject instances representing the filtered events from the log file.</returns>
     public static IEnumerable<EventObject> QueryLogFile(string filePath, List<int> eventIds = null, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null, int maxEvents = 0, List<long> eventRecordId = null, TimePeriod? timePeriod = null, bool oldest = false, System.Collections.Hashtable namedDataFilter = null, System.Collections.Hashtable namedDataExcludeFilter = null) {
 
+        string absolutePath = Path.GetFullPath(filePath);
+
+        if (!File.Exists(absolutePath)) {
+            throw new FileNotFoundException($"The log file '{absolutePath}' does not exist.", absolutePath);
+        }
+
         // Check if we have any filters that require an XML query
         bool hasFilters = namedDataFilter != null || namedDataExcludeFilter != null || eventIds != null ||
                          providerName != null || keywords != null || level != null || startTime != null ||
                          endTime != null || userId != null || eventRecordId != null;
 
         EventLogQuery query;
-        string absolutePath = Path.GetFullPath(filePath);
 
         if (hasFilters) {
             // Build complex XML query with filters
@@ -191,7 +202,11 @@ public partial class SearchEvents : Settings {
                     // }
                 }
             }
-        }
+        } 
+    }
+
+    public static IEnumerable<EventObject> QueryLog(KnownLog logName, List<int> eventIds = null, string machineName = null, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null, int maxEvents = 0, List<long> eventRecordId = null, TimePeriod? timePeriod = null) {
+        return QueryLog(LogNameToString(logName), eventIds, machineName, providerName, keywords, level, startTime, endTime, userId, maxEvents, eventRecordId, timePeriod);
     }
 
     /// <summary>
@@ -301,6 +316,13 @@ public partial class SearchEvents : Settings {
         queryString.Append(condition);
     }
 
+    private static string LogNameToString(KnownLog logName) => logName switch {
+        KnownLog.DirectoryService => "Directory Service",
+        KnownLog.DNSServer => "DNS Server",
+        KnownLog.WindowsPowerShell => "Windows PowerShell",
+        _ => logName.ToString()
+    };
+
     public static IEnumerable<EventObject> QueryLogsParallel(string logName, List<int> eventIds = null, List<string> machineNames = null, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null, int maxEvents = 0, int maxThreads = 8, List<long> eventRecordId = null, TimePeriod? timePeriod = null) {
         if (machineNames == null || !machineNames.Any()) {
             machineNames = new List<string> { null };
@@ -345,6 +367,10 @@ public partial class SearchEvents : Settings {
         return results.GetConsumingEnumerable();
     }
 
+    public static IEnumerable<EventObject> QueryLogsParallel(KnownLog logName, List<int> eventIds = null, List<string> machineNames = null, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null, int maxEvents = 0, int maxThreads = 8, List<long> eventRecordId = null, TimePeriod? timePeriod = null) {
+        return QueryLogsParallel(LogNameToString(logName), eventIds, machineNames, providerName, keywords, level, startTime, endTime, userId, maxEvents, maxThreads, eventRecordId, timePeriod);
+    }
+
     private static Task CreateTask(string machineName, string logName, List<int> eventIds, string providerName, Keywords? keywords, Level? level, DateTime? startTime, DateTime? endTime, string userId, int maxEvents, SemaphoreSlim semaphore, BlockingCollection<EventObject> results, List<long> eventRecordId = null, TimePeriod? timePeriod = null) {
         return Task.Run(async () => {
             _logger.WriteVerbose($"Querying log on machine: {machineName}, logName: {logName}, event ids: " + string.Join(", ", eventIds ?? new List<int>()));
@@ -382,5 +408,9 @@ public partial class SearchEvents : Settings {
         });
 
         return results.GetConsumingEnumerable();
+    }
+
+    public static IEnumerable<EventObject> QueryLogsParallelForEach(KnownLog logName, List<int> eventIds = null, List<string> machineNames = null, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null, int maxEvents = 0, int maxThreads = 4, List<long> eventRecordId = null) {
+        return QueryLogsParallelForEach(LogNameToString(logName), eventIds, machineNames, providerName, keywords, level, startTime, endTime, userId, maxEvents, maxThreads, eventRecordId);
     }
 }

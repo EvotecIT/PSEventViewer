@@ -4,6 +4,7 @@ using System.Diagnostics.Eventing.Reader;
 using System.Linq;
 using System.Security.Principal;
 using System.Xml.Linq;
+using System.Text.RegularExpressions;
 
 namespace EventViewerX {
     public class EventObject {
@@ -96,6 +97,11 @@ namespace EventViewerX {
         public Dictionary<string, string> Data { get; private set; }
 
         /// <summary>
+        /// NIC identifiers extracted from event data
+        /// </summary>
+        public List<string> NicIdentifiers { get; private set; }
+
+        /// <summary>
         /// Data available in the message converted to a dictionary
         /// </summary>
         public Dictionary<string, string> MessageData { get; private set; }
@@ -155,6 +161,7 @@ namespace EventViewerX {
                 MessageData = new Dictionary<string, string>();
                 //_logger.WriteError("Error parsing message");
             }
+            NicIdentifiers = ExtractNicIdentifiers();
         }
 
         /// <summary>
@@ -166,7 +173,7 @@ namespace EventViewerX {
             Dictionary<string, string> data = new Dictionary<string, string>();
 
             // Split the message into lines
-            string[] lines = message.Split('\n');
+            string[] lines = Regex.Split(message, "\r?\n");
 
             // Find the first non-empty line and add it to the dictionary with a default key of "Message"
             string firstLine = lines.FirstOrDefault(line => !string.IsNullOrWhiteSpace(line));
@@ -200,6 +207,37 @@ namespace EventViewerX {
         }
 
         /// <summary>
+        /// Parses lines containing colon separated key/value pairs.
+        /// </summary>
+        /// <param name="text">Text to parse</param>
+        /// <returns>Dictionary with parsed key value pairs</returns>
+        private static Dictionary<string, string> ParseColonSeparatedLines(string text) {
+            Dictionary<string, string> data = new Dictionary<string, string>();
+            if (string.IsNullOrEmpty(text)) {
+                return data;
+            }
+
+            string[] lines = Regex.Split(text, "\r?\n");
+            foreach (string rawLine in lines) {
+                string line = rawLine.Trim();
+                if (string.IsNullOrEmpty(line)) {
+                    continue;
+                }
+
+                int index = line.IndexOf(':');
+                if (index > -1) {
+                    string key = line.Substring(0, index).Trim();
+                    string value = line.Substring(index + 1).Trim();
+                    if (!string.IsNullOrEmpty(key)) {
+                        data[key] = value;
+                    }
+                }
+            }
+
+            return data;
+        }
+
+        /// <summary>
         /// Parses the XML data of the event record into a dictionary converting it into a key value pair
         /// </summary>
         /// <param name="xmlData">The XML data.</param>
@@ -208,7 +246,13 @@ namespace EventViewerX {
             Dictionary<string, string> data = new Dictionary<string, string>();
 
             // Parse the XML data into an XElement
-            XElement root = XElement.Parse(xmlData);
+            XElement root;
+            try {
+                root = XElement.Parse(xmlData);
+            } catch (Exception ex) {
+                Settings._logger.WriteWarning($"Failed to parse event XML. Error: {ex.Message}");
+                return data;
+            }
 
             // Get the namespace of the root element
             XNamespace ns = root.GetDefaultNamespace();
@@ -236,6 +280,11 @@ namespace EventViewerX {
                         }
                     }
                     data[name] = value;
+                    foreach (var kv in ParseColonSeparatedLines(value)) {
+                        if (!data.ContainsKey(kv.Key)) {
+                            data[kv.Key] = kv.Value;
+                        }
+                    }
                 }
             }
             return data;
@@ -275,6 +324,23 @@ namespace EventViewerX {
             }
 
             return false;
+        }
+
+        private List<string> ExtractNicIdentifiers() {
+            var nics = new List<string>();
+            foreach (var kvp in Data) {
+                var key = kvp.Key;
+                if (key.IndexOf("nic", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    key.IndexOf("nasidentifier", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    key.IndexOf("calledstationid", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    key.IndexOf("callingstationid", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    key.IndexOf("mac", StringComparison.OrdinalIgnoreCase) >= 0) {
+                    if (!string.IsNullOrEmpty(kvp.Value)) {
+                        nics.Add(kvp.Value);
+                    }
+                }
+            }
+            return nics;
         }
     }
 }

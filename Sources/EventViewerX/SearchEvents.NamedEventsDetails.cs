@@ -9,43 +9,153 @@ namespace EventViewerX {
     /// Defines the named events that can be searched for
     /// </summary>
     public enum NamedEvents {
+        /// <summary>
+        /// Active Directory computer account created or modified
+        /// </summary>
         ADComputerCreateChange,
+        /// <summary>
+        /// Active Directory computer account deleted
+        /// </summary>
         ADComputerDeleted,
+        /// <summary>
+        /// Detailed changes for computer accounts
+        /// </summary>
         ADComputerChangeDetailed,
 
+        /// <summary>
+        /// Modifications to group membership
+        /// </summary>
         ADGroupMembershipChange,
+        /// <summary>
+        /// Group membership enumeration events
+        /// </summary>
         ADGroupEnumeration,
+        /// <summary>
+        /// Active Directory group created, changed or deleted
+        /// </summary>
         ADGroupChange,
+        /// <summary>
+        /// Group creation or deletion events
+        /// </summary>
         ADGroupCreateDelete,
+        /// <summary>
+        /// Detailed changes for group objects
+        /// </summary>
         ADGroupChangeDetailed,
 
+        /// <summary>
+        /// Changes to Group Policy Objects
+        /// </summary>
         ADGroupPolicyChanges,
+        /// <summary>
+        /// Edits to Group Policy Objects
+        /// </summary>
         ADGroupPolicyEdits,
+        /// <summary>
+        /// Links or unlinks of Group Policy Objects
+        /// </summary>
         ADGroupPolicyLinks,
 
+        /// <summary>
+        /// Group Policy Object created
+        /// </summary>
+        GpoCreated,
+        /// <summary>
+        /// Group Policy Object deleted
+        /// </summary>
+        GpoDeleted,
+        /// <summary>
+        /// Group Policy Object modified
+        /// </summary>
+        GpoModified,
+
+        /// <summary>
+        /// Summary of LDAP binding activity
+        /// </summary>
         ADLdapBindingSummary,
+        /// <summary>
+        /// Detailed LDAP binding information
+        /// </summary>
         ADLdapBindingDetails,
+        /// <summary>
+        /// Active Directory user account created or changed
+        /// </summary>
         ADUserCreateChange,
+        /// <summary>
+        /// User account enabled, disabled, unlocked or deleted
+        /// </summary>
         ADUserStatus,
+        /// <summary>
+        /// Detailed changes for user accounts
+        /// </summary>
         ADUserChangeDetailed,
+        /// <summary>
+        /// User account lockout events
+        /// </summary>
         ADUserLockouts,
+        /// <summary>
+        /// Successful user logon
+        /// </summary>
         ADUserLogon,
+        /// <summary>
+        /// NTLMv1 logon tracking
+        /// </summary>
+        ADUserLogonNTLMv1,
+        /// <summary>
+        /// Kerberos authentication ticket requests
+        /// </summary>
         ADUserLogonKerberos,
+        /// <summary>
+        /// Failed user logon attempts
+        /// </summary>
         ADUserLogonFailed,
+        /// <summary>
+        /// User account unlocked
+        /// </summary>
         ADUserUnlocked,
+        /// <summary>
+        /// Organizational unit created, deleted or moved
+        /// </summary>
         ADOrganizationalUnitChangeDetailed,
+        /// <summary>
+        /// Detailed changes for other directory objects
+        /// </summary>
         ADOtherChangeDetailed,
 
+        /// <summary>
+        /// SMB1 access audit information
+        /// </summary>
         ADSMBServerAuditV1,
 
+        /// <summary>
+        /// Security log cleared
+        /// </summary>
         LogsClearedSecurity,
+        /// <summary>
+        /// Application or system log cleared
+        /// </summary>
         LogsClearedOther,
+        /// <summary>
+        /// Security log is full
+        /// </summary>
         LogsFullSecurity,
 
+        /// <summary>
+        /// NPS granted or denied network access
+        /// </summary>
         NetworkAccessAuthenticationPolicy,
 
+        /// <summary>
+        /// Unexpected system shutdown
+        /// </summary>
         OSCrash,
+        /// <summary>
+        /// System start-up, shutdown or crash events
+        /// </summary>
         OSStartupShutdownCrash,
+        /// <summary>
+        /// System time changed
+        /// </summary>
         OSTimeChange,
     }
 
@@ -68,6 +178,9 @@ namespace EventViewerX {
             { NamedEvents.ADGroupPolicyChanges, ([5136, 5137, 5141], "Security")},
             { NamedEvents.ADGroupPolicyEdits, ([5136, 5137, 5141], "Security")},
             { NamedEvents.ADGroupPolicyLinks, ([5136, 5137, 5141], "Security")},
+            { NamedEvents.GpoCreated, (new List<int> { 5137 }, "Security") },
+            { NamedEvents.GpoDeleted, (new List<int> { 5141 }, "Security") },
+            { NamedEvents.GpoModified, (new List<int> { 5136 }, "Security") },
             // user based events
             { NamedEvents.ADUserCreateChange, ([4720, 4738], "Security") },
             { NamedEvents.ADUserStatus, ([4722, 4725, 4723, 4724, 4726], "Security") },
@@ -75,6 +188,7 @@ namespace EventViewerX {
             { NamedEvents.ADOrganizationalUnitChangeDetailed, ([5136, 5137, 5139, 5141], "Security") },
             { NamedEvents.ADUserLockouts, ([4740], "Security") },
             { NamedEvents.ADUserLogon, ([4624], "Security") },
+            { NamedEvents.ADUserLogonNTLMv1, ([4624], "Security") },
             { NamedEvents.ADUserLogonFailed, ([4625], "Security")},
             { NamedEvents.ADUserLogonKerberos, ([4768], "Security") },
             { NamedEvents.ADUserUnlocked, ([4767], "Security") },
@@ -109,13 +223,16 @@ namespace EventViewerX {
                 if (eventIdsMap.TryGetValue(typeEvents, out var eventInfo) &&
                     eventInfo.EventIds.Contains(eventObject.Id) &&
                     eventInfo.LogName == eventObject.LogName) {
+                    // Try reading ObjectClass if available
+                    eventObject.Data.TryGetValue("ObjectClass", out var objectClass);
+
                     // If they match, create the appropriate event object based on the NamedEvents value
                     switch (typeEvents) {
                         // computer based events
                         case NamedEvents.ADComputerCreateChange:
                             return new ADComputerCreateChange(eventObject);
                         case NamedEvents.ADComputerChangeDetailed:
-                            if (eventObject.Data["ObjectClass"] == "computer") {
+                            if (objectClass == "computer") {
                                 return new ADComputerChangeDetailed(eventObject);
                             }
                             break;
@@ -139,7 +256,7 @@ namespace EventViewerX {
                         case NamedEvents.ADGroupCreateDelete:
                             return new ADGroupCreateDelete(eventObject);
                         case NamedEvents.ADGroupChangeDetailed:
-                            if (eventObject.Data["ObjectClass"] == "user") {
+                            if (objectClass == "user") {
                                 return new ADGroupChangeDetailed(eventObject);
                             }
                             break;
@@ -150,7 +267,7 @@ namespace EventViewerX {
                         case NamedEvents.ADUserStatus:
                             return new ADUserStatus(eventObject);
                         case NamedEvents.ADUserChangeDetailed:
-                            if (eventObject.Data["ObjectClass"] == "user") {
+                            if (objectClass == "user") {
                                 return new ADUserChangeDetailed(eventObject);
                             }
                             break;
@@ -158,6 +275,11 @@ namespace EventViewerX {
                             return new ADUserLockouts(eventObject);
                         case NamedEvents.ADUserLogon:
                             return new ADUserLogon(eventObject);
+                        case NamedEvents.ADUserLogonNTLMv1:
+                            if (eventObject.ValueMatches("LmPackageName", "NTLM V1")) {
+                                return new ADUserLogonNTLMv1(eventObject);
+                            }
+                            break;
                         case NamedEvents.ADUserLogonKerberos:
                             return new ADUserLogonKerberos(eventObject);
                         case NamedEvents.ADUserLogonFailed:
@@ -166,15 +288,15 @@ namespace EventViewerX {
                             return new ADUserUnlocked(eventObject);
                         // organizational unit and other events
                         case NamedEvents.ADOrganizationalUnitChangeDetailed:
-                            if (eventObject.Data["ObjectClass"] == "organizationalUnit" && eventObject.Data["AttributeLDAPDisplayName"] != "qPLik") {
+                            if (objectClass == "organizationalUnit" && eventObject.Data["AttributeLDAPDisplayName"] != "qPLik") {
                                 return new ADOrganizationalUnitChangeDetailed(eventObject);
                             }
                             break;
                         case NamedEvents.ADOtherChangeDetailed:
-                            if (eventObject.Data["ObjectClass"] != "user"
-                                && eventObject.Data["ObjectClass"] != "computer"
-                                && eventObject.Data["ObjectClass"] != "organizationalUnit"
-                                && eventObject.Data["ObjectClass"] != "group"
+                            if (objectClass != "user"
+                                && objectClass != "computer"
+                                && objectClass != "organizationalUnit"
+                                && objectClass != "group"
                                 ) {
                                 return new ADOtherChangeDetailed(eventObject);
                             }
@@ -197,22 +319,37 @@ namespace EventViewerX {
                         case NamedEvents.ADSMBServerAuditV1:
                             return SMBServerAudit.Create(eventObject);
                         case NamedEvents.ADGroupPolicyChanges:
-                            if (eventObject.Data["ObjectClass"] == "groupPolicyContainer" || eventObject.Data["ObjectClass"] == "container") {
+                            if (objectClass == "groupPolicyContainer" || objectClass == "container") {
                                 return new ADGroupPolicyChanges(eventObject);
                             }
                             break;
                         case NamedEvents.ADGroupPolicyLinks:
-                            if ((eventObject.Data["ObjectClass"] == "domainDNS" || eventObject.Data["ObjectClass"] == "organizationalUnit" || eventObject.Data["ObjectClass"] == "site")
+                            if ((objectClass == "domainDNS" || objectClass == "organizationalUnit" || objectClass == "site")
                                  && eventObject.ValueMatches("AttributeLDAPDisplayName", "gpLink")) {
                                 return new ADGroupPolicyLinks(eventObject);
                             }
                             break;
                         case NamedEvents.ADGroupPolicyEdits:
-                            if (eventObject.Data["ObjectClass"] == "groupPolicyContainer"
+                            if (objectClass == "groupPolicyContainer"
                                 && eventObject.Data.TryGetValue("AttributeLDAPDisplayName", out var ldapDisplayObjName)
                                 && ldapDisplayObjName is string ldapDisplayNameValue
                                 && ldapDisplayNameValue == "versionNumber") {
                                 return new ADGroupPolicyEdits(eventObject);
+                            }
+                            break;
+                        case NamedEvents.GpoCreated:
+                            if (objectClass == "groupPolicyContainer") {
+                                return new GpoCreated(eventObject);
+                            }
+                            break;
+                        case NamedEvents.GpoDeleted:
+                            if (objectClass == "groupPolicyContainer") {
+                                return new GpoDeleted(eventObject);
+                            }
+                            break;
+                        case NamedEvents.GpoModified:
+                            if (objectClass == "groupPolicyContainer") {
+                                return new GpoModified(eventObject);
                             }
                             break;
 

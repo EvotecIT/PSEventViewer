@@ -14,6 +14,11 @@ namespace EventViewerX {
         private ConcurrentBag<int> _watchEventId = new ConcurrentBag<int>();
 
         /// <summary>
+        /// Action executed when an event matching the filter is detected.
+        /// </summary>
+        private Action<EventObject> _eventAction;
+
+        /// <summary>
         /// Events
         /// </summary>
         readonly ConcurrentDictionary<EventObject, byte> WatchedEvents = new ConcurrentDictionary<EventObject, byte>();
@@ -26,9 +31,10 @@ namespace EventViewerX {
             }
         }
 
-        public void Watch(string machineName, string logName, List<int> eventId) {
+        public void Watch(string machineName, string logName, List<int> eventId, Action<EventObject> eventAction = null) {
             _machineName = machineName;
             _watchEventId = new ConcurrentBag<int>(eventId);
+            _eventAction = eventAction;
             try {
                 var eventLogSession = new EventLogSession(machineName);
                 var eventLogWatcher = new EventLogWatcher(new EventLogQuery(logName, PathType.LogName) {
@@ -58,6 +64,7 @@ namespace EventViewerX {
 
                     var eventObject = new EventObject(Event, _machineName);
                     WatchedEvents.TryAdd(eventObject, 0);
+                    _eventAction?.Invoke(eventObject);
                 }
             } else {
                 _logger.WriteWarning("Event log subscription callback was given invalid data. This shouldn't happen.");
