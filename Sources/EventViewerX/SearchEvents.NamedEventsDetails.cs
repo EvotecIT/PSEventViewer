@@ -109,13 +109,16 @@ namespace EventViewerX {
                 if (eventIdsMap.TryGetValue(typeEvents, out var eventInfo) &&
                     eventInfo.EventIds.Contains(eventObject.Id) &&
                     eventInfo.LogName == eventObject.LogName) {
+                    // Try reading ObjectClass if available
+                    eventObject.Data.TryGetValue("ObjectClass", out var objectClass);
+
                     // If they match, create the appropriate event object based on the NamedEvents value
                     switch (typeEvents) {
                         // computer based events
                         case NamedEvents.ADComputerCreateChange:
                             return new ADComputerCreateChange(eventObject);
                         case NamedEvents.ADComputerChangeDetailed:
-                            if (eventObject.Data["ObjectClass"] == "computer") {
+                            if (objectClass == "computer") {
                                 return new ADComputerChangeDetailed(eventObject);
                             }
                             break;
@@ -139,7 +142,7 @@ namespace EventViewerX {
                         case NamedEvents.ADGroupCreateDelete:
                             return new ADGroupCreateDelete(eventObject);
                         case NamedEvents.ADGroupChangeDetailed:
-                            if (eventObject.Data["ObjectClass"] == "user") {
+                            if (objectClass == "user") {
                                 return new ADGroupChangeDetailed(eventObject);
                             }
                             break;
@@ -150,7 +153,7 @@ namespace EventViewerX {
                         case NamedEvents.ADUserStatus:
                             return new ADUserStatus(eventObject);
                         case NamedEvents.ADUserChangeDetailed:
-                            if (eventObject.Data["ObjectClass"] == "user") {
+                            if (objectClass == "user") {
                                 return new ADUserChangeDetailed(eventObject);
                             }
                             break;
@@ -166,15 +169,15 @@ namespace EventViewerX {
                             return new ADUserUnlocked(eventObject);
                         // organizational unit and other events
                         case NamedEvents.ADOrganizationalUnitChangeDetailed:
-                            if (eventObject.Data["ObjectClass"] == "organizationalUnit" && eventObject.Data["AttributeLDAPDisplayName"] != "qPLik") {
+                            if (objectClass == "organizationalUnit" && eventObject.Data["AttributeLDAPDisplayName"] != "qPLik") {
                                 return new ADOrganizationalUnitChangeDetailed(eventObject);
                             }
                             break;
                         case NamedEvents.ADOtherChangeDetailed:
-                            if (eventObject.Data["ObjectClass"] != "user"
-                                && eventObject.Data["ObjectClass"] != "computer"
-                                && eventObject.Data["ObjectClass"] != "organizationalUnit"
-                                && eventObject.Data["ObjectClass"] != "group"
+                            if (objectClass != "user"
+                                && objectClass != "computer"
+                                && objectClass != "organizationalUnit"
+                                && objectClass != "group"
                                 ) {
                                 return new ADOtherChangeDetailed(eventObject);
                             }
@@ -197,18 +200,18 @@ namespace EventViewerX {
                         case NamedEvents.ADSMBServerAuditV1:
                             return SMBServerAudit.Create(eventObject);
                         case NamedEvents.ADGroupPolicyChanges:
-                            if (eventObject.Data["ObjectClass"] == "groupPolicyContainer" || eventObject.Data["ObjectClass"] == "container") {
+                            if (objectClass == "groupPolicyContainer" || objectClass == "container") {
                                 return new ADGroupPolicyChanges(eventObject);
                             }
                             break;
                         case NamedEvents.ADGroupPolicyLinks:
-                            if ((eventObject.Data["ObjectClass"] == "domainDNS" || eventObject.Data["ObjectClass"] == "organizationalUnit" || eventObject.Data["ObjectClass"] == "site")
+                            if ((objectClass == "domainDNS" || objectClass == "organizationalUnit" || objectClass == "site")
                                  && eventObject.ValueMatches("AttributeLDAPDisplayName", "gpLink")) {
                                 return new ADGroupPolicyLinks(eventObject);
                             }
                             break;
                         case NamedEvents.ADGroupPolicyEdits:
-                            if (eventObject.Data["ObjectClass"] == "groupPolicyContainer"
+                            if (objectClass == "groupPolicyContainer"
                                 && eventObject.Data.TryGetValue("AttributeLDAPDisplayName", out var ldapDisplayObjName)
                                 && ldapDisplayObjName is string ldapDisplayNameValue
                                 && ldapDisplayNameValue == "versionNumber") {
