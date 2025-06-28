@@ -41,7 +41,7 @@ namespace EventViewerX {
 
             switch (timePeriod) {
                 case TimePeriod.PastHour:
-                    startTime = new DateTime(now.Year, now.Month, now.Day, now.Hour - 1, 0, 0);
+                    startTime = new DateTime(now.Year, now.Month, now.Day, now.Hour, 0, 0).AddHours(-1);
                     endTime = startTime.Value.AddHours(1);
                     break;
                 case TimePeriod.CurrentHour:
@@ -49,7 +49,7 @@ namespace EventViewerX {
                     endTime = startTime.Value.AddHours(1);
                     break;
                 case TimePeriod.PastDay:
-                    startTime = new DateTime(now.Year, now.Month, now.Day - 1, 0, 0, 0);
+                    startTime = now.Date.AddDays(-1);
                     endTime = startTime.Value.AddDays(1);
                     break;
                 case TimePeriod.CurrentDay:
@@ -66,8 +66,9 @@ namespace EventViewerX {
                     break;
                 case TimePeriod.PastQuarter:
                     int currentQuarter = (now.Month - 1) / 3 + 1;
-                    startTime = new DateTime(now.Year, (currentQuarter - 2) * 3 + 1, 1);
-                    endTime = new DateTime(now.Year, (currentQuarter - 1) * 3 + 1, 1);
+                    DateTime startOfCurrentQuarter = new DateTime(now.Year, (currentQuarter - 1) * 3 + 1, 1);
+                    startTime = startOfCurrentQuarter.AddMonths(-3);
+                    endTime = startOfCurrentQuarter;
                     break;
                 case TimePeriod.CurrentQuarter:
                     currentQuarter = (now.Month - 1) / 3 + 1;
