@@ -63,13 +63,18 @@ public partial class SearchEvents : Settings {
     /// <returns>An enumerable collection of EventObject instances representing the filtered events from the log file.</returns>
     public static IEnumerable<EventObject> QueryLogFile(string filePath, List<int> eventIds = null, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null, int maxEvents = 0, List<long> eventRecordId = null, TimePeriod? timePeriod = null, bool oldest = false, System.Collections.Hashtable namedDataFilter = null, System.Collections.Hashtable namedDataExcludeFilter = null) {
 
+        string absolutePath = Path.GetFullPath(filePath);
+
+        if (!File.Exists(absolutePath)) {
+            throw new FileNotFoundException($"The log file '{absolutePath}' does not exist.", absolutePath);
+        }
+
         // Check if we have any filters that require an XML query
         bool hasFilters = namedDataFilter != null || namedDataExcludeFilter != null || eventIds != null ||
                          providerName != null || keywords != null || level != null || startTime != null ||
                          endTime != null || userId != null || eventRecordId != null;
 
         EventLogQuery query;
-        string absolutePath = Path.GetFullPath(filePath);
 
         if (hasFilters) {
             // Build complex XML query with filters
