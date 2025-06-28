@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using Xunit;
 
@@ -50,6 +51,23 @@ namespace EventViewerX.Tests {
         public void IdMultipleValuesOr() {
             var result = SearchEvents.BuildWinEventFilter(id: ["1", "2"], logName: "x", xpathOnly: true);
             Assert.Equal("*[System[(EventID=1) or (EventID=2)]]", result);
+        }
+
+        [Fact]
+        public void IdMultipleValuesXmlQuery() {
+            var result = SearchEvents.BuildWinEventFilter(id: ["1", "2"], logName: "Log");
+            Assert.StartsWith("<QueryList>", result);
+            Assert.Contains("(EventID=1) or (EventID=2)", result);
+        }
+
+        [Fact]
+        public void DateRangeFilterXpathOnly() {
+            var start = DateTime.Now.AddHours(-1);
+            var end = DateTime.Now.AddMinutes(-30);
+            var result = SearchEvents.BuildWinEventFilter(startTime: start, endTime: end, logName: "x", xpathOnly: true);
+            Assert.Contains("TimeCreated[timediff(@SystemTime) <=", result);
+            Assert.Contains("TimeCreated[timediff(@SystemTime) >=", result);
+            Assert.DoesNotContain("<QueryList>", result);
         }
     }
 }
