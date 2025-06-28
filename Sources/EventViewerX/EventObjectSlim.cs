@@ -31,6 +31,13 @@ public class EventObjectSlim {
         { 0x800000, "PASSWORD_EXPIRED" },
         { 0x1000000, "TRUSTED_TO_AUTH_FOR_DELEGATION" },
         { 0x04000000, "PARTIAL_SECRETS_ACCOUNT" }
+    }
+  
+    private static readonly Dictionary<string, string> OperationTypeLookup = new()
+    {
+        {"%%14674", "Value Added"},
+        {"%%14675", "Value Deleted"},
+        {"%%14676", "Unknown"}
     };
 
 
@@ -59,17 +66,11 @@ public class EventObjectSlim {
         }
     }
     internal string ConvertFromOperationType(string s) {
-        Dictionary<string, string> known = new Dictionary<string, string> {
-                {"%%14674", "Value Added"},
-                {"%%14675", "Value Deleted"},
-                {"%%14676", "Unknown"}
-            };
-
-        if (known.ContainsKey(s)) {
-            return known[s];
-        } else {
-            return "Unknown Operation";
+        if (OperationTypeLookup.ContainsKey(s)) {
+            return OperationTypeLookup[s];
         }
+
+        return "Unknown Operation";
     }
     internal static string OverwriteByField(string findField, string expectedValue, string currentValue, string insertValue) {
         //OverwriteByField = [ordered] @{

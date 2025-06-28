@@ -4,6 +4,7 @@ using System.Diagnostics.Eventing.Reader;
 using System.Linq;
 using System.Security.Principal;
 using System.Xml.Linq;
+using System.Text.RegularExpressions;
 
 namespace EventViewerX {
     public class EventObject {
@@ -166,7 +167,7 @@ namespace EventViewerX {
             Dictionary<string, string> data = new Dictionary<string, string>();
 
             // Split the message into lines
-            string[] lines = message.Split('\n');
+            string[] lines = Regex.Split(message, "\r?\n");
 
             // Find the first non-empty line and add it to the dictionary with a default key of "Message"
             string firstLine = lines.FirstOrDefault(line => !string.IsNullOrWhiteSpace(line));
@@ -200,6 +201,37 @@ namespace EventViewerX {
         }
 
         /// <summary>
+        /// Parses lines containing colon separated key/value pairs.
+        /// </summary>
+        /// <param name="text">Text to parse</param>
+        /// <returns>Dictionary with parsed key value pairs</returns>
+        private static Dictionary<string, string> ParseColonSeparatedLines(string text) {
+            Dictionary<string, string> data = new Dictionary<string, string>();
+            if (string.IsNullOrEmpty(text)) {
+                return data;
+            }
+
+            string[] lines = Regex.Split(text, "\r?\n");
+            foreach (string rawLine in lines) {
+                string line = rawLine.Trim();
+                if (string.IsNullOrEmpty(line)) {
+                    continue;
+                }
+
+                int index = line.IndexOf(':');
+                if (index > -1) {
+                    string key = line.Substring(0, index).Trim();
+                    string value = line.Substring(index + 1).Trim();
+                    if (!string.IsNullOrEmpty(key)) {
+                        data[key] = value;
+                    }
+                }
+            }
+
+            return data;
+        }
+
+        /// <summary>
         /// Parses the XML data of the event record into a dictionary converting it into a key value pair
         /// </summary>
         /// <param name="xmlData">The XML data.</param>
@@ -208,7 +240,13 @@ namespace EventViewerX {
             Dictionary<string, string> data = new Dictionary<string, string>();
 
             // Parse the XML data into an XElement
-            XElement root = XElement.Parse(xmlData);
+            XElement root;
+            try {
+                root = XElement.Parse(xmlData);
+            } catch (Exception ex) {
+                Settings._logger.WriteWarning($"Failed to parse event XML. Error: {ex.Message}");
+                return data;
+            }
 
             // Get the namespace of the root element
             XNamespace ns = root.GetDefaultNamespace();
@@ -236,6 +274,11 @@ namespace EventViewerX {
                         }
                     }
                     data[name] = value;
+                    foreach (var kv in ParseColonSeparatedLines(value)) {
+                        if (!data.ContainsKey(kv.Key)) {
+                            data[kv.Key] = kv.Value;
+                        }
+                    }
                 }
             }
             return data;
