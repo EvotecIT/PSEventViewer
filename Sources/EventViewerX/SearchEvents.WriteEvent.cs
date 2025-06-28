@@ -63,7 +63,9 @@ public partial class SearchEvents : Settings {
                         LoggingMessages.Logger.WriteVerbose($"Writing event '{eventId}' of type '{type}' of category '{category}' to EventLog: '{message}'");
                         eventLog.WriteEntry(message, type, eventId, (short)category);
                     } else {
-                        var joinedMessage = replacementStrings.Prepend(message).ToArray();
+                        var joinedMessage = replacementStrings == null
+                            ? new[] { message }
+                            : replacementStrings.Prepend(message).ToArray();
                         // If rawData and/or replacementStrings are provided, write them to the event log.
                         LoggingMessages.Logger.WriteVerbose($"Writing event '{eventId}' of type '{type}' of category '{category}' to EventLog: '{joinedMessage}'");
                         eventLog.WriteEvent(eventInstance, rawData, joinedMessage);
