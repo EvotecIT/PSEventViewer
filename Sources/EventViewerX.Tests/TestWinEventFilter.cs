@@ -65,8 +65,8 @@ namespace EventViewerX.Tests {
             var start = DateTime.Now.AddHours(-1);
             var end = DateTime.Now.AddMinutes(-30);
             var result = SearchEvents.BuildWinEventFilter(startTime: start, endTime: end, logName: "x", xpathOnly: true);
-            Assert.Contains("TimeCreated[timediff(@SystemTime) <=", result);
-            Assert.Contains("TimeCreated[timediff(@SystemTime) >=", result);
+            Assert.Contains("TimeCreated[timediff(@SystemTime) &lt;=", result);
+            Assert.Contains("TimeCreated[timediff(@SystemTime) &gt;=", result);
             Assert.DoesNotContain("<QueryList>", result);
         }
     }
