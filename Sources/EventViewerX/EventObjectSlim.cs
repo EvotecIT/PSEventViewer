@@ -8,6 +8,13 @@ public class EventObjectSlim {
     public string GatheredLogName; // = _eventObject.LogName;
     public string Type;
 
+    private static readonly Dictionary<string, string> OperationTypeLookup = new()
+    {
+        {"%%14674", "Value Added"},
+        {"%%14675", "Value Deleted"},
+        {"%%14676", "Unknown"}
+    };
+
 
     public EventObjectSlim(EventObject eventObject) {
         _eventObject = eventObject;
@@ -34,17 +41,11 @@ public class EventObjectSlim {
         }
     }
     internal string ConvertFromOperationType(string s) {
-        Dictionary<string, string> known = new Dictionary<string, string> {
-                {"%%14674", "Value Added"},
-                {"%%14675", "Value Deleted"},
-                {"%%14676", "Unknown"}
-            };
-
-        if (known.ContainsKey(s)) {
-            return known[s];
-        } else {
-            return "Unknown Operation";
+        if (OperationTypeLookup.ContainsKey(s)) {
+            return OperationTypeLookup[s];
         }
+
+        return "Unknown Operation";
     }
     internal static string OverwriteByField(string findField, string expectedValue, string currentValue, string insertValue) {
         //OverwriteByField = [ordered] @{
