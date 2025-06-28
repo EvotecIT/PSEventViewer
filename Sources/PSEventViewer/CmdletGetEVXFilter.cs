@@ -30,7 +30,7 @@ public sealed class CmdletGetEVXFilter : AsyncPSCmdlet {
     [Parameter]
     public long[] Keywords;
 
-    [ValidateSet("Critical","Error","Informational","LogAlways","Verbose","Warning")]
+    [ValidateSet("Critical", "Error", "Informational", "LogAlways", "Verbose", "Warning")]
     [Parameter]
     public string[] Level;
 

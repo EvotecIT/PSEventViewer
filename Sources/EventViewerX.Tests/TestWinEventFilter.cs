@@ -51,5 +51,5 @@ namespace EventViewerX.Tests {
             var result = SearchEvents.BuildWinEventFilter(id: ["1", "2"], logName: "x", xpathOnly: true);
             Assert.Equal("*[System[(EventID=1) or (EventID=2)]]", result);
         }
-}
+    }
 }

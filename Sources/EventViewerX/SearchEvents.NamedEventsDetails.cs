@@ -1,8 +1,8 @@
-﻿using System;
-using System.Collections.Generic;
-using EventViewerX.Rules.ActiveDirectory;
+﻿using EventViewerX.Rules.ActiveDirectory;
 using EventViewerX.Rules.Logging;
 using EventViewerX.Rules.Windows;
+using System;
+using System.Collections.Generic;
 
 namespace EventViewerX {
     /// <summary>
