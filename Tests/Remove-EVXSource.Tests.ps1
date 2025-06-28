@@ -1,8 +1,7 @@
 describe 'Remove-EVXSource cmdlet' {
-    $script:source = 'TestEVXSource'
-
     BeforeAll {
-        # Make sure event source exists before running the test
+        # Register a temporary source for removal
+        $script:source = 'TestEVXSource'
         Write-EVXEntry -LogName 'Application' -ProviderName $script:source -EventId 1 -Message 'test'
     }
 
