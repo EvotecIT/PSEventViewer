@@ -6,6 +6,8 @@ using System.Threading.Tasks;
 
 namespace PSEventViewer;
 
+#nullable enable
+
 /// <summary>
 /// An abstract base class for asynchronous PowerShell cmdlets.
 /// </summary>

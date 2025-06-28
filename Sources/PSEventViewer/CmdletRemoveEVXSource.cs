@@ -11,14 +11,23 @@ using System.Threading.Tasks;
 [Alias("Remove-EventViewerXSource", "Remove-WinEventSource")]
 [OutputType(typeof(bool))]
 public sealed class CmdletRemoveEVXSource : AsyncPSCmdlet {
+    /// <summary>
+    /// Name of the event source to remove.
+    /// </summary>
     [Parameter(Mandatory = true, Position = 0)]
     [Alias("Source", "Provider")]
     public string SourceName { get; set; }
 
+    /// <summary>
+    /// Target computer where the source resides.
+    /// </summary>
     [Parameter]
     [Alias("ComputerName", "ServerName")]
     public string MachineName { get; set; }
 
+    /// <summary>
+    /// Removes the specified event source from the system.
+    /// </summary>
     protected override Task ProcessRecordAsync() {
         var errorAction = GetErrorActionPreference();
         try {
