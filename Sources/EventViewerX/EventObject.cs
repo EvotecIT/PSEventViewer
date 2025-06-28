@@ -135,7 +135,6 @@ namespace EventViewerX {
 
             ContainerLog = ((EventLogRecord)_eventRecord).ContainerLog;
 
-            // Set GatheredFrom and GatheredLogName to match Get-Events functionality
             // GatheredFrom is the file path if querying from file, otherwise computer name
             if (queriedMachine != null && (queriedMachine.EndsWith(".evtx", StringComparison.OrdinalIgnoreCase) || queriedMachine.Contains("\\"))) {
                 // This looks like a file path
