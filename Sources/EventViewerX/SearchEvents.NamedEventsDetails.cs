@@ -85,6 +85,10 @@ namespace EventViewerX {
         /// </summary>
         ADUserLogon,
         /// <summary>
+        /// NTLMv1 logon tracking
+        /// </summary>
+        ADUserLogonNTLMv1,
+        /// <summary>
         /// Kerberos authentication ticket requests
         /// </summary>
         ADUserLogonKerberos,
@@ -168,6 +172,7 @@ namespace EventViewerX {
             { NamedEvents.ADOrganizationalUnitChangeDetailed, ([5136, 5137, 5139, 5141], "Security") },
             { NamedEvents.ADUserLockouts, ([4740], "Security") },
             { NamedEvents.ADUserLogon, ([4624], "Security") },
+            { NamedEvents.ADUserLogonNTLMv1, ([4624], "Security") },
             { NamedEvents.ADUserLogonFailed, ([4625], "Security")},
             { NamedEvents.ADUserLogonKerberos, ([4768], "Security") },
             { NamedEvents.ADUserUnlocked, ([4767], "Security") },
@@ -254,6 +259,11 @@ namespace EventViewerX {
                             return new ADUserLockouts(eventObject);
                         case NamedEvents.ADUserLogon:
                             return new ADUserLogon(eventObject);
+                        case NamedEvents.ADUserLogonNTLMv1:
+                            if (eventObject.ValueMatches("LmPackageName", "NTLM V1")) {
+                                return new ADUserLogonNTLMv1(eventObject);
+                            }
+                            break;
                         case NamedEvents.ADUserLogonKerberos:
                             return new ADUserLogonKerberos(eventObject);
                         case NamedEvents.ADUserLogonFailed:
