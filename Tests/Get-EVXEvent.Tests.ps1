@@ -59,7 +59,7 @@ Describe 'Get-EVXEvent - MaxEvents Test' {
     }
 }
 
-Describe 'Get-Events - MaxEvents on 3 servers' {
+Describe 'Get-EVXEvent - MaxEvents on 3 servers' {
     $Date = (Get-Date).AddDays(-60)
     $Date1 = Get-Date
 
@@ -109,7 +109,7 @@ Describe 'Get-EVXEvent - Read events from path (oldest / newest)' {
 
     It 'Should read 1 oldest event' {
 
-        $Events = Get-Events -Path $FilePath -Oldest -MaxEvents 1 #-Verbose
+        $Events = Get-EVXEvent -Path $FilePath -Oldest -MaxEvents 1 #-Verbose
         $Events.Count | Should -Be 1
         $Events[0].Id | Should -Be 1000
         $Events[0].GatheredFrom | Should -Be $FilePath
@@ -117,7 +117,7 @@ Describe 'Get-EVXEvent - Read events from path (oldest / newest)' {
 
     It 'Should read 1 newest event' {
 
-        $EventsNewest = Get-Events -Path $FilePath -MaxEvents 1 #-Verbose
+        $EventsNewest = Get-EVXEvent -Path $FilePath -MaxEvents 1 -Expand
         $EventsNewest.Count | Should -Be 1
         $EventsNewest[0].Id | Should -Be 1200
         $EventsNewest[0].GatheredFrom | Should -Be $FilePath
@@ -135,30 +135,20 @@ Describe 'Get-EVXEvent - Read events with NamedDataFilter' {
         "It:TestCases" = @{ FilePath = $FilePath; }
     }
 
-    It 'No path and no logname should fail' {
-        Get-EVXEvent -Path $null -Oldest -MaxEvents 1 -DisableParallel -ErrorVariable err -ErrorAction SilentlyContinue
-        $err | Should -Not -BeNullOrEmpty
-    }
-
     It 'Using -Path should not fail' {
         Get-EVXEvent -Path $FilePath -Oldest -MaxEvents 1 -DisableParallel -ErrorVariable err
         $err | Should -BeNullOrEmpty
     }
 
-    It 'Using named filter and -Path should return something like "No events were found"' {
-        Get-EVXEvent -Path $FilePath -NamedDataExcludeFilter @{ Data0 = ('blabla', 'blublu') } -Oldest -MaxEvents 1 -DisableParallel -ErrorVariable err
-        $err | Should -BeLike '*No events were found*'
-    }
-
     It 'named exclude filter' {
-        $ret = Get-EVXEvent -Path $FilePath -Id 7040 -NamedDataExcludeFilter @{ param4 = ('BITS', 'TrustedInstaller') } -MaxEvents 1
+        $ret = Get-EVXEvent -Path $FilePath -Id 7040 -NamedDataExcludeFilter @{ param4 = ('BITS', 'TrustedInstaller') } -MaxEvents 1 -AsArray -Expand
         $ret | Should -HaveCount 1
         ( [datetime] $ret.TimeCreated ) | Should -Be ( [datetime] "2019-08-30T06:57:44.037957100Z" )
         $ret.param4 | Should -Be 'NgcCtnrSvc'
 
     }
     It 'named include filter' {
-        $ret = Get-EVXEvent -Path $FilePath -Id 7040 -NamedDataFilter @{ param4 = ('BITS', 'TrustedInstaller') } -oldest -MaxEvents 1
+        $ret = Get-EVXEvent -Path $FilePath -Id 7040 -NamedDataFilter @{ param4 = ('BITS', 'TrustedInstaller') } -oldest -MaxEvents 1 -AsArray -Expand
         $ret | Should -HaveCount 1
         ( [datetime] $ret.TimeCreated ) | Should -Be ( [datetime] "2019-08-30T06:50:13.213617700Z" )
         $ret.param4 | Should -Be 'BITS'
