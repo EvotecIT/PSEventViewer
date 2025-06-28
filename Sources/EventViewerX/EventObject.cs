@@ -201,6 +201,37 @@ namespace EventViewerX {
         }
 
         /// <summary>
+        /// Parses lines containing colon separated key/value pairs.
+        /// </summary>
+        /// <param name="text">Text to parse</param>
+        /// <returns>Dictionary with parsed key value pairs</returns>
+        private static Dictionary<string, string> ParseColonSeparatedLines(string text) {
+            Dictionary<string, string> data = new Dictionary<string, string>();
+            if (string.IsNullOrEmpty(text)) {
+                return data;
+            }
+
+            string[] lines = Regex.Split(text, "\r?\n");
+            foreach (string rawLine in lines) {
+                string line = rawLine.Trim();
+                if (string.IsNullOrEmpty(line)) {
+                    continue;
+                }
+
+                int index = line.IndexOf(':');
+                if (index > -1) {
+                    string key = line.Substring(0, index).Trim();
+                    string value = line.Substring(index + 1).Trim();
+                    if (!string.IsNullOrEmpty(key)) {
+                        data[key] = value;
+                    }
+                }
+            }
+
+            return data;
+        }
+
+        /// <summary>
         /// Parses the XML data of the event record into a dictionary converting it into a key value pair
         /// </summary>
         /// <param name="xmlData">The XML data.</param>
@@ -243,6 +274,11 @@ namespace EventViewerX {
                         }
                     }
                     data[name] = value;
+                    foreach (var kv in ParseColonSeparatedLines(value)) {
+                        if (!data.ContainsKey(kv.Key)) {
+                            data[kv.Key] = kv.Value;
+                        }
+                    }
                 }
             }
             return data;
