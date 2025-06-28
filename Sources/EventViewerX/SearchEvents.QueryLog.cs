@@ -1,5 +1,6 @@
 ﻿using System.Diagnostics.Eventing.Reader;
 using System.IO;
+using System.Net;
 
 namespace EventViewerX;
 
@@ -40,7 +41,12 @@ public partial class SearchEvents : Settings {
     /// </summary>
     /// <returns></returns>
     private static string GetFQDN() {
-        return Dns.GetHostEntry("").HostName;
+        try {
+            return Dns.GetHostEntry("").HostName;
+        } catch (Exception ex) {
+            _logger.WriteVerbose($"Failed to resolve FQDN via DNS: {ex.Message}. Falling back to machine name.");
+            return Environment.MachineName;
+        }
     }
 
     /// <summary>
