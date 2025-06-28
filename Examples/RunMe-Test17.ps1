@@ -1,6 +1,6 @@
 ﻿Import-Module PSEventViewer -Force
 
-$AllEvents = Get-Events -LogName 'Application' -ID 1001 -MaxEvents 1 -Verbose -DisableParallel
+$AllEvents = Get-EVXEvent -LogName 'Application' -ID 1001 -MaxEvents 1 -Verbose -DisableParallel
 $Message = $AllEvents[0].Message
 
 $M = [ordered] @{}

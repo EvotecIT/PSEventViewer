@@ -1,11 +1,11 @@
 Clear-Host
 #Import-Module PSEventViewer -Force
-#Get-Events -LogName 'ForwardedEvents' -ID 1105 -RecordID 3512231 -Verbose
-#Get-Events -LogName 'Security' -ID 5379 -Verbose
+#Get-EVXEvent -LogName 'ForwardedEvents' -ID 1105 -RecordID 3512231 -Verbose
+#Get-EVXEvent -LogName 'Security' -ID 5379 -Verbose
 
 
-#Get-Events -LogName 'Security' -RecordID 5287804 -Machine AD1.AD.EVOTEC.XYZ | fl Message, MemberName, MemberNameWithoutCN
-#Get-Events -LogName 'Security' -RecordID 5844279 -Machine AD1.AD.EVOTEC.XYZ | fl Message, MemberName, MemberNameWithoutCN
+#Get-EVXEvent -LogName 'Security' -RecordID 5287804 -Machine AD1.AD.EVOTEC.XYZ | fl Message, MemberName, MemberNameWithoutCN
+#Get-EVXEvent -LogName 'Security' -RecordID 5844279 -Machine AD1.AD.EVOTEC.XYZ | fl Message, MemberName, MemberNameWithoutCN
 
 
 $MemberName = @(
@@ -31,12 +31,12 @@ foreach ($Member in $MemberName) {
 }
 Write-Color '- NewVersion' -Color Red
 foreach ($Member in $MemberName) {
-  
+
     $Member -replace 'CN=|\\,|,(OU|DC|CN).*$'
 }
 
 Write-Color '- Final version?' -Color Blue
 foreach ($Member in $MemberName) {
-  
+
     $Member -replace 'CN=|\\|,(OU|DC|CN).*$'
 }

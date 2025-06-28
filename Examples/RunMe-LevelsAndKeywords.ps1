@@ -1,3 +1,3 @@
 Import-Module PSEventViewer -Force
 
-Get-Events -MaxEvents 5 -LogName Security -Keywords AuditSuccess | Format-List *
+Get-EVXEvent -MaxEvents 5 -LogName Security -Keywords AuditSuccess | Format-List *

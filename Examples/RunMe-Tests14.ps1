@@ -9,5 +9,5 @@ $List = @(
     @{ Server = 'Evo1'; LogName = 'Security'; Type = 'Computer'; MaxEvents = 15; Keywords = 'AuditSuccess' }
     @{ Server = 'Evo1'; LogName = 'Security'; Type = 'Computer'; MaxEvents = 15; Level = 'Informational'; Keywords = 'AuditFailure' }
 )
-$Output4 = Get-Events -ExtendedInput $List -Verbose
+$Output4 = Get-EVXEvent -ExtendedInput $List -Verbose
 $Output4 | Format-Table Computer, Date, LevelDisplayName

@@ -6,4 +6,4 @@ $IDRequiringSplitOver23 = 1102, 5136, 5137, 5141, 4364, 4647, 4672, 4727, 4730, 
 #Get-WinEvent -FilterHashtable @{ LogName = 'ForwardedEvents'; ID = $IDRequiringSplitOver23 } -Verbose
 
 ### New approach
-Get-Events -Id $IDRequiringSplitOver23 -LogName 'Security' -Verbose
+Get-EVXEvent -Id $IDRequiringSplitOver23 -LogName 'Security' -Verbose

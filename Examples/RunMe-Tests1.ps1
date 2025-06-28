@@ -4,25 +4,25 @@ Write-Color 'Start processing events - Tests for expected output' -Color Red
 # #, 4722, 4723, 4724, 4725, 4726, 4738, 4740, 4767
 $TestServers = 'AD1.ad.evotec.xyz'
 $ID = 104
-$TestEvents1 = Get-Events -Machine $TestServers -Id $ID -LogName 'System' -MaxEvents 1 #-DisableParallel #-Verbose
+$TestEvents1 = Get-EVXEvent -Machine $TestServers -Id $ID -LogName 'System' -MaxEvents 1 #-DisableParallel #-Verbose
 $ID = 16384
-$TestEvents2 = Get-Events -Machine $TestServers -Id $ID -LogName 'Application' -MaxEvents 1 #-DisableParallel #-Verbose
+$TestEvents2 = Get-EVXEvent -Machine $TestServers -Id $ID -LogName 'Application' -MaxEvents 1 #-DisableParallel #-Verbose
 $ID = 4634
-$TestEvents3 = Get-Events -Machine $TestServers -Id $ID -LogName 'Security' -MaxEvents 1 #-DisableParallel #-Verbose
+$TestEvents3 = Get-EVXEvent -Machine $TestServers -Id $ID -LogName 'Security' -MaxEvents 1 #-DisableParallel #-Verbose
 $ID = 4688
-$TestEvents4 = Get-Events -Machine $TestServers -Id $ID -LogName 'Security' -MaxEvents 1 #-DisableParallel #-Verbose
+$TestEvents4 = Get-EVXEvent -Machine $TestServers -Id $ID -LogName 'Security' -MaxEvents 1 #-DisableParallel #-Verbose
 $ID = 105
-$TestEvents5 = Get-Events -Machine $TestServers -Id $ID -LogName 'Application' -MaxEvents 1  #-DisableParallel  #-Verbose
+$TestEvents5 = Get-EVXEvent -Machine $TestServers -Id $ID -LogName 'Application' -MaxEvents 1  #-DisableParallel  #-Verbose
 $ID = 7036
-$TestEvents6 = Get-Events -Machine $TestServers -Id $ID -LogName 'System' -MaxEvents 1 #-DisableParallel #-Verbose
+$TestEvents6 = Get-EVXEvent -Machine $TestServers -Id $ID -LogName 'System' -MaxEvents 1 #-DisableParallel #-Verbose
 $ID = 32
-$TestEvents7 = Get-Events -Machine $TestServers -Id $ID -LogName 'System' -MaxEvents 1 #-DisableParallel #-Verbose
+$TestEvents7 = Get-EVXEvent -Machine $TestServers -Id $ID -LogName 'System' -MaxEvents 1 #-DisableParallel #-Verbose
 $ID = 1014
-$TestEvents8 = Get-Events -Machine $TestServers -Id $ID -LogName 'System' -MaxEvents 1 #-DisableParallel #-Verbose
+$TestEvents8 = Get-EVXEvent -Machine $TestServers -Id $ID -LogName 'System' -MaxEvents 1 #-DisableParallel #-Verbose
 $ID = 8198
-$TestEvents9 = Get-Events -Machine $TestServers -Id $ID -LogName 'Application' -MaxEvents 1  #-DisableParallel  #-Verbose
+$TestEvents9 = Get-EVXEvent -Machine $TestServers -Id $ID -LogName 'Application' -MaxEvents 1  #-DisableParallel  #-Verbose
 $ID = 10154
-$TestEvents10 = Get-Events -Machine $TestServers -Id $ID -LogName 'System' -MaxEvents 1 #-DisableParallel #-Verbose
+$TestEvents10 = Get-EVXEvent -Machine $TestServers -Id $ID -LogName 'System' -MaxEvents 1 #-DisableParallel #-Verbose
 
 Write-Color 'Jump 1' -Color Green
 $TestEvents1 | fl Channel, BackupPath, SubjectDomainName, SubjectUserName, MessageSubject, Message
