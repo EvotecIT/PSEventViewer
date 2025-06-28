@@ -8,37 +8,64 @@
 [Alias("Write-EventViewerXEntry", "Write-WinEvent")]
 [OutputType(typeof(bool))]
 public sealed class CmdletWriteEVXEntry : AsyncPSCmdlet {
+    /// <summary>
+    /// Target computer to write the event to.
+    /// </summary>
     [Alias("ComputerName", "ServerName")]
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
     public string MachineName;
 
+    /// <summary>
+    /// Name of the event log where the entry will be written.
+    /// </summary>
     [Parameter(Mandatory = true, Position = 0, ParameterSetName = "RecordId")]
     [Parameter(Mandatory = true, Position = 0, ParameterSetName = "GenericEvents")]
     public string LogName;
 
+    /// <summary>
+    /// Name of the provider that writes the entry.
+    /// </summary>
     [Alias("Source", "Provider")]
     [Parameter(Mandatory = true, ParameterSetName = "GenericEvents")]
     public string ProviderName;
 
+    /// <summary>
+    /// Category for the event entry.
+    /// </summary>
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
     public int Category;
 
+    /// <summary>
+    /// Type of the event log entry.
+    /// </summary>
     [Alias("EntryType")]
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
     public System.Diagnostics.EventLogEntryType EventLogEntryType = System.Diagnostics.EventLogEntryType.Information;
 
+    /// <summary>
+    /// Identifier for the event entry.
+    /// </summary>
     [Alias("Id")]
     [Parameter(Mandatory = true, ParameterSetName = "GenericEvents")]
     public int EventId;
 
+    /// <summary>
+    /// Message for the event entry.
+    /// </summary>
     [Parameter(Mandatory = true, ParameterSetName = "GenericEvents")]
     public string Message;
 
+    /// <summary>
+    /// Additional custom fields to include with the event.
+    /// </summary>
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
     public string[] AdditionalFields;
 
     private ActionPreference errorAction;
 
+    /// <summary>
+    /// Initializes processing and reads error preferences.
+    /// </summary>
     protected override Task BeginProcessingAsync() {
         // Get the error action preference as user requested
         // It first sets the error action to the default error action preference
@@ -58,6 +85,9 @@ public sealed class CmdletWriteEVXEntry : AsyncPSCmdlet {
         var searchEvents = new SearchEvents(internalLogger);
         return Task.CompletedTask;
     }
+    /// <summary>
+    /// Writes the event using <see cref="SearchEvents"/>.
+    /// </summary>
     protected override Task ProcessRecordAsync() {
         SearchEvents.WriteEvent(ProviderName, LogName, Message, EventLogEntryType, Category, EventId, MachineName, AdditionalFields);
         return Task.CompletedTask;

@@ -15,24 +15,42 @@ namespace PSEventViewer {
     [Alias("Get-EventViewerXInfo", "Get-EventsSettings", "Get-EventsInformation")]
     [OutputType(typeof(WinEventInformation))]
     public sealed class CmdletGetEVXInfo : AsyncPSCmdlet {
+        /// <summary>
+        /// Target machines from which to gather log information.
+        /// </summary>
         [Alias("ADDomainControllers", "DomainController", "Server", "Servers", "Computer", "Computers", "ComputerName")]
         [Parameter(Mandatory = false)]
         public List<string> Machine { get; set; } = new() { Environment.MachineName };
 
+        /// <summary>
+        /// Paths to event log files to analyse.
+        /// </summary>
         [Parameter(Mandatory = false)]
         public List<string> FilePath { get; set; }
 
+        /// <summary>
+        /// Names of logs to retrieve information about.
+        /// </summary>
         [Alias("LogType", "Log")]
         [Parameter(Mandatory = false)]
         public List<string> LogName { get; set; } = new() { "Security" };
 
+        /// <summary>
+        /// Maximum number of runspaces used when querying multiple machines.
+        /// </summary>
         [Parameter(Mandatory = false)]
         public int MaxRunspaces { get; set; } = 50;
 
+        /// <summary>
+        /// When set, queries domain controllers instead of specified machines.
+        /// </summary>
         [Alias("AskDC", "QueryDomainControllers", "AskForest")]
         [Parameter(Mandatory = false)]
         public SwitchParameter RunAgainstDC { get; set; }
 
+        /// <summary>
+        /// Retrieves event log information based on the provided parameters.
+        /// </summary>
         protected override Task ProcessRecordAsync() {
             // Create fresh instances for each invocation to prevent state retention
             var internalLogger = new InternalLogger(false);

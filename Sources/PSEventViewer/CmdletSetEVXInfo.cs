@@ -10,19 +10,34 @@ namespace PSEventViewer;
 [Alias("Set-EventViewerXInfo", "Set-EventsInformation", "Set-EventsSettings")]
 [OutputType(typeof(bool))]
 public sealed class CmdletSetEVXInfo : AsyncPSCmdlet {
+    /// <summary>
+    /// Name of the log whose settings will be modified.
+    /// </summary>
     [Parameter(Mandatory = true)]
     public string LogName { get; set; }
 
+    /// <summary>
+    /// Target computer on which to modify the log.
+    /// </summary>
     [Parameter]
     [Alias("ComputerName", "ServerName")]
     public string ComputerName { get; set; }
 
+    /// <summary>
+    /// Maximum size of the log in megabytes.
+    /// </summary>
     [Parameter]
     public int MaximumSizeMB { get; set; }
 
+    /// <summary>
+    /// Maximum size of the log in bytes.
+    /// </summary>
     [Parameter]
     public long MaximumSizeInBytes { get; set; }
 
+    /// <summary>
+    /// Action to take when the log reaches its maximum size.
+    /// </summary>
     [Parameter]
     [ValidateSet(
         "OverwriteEventsAsNeededOldestFirst",
@@ -30,12 +45,18 @@ public sealed class CmdletSetEVXInfo : AsyncPSCmdlet {
         "DoNotOverwriteEventsClearLogManually")]
     public string EventAction { get; set; }
 
+    /// <summary>
+    /// Log mode to apply to the specified log.
+    /// </summary>
     [Alias("LogMode")]
     [Parameter]
     public EventLogMode? Mode { get; set; }
 
     private EventLogConfiguration _log;
 
+    /// <summary>
+    /// Initializes the event log configuration object.
+    /// </summary>
     protected override Task BeginProcessingAsync() {
         try {
             EventLogSession session = string.IsNullOrEmpty(ComputerName)
@@ -48,6 +69,9 @@ public sealed class CmdletSetEVXInfo : AsyncPSCmdlet {
         return Task.CompletedTask;
     }
 
+    /// <summary>
+    /// Applies the new configuration values to the log.
+    /// </summary>
     protected override Task ProcessRecordAsync() {
         if (_log == null) {
             return Task.CompletedTask;

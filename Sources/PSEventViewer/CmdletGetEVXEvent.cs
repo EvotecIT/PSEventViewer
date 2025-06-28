@@ -13,22 +13,37 @@ namespace PSEventViewer;
 [Cmdlet(VerbsCommon.Get, "EVXEvent", DefaultParameterSetName = "GenericEvents")]
 [Alias("Get-EventViewerXEvent", "Find-WinEvent", "Get-Events")]
 public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
+    /// <summary>
+    /// Name of the log to query.
+    /// </summary>
     [Parameter(Mandatory = true, Position = 0, ParameterSetName = "RecordId")]
     [Parameter(Mandatory = true, Position = 0, ParameterSetName = "GenericEvents")]
     public string LogName;
 
+    /// <summary>
+    /// Path to an event log file for offline analysis.
+    /// </summary>
     [Parameter(Mandatory = true, ParameterSetName = "PathEvents")]
     public string Path;
 
+    /// <summary>
+    /// Event identifiers used to filter results.
+    /// </summary>
     [Alias("Id")]
     [Parameter(Mandatory = false, Position = 1, ParameterSetName = "GenericEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
     public List<int> EventId = null;
 
+    /// <summary>
+    /// Specific event record identifiers to retrieve.
+    /// </summary>
     [Alias("RecordId")]
     [Parameter(Mandatory = false, Position = 1, ParameterSetName = "RecordId")]
     public List<long> EventRecordId = null;
 
+    /// <summary>
+    /// Computer names against which to run the query.
+    /// </summary>
     [Alias("ComputerName", "ServerName")]
     [Parameter(Mandatory = false, ParameterSetName = "RecordId")]
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
@@ -36,70 +51,118 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
     [Parameter(Mandatory = false, ParameterSetName = "ListLog")]
     public List<string> MachineName;
 
+    /// <summary>
+    /// Event provider name to filter results.
+    /// </summary>
     [Alias("Source", "Provider")]
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
     public string ProviderName;
 
+    /// <summary>
+    /// Keywords used to filter events.
+    /// </summary>
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
     public Keywords? Keywords;
 
+    /// <summary>
+    /// Event level (e.g. Error, Warning) used for filtering.
+    /// </summary>
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
     public Level? Level;
 
+    /// <summary>
+    /// Start time for the event query.
+    /// </summary>
     [Alias("DateFrom")]
     [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
     public DateTime? StartTime;
 
+    /// <summary>
+    /// End time for the event query.
+    /// </summary>
     [Alias("DateTo")]
     [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
     public DateTime? EndTime;
 
+    /// <summary>
+    /// Relative time period for filtering events.
+    /// </summary>
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
     public TimePeriod? TimePeriod;
 
+    /// <summary>
+    /// User identifier used to filter events.
+    /// </summary>
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
     public string UserId;
 
+    /// <summary>
+    /// Number of parallel threads used for queries.
+    /// </summary>
     [Parameter(Mandatory = false, ParameterSetName = "RecordId")]
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
     public int NumberOfThreads = 8;
 
+    /// <summary>
+    /// Maximum number of events to return.
+    /// </summary>
     [Parameter(Mandatory = false, ParameterSetName = "RecordId")]
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
     public int MaxEvents = 0;
 
+    /// <summary>
+    /// Controls whether queries run in parallel or sequentially.
+    /// </summary>
     [Parameter(Mandatory = false, ParameterSetName = "RecordId")]
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
     public ParallelOption ParallelOption = ParallelOption.Parallel;
 
+    /// <summary>
+    /// Expands event data into individual properties.
+    /// </summary>
     [Parameter(Mandatory = false, ParameterSetName = "RecordId")]
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
     public SwitchParameter Expand;
 
+    /// <summary>
+    /// Reads events from oldest to newest when querying files.
+    /// </summary>
     [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
     public SwitchParameter Oldest;
 
+    /// <summary>
+    /// Hashtable filter for named event data when querying files.
+    /// </summary>
     [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
     public Hashtable NamedDataFilter;
 
+    /// <summary>
+    /// Hashtable filter to exclude named event data when querying files.
+    /// </summary>
     [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
     public Hashtable NamedDataExcludeFilter;
 
+    /// <summary>
+    /// Disables parallel processing of file queries.
+    /// </summary>
     [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
     public SwitchParameter DisableParallel;
 
+    /// <summary>
+    /// Returns results as an array instead of streaming them.
+    /// </summary>
     [Parameter(Mandatory = false, ParameterSetName = "RecordId")]
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
@@ -107,6 +170,9 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
     [Parameter(Mandatory = false, ParameterSetName = "ListLog")]
     public SwitchParameter AsArray;
 
+    /// <summary>
+    /// Predefined named events to query.
+    /// </summary>
     [Parameter(Mandatory = true, ParameterSetName = "NamedEvents")]
     public NamedEvents[] Type;
 
@@ -119,6 +185,9 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
     public string[] ListLog = { "*" };
 
 
+    /// <summary>
+    /// Initializes logging and helper classes before processing.
+    /// </summary>
     protected override Task BeginProcessingAsync() {
         // Initialize the logger to be able to see verbose, warning, debug, error, progress, and information messages.
         var internalLogger = new InternalLogger(false);
@@ -126,6 +195,9 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
         var searchEvents = new SearchEvents(internalLogger);
         return Task.CompletedTask;
     }
+    /// <summary>
+    /// Executes the event query based on provided parameters.
+    /// </summary>
     protected override Task ProcessRecordAsync() {
         var results = AsArray ? new List<object>() : null;
 
