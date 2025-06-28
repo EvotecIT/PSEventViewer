@@ -17,12 +17,44 @@ env:
   BUILD_CONFIGURATION: 'Debug'
 
 jobs:
+  refresh-psd1:
+    name: 'Refresh PSD1'
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup PowerShell modules
+        run: |
+          Install-Module PSPublishModule -Force -Scope CurrentUser -AllowClobber
+        shell: pwsh
+
+      - name: Refresh module manifest
+        env:
+          RefreshPSD1Only: 'true'
+        run: |
+          .\Build\Manage-Module.ps1
+        shell: pwsh
+
+      - name: Upload refreshed manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: psd1
+          path: PSEventViewer.psd1
+
   test-windows-ps5:
+    needs: refresh-psd1
     name: 'Windows PowerShell 5.1'
     runs-on: windows-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Download manifest
+        uses: actions/download-artifact@v4
+        with:
+          name: psd1
+          path: .
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -46,11 +78,18 @@ jobs:
         run: .\PSEventViewer.Tests.ps1
 
   test-windows-ps7:
+    needs: refresh-psd1
     name: 'Windows PowerShell 7'
     runs-on: windows-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Download manifest
+        uses: actions/download-artifact@v4
+        with:
+          name: psd1
+          path: .
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -72,3 +111,4 @@ jobs:
       - name: Run PowerShell tests
         shell: pwsh
         run: .\PSEventViewer.Tests.ps1
+
