@@ -6,7 +6,7 @@
                 Warning = true,
                 Verbose = true
             };
-            c1.Watch("AD1", "Security", new List<int>() { 4627, 4624 });
+            c1.Watch("AD1", "Security", new List<int>() { 4627, 4624 }, e => Console.WriteLine($"Found event {e.Id}"));
         }
     }
 }
