@@ -57,6 +57,19 @@ namespace EventViewerX {
         ADGroupPolicyLinks,
 
         /// <summary>
+        /// Group Policy Object created
+        /// </summary>
+        GpoCreated,
+        /// <summary>
+        /// Group Policy Object deleted
+        /// </summary>
+        GpoDeleted,
+        /// <summary>
+        /// Group Policy Object modified
+        /// </summary>
+        GpoModified,
+
+        /// <summary>
         /// Summary of LDAP binding activity
         /// </summary>
         ADLdapBindingSummary,
@@ -165,6 +178,9 @@ namespace EventViewerX {
             { NamedEvents.ADGroupPolicyChanges, ([5136, 5137, 5141], "Security")},
             { NamedEvents.ADGroupPolicyEdits, ([5136, 5137, 5141], "Security")},
             { NamedEvents.ADGroupPolicyLinks, ([5136, 5137, 5141], "Security")},
+            { NamedEvents.GpoCreated, (new List<int> { 5137 }, "Security") },
+            { NamedEvents.GpoDeleted, (new List<int> { 5141 }, "Security") },
+            { NamedEvents.GpoModified, (new List<int> { 5136 }, "Security") },
             // user based events
             { NamedEvents.ADUserCreateChange, ([4720, 4738], "Security") },
             { NamedEvents.ADUserStatus, ([4722, 4725, 4723, 4724, 4726], "Security") },
@@ -319,6 +335,21 @@ namespace EventViewerX {
                                 && ldapDisplayObjName is string ldapDisplayNameValue
                                 && ldapDisplayNameValue == "versionNumber") {
                                 return new ADGroupPolicyEdits(eventObject);
+                            }
+                            break;
+                        case NamedEvents.GpoCreated:
+                            if (objectClass == "groupPolicyContainer") {
+                                return new GpoCreated(eventObject);
+                            }
+                            break;
+                        case NamedEvents.GpoDeleted:
+                            if (objectClass == "groupPolicyContainer") {
+                                return new GpoDeleted(eventObject);
+                            }
+                            break;
+                        case NamedEvents.GpoModified:
+                            if (objectClass == "groupPolicyContainer") {
+                                return new GpoModified(eventObject);
                             }
                             break;
 
