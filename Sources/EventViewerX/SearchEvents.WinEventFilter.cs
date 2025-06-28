@@ -135,7 +135,8 @@ public partial class SearchEvents {
         }
 
         if (!string.IsNullOrEmpty(path)) {
-            return $"<QueryList><Query Id=\"0\" Path=\"file://{path}\"><Select>{filter}</Select></Query></QueryList>";
+            var selectFilter = string.IsNullOrEmpty(filter) ? "*" : filter;
+            return $"<QueryList><Query Id=\"0\" Path=\"file://{path}\"><Select>{selectFilter}</Select></Query></QueryList>";
         }
         return $"<QueryList><Query Id=\"0\" Path=\"{logName}\"><Select Path=\"{logName}\">{filter}</Select></Query></QueryList>";
     }
