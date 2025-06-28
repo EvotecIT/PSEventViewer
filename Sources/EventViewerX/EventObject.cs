@@ -208,7 +208,13 @@ namespace EventViewerX {
             Dictionary<string, string> data = new Dictionary<string, string>();
 
             // Parse the XML data into an XElement
-            XElement root = XElement.Parse(xmlData);
+            XElement root;
+            try {
+                root = XElement.Parse(xmlData);
+            } catch (Exception ex) {
+                Settings._logger.WriteWarning($"Failed to parse event XML. Error: {ex.Message}");
+                return data;
+            }
 
             // Get the namespace of the root element
             XNamespace ns = root.GetDefaultNamespace();
