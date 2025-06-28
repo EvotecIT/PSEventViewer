@@ -1,6 +1,7 @@
 ﻿using EventViewerX.Rules.ActiveDirectory;
 using EventViewerX.Rules.Logging;
 using EventViewerX.Rules.Windows;
+using EventViewerX.Rules.Kerberos;
 using System;
 using System.Collections.Generic;
 
@@ -114,6 +115,14 @@ namespace EventViewerX {
         /// </summary>
         ADUserUnlocked,
         /// <summary>
+        /// Kerberos service ticket requests and renewals
+        /// </summary>
+        KerberosServiceTicket,
+        /// <summary>
+        /// Kerberos ticket request failures
+        /// </summary>
+        KerberosTicketFailure,
+        /// <summary>
         /// Organizational unit created, deleted or moved
         /// </summary>
         ADOrganizationalUnitChangeDetailed,
@@ -192,6 +201,8 @@ namespace EventViewerX {
             { NamedEvents.ADUserLogonFailed, ([4625], "Security")},
             { NamedEvents.ADUserLogonKerberos, ([4768], "Security") },
             { NamedEvents.ADUserUnlocked, ([4767], "Security") },
+            { NamedEvents.KerberosServiceTicket, (new List<int> { 4769, 4770 }, "Security") },
+            { NamedEvents.KerberosTicketFailure, (new List<int> { 4771, 4772 }, "Security") },
             // other based events
             { NamedEvents.ADOtherChangeDetailed, (new List<int> { 5136, 5137, 5139, 5141 }, "Security") },
             // ldap events
@@ -286,6 +297,10 @@ namespace EventViewerX {
                             return new ADUserLogonFailed(eventObject);
                         case NamedEvents.ADUserUnlocked:
                             return new ADUserUnlocked(eventObject);
+                        case NamedEvents.KerberosServiceTicket:
+                            return new KerberosServiceTicket(eventObject);
+                        case NamedEvents.KerberosTicketFailure:
+                            return new KerberosTicketFailure(eventObject);
                         // organizational unit and other events
                         case NamedEvents.ADOrganizationalUnitChangeDetailed:
                             if (objectClass == "organizationalUnit" && eventObject.Data["AttributeLDAPDisplayName"] != "qPLik") {
