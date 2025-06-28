@@ -1,5 +1,3 @@
-Clear-Host
-
 Import-Module PSPublishModule -Force
 
 Build-Module -ModuleName 'PSEventViewer' {
@@ -47,22 +45,18 @@ Build-Module -ModuleName 'PSEventViewer' {
 
     $ConfigurationFormat = [ordered] @{
         RemoveComments                              = $false
-
         PlaceOpenBraceEnable                        = $true
         PlaceOpenBraceOnSameLine                    = $true
         PlaceOpenBraceNewLineAfter                  = $true
         PlaceOpenBraceIgnoreOneLineBlock            = $false
-
         PlaceCloseBraceEnable                       = $true
         PlaceCloseBraceNewLineAfter                 = $false
         PlaceCloseBraceIgnoreOneLineBlock           = $false
         PlaceCloseBraceNoEmptyLineBefore            = $true
-
         UseConsistentIndentationEnable              = $true
         UseConsistentIndentationKind                = 'space'
         UseConsistentIndentationPipelineIndentation = 'IncreaseIndentationAfterEveryPipeline'
         UseConsistentIndentationIndentationSize     = 4
-
         UseConsistentWhitespaceEnable               = $true
         UseConsistentWhitespaceCheckInnerBrace      = $true
         UseConsistentWhitespaceCheckOpenBrace       = $true
@@ -70,10 +64,8 @@ Build-Module -ModuleName 'PSEventViewer' {
         UseConsistentWhitespaceCheckOperator        = $true
         UseConsistentWhitespaceCheckPipe            = $true
         UseConsistentWhitespaceCheckSeparator       = $true
-
         AlignAssignmentStatementEnable              = $true
         AlignAssignmentStatementCheckHashtable      = $true
-
         UseCorrectCasingEnable                      = $true
     }
     # format PSD1 and PSM1 files when merging into a single file
@@ -84,26 +76,8 @@ Build-Module -ModuleName 'PSEventViewer' {
     New-ConfigurationFormat -ApplyTo 'DefaultPSD1', 'DefaultPSM1' -EnableFormatting -Sort None
     # when creating PSD1 use special style without comments and with only required parameters
     New-ConfigurationFormat -ApplyTo 'DefaultPSD1', 'OnMergePSD1' -PSD1Style 'Minimal'
-
     # configuration for documentation, at the same time it enables documentation processing
     New-ConfigurationDocumentation -Enable:$false -StartClean -UpdateWhenNew -PathReadme 'Docs\Readme.md' -Path 'Docs'
-
-    # New-ConfigurationImportModule -ImportSelf
-
-    # $newConfigurationBuildSplat = @{
-    #     Enable                            = $true
-    #     SignModule                        = $true
-    #     MergeModuleOnBuild                = $true
-    #     MergeFunctionsFromApprovedModules = $true
-    #     CertificateThumbprint             = '483292C9E317AA13B07BB7A96AE9D1A5ED9E7703'
-    #     ResolveBinaryConflicts            = $false
-    #     ResolveBinaryConflictsName        = 'PSEventViewer.PowerShell'
-    #     NETProjectName                    = 'PSEventViewer.PowerShell'
-    #     NETBinaryModule                   = 'PSEventViewer.PowerShell.dll'
-    #     NETConfiguration                  = 'Release'
-    #     NETFramework                      = 'netstandard2.0', 'net472'
-    #     DotSourceLibraries                = $true
-    # }
 
     $newConfigurationBuildSplat = @{
         Enable                            = $true
