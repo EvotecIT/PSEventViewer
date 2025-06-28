@@ -31,7 +31,7 @@ public class EventObjectSlim {
         { 0x800000, "PASSWORD_EXPIRED" },
         { 0x1000000, "TRUSTED_TO_AUTH_FOR_DELEGATION" },
         { 0x04000000, "PARTIAL_SECRETS_ACCOUNT" }
-    }
+    };
   
     private static readonly Dictionary<string, string> OperationTypeLookup = new()
     {
