@@ -4,6 +4,7 @@ using System.Diagnostics.Eventing.Reader;
 using System.Linq;
 using System.Security.Principal;
 using System.Xml.Linq;
+using System.Text.RegularExpressions;
 
 namespace EventViewerX {
     public class EventObject {
@@ -166,7 +167,7 @@ namespace EventViewerX {
             Dictionary<string, string> data = new Dictionary<string, string>();
 
             // Split the message into lines
-            string[] lines = message.Split('\n');
+            string[] lines = Regex.Split(message, "\r?\n");
 
             // Find the first non-empty line and add it to the dictionary with a default key of "Message"
             string firstLine = lines.FirstOrDefault(line => !string.IsNullOrWhiteSpace(line));
