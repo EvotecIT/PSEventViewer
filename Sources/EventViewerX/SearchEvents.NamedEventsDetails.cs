@@ -161,6 +161,11 @@ namespace EventViewerX {
         CertificateIssued,
 
         /// <summary>
+        /// System audit policy was changed
+        /// </summary>
+        AuditPolicyChange,
+
+        /// <summary>
         /// Unexpected system shutdown
         /// </summary>
         OSCrash,
@@ -231,6 +236,7 @@ namespace EventViewerX {
             // network access
             { NamedEvents.NetworkAccessAuthenticationPolicy, (new List<int> { 6272, 6273 }, "Security") },
             { NamedEvents.CertificateIssued, (new List<int> { 4886, 4887 }, "Security") },
+            { NamedEvents.AuditPolicyChange, (new List<int> { 4719 }, "Security") },
             // windows OS
             { NamedEvents.OSCrash, (new List<int> { 6008 }, "System") },
             { NamedEvents.OSStartupShutdownCrash,  (new List<int> { 12, 13, 41, 4608, 4621, 6008 }, "System") },
@@ -344,6 +350,8 @@ namespace EventViewerX {
                             return new LogsClearedOther(eventObject);
                         case NamedEvents.CertificateIssued:
                             return new CertificateIssued(eventObject);
+                        case NamedEvents.AuditPolicyChange:
+                            return new AuditPolicyChange(eventObject);
                         case NamedEvents.OSCrash:
                             return new OSCrash(eventObject);
                         case NamedEvents.OSStartupShutdownCrash:
