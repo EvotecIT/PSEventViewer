@@ -1,27 +1,36 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.Diagnostics.Eventing.Reader;
 using System.Linq;
 
 namespace EventViewerX {
     public partial class SearchEvents : Settings {
 
+        /// <summary>
+        /// Cache of provider metadata keyed by provider name to avoid repeated lookups.
+        /// </summary>
+        private static readonly ConcurrentDictionary<string, Metadata> _providerMetadataCache = new(StringComparer.OrdinalIgnoreCase);
+
         public static IEnumerable<Metadata> GetProviders() {
             EventLogSession session = new EventLogSession();
             foreach (string providerName in session.GetProviderNames()) {
-                Metadata metadata = null;
-                try {
-                    using ProviderMetadata providerMetadata = new ProviderMetadata(providerName);
-                    metadata = new Metadata(providerName, providerMetadata);
-                } catch (EventLogInvalidDataException ex) {
-                    _logger.WriteWarning($"Error reading data for provider {providerName}: {ex.Message}");
-                } catch (EventLogException ex) {
-                    _logger.WriteWarning($"Error reading metadata for provider {providerName}: {ex.Message}");
-                } catch (UnauthorizedAccessException ex) {
-                    _logger.WriteWarning($"Access denied reading metadata for provider {providerName}: {ex.Message}");
-                } catch (Exception ex) {
-                    _logger.WriteWarning($"Error reading metadata for provider {providerName}: {ex.Message}");
+                if (!_providerMetadataCache.TryGetValue(providerName, out var metadata)) {
+                    try {
+                        using ProviderMetadata providerMetadata = new ProviderMetadata(providerName);
+                        metadata = new Metadata(providerName, providerMetadata);
+                        _providerMetadataCache[providerName] = metadata;
+                    } catch (EventLogInvalidDataException ex) {
+                        _logger.WriteWarning($"Error reading data for provider {providerName}: {ex.Message}");
+                    } catch (EventLogException ex) {
+                        _logger.WriteWarning($"Error reading metadata for provider {providerName}: {ex.Message}");
+                    } catch (UnauthorizedAccessException ex) {
+                        _logger.WriteWarning($"Access denied reading metadata for provider {providerName}: {ex.Message}");
+                    } catch (Exception ex) {
+                        _logger.WriteWarning($"Error reading metadata for provider {providerName}: {ex.Message}");
+                    }
                 }
+
                 if (metadata != null) {
                     yield return metadata;
                 }
