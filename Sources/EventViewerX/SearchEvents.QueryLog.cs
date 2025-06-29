@@ -75,6 +75,14 @@ public partial class SearchEvents : Settings {
             throw new FileNotFoundException($"The log file '{absolutePath}' does not exist.", absolutePath);
         }
 
+        if (eventIds != null && eventIds.Any(id => id <= 0)) {
+            throw new ArgumentException("Event IDs must be positive.", nameof(eventIds));
+        }
+
+        if (eventRecordId != null && eventRecordId.Any(id => id <= 0)) {
+            throw new ArgumentException("Event record IDs must be positive.", nameof(eventRecordId));
+        }
+
         // Check if we have any filters that require an XML query
         bool hasFilters = namedDataFilter != null || namedDataExcludeFilter != null || eventIds != null ||
                          providerName != null || keywords != null || level != null || startTime != null ||
@@ -165,6 +173,14 @@ public partial class SearchEvents : Settings {
     /// <param name="timePeriod">The time period.</param>
     /// <returns></returns>
     public static IEnumerable<EventObject> QueryLog(string logName, List<int> eventIds = null, string machineName = null, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null, int maxEvents = 0, List<long> eventRecordId = null, TimePeriod? timePeriod = null) {
+        if (eventIds != null && eventIds.Any(id => id <= 0)) {
+            throw new ArgumentException("Event IDs must be positive.", nameof(eventIds));
+        }
+
+        if (eventRecordId != null && eventRecordId.Any(id => id <= 0)) {
+            throw new ArgumentException("Event record IDs must be positive.", nameof(eventRecordId));
+        }
+
         string queryString;
         if (eventRecordId != null) {
             // If eventRecordId is provided, query the log for the specific event record ID
@@ -215,11 +231,14 @@ public partial class SearchEvents : Settings {
     /// <param name="eventRecordIds"></param>
     /// <returns></returns>
     private static string BuildQueryString(List<long> eventRecordIds) {
-        if (eventRecordIds != null && eventRecordIds.Any()) {
-            return $"*[System[{string.Join(" or ", eventRecordIds.Select(id => $"EventRecordID={id}"))}]]";
-        } else {
-            return "*";
+        if (eventRecordIds != null) {
+            var validIds = eventRecordIds.Where(id => id > 0).ToList();
+            if (validIds.Any()) {
+                return $"*[System[{string.Join(" or ", validIds.Select(id => $"EventRecordID={id}"))}]]";
+            }
         }
+
+        return "*";
     }
 
 
@@ -251,8 +270,11 @@ public partial class SearchEvents : Settings {
         StringBuilder queryString = new StringBuilder($"<QueryList><Query Id='0' Path='{logName}'><Select Path='{logName}'>*[System[");
 
         // Add event IDs to the query
-        if (eventIds != null && eventIds.Any()) {
-            AddCondition(queryString, "(" + string.Join(" or ", eventIds.Select(id => $"EventID={id}")) + ")");
+        if (eventIds != null) {
+            var validIds = eventIds.Where(id => id > 0).ToList();
+            if (validIds.Any()) {
+                AddCondition(queryString, "(" + string.Join(" or ", validIds.Select(id => $"EventID={id}")) + ")");
+            }
         }
 
         // Add provider name to the query
