@@ -19,6 +19,13 @@ namespace EventViewerX.Tests {
         }
 
         [Fact]
+        public void NamedDataFilterEscapesSpecialCharacters() {
+            var ht = new Hashtable { { "Field", "O'Reilly & Co" } };
+            var result = SearchEvents.BuildWinEventFilter(namedDataFilter: [ht], logName: "xx", xpathOnly: true);
+            Assert.Equal("*[EventData[Data[@Name='Field'] = 'O&apos;Reilly &amp; Co']]", result);
+        }
+
+        [Fact]
         public void NamedDataExcludeFilterSingleValue() {
             var ht = new Hashtable { { "FieldName", "Value1" } };
             var result = SearchEvents.BuildWinEventFilter(namedDataExcludeFilter: [ht], logName: "xx", xpathOnly: true);
