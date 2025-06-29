@@ -10,12 +10,9 @@ namespace EventViewerX {
             var eventInfoDict = new Dictionary<string, HashSet<int>>();
 
             foreach (var typeEvents in typeEventsList) {
-                // Look up the list of event IDs and the log name based on typeEvents
-                if (!eventIdsMap.TryGetValue(typeEvents, out var eventInfo)) {
+                if (!eventDefinitions.TryGetValue(typeEvents, out var eventInfo)) {
                     throw new ArgumentException($"Invalid typeEvents value: {typeEvents}");
                 }
-
-                // Add the event IDs to the dictionary
                 if (!eventInfoDict.TryGetValue(eventInfo.LogName, out var eventIds)) {
                     eventIds = new HashSet<int>();
                     eventInfoDict[eventInfo.LogName] = eventIds;

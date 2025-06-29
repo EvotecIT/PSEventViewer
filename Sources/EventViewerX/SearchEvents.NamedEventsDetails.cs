@@ -3,8 +3,10 @@ using EventViewerX.Rules.Logging;
 using EventViewerX.Rules.Windows;
 using EventViewerX.Rules.Kerberos;
 using EventViewerX.Rules.CertificateAuthority;
+using EventViewerX.Rules.NPS;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace EventViewerX {
     /// <summary>
@@ -188,62 +190,119 @@ namespace EventViewerX {
     }
 
     public partial class SearchEvents : Settings {
+        private sealed class NamedEventDefinition {
+            public NamedEvents Name { get; }
+            public IReadOnlyList<int> EventIds { get; }
+            public string LogName { get; }
+            private readonly Func<EventObject, EventObjectSlim?> _builder;
+
+            private NamedEventDefinition(NamedEvents name, int[] eventIds, string logName, Func<EventObject, EventObjectSlim?> builder) {
+                Name = name;
+                EventIds = eventIds;
+                LogName = logName;
+                _builder = builder;
+            }
+
+            public EventObjectSlim? Build(EventObject eventObject) => _builder(eventObject);
+
+            public static NamedEventDefinition Create<T>(NamedEvents name, string logName, params int[] eventIds) where T : EventObjectSlim =>
+                new(name, eventIds, logName, e => Activator.CreateInstance(typeof(T), e) as EventObjectSlim);
+
+            public static NamedEventDefinition Create<T>(NamedEvents name, string logName, Func<EventObject, bool> filter, params int[] eventIds) where T : EventObjectSlim =>
+                new(name, eventIds, logName, e => filter(e) ? Activator.CreateInstance(typeof(T), e) as EventObjectSlim : null);
+
+            public static NamedEventDefinition Create(NamedEvents name, string logName, Func<EventObject, EventObjectSlim?> builder, params int[] eventIds) =>
+                new(name, eventIds, logName, builder);
+        }
+
         /// <summary>
-        /// Named events dictionary that maps NamedEvents to event IDs and log names
+        /// Named events list used to build the dictionary at runtime
         /// </summary>
-        private static readonly Dictionary<NamedEvents, (List<int> EventIds, string LogName)> eventIdsMap = new Dictionary<NamedEvents, (List<int>, string)> {
+        private static readonly List<NamedEventDefinition> eventDefinitionsList = new()
+        {
             // computer based events
-            { NamedEvents.ADComputerCreateChange, (new List<int> {  4741, 4742 }, "Security") },
-            { NamedEvents.ADComputerChangeDetailed, (new List<int> { 5136, 5137, 5139, 5141 }, "Security") },
-            { NamedEvents.ADComputerDeleted, (new List<int> { 4743 }, "Security") },
+            NamedEventDefinition.Create<ADComputerCreateChange>(NamedEvents.ADComputerCreateChange, "Security", 4741, 4742),
+            NamedEventDefinition.Create<ADComputerChangeDetailed>(NamedEvents.ADComputerChangeDetailed, "Security", e => e.Data.TryGetValue("ObjectClass", out var obj) && obj == "computer", 5136, 5137, 5139, 5141),
+            NamedEventDefinition.Create<ADComputerDeleted>(NamedEvents.ADComputerDeleted, "Security", 4743),
             // group based events
-            { NamedEvents.ADGroupMembershipChange, (new List<int> {  4728, 4729, 4732, 4733, 4746, 4747, 4751, 4752, 4756, 4757, 4761, 4762, 4785, 4786, 4787, 4788 }, "Security") },
-            { NamedEvents.ADGroupEnumeration, (new List<int> { 4798, 4799}, "Security") },
-            { NamedEvents.ADGroupChange, (new List<int> { 4735, 4737, 4745, 4750, 4760, 4764, 4784, 4791 }, "Security") },
-            { NamedEvents.ADGroupCreateDelete, (new List<int> { 4727, 4730, 4731, 4734, 4744, 4748, 4749, 4753, 4754, 4758, 4759, 4763 }, "Security") },
-            { NamedEvents.ADGroupChangeDetailed, (new List<int> { 5136, 5137, 5139, 5141 }, "Security") },
+            NamedEventDefinition.Create<ADGroupMembershipChange>(NamedEvents.ADGroupMembershipChange, "Security", 4728, 4729, 4732, 4733, 4746, 4747, 4751, 4752, 4756, 4757, 4761, 4762, 4785, 4786, 4787, 4788),
+            NamedEventDefinition.Create<ADGroupEnumeration>(NamedEvents.ADGroupEnumeration, "Security", 4798, 4799),
+            NamedEventDefinition.Create(NamedEvents.ADGroupChange, "Security", e =>
+            {
+                var result = new ADGroupChange(e);
+                return result.Who == "*ANONYMOUS*" ? null : result;
+            }, 4735, 4737, 4745, 4750, 4760, 4764, 4784, 4791),
+            NamedEventDefinition.Create<ADGroupCreateDelete>(NamedEvents.ADGroupCreateDelete, "Security", 4727, 4730, 4731, 4734, 4744, 4748, 4749, 4753, 4754, 4758, 4759, 4763),
+            NamedEventDefinition.Create<ADGroupChangeDetailed>(NamedEvents.ADGroupChangeDetailed, "Security", e => e.Data.TryGetValue("ObjectClass", out var obj) && obj == "user", 5136, 5137, 5139, 5141),
             // group policy events
-            { NamedEvents.ADGroupPolicyChanges, ([5136, 5137, 5141], "Security")},
-            { NamedEvents.ADGroupPolicyEdits, ([5136, 5137, 5141], "Security")},
-            { NamedEvents.ADGroupPolicyLinks, ([5136, 5137, 5141], "Security")},
-            { NamedEvents.GpoCreated, (new List<int> { 5137 }, "Security") },
-            { NamedEvents.GpoDeleted, (new List<int> { 5141 }, "Security") },
-            { NamedEvents.GpoModified, (new List<int> { 5136 }, "Security") },
+            NamedEventDefinition.Create<ADGroupPolicyChanges>(NamedEvents.ADGroupPolicyChanges, "Security", e => e.Data.TryGetValue("ObjectClass", out var obj) && (obj == "groupPolicyContainer" || obj == "container"), 5136, 5137, 5141),
+            NamedEventDefinition.Create<ADGroupPolicyEdits>(NamedEvents.ADGroupPolicyEdits, "Security", e =>
+            {
+                if (e.Data.TryGetValue("ObjectClass", out var obj) && obj == "groupPolicyContainer" &&
+                    e.Data.TryGetValue("AttributeLDAPDisplayName", out var ldapDisplayObjName) &&
+                    ldapDisplayObjName is string ldapDisplayNameValue && ldapDisplayNameValue == "versionNumber")
+                {
+                    return true;
+                }
+                return false;
+            }, 5136, 5137, 5141),
+            NamedEventDefinition.Create<ADGroupPolicyLinks>(NamedEvents.ADGroupPolicyLinks, "Security", e =>
+            {
+                if (e.Data.TryGetValue("ObjectClass", out var obj) && (obj == "domainDNS" || obj == "organizationalUnit" || obj == "site") &&
+                    e.ValueMatches("AttributeLDAPDisplayName", "gpLink"))
+                {
+                    return true;
+                }
+                return false;
+            }, 5136, 5137, 5141),
+            NamedEventDefinition.Create<GpoCreated>(NamedEvents.GpoCreated, "Security", e => e.Data.TryGetValue("ObjectClass", out var obj) && obj == "groupPolicyContainer", 5137),
+            NamedEventDefinition.Create<GpoDeleted>(NamedEvents.GpoDeleted, "Security", e => e.Data.TryGetValue("ObjectClass", out var obj) && obj == "groupPolicyContainer", 5141),
+            NamedEventDefinition.Create<GpoModified>(NamedEvents.GpoModified, "Security", e => e.Data.TryGetValue("ObjectClass", out var obj) && obj == "groupPolicyContainer", 5136),
             // user based events
-            { NamedEvents.ADUserCreateChange, ([4720, 4738], "Security") },
-            { NamedEvents.ADUserStatus, ([4722, 4725, 4723, 4724, 4726], "Security") },
-            { NamedEvents.ADUserChangeDetailed, ([5136, 5137, 5139, 5141], "Security") },
-            { NamedEvents.ADOrganizationalUnitChangeDetailed, ([5136, 5137, 5139, 5141], "Security") },
-            { NamedEvents.ADUserLockouts, ([4740], "Security") },
-            { NamedEvents.ADUserLogon, ([4624], "Security") },
-            { NamedEvents.ADUserLogonNTLMv1, ([4624], "Security") },
-            { NamedEvents.ADUserLogonFailed, ([4625], "Security")},
-            { NamedEvents.ADUserLogonKerberos, ([4768], "Security") },
-            { NamedEvents.ADUserUnlocked, ([4767], "Security") },
-            { NamedEvents.KerberosServiceTicket, (new List<int> { 4769, 4770 }, "Security") },
-            { NamedEvents.KerberosTicketFailure, (new List<int> { 4771, 4772 }, "Security") },
+            NamedEventDefinition.Create<ADUserCreateChange>(NamedEvents.ADUserCreateChange, "Security", 4720, 4738),
+            NamedEventDefinition.Create<ADUserStatus>(NamedEvents.ADUserStatus, "Security", 4722, 4725, 4723, 4724, 4726),
+            NamedEventDefinition.Create<ADUserChangeDetailed>(NamedEvents.ADUserChangeDetailed, "Security", e => e.Data.TryGetValue("ObjectClass", out var obj) && obj == "user", 5136, 5137, 5139, 5141),
+            NamedEventDefinition.Create<ADOrganizationalUnitChangeDetailed>(NamedEvents.ADOrganizationalUnitChangeDetailed, "Security", e => e.Data.TryGetValue("ObjectClass", out var obj) && obj == "organizationalUnit" && e.Data["AttributeLDAPDisplayName"] != "qPLik", 5136, 5137, 5139, 5141),
+            NamedEventDefinition.Create<ADUserLockouts>(NamedEvents.ADUserLockouts, "Security", 4740),
+            NamedEventDefinition.Create<ADUserLogon>(NamedEvents.ADUserLogon, "Security", 4624),
+            NamedEventDefinition.Create<ADUserLogonNTLMv1>(NamedEvents.ADUserLogonNTLMv1, "Security", e => e.ValueMatches("LmPackageName", "NTLM V1"), 4624),
+            NamedEventDefinition.Create<ADUserLogonFailed>(NamedEvents.ADUserLogonFailed, "Security", 4625),
+            NamedEventDefinition.Create<ADUserLogonKerberos>(NamedEvents.ADUserLogonKerberos, "Security", 4768),
+            NamedEventDefinition.Create<ADUserUnlocked>(NamedEvents.ADUserUnlocked, "Security", 4767),
+            NamedEventDefinition.Create<KerberosServiceTicket>(NamedEvents.KerberosServiceTicket, "Security", 4769, 4770),
+            NamedEventDefinition.Create<KerberosTicketFailure>(NamedEvents.KerberosTicketFailure, "Security", 4771, 4772),
             // other based events
-            { NamedEvents.ADOtherChangeDetailed, (new List<int> { 5136, 5137, 5139, 5141 }, "Security") },
+            NamedEventDefinition.Create<ADOtherChangeDetailed>(NamedEvents.ADOtherChangeDetailed, "Security", e =>
+            {
+                if (e.Data.TryGetValue("ObjectClass", out var obj) && obj is string s && s is not ("user" or "computer" or "organizationalUnit" or "group"))
+                {
+                    return true;
+                }
+                return false;
+            }, 5136, 5137, 5139, 5141),
             // ldap events
-            { NamedEvents.ADLdapBindingSummary, (new List<int> { 2887 }, "Directory Service") },
-            { NamedEvents.ADLdapBindingDetails,(new List<int> { 2889 }, "Directory Service") },
+            NamedEventDefinition.Create<ADLdapBindingSummary>(NamedEvents.ADLdapBindingSummary, "Directory Service", 2887),
+            NamedEventDefinition.Create<ADLdapBindingDetails>(NamedEvents.ADLdapBindingDetails, "Directory Service", 2889),
             // samba
-            { NamedEvents.ADSMBServerAuditV1, (new List<int> { 3000 }, "Microsoft-Windows-SMBServer/Audit") },
+            NamedEventDefinition.Create(NamedEvents.ADSMBServerAuditV1, "Microsoft-Windows-SMBServer/Audit", SMBServerAudit.Create, 3000),
             // logs cleared
-            { NamedEvents.LogsClearedSecurity, (new List<int> { 1102,1105 }, "Security") },
-            { NamedEvents.LogsClearedOther,(new List<int> { 104 }, "System") },
-            { NamedEvents.LogsFullSecurity, (new List<int> { 1104  }, "Security") },
+            NamedEventDefinition.Create<LogsClearedSecurity>(NamedEvents.LogsClearedSecurity, "Security", 1102, 1105),
+            NamedEventDefinition.Create<LogsClearedOther>(NamedEvents.LogsClearedOther, "System", 104),
+            NamedEventDefinition.Create(NamedEvents.LogsFullSecurity, "Security", _ => null, 1104),
             // network access
-            { NamedEvents.NetworkAccessAuthenticationPolicy, (new List<int> { 6272, 6273 }, "Security") },
-            { NamedEvents.CertificateIssued, (new List<int> { 4886, 4887 }, "Security") },
-            { NamedEvents.AuditPolicyChange, (new List<int> { 4719 }, "Security") },
+            NamedEventDefinition.Create<NetworkAccessAuthenticationPolicy>(NamedEvents.NetworkAccessAuthenticationPolicy, "Security", 6272, 6273),
+            NamedEventDefinition.Create<CertificateIssued>(NamedEvents.CertificateIssued, "Security", 4886, 4887),
+            NamedEventDefinition.Create<AuditPolicyChange>(NamedEvents.AuditPolicyChange, "Security", 4719),
             // windows OS
-            { NamedEvents.OSCrash, (new List<int> { 6008 }, "System") },
-            { NamedEvents.OSStartupShutdownCrash,  (new List<int> { 12, 13, 41, 4608, 4621, 6008 }, "System") },
-            { NamedEvents.OSTimeChange, (new List<int> { 4616 }, "Security") },
-            { NamedEvents.ClientGroupPoliciesApplication, (new List<int> { 4098 }, "Application") },
-            { NamedEvents.ClientGroupPoliciesSystem, (new List<int> { 1085 }, "System") },
+            NamedEventDefinition.Create<OSCrash>(NamedEvents.OSCrash, "System", 6008),
+            NamedEventDefinition.Create<OSStartupShutdownCrash>(NamedEvents.OSStartupShutdownCrash, "System", 12, 13, 41, 4608, 4621, 6008),
+            NamedEventDefinition.Create<OSTimeChange>(NamedEvents.OSTimeChange, "Security", 4616),
+            NamedEventDefinition.Create<ClientGroupPolicies>(NamedEvents.ClientGroupPoliciesApplication, "Application", 4098),
+            NamedEventDefinition.Create<ClientGroupPolicies>(NamedEvents.ClientGroupPoliciesSystem, "System", 1085),
         };
+
+        private static readonly Dictionary<NamedEvents, NamedEventDefinition> eventDefinitions =
+            eventDefinitionsList.ToDictionary(d => d.Name);
         /// <summary>
         /// Builds the appropriate event object based on the NamedEvents value
         /// </summary>
@@ -252,159 +311,17 @@ namespace EventViewerX {
         /// <returns></returns>
         /// <exception cref="ArgumentException"></exception>
         private static EventObjectSlim BuildTargetEvents(EventObject eventObject, List<NamedEvents> typeEventsList) {
-            // Check if the event ID and log name match any of the NamedEvents values
             foreach (var typeEvents in typeEventsList) {
-                if (eventIdsMap.TryGetValue(typeEvents, out var eventInfo) &&
-                    eventInfo.EventIds.Contains(eventObject.Id) &&
-                    eventInfo.LogName == eventObject.LogName) {
-                    // Try reading ObjectClass if available
-                    eventObject.Data.TryGetValue("ObjectClass", out var objectClass);
-
-                    // If they match, create the appropriate event object based on the NamedEvents value
-                    switch (typeEvents) {
-                        // computer based events
-                        case NamedEvents.ADComputerCreateChange:
-                            return new ADComputerCreateChange(eventObject);
-                        case NamedEvents.ADComputerChangeDetailed:
-                            if (objectClass == "computer") {
-                                return new ADComputerChangeDetailed(eventObject);
-                            }
-                            break;
-                        case NamedEvents.ADComputerDeleted:
-                            return new ADComputerDeleted(eventObject);
-
-                        // group based events
-                        case NamedEvents.ADGroupMembershipChange:
-                            return new ADGroupMembershipChange(eventObject);
-                        case NamedEvents.ADGroupEnumeration:
-                            return new ADGroupEnumeration(eventObject);
-                        case NamedEvents.ADGroupChange:
-                            // this is a special case where we ignore *ANONYMOUS* events
-                            // those happen but are not useful at all and just clutter the view
-                            var adGroupChange = new ADGroupChange(eventObject);
-                            if (adGroupChange.Who == "*ANONYMOUS*") {
-                                return null;
-                            } else {
-                                return adGroupChange;
-                            }
-                        case NamedEvents.ADGroupCreateDelete:
-                            return new ADGroupCreateDelete(eventObject);
-                        case NamedEvents.ADGroupChangeDetailed:
-                            if (objectClass == "user") {
-                                return new ADGroupChangeDetailed(eventObject);
-                            }
-                            break;
-
-                        // user based events
-                        case NamedEvents.ADUserCreateChange:
-                            return new ADUserCreateChange(eventObject);
-                        case NamedEvents.ADUserStatus:
-                            return new ADUserStatus(eventObject);
-                        case NamedEvents.ADUserChangeDetailed:
-                            if (objectClass == "user") {
-                                return new ADUserChangeDetailed(eventObject);
-                            }
-                            break;
-                        case NamedEvents.ADUserLockouts:
-                            return new ADUserLockouts(eventObject);
-                        case NamedEvents.ADUserLogon:
-                            return new ADUserLogon(eventObject);
-                        case NamedEvents.ADUserLogonNTLMv1:
-                            if (eventObject.ValueMatches("LmPackageName", "NTLM V1")) {
-                                return new ADUserLogonNTLMv1(eventObject);
-                            }
-                            break;
-                        case NamedEvents.ADUserLogonKerberos:
-                            return new ADUserLogonKerberos(eventObject);
-                        case NamedEvents.ADUserLogonFailed:
-                            return new ADUserLogonFailed(eventObject);
-                        case NamedEvents.ADUserUnlocked:
-                            return new ADUserUnlocked(eventObject);
-                        case NamedEvents.KerberosServiceTicket:
-                            return new KerberosServiceTicket(eventObject);
-                        case NamedEvents.KerberosTicketFailure:
-                            return new KerberosTicketFailure(eventObject);
-                        // organizational unit and other events
-                        case NamedEvents.ADOrganizationalUnitChangeDetailed:
-                            if (objectClass == "organizationalUnit" && eventObject.Data["AttributeLDAPDisplayName"] != "qPLik") {
-                                return new ADOrganizationalUnitChangeDetailed(eventObject);
-                            }
-                            break;
-                        case NamedEvents.ADOtherChangeDetailed:
-                            if (objectClass != "user"
-                                && objectClass != "computer"
-                                && objectClass != "organizationalUnit"
-                                && objectClass != "group"
-                                ) {
-                                return new ADOtherChangeDetailed(eventObject);
-                            }
-                            break;
-                        // ldap events
-                        case NamedEvents.ADLdapBindingSummary:
-                            return new ADLdapBindingSummary(eventObject);
-                        case NamedEvents.ADLdapBindingDetails:
-                            return new ADLdapBindingDetails(eventObject);
-                        case NamedEvents.LogsClearedSecurity:
-                            return new LogsClearedSecurity(eventObject);
-                        case NamedEvents.LogsClearedOther:
-                            return new LogsClearedOther(eventObject);
-                        case NamedEvents.CertificateIssued:
-                            return new CertificateIssued(eventObject);
-                        case NamedEvents.AuditPolicyChange:
-                            return new AuditPolicyChange(eventObject);
-                        case NamedEvents.OSCrash:
-                            return new OSCrash(eventObject);
-                        case NamedEvents.OSStartupShutdownCrash:
-                            return new OSStartupShutdownCrash(eventObject);
-                        case NamedEvents.OSTimeChange:
-                            return new OSTimeChange(eventObject);
-                        case NamedEvents.ClientGroupPoliciesApplication:
-                        case NamedEvents.ClientGroupPoliciesSystem:
-                            return new ClientGroupPolicies(eventObject);
-                        case NamedEvents.ADSMBServerAuditV1:
-                            return SMBServerAudit.Create(eventObject);
-                        case NamedEvents.ADGroupPolicyChanges:
-                            if (objectClass == "groupPolicyContainer" || objectClass == "container") {
-                                return new ADGroupPolicyChanges(eventObject);
-                            }
-                            break;
-                        case NamedEvents.ADGroupPolicyLinks:
-                            if ((objectClass == "domainDNS" || objectClass == "organizationalUnit" || objectClass == "site")
-                                 && eventObject.ValueMatches("AttributeLDAPDisplayName", "gpLink")) {
-                                return new ADGroupPolicyLinks(eventObject);
-                            }
-                            break;
-                        case NamedEvents.ADGroupPolicyEdits:
-                            if (objectClass == "groupPolicyContainer"
-                                && eventObject.Data.TryGetValue("AttributeLDAPDisplayName", out var ldapDisplayObjName)
-                                && ldapDisplayObjName is string ldapDisplayNameValue
-                                && ldapDisplayNameValue == "versionNumber") {
-                                return new ADGroupPolicyEdits(eventObject);
-                            }
-                            break;
-                        case NamedEvents.GpoCreated:
-                            if (objectClass == "groupPolicyContainer") {
-                                return new GpoCreated(eventObject);
-                            }
-                            break;
-                        case NamedEvents.GpoDeleted:
-                            if (objectClass == "groupPolicyContainer") {
-                                return new GpoDeleted(eventObject);
-                            }
-                            break;
-                        case NamedEvents.GpoModified:
-                            if (objectClass == "groupPolicyContainer") {
-                                return new GpoModified(eventObject);
-                            }
-                            break;
-
-                        default:
-                            throw new ArgumentException($"You forgot to add NamedEvents value properly: {typeEvents}");
+                if (eventDefinitions.TryGetValue(typeEvents, out var def) &&
+                    def.EventIds.Contains(eventObject.Id) &&
+                    def.LogName == eventObject.LogName) {
+                    var result = def.Build(eventObject);
+                    if (result != null) {
+                        return result;
                     }
                 }
             }
 
-            // If no match is found, return null or throw an exception
             return null;
         }
     }
