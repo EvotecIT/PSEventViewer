@@ -102,6 +102,9 @@ public class EventLogDetails {
             case "TB":
                 size *= 1024.0 * 1024.0 * 1024.0 * 1024.0;
                 break;
+            default:
+                // Treat unknown units as bytes
+                break;
         }
 
         switch (toUnit.ToUpper()) {
@@ -118,6 +121,9 @@ public class EventLogDetails {
                 break;
             case "TB":
                 size /= 1024.0 * 1024.0 * 1024.0 * 1024.0;
+                break;
+            default:
+                // Keep size unchanged for unknown units
                 break;
         }
 
