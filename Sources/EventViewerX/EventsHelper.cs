@@ -100,4 +100,48 @@ internal static class EventsHelper {
         }
         return null;
     }
+
+    /// <summary>
+    /// Translates a string value to a BitLockerProtectorType enum.
+    /// </summary>
+    /// <param name="value">The value to translate.</param>
+    /// <returns>The translated BitLockerProtectorType enum.</returns>
+    public static BitLockerProtectorType? GetBitLockerProtectorType(string value) {
+        if (string.IsNullOrEmpty(value)) {
+            return null;
+        }
+
+        if (value.StartsWith("%%")) {
+            value = value.Trim('%');
+        }
+
+        if (int.TryParse(value, out var number)
+            && Enum.IsDefined(typeof(BitLockerProtectorType), number)) {
+            return (BitLockerProtectorType)number;
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Translates a string value to a BitLockerVolumeType enum.
+    /// </summary>
+    /// <param name="value">The value to translate.</param>
+    /// <returns>The translated BitLockerVolumeType enum.</returns>
+    public static BitLockerVolumeType? GetBitLockerVolumeType(string value) {
+        if (string.IsNullOrEmpty(value)) {
+            return null;
+        }
+
+        if (value.StartsWith("%%")) {
+            value = value.Trim('%');
+        }
+
+        if (int.TryParse(value, out var number)
+            && Enum.IsDefined(typeof(BitLockerVolumeType), number)) {
+            return (BitLockerVolumeType)number;
+        }
+
+        return null;
+    }
 }
