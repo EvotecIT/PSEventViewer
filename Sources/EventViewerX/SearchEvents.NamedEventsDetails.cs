@@ -2,6 +2,7 @@
 using EventViewerX.Rules.Logging;
 using EventViewerX.Rules.Windows;
 using EventViewerX.Rules.Kerberos;
+using EventViewerX.Rules.CertificateAuthority;
 using System;
 using System.Collections.Generic;
 
@@ -155,6 +156,11 @@ namespace EventViewerX {
         NetworkAccessAuthenticationPolicy,
 
         /// <summary>
+        /// Certificate issued by Certificate Authority
+        /// </summary>
+        CertificateIssued,
+
+        /// <summary>
         /// Unexpected system shutdown
         /// </summary>
         OSCrash,
@@ -224,6 +230,7 @@ namespace EventViewerX {
             { NamedEvents.LogsFullSecurity, (new List<int> { 1104  }, "Security") },
             // network access
             { NamedEvents.NetworkAccessAuthenticationPolicy, (new List<int> { 6272, 6273 }, "Security") },
+            { NamedEvents.CertificateIssued, (new List<int> { 4886, 4887 }, "Security") },
             // windows OS
             { NamedEvents.OSCrash, (new List<int> { 6008 }, "System") },
             { NamedEvents.OSStartupShutdownCrash,  (new List<int> { 12, 13, 41, 4608, 4621, 6008 }, "System") },
@@ -335,6 +342,8 @@ namespace EventViewerX {
                             return new LogsClearedSecurity(eventObject);
                         case NamedEvents.LogsClearedOther:
                             return new LogsClearedOther(eventObject);
+                        case NamedEvents.CertificateIssued:
+                            return new CertificateIssued(eventObject);
                         case NamedEvents.OSCrash:
                             return new OSCrash(eventObject);
                         case NamedEvents.OSStartupShutdownCrash:
