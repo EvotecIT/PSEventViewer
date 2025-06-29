@@ -3,7 +3,7 @@
 namespace EventViewerX.Examples {
     internal partial class Examples {
 
-        public static void QueryParallelSpeed() {
+        public static async Task QueryParallelSpeed() {
             var eventSearching = new SearchEvents {
                 Verbose = true,
                 Warning = true,
@@ -22,7 +22,7 @@ namespace EventViewerX.Examples {
             });
         }
 
-        public static void QueryParallelCompare() {
+        public static async Task QueryParallelCompare() {
             var eventSearching = new SearchEvents {
                 Verbose = true,
                 Warning = true,
@@ -45,7 +45,7 @@ namespace EventViewerX.Examples {
 
             stopwatch.Restart();
             int eventCount2 = 0;
-            foreach (var eventObject in SearchEvents.QueryLogsParallel("Security", eventIds, machineNames)) {
+            await foreach (var eventObject in SearchEvents.QueryLogsParallel("Security", eventIds, machineNames)) {
                 eventCount2++;
             }
             stopwatch.Stop();
