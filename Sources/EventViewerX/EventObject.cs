@@ -56,7 +56,7 @@ namespace EventViewerX {
 
         public EventBookmark Bookmark => _eventRecord.Bookmark;
 
-        public string Message => _eventRecord.FormatDescription();
+        public string Message => _eventRecord.FormatDescription() ?? string.Empty;
 
         public string TaskDisplayName => _eventRecord.TaskDisplayName;
 
