@@ -183,6 +183,10 @@ namespace EventViewerX {
         /// </summary>
         OSTimeChange,
         /// <summary>
+        /// Windows Update installation failure
+        /// </summary>
+        WindowsUpdateFailure,
+        /// <summary>
         /// Group Policy client-side processing events from Application log
         /// </summary>
         ClientGroupPoliciesApplication,
@@ -247,6 +251,7 @@ namespace EventViewerX {
             { NamedEvents.OSCrash, (new List<int> { 6008 }, "System") },
             { NamedEvents.OSStartupShutdownCrash,  (new List<int> { 12, 13, 41, 4608, 4621, 6008 }, "System") },
             { NamedEvents.OSTimeChange, (new List<int> { 4616 }, "Security") },
+            { NamedEvents.WindowsUpdateFailure, (new List<int> { 20 }, "Setup") },
             { NamedEvents.ClientGroupPoliciesApplication, (new List<int> { 4098 }, "Application") },
             { NamedEvents.ClientGroupPoliciesSystem, (new List<int> { 1085 }, "System") },
         };
@@ -366,6 +371,8 @@ namespace EventViewerX {
                             return new OSStartupShutdownCrash(eventObject);
                         case NamedEvents.OSTimeChange:
                             return new OSTimeChange(eventObject);
+                        case NamedEvents.WindowsUpdateFailure:
+                            return new WindowsUpdateFailure(eventObject);
                         case NamedEvents.ClientGroupPoliciesApplication:
                         case NamedEvents.ClientGroupPoliciesSystem:
                             return new ClientGroupPolicies(eventObject);
