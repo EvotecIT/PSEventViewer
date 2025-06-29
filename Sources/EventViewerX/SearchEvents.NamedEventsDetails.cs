@@ -124,6 +124,10 @@ namespace EventViewerX {
         /// </summary>
         KerberosTicketFailure,
         /// <summary>
+        /// Kerberos policy changed
+        /// </summary>
+        KerberosPolicyChange,
+        /// <summary>
         /// Organizational unit created, deleted or moved
         /// </summary>
         ADOrganizationalUnitChangeDetailed,
@@ -236,6 +240,7 @@ namespace EventViewerX {
             { NamedEvents.ADUserUnlocked, ([4767], "Security") },
             { NamedEvents.KerberosServiceTicket, (new List<int> { 4769, 4770 }, "Security") },
             { NamedEvents.KerberosTicketFailure, (new List<int> { 4771, 4772 }, "Security") },
+            { NamedEvents.KerberosPolicyChange, (new List<int> { 4713 }, "Security") },
             // other based events
             { NamedEvents.ADOtherChangeDetailed, (new List<int> { 5136, 5137, 5139, 5141 }, "Security") },
             // ldap events
@@ -341,6 +346,8 @@ namespace EventViewerX {
                             return new KerberosServiceTicket(eventObject);
                         case NamedEvents.KerberosTicketFailure:
                             return new KerberosTicketFailure(eventObject);
+                        case NamedEvents.KerberosPolicyChange:
+                            return new KerberosPolicyChange(eventObject);
                         // organizational unit and other events
                         case NamedEvents.ADOrganizationalUnitChangeDetailed:
                             if (objectClass == "organizationalUnit" && eventObject.Data["AttributeLDAPDisplayName"] != "qPLik") {
