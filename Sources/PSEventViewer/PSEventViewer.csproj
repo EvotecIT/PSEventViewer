@@ -43,8 +43,10 @@
 
     <!-- We need to remove PowerShell conflicting libraries as it will break output -->
     <Target Name="RemoveFilesAfterBuild" AfterTargets="Build">
-        <Delete Files="$(OutDir)System.Management.Automation.dll" />
-        <Delete Files="$(OutDir)System.Management.dll" />
+        <Delete Files="$(OutDir)System.Management.Automation.dll"
+                Condition="Exists('$(OutDir)System.Management.Automation.dll')" />
+        <Delete Files="$(OutDir)System.Management.dll"
+                Condition="Exists('$(OutDir)System.Management.Automation.dll')" />
     </Target>
 
     <PropertyGroup>
