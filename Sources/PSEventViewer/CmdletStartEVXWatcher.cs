@@ -61,7 +61,7 @@ namespace PSEventViewer {
         /// Starts watching for events and invokes the provided action.
         /// </summary>
         protected override Task ProcessRecordAsync() {
-            EventWatching.Watch(MachineName, LogName, EventId.ToList(), e => Action.Invoke(e));
+            EventWatching.Watch(MachineName, LogName, EventId.ToList(), e => Action.Invoke(e), CancelToken);
             return Task.CompletedTask;
         }
         /// <summary>
