@@ -166,6 +166,14 @@ namespace EventViewerX {
         /// System time changed
         /// </summary>
         OSTimeChange,
+        /// <summary>
+        /// Group Policy client-side processing events from Application log
+        /// </summary>
+        ClientGroupPoliciesApplication,
+        /// <summary>
+        /// Group Policy client-side processing events from System log
+        /// </summary>
+        ClientGroupPoliciesSystem,
     }
 
     public partial class SearchEvents : Settings {
@@ -220,6 +228,8 @@ namespace EventViewerX {
             { NamedEvents.OSCrash, (new List<int> { 6008 }, "System") },
             { NamedEvents.OSStartupShutdownCrash,  (new List<int> { 12, 13, 41, 4608, 4621, 6008 }, "System") },
             { NamedEvents.OSTimeChange, (new List<int> { 4616 }, "Security") },
+            { NamedEvents.ClientGroupPoliciesApplication, (new List<int> { 4098 }, "Application") },
+            { NamedEvents.ClientGroupPoliciesSystem, (new List<int> { 1085 }, "System") },
         };
         /// <summary>
         /// Builds the appropriate event object based on the NamedEvents value
@@ -331,6 +341,9 @@ namespace EventViewerX {
                             return new OSStartupShutdownCrash(eventObject);
                         case NamedEvents.OSTimeChange:
                             return new OSTimeChange(eventObject);
+                        case NamedEvents.ClientGroupPoliciesApplication:
+                        case NamedEvents.ClientGroupPoliciesSystem:
+                            return new ClientGroupPolicies(eventObject);
                         case NamedEvents.ADSMBServerAuditV1:
                             return SMBServerAudit.Create(eventObject);
                         case NamedEvents.ADGroupPolicyChanges:
