@@ -33,7 +33,7 @@ jobs:
         env:
           RefreshPSD1Only: 'true'
         run: |
-          .\Build\Manage-Module.ps1
+          .\Build\Build-Module.ps1
         shell: pwsh
 
       - name: Upload refreshed manifest
