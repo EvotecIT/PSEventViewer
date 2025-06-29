@@ -1,7 +1,7 @@
 ﻿@{
-    AliasesToExport      = @('Get-EventViewerXEvent', 'Find-WinEvent', 'Get-Events', 'Get-EventViewerXFilter', 'Get-WinEventFilter', 'Get-EventsFilter', 'Get-EventViewerXInfo', 'Get-EventsSettings', 'Get-EventsInformation', 'Get-EventViewerXProviderList', 'Remove-EventViewerXSource', 'Remove-WinEventSource', 'Set-EventViewerXInfo', 'Set-EventsInformation', 'Set-EventsSettings', 'Start-EventViewerXWatcher', 'Start-EventWatching', 'Write-EventViewerXEntry', 'Write-WinEvent')
+    AliasesToExport      = @('Get-EventViewerXEvent', 'Find-WinEvent', 'Get-Events', 'Get-EventViewerXFilter', 'Get-WinEventFilter', 'Get-EventsFilter', 'Get-EventViewerXInfo', 'Get-EventsSettings', 'Get-EventsInformation', 'Get-EventViewerXProviderList', 'Remove-EventViewerXSource', 'Remove-WinEventSource', 'Set-EventViewerXInfo', 'Set-EventsInformation', 'Set-EventsSettings', 'Start-EventViewerXWatcher', 'Start-EventWatching', 'Write-EventViewerXEntry', 'Write-WinEvent', 'Get-PowerShellScriptExecution', 'Restore-PowerShellScript')
     Author               = 'Przemyslaw Klys'
-    CmdletsToExport      = @('Get-EVXEvent', 'Get-EVXFilter', 'Get-EVXInfo', 'Get-EVXProviderList', 'Remove-EVXSource', 'Set-EVXInfo', 'Start-EVXWatcher', 'Write-EVXEntry')
+    CmdletsToExport      = @('Get-EVXEvent', 'Get-EVXFilter', 'Get-EVXInfo', 'Get-EVXProviderList', 'Remove-EVXSource', 'Set-EVXInfo', 'Start-EVXWatcher', 'Write-EVXEntry', 'Get-EVXPowerShellScriptExecution', 'Restore-EVXPowerShellScript')
     CompanyName          = 'Evotec'
     CompatiblePSEditions = @('Desktop', 'Core')
     Copyright            = '(c) 2011 - 2025 Przemyslaw Klys @ Evotec. All rights reserved.'
