@@ -1,6 +1,9 @@
 namespace EventViewerX;
 
 public partial class SearchEvents {
+    private static string EscapeXPathValue(string value) {
+        return System.Security.SecurityElement.Escape(value);
+    }
     private static string JoinXPathFilter(string newFilter, string existingFilter = "", string logic = "and", bool noParenthesis = false) {
         if (!string.IsNullOrEmpty(existingFilter)) {
             return noParenthesis
@@ -10,10 +13,11 @@ public partial class SearchEvents {
         return newFilter;
     }
 
-    private static string InitializeXPathFilter(IEnumerable<object> items, string forEachFormatString, string finalizeFormatString, string logic = "or", bool noParenthesis = false) {
+    private static string InitializeXPathFilter(IEnumerable<object> items, string forEachFormatString, string finalizeFormatString, string logic = "or", bool noParenthesis = false, bool escapeItems = true) {
         var filter = string.Empty;
         foreach (var item in items) {
-            var formatted = string.Format(forEachFormatString, item);
+            var value = escapeItems ? EscapeXPathValue(item.ToString()) : item.ToString();
+            var formatted = string.Format(forEachFormatString, value);
             filter = JoinXPathFilter(formatted, filter, logic, noParenthesis);
         }
         return string.Format(finalizeFormatString, filter);
@@ -111,32 +115,34 @@ public partial class SearchEvents {
             foreach (Hashtable table in namedDataFilter) {
                 var keyFilters = new List<string>();
                 foreach (var key in table.Keys) {
+                    var keyName = EscapeXPathValue(key.ToString());
                     var values = AsEnumerable(table[key]);
                     if (values.Any()) {
-                        keyFilters.Add(InitializeXPathFilter(values, $"Data[@Name='{key}'] = '{{0}}'", "{0}", "or", true));
+                        keyFilters.Add(InitializeXPathFilter(values, $"Data[@Name='{keyName}'] = '{{0}}'", "{0}", "or", true));
                     } else {
-                        keyFilters.Add($"Data[@Name='{key}']");
+                        keyFilters.Add($"Data[@Name='{keyName}']");
                     }
                 }
-                items.Add(InitializeXPathFilter(keyFilters, "{0}", "{0}"));
+                items.Add(InitializeXPathFilter(keyFilters, "{0}", "{0}", escapeItems: false));
             }
-            filter = JoinXPathFilter(InitializeXPathFilter(items, "{0}", "*[EventData[{0}]]"), filter);
+            filter = JoinXPathFilter(InitializeXPathFilter(items, "{0}", "*[EventData[{0}]]", escapeItems: false), filter);
         }
         if (namedDataExcludeFilter != null && namedDataExcludeFilter.Length > 0) {
             var items = new List<string>();
             foreach (Hashtable table in namedDataExcludeFilter) {
                 var keyFilters = new List<string>();
                 foreach (var key in table.Keys) {
+                    var keyName = EscapeXPathValue(key.ToString());
                     var values = AsEnumerable(table[key]);
                     if (values.Any()) {
-                        keyFilters.Add(InitializeXPathFilter(values, $"Data[@Name='{key}'] != '{{0}}'", "{0}", "and", true));
+                        keyFilters.Add(InitializeXPathFilter(values, $"Data[@Name='{keyName}'] != '{{0}}'", "{0}", "and", true));
                     } else {
-                        keyFilters.Add($"Data[@Name='{key}']");
+                        keyFilters.Add($"Data[@Name='{keyName}']");
                     }
                 }
-                items.Add(InitializeXPathFilter(keyFilters, "{0}", "{0}"));
+                items.Add(InitializeXPathFilter(keyFilters, "{0}", "{0}", escapeItems: false));
             }
-            filter = JoinXPathFilter(InitializeXPathFilter(items, "{0}", "*[EventData[{0}]]"), filter);
+            filter = JoinXPathFilter(InitializeXPathFilter(items, "{0}", "*[EventData[{0}]]", escapeItems: false), filter);
         }
 
         if (xpathOnly) {
@@ -145,8 +151,10 @@ public partial class SearchEvents {
 
         if (!string.IsNullOrEmpty(path)) {
             var selectFilter = string.IsNullOrEmpty(filter) ? "*" : filter;
-            return $"<QueryList><Query Id=\"0\" Path=\"file://{path}\"><Select>{selectFilter}</Select></Query></QueryList>";
+            var escapedPath = EscapeXPathValue(path);
+            return $"<QueryList><Query Id=\"0\" Path=\"file://{escapedPath}\"><Select>{selectFilter}</Select></Query></QueryList>";
         }
-        return $"<QueryList><Query Id=\"0\" Path=\"{logName}\"><Select Path=\"{logName}\">{filter}</Select></Query></QueryList>";
+        var escapedLog = EscapeXPathValue(logName ?? string.Empty);
+        return $"<QueryList><Query Id=\"0\" Path=\"{escapedLog}\"><Select Path=\"{escapedLog}\">{filter}</Select></Query></QueryList>";
     }
 }
