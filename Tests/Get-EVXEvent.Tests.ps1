@@ -155,3 +155,11 @@ Describe 'Get-EVXEvent - Read events with NamedDataFilter' {
 
     }
 }
+
+Describe 'Get-EVXEvent - MessageRegex' {
+    It 'Supports filtering by message regex' {
+        $FilePath = [System.IO.Path]::Combine($PSScriptRoot, 'Logs', 'Active Directory Web Services.evtx')
+        $events   = Get-EVXEvent -Path $FilePath -MaxEvents 1 -MessageRegex '.*'
+        $events.Count | Should -Be 1
+    }
+}
