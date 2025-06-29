@@ -31,7 +31,7 @@ namespace EventViewerX {
             }
         }
 
-        public void Watch(string machineName, string logName, List<int> eventId, Action<EventObject> eventAction = null) {
+        public void Watch(string machineName, string logName, List<int> eventId, Action<EventObject> eventAction = null, CancellationToken cancellationToken = default) {
             _machineName = machineName;
             _watchEventId = new ConcurrentBag<int>(eventId);
             _eventAction = eventAction;
@@ -42,6 +42,11 @@ namespace EventViewerX {
                 });
                 eventLogWatcher.EventRecordWritten += DetectEventsLogCallback;
                 eventLogWatcher.Enabled = true;
+                cancellationToken.Register(() => {
+                    eventLogWatcher.EventRecordWritten -= DetectEventsLogCallback;
+                    eventLogWatcher.Enabled = false;
+                    eventLogWatcher.Dispose();
+                });
                 _logger.WriteVerbose("Created event log subscription to {0}.", machineName);
             } catch (Exception ex) {
                 _logger.WriteWarning("Failed to create event log subscription to Target Machine {0}. Verify network connectivity, firewall settings, permissions, etc. Continuing on to next DC if applicable...  ({1})", machineName, ex.Message.Trim());

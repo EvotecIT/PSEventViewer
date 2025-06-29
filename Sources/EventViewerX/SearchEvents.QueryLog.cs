@@ -1,6 +1,7 @@
 ﻿using System.Diagnostics.Eventing.Reader;
 using System.IO;
 using System.Net;
+using System.Threading;
 
 namespace EventViewerX;
 
@@ -67,7 +68,7 @@ public partial class SearchEvents : Settings {
     /// <param name="namedDataFilter">Optional hashtable containing named data filters to include events.</param>
     /// <param name="namedDataExcludeFilter">Optional hashtable containing named data filters to exclude events.</param>
     /// <returns>An enumerable collection of EventObject instances representing the filtered events from the log file.</returns>
-    public static IEnumerable<EventObject> QueryLogFile(string filePath, List<int> eventIds = null, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null, int maxEvents = 0, List<long> eventRecordId = null, TimePeriod? timePeriod = null, bool oldest = false, System.Collections.Hashtable namedDataFilter = null, System.Collections.Hashtable namedDataExcludeFilter = null) {
+    public static IEnumerable<EventObject> QueryLogFile(string filePath, List<int> eventIds = null, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null, int maxEvents = 0, List<long> eventRecordId = null, TimePeriod? timePeriod = null, bool oldest = false, System.Collections.Hashtable namedDataFilter = null, System.Collections.Hashtable namedDataExcludeFilter = null, CancellationToken cancellationToken = default) {
 
         string absolutePath = Path.GetFullPath(filePath);
 
@@ -142,7 +143,7 @@ public partial class SearchEvents : Settings {
         using (EventLogReader reader = CreateEventLogReader(query, filePath)) {
             if (reader != null) {
                 int eventCount = 0;
-                while ((record = reader.ReadEvent()) != null) {
+                while (!cancellationToken.IsCancellationRequested && (record = reader.ReadEvent()) != null) {
                     // using (record) {
                     EventObject eventObject = new EventObject(record, filePath);
                     yield return eventObject;
@@ -172,7 +173,7 @@ public partial class SearchEvents : Settings {
     /// <param name="eventRecordId">The event record identifier.</param>
     /// <param name="timePeriod">The time period.</param>
     /// <returns></returns>
-    public static IEnumerable<EventObject> QueryLog(string logName, List<int> eventIds = null, string machineName = null, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null, int maxEvents = 0, List<long> eventRecordId = null, TimePeriod? timePeriod = null) {
+    public static IEnumerable<EventObject> QueryLog(string logName, List<int> eventIds = null, string machineName = null, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null, int maxEvents = 0, List<long> eventRecordId = null, TimePeriod? timePeriod = null, CancellationToken cancellationToken = default) {
         if (eventIds != null && eventIds.Any(id => id <= 0)) {
             throw new ArgumentException("Event IDs must be positive.", nameof(eventIds));
         }
@@ -207,7 +208,7 @@ public partial class SearchEvents : Settings {
         using (EventLogReader reader = CreateEventLogReader(query, machineName)) {
             if (reader != null) {
                 int eventCount = 0;
-                while ((record = reader.ReadEvent()) != null) {
+                while (!cancellationToken.IsCancellationRequested && (record = reader.ReadEvent()) != null) {
                     // using (record) {
                     EventObject eventObject = new EventObject(record, queriedMachine);
                     yield return eventObject;
@@ -218,11 +219,11 @@ public partial class SearchEvents : Settings {
                     // }
                 }
             }
-        } 
+        }
     }
 
-    public static IEnumerable<EventObject> QueryLog(KnownLog logName, List<int> eventIds = null, string machineName = null, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null, int maxEvents = 0, List<long> eventRecordId = null, TimePeriod? timePeriod = null) {
-        return QueryLog(LogNameToString(logName), eventIds, machineName, providerName, keywords, level, startTime, endTime, userId, maxEvents, eventRecordId, timePeriod);
+    public static IEnumerable<EventObject> QueryLog(KnownLog logName, List<int> eventIds = null, string machineName = null, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null, int maxEvents = 0, List<long> eventRecordId = null, TimePeriod? timePeriod = null, CancellationToken cancellationToken = default) {
+        return QueryLog(LogNameToString(logName), eventIds, machineName, providerName, keywords, level, startTime, endTime, userId, maxEvents, eventRecordId, timePeriod, cancellationToken);
     }
 
     /// <summary>
@@ -345,7 +346,7 @@ public partial class SearchEvents : Settings {
         _ => logName.ToString()
     };
 
-    public static IEnumerable<EventObject> QueryLogsParallel(string logName, List<int> eventIds = null, List<string> machineNames = null, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null, int maxEvents = 0, int maxThreads = 8, List<long> eventRecordId = null, TimePeriod? timePeriod = null) {
+    public static IEnumerable<EventObject> QueryLogsParallel(string logName, List<int> eventIds = null, List<string> machineNames = null, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null, int maxEvents = 0, int maxThreads = 8, List<long> eventRecordId = null, TimePeriod? timePeriod = null, CancellationToken cancellationToken = default) {
         if (machineNames == null || !machineNames.Any()) {
             machineNames = new List<string> { null };
             _logger.WriteVerbose("No machine names provided, querying the local machine.");
@@ -364,7 +365,7 @@ public partial class SearchEvents : Settings {
                     .ToList();
 
                 foreach (var chunk in eventIdsChunks) {
-                    tasks.Add(CreateTask(machineName, logName, chunk, providerName, keywords, level, startTime, endTime, userId, maxEvents, semaphore, results, timePeriod: timePeriod));
+                    tasks.Add(CreateTask(machineName, logName, chunk, providerName, keywords, level, startTime, endTime, userId, maxEvents, semaphore, results, cancellationToken, timePeriod: timePeriod));
                 }
             } else if (eventRecordId != null) {
                 var eventRecordIdChunks = eventRecordId.Select((x, i) => new { Index = i, Value = x })
@@ -373,11 +374,11 @@ public partial class SearchEvents : Settings {
                     .ToList();
 
                 foreach (var chunk in eventRecordIdChunks) {
-                    tasks.Add(CreateTask(machineName, logName, null, providerName, keywords, level, startTime, endTime, userId, maxEvents, semaphore, results, chunk, timePeriod: timePeriod));
+                    tasks.Add(CreateTask(machineName, logName, null, providerName, keywords, level, startTime, endTime, userId, maxEvents, semaphore, results, cancellationToken, chunk, timePeriod: timePeriod));
                 }
             } else {
                 // event ids are null, so we don't need to chunk them
-                tasks.Add(CreateTask(machineName, logName, eventIds, providerName, keywords, level, startTime, endTime, userId, maxEvents, semaphore, results, timePeriod: timePeriod));
+                tasks.Add(CreateTask(machineName, logName, eventIds, providerName, keywords, level, startTime, endTime, userId, maxEvents, semaphore, results, cancellationToken, timePeriod: timePeriod));
             }
         }
 
@@ -386,30 +387,31 @@ public partial class SearchEvents : Settings {
             results.CompleteAdding();
         });
 
-        return results.GetConsumingEnumerable();
+        return results.GetConsumingEnumerable(cancellationToken);
     }
 
-    public static IEnumerable<EventObject> QueryLogsParallel(KnownLog logName, List<int> eventIds = null, List<string> machineNames = null, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null, int maxEvents = 0, int maxThreads = 8, List<long> eventRecordId = null, TimePeriod? timePeriod = null) {
-        return QueryLogsParallel(LogNameToString(logName), eventIds, machineNames, providerName, keywords, level, startTime, endTime, userId, maxEvents, maxThreads, eventRecordId, timePeriod);
+    public static IEnumerable<EventObject> QueryLogsParallel(KnownLog logName, List<int> eventIds = null, List<string> machineNames = null, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null, int maxEvents = 0, int maxThreads = 8, List<long> eventRecordId = null, TimePeriod? timePeriod = null, CancellationToken cancellationToken = default) {
+        return QueryLogsParallel(LogNameToString(logName), eventIds, machineNames, providerName, keywords, level, startTime, endTime, userId, maxEvents, maxThreads, eventRecordId, timePeriod, cancellationToken);
     }
 
-    private static Task CreateTask(string machineName, string logName, List<int> eventIds, string providerName, Keywords? keywords, Level? level, DateTime? startTime, DateTime? endTime, string userId, int maxEvents, SemaphoreSlim semaphore, BlockingCollection<EventObject> results, List<long> eventRecordId = null, TimePeriod? timePeriod = null) {
+    private static Task CreateTask(string machineName, string logName, List<int> eventIds, string providerName, Keywords? keywords, Level? level, DateTime? startTime, DateTime? endTime, string userId, int maxEvents, SemaphoreSlim semaphore, BlockingCollection<EventObject> results, CancellationToken cancellationToken, List<long> eventRecordId = null, TimePeriod? timePeriod = null) {
         return Task.Run(async () => {
             _logger.WriteVerbose($"Querying log on machine: {machineName}, logName: {logName}, event ids: " + string.Join(", ", eventIds ?? new List<int>()));
-            await semaphore.WaitAsync();
+            await semaphore.WaitAsync(cancellationToken);
             try {
-                var queryResults = QueryLog(logName, eventIds, machineName, providerName, keywords, level, startTime, endTime, userId, maxEvents, eventRecordId, timePeriod);
+                var queryResults = QueryLog(logName, eventIds, machineName, providerName, keywords, level, startTime, endTime, userId, maxEvents, eventRecordId, timePeriod, cancellationToken);
                 foreach (var result in queryResults) {
-                    results.Add(result);
+                    if (cancellationToken.IsCancellationRequested) break;
+                    results.Add(result, cancellationToken);
                 }
                 _logger.WriteVerbose("Querying log on machine: " + machineName + " completed.");
             } finally {
                 semaphore.Release();
             }
-        });
+        }, cancellationToken);
     }
 
-    public static IEnumerable<EventObject> QueryLogsParallelForEach(string logName, List<int> eventIds = null, List<string> machineNames = null, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null, int maxEvents = 0, int maxThreads = 4, List<long> eventRecordId = null) {
+    public static IEnumerable<EventObject> QueryLogsParallelForEach(string logName, List<int> eventIds = null, List<string> machineNames = null, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null, int maxEvents = 0, int maxThreads = 4, List<long> eventRecordId = null, CancellationToken cancellationToken = default) {
         if (machineNames == null || !machineNames.Any()) {
             throw new ArgumentException("At least one machine name must be provided", nameof(machineNames));
         }
@@ -420,19 +422,20 @@ public partial class SearchEvents : Settings {
         Task.Factory.StartNew(() => {
             Parallel.ForEach(machineNames, options, machineName => {
                 _logger.WriteVerbose("Starting task for machine: " + machineName);
-                var queryResults = QueryLog(logName, eventIds, machineName, providerName, keywords, level, startTime, endTime, userId, maxEvents, eventRecordId);
+                var queryResults = QueryLog(logName, eventIds, machineName, providerName, keywords, level, startTime, endTime, userId, maxEvents, eventRecordId, cancellationToken: cancellationToken);
                 foreach (var result in queryResults) {
-                    results.Add(result);
+                    if (cancellationToken.IsCancellationRequested) break;
+                    results.Add(result, cancellationToken);
                 }
                 _logger.WriteVerbose("Finished task for machine: " + machineName);
             });
             results.CompleteAdding();
-        });
+        }, cancellationToken);
 
-        return results.GetConsumingEnumerable();
+        return results.GetConsumingEnumerable(cancellationToken);
     }
 
-    public static IEnumerable<EventObject> QueryLogsParallelForEach(KnownLog logName, List<int> eventIds = null, List<string> machineNames = null, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null, int maxEvents = 0, int maxThreads = 4, List<long> eventRecordId = null) {
-        return QueryLogsParallelForEach(LogNameToString(logName), eventIds, machineNames, providerName, keywords, level, startTime, endTime, userId, maxEvents, maxThreads, eventRecordId);
+    public static IEnumerable<EventObject> QueryLogsParallelForEach(KnownLog logName, List<int> eventIds = null, List<string> machineNames = null, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null, int maxEvents = 0, int maxThreads = 4, List<long> eventRecordId = null, CancellationToken cancellationToken = default) {
+        return QueryLogsParallelForEach(LogNameToString(logName), eventIds, machineNames, providerName, keywords, level, startTime, endTime, userId, maxEvents, maxThreads, eventRecordId, cancellationToken);
     }
 }

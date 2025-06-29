@@ -2,10 +2,11 @@
 using System.Collections.Generic;
 using System.Linq;
 
+using System.Threading;
 namespace EventViewerX {
     public partial class SearchEvents : Settings {
 
-        public static IEnumerable<EventObjectSlim> FindEventsByNamedEvents(List<NamedEvents> typeEventsList, List<string> machineNames = null, DateTime? startTime = null, DateTime? endTime = null, TimePeriod? timePeriod = null, int maxThreads = 8, int maxEvents = 0) {
+        public static IEnumerable<EventObjectSlim> FindEventsByNamedEvents(List<NamedEvents> typeEventsList, List<string> machineNames = null, DateTime? startTime = null, DateTime? endTime = null, TimePeriod? timePeriod = null, int maxThreads = 8, int maxEvents = 0, CancellationToken cancellationToken = default) {
             // Create a dictionary to store unique event IDs and log names
             var eventInfoDict = new Dictionary<string, HashSet<int>>();
 
@@ -31,7 +32,7 @@ namespace EventViewerX {
                 var logName = kvp.Key;
                 var eventIds = kvp.Value.ToList();
 
-                foreach (var foundEvent in SearchEvents.QueryLogsParallel(logName, eventIds, machineNames, startTime: startTime, endTime: endTime, timePeriod: timePeriod, maxThreads: maxThreads, maxEvents: maxEvents)) {
+                foreach (var foundEvent in SearchEvents.QueryLogsParallel(logName, eventIds, machineNames, startTime: startTime, endTime: endTime, timePeriod: timePeriod, maxThreads: maxThreads, maxEvents: maxEvents, cancellationToken: cancellationToken)) {
                     _logger.WriteDebug($"Found event: {foundEvent.Id} {foundEvent.LogName} {foundEvent.ComputerName}");
                     // yield return BuildTargetEvents(foundEvent, typeEventsList);
                     var targetEvent = BuildTargetEvents(foundEvent, typeEventsList);
