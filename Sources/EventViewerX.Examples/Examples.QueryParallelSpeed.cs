@@ -3,7 +3,7 @@
 namespace EventViewerX.Examples {
     internal partial class Examples {
 
-        public static async Task QueryParallelSpeed() {
+        public static void QueryParallelSpeed() {
             var eventSearching = new SearchEvents {
                 Verbose = true,
                 Warning = true,

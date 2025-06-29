@@ -203,7 +203,7 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
         var internalLogger = new InternalLogger(false);
         var internalLoggerPowerShell = new InternalLoggerPowerShell(internalLogger, this.WriteVerbose, this.WriteWarning, this.WriteDebug, this.WriteError, this.WriteProgress, this.WriteInformation);
         var searchEvents = new SearchEvents(internalLogger);
-        return;
+        return Task.CompletedTask;
     }
     /// <summary>
     /// Executes the event query based on provided parameters.
