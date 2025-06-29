@@ -192,5 +192,16 @@ namespace EventViewerX {
             }
             return sb.ToString();
         }
+
+        public static IEnumerable<RestoredPowerShellScript> GetPowerShellScripts(
+            PowerShellEdition type,
+            string machineName = null,
+            string eventLogPath = null,
+            DateTime? dateFrom = null,
+            DateTime? dateTo = null,
+            bool format = false,
+            IEnumerable<string> containsText = null) {
+            return RestorePowerShellScripts(type, machineName, eventLogPath, dateFrom, dateTo, format, containsText);
+        }
     }
 }
