@@ -93,3 +93,20 @@ public enum SubStatusCode : uint {
     StatusPasswordExpired = 0xC0000071,
     StatusAccountDisabled = 0xC0000072
 }
+
+public enum BitLockerVolumeType {
+    OperatingSystemVolume = 810,
+    FixedDataVolume = 811,
+    RemovableDataVolume = 812
+}
+
+public enum BitLockerProtectorType {
+    Tpm = 2200,
+    ExternalKey = 2201,
+    NumericalPassword = 2202,
+    TpmPin = 2203,
+    TpmStartupKey = 2204,
+    TpmPinAndStartupKey = 2205,
+    Passphrase = 2206,
+    RecoveryKey = 2207
+}
