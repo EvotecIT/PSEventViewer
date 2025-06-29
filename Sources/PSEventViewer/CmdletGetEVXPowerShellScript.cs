@@ -40,22 +40,10 @@ namespace PSEventViewer {
         protected override Task ProcessRecordAsync() {
             var machines = MachineName ?? new string[] { null };
             foreach (var machine in machines) {
-                foreach (var script in SearchEvents.RestorePowerShellScripts(Type, machine, EventLogPath, DateFrom, DateTo, Format.IsPresent, ContainsText)) {
+                foreach (var script in SearchEvents.GetPowerShellScripts(Type, machine, EventLogPath, DateFrom, DateTo, Format.IsPresent, ContainsText)) {
                     if (!string.IsNullOrEmpty(Path)) {
-                        Directory.CreateDirectory(Path);
-                        string fileName = $"{script.EventRecord.MachineName}_{script.ScriptBlockId}.ps1";
-                        string filePath = System.IO.Path.Combine(Path, fileName);
-                        string header = string.Join(Environment.NewLine,
-                            "<#",
-                            $"RecordID = {script.EventRecord.RecordId}",
-                            $"LogName = {script.EventRecord.LogName}",
-                            $"MachineName = {script.EventRecord.MachineName}",
-                            $"TimeCreated = {script.EventRecord.TimeCreated}",
-                            "#>");
-                        File.WriteAllText(filePath, header + Environment.NewLine + script.Script);
-                        string zonePath = filePath + ":Zone.Identifier";
-                        File.WriteAllText(zonePath, "[ZoneTransfer]\r\nZoneId=3");
-                        WriteObject(filePath);
+                        string path = script.Save(Path);
+                        WriteObject(path);
                     } else {
                         WriteObject(script);
                     }

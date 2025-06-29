@@ -77,7 +77,7 @@ namespace EventViewerX {
                 yield break;
             }
 
-            var cache = new Dictionary<string, Dictionary<string, object>>();
+            var cache = new Dictionary<string, ScriptCache>();
             EventRecord record;
             while ((record = reader.ReadEvent()) != null) {
                 string scriptText = ExtractData(record, "ScriptBlockText");
@@ -90,20 +90,24 @@ namespace EventViewerX {
                 }
                 string messageNumber = ExtractData(record, "MessageNumber") ?? "0";
                 if (!cache.TryGetValue(scriptId, out var inner)) {
-                    inner = new Dictionary<string, object>();
+                    inner = new ScriptCache();
                     cache[scriptId] = inner;
                 }
-                inner["0"] = record;
-                inner[messageNumber] = scriptText;
+                inner.Events.Add(record);
+                if (messageNumber == "0") {
+                    inner.MetaRecord = record;
+                } else if (int.TryParse(messageNumber, out int num)) {
+                    inner.Parts[num] = scriptText;
+                }
             }
 
             foreach (var kv in cache) {
-                var metaRecord = (EventRecord)kv.Value["0"];
+                var metaRecord = kv.Value.MetaRecord ?? kv.Value.Events[0];
                 string totalStr = ExtractData(metaRecord, "MessageTotal") ?? "0";
                 if (!int.TryParse(totalStr, out int total)) total = 0;
                 var sb = new StringBuilder();
                 for (int i = 1; i <= total; i++) {
-                    if (kv.Value.TryGetValue(i.ToString(), out var partObj) && partObj is string part) {
+                    if (kv.Value.Parts.TryGetValue(i, out var part)) {
                         sb.Append(part);
                     }
                 }
@@ -127,10 +131,16 @@ namespace EventViewerX {
                 yield return new RestoredPowerShellScript {
                     ScriptBlockId = kv.Key,
                     Script = script,
-                    EventRecord = metaRecord,
+                    Events = kv.Value.Events.AsReadOnly(),
                     Data = GetAllData(metaRecord)
                 };
             }
+        }
+
+        private sealed class ScriptCache {
+            public EventRecord MetaRecord { get; set; }
+            public List<EventRecord> Events { get; } = new List<EventRecord>();
+            public Dictionary<int, string> Parts { get; } = new Dictionary<int, string>();
         }
 
         private static Dictionary<string, string?> ParseContextInfo(string context) {
