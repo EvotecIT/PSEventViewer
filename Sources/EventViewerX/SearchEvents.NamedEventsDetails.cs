@@ -180,6 +180,11 @@ namespace EventViewerX {
         BitLockerKeyChange,
 
         /// <summary>
+        /// External device recognized by the system
+        /// </summary>
+        DeviceRecognized,
+
+        /// <summary>
         /// Unexpected system shutdown
         /// </summary>
         OSCrash,
@@ -258,6 +263,7 @@ namespace EventViewerX {
             { NamedEvents.AuditPolicyChange, (new List<int> { 4719 }, "Security") },
             { NamedEvents.FirewallRuleChange, (new List<int> { 4947 }, "Security") },
             { NamedEvents.BitLockerKeyChange, (new List<int> { 4673, 4692 }, "Security") },
+            { NamedEvents.DeviceRecognized, (new List<int> { 6416 }, "Security") },
             // windows OS
             { NamedEvents.OSCrash, (new List<int> { 6008 }, "System") },
             { NamedEvents.OSStartupShutdownCrash,  (new List<int> { 12, 13, 41, 4608, 4621, 6008 }, "System") },
@@ -380,6 +386,8 @@ namespace EventViewerX {
                             return new FirewallRuleChange(eventObject);
                         case NamedEvents.BitLockerKeyChange:
                             return new BitLockerKeyChange(eventObject);
+                        case NamedEvents.DeviceRecognized:
+                            return new DeviceRecognized(eventObject);
                         case NamedEvents.OSCrash:
                             return new OSCrash(eventObject);
                         case NamedEvents.OSStartupShutdownCrash:
