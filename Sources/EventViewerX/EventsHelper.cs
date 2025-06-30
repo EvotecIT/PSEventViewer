@@ -144,4 +144,73 @@ internal static class EventsHelper {
 
         return null;
     }
+
+    /// <summary>
+    /// Translates device class name into a simplified device type.
+    /// </summary>
+    /// <param name="className">Device class name.</param>
+    /// <returns>Device type string.</returns>
+    public static string TranslateDeviceType(string className) {
+        if (string.IsNullOrEmpty(className)) {
+            return string.Empty;
+        }
+
+        if (className.Equals("DiskDrive", StringComparison.OrdinalIgnoreCase)) {
+            return "Disk Drive";
+        }
+
+        if (className.IndexOf("USB", StringComparison.OrdinalIgnoreCase) >= 0) {
+            return "USB Device";
+        }
+
+        if (className.IndexOf("Network", StringComparison.OrdinalIgnoreCase) >= 0) {
+            return "Network Adapter";
+        }
+
+        if (className.IndexOf("Image", StringComparison.OrdinalIgnoreCase) >= 0
+            || className.IndexOf("Camera", StringComparison.OrdinalIgnoreCase) >= 0) {
+            return "Imaging Device";
+        }
+
+        return className;
+    }
+
+    private static readonly Dictionary<string, string> VendorLookup = new() {
+        { "045E", "Microsoft" },
+        { "046D", "Logitech" },
+        { "0781", "SanDisk" },
+        { "05AC", "Apple" },
+        { "0BDA", "Realtek" }
+    };
+
+    /// <summary>
+    /// Attempts to translate hardware vendor identifiers to a friendly name.
+    /// </summary>
+    /// <param name="vendorIds">Vendor identifiers string.</param>
+    /// <returns>Vendor name if recognized; otherwise original value.</returns>
+    public static string TranslateVendor(string vendorIds) {
+        if (string.IsNullOrEmpty(vendorIds)) {
+            return string.Empty;
+        }
+
+        var match = System.Text.RegularExpressions.Regex.Match(
+            vendorIds,
+            @"VID_([0-9A-Fa-f]{4})|VEN_([0-9A-Fa-f]{4})");
+        if (match.Success) {
+            var vid = match.Groups[1].Success ? match.Groups[1].Value : match.Groups[2].Value;
+            if (VendorLookup.TryGetValue(vid.ToUpperInvariant(), out var name)) {
+                return name;
+            }
+        }
+
+        var scsiMatch = System.Text.RegularExpressions.Regex.Match(
+            vendorIds,
+            @"SCSI\\\\Disk(?<vendor>[^\\_]+)",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        if (scsiMatch.Success) {
+            return scsiMatch.Groups["vendor"].Value;
+        }
+
+        return vendorIds.Replace('_', ' ');
+    }
 }
