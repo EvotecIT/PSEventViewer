@@ -1,11 +1,9 @@
-using EventViewerX;
-namespace EventViewerX.Rules.ActiveDirectory;
+﻿namespace EventViewerX.Rules.ActiveDirectory;
 
 /// <summary>
 /// Active Directory User Unlocked
 /// 4767: A user account was unlocked
 /// </summary>
-[NamedEvent(NamedEvents.ADUserUnlocked, "Security", 4767)]
 public class ADUserUnlocked : EventObjectSlim {
     public string Computer;
     public string Action;
@@ -17,10 +15,14 @@ public class ADUserUnlocked : EventObjectSlim {
     public ADUserUnlocked(EventObject eventObject) : base(eventObject) {
         _eventObject = eventObject;
         Type = "ADUserUnlocked";
+
         Computer = _eventObject.ComputerName;
         Action = _eventObject.MessageSubject;
-        ComputerLockoutOn = _eventObject.GetValueFromDataDictionary("ComputerName");
+
+        ComputerLockoutOn = _eventObject.GetValueFromDataDictionary("TargetDomainName");
+
         UserAffected = _eventObject.GetValueFromDataDictionary("TargetUserName", "TargetDomainName", "\\", reverseOrder: true);
+
         Who = _eventObject.GetValueFromDataDictionary("SubjectUserName", "SubjectDomainName", "\\", reverseOrder: true);
         When = _eventObject.TimeCreated;
     }

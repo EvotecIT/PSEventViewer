@@ -1,5 +1,5 @@
 using EventViewerX;
-﻿namespace EventViewerX.Rules.ActiveDirectory;
+namespace EventViewerX.Rules.ActiveDirectory;
 
 /// <summary>
 /// Active Directory Group Change
@@ -38,11 +38,10 @@ public class ADGroupChange : EventObjectSlim {
         // common fields
         Who = _eventObject.GetValueFromDataDictionary("SubjectUserName", "SubjectDomainName", "\\", reverseOrder: true);
         When = _eventObject.TimeCreated;
-    }
+}
     public static EventObjectSlim? TryCreate(EventObject e)
     {
         var obj = new ADGroupChange(e);
         return obj.Who == "*ANONYMOUS*" ? null : obj;
     }
-
 }

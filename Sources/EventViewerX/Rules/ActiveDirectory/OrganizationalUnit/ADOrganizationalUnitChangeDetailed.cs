@@ -1,8 +1,6 @@
 ﻿using System;
-using EventViewerX;
 
 namespace EventViewerX.Rules.ActiveDirectory {
-[NamedEvent(NamedEvents.ADOrganizationalUnitChangeDetailed, "Security", 5136, 5137, 5139, 5141)]
     public class ADOrganizationalUnitChangeDetailed : EventObjectSlim {
 
 
@@ -96,14 +94,5 @@ namespace EventViewerX.Rules.ActiveDirectory {
                 OperationType = "Organizational Unit Moved";
             }
         }
-    public static EventObjectSlim? TryCreate(EventObject e)
-    {
-        e.Data.TryGetValue("ObjectClass", out var cls);
-        if (cls == "organizationalUnit" && (!e.Data.TryGetValue("AttributeLDAPDisplayName", out var name) || (name is string s && s != "qPLik")))
-        {
-            return new ADOrganizationalUnitChangeDetailed(e);
-        }
-        return null;
     }
-
-}}
+}

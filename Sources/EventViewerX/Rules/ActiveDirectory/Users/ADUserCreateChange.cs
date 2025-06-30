@@ -1,12 +1,10 @@
-using EventViewerX;
-namespace EventViewerX.Rules.ActiveDirectory;
+﻿namespace EventViewerX.Rules.ActiveDirectory;
 
 /// <summary>
 /// Includes users added or modified in Active Directory
 /// 4720: A user account was created
 /// 4738: A user account was changed
 /// </summary>
-[NamedEvent(NamedEvents.ADUserCreateChange, "Security", 4720, 4738)]
 public class ADUserCreateChange : EventObjectSlim {
     public string Computer;
     public string Action;
@@ -33,7 +31,9 @@ public class ADUserCreateChange : EventObjectSlim {
     public DateTime When;
 
     public ADUserCreateChange(EventObject eventObject) : base(eventObject) {
+        // main object initialization
         _eventObject = eventObject;
+        // dedicated properties initialization
         Type = "ADUserChange";
         Computer = _eventObject.ComputerName;
         Action = _eventObject.MessageSubject;
@@ -59,6 +59,7 @@ public class ADUserCreateChange : EventObjectSlim {
         Who = _eventObject.GetValueFromDataDictionary("SubjectUserName", "SubjectDomainName", "\\", reverseOrder: true);
         When = _eventObject.TimeCreated;
 
+        // let's try to translate them
         OldUacValue = TranslateUacValue(OldUacValue);
         NewUacValue = TranslateUacValue(NewUacValue);
         UserAccountControl = TranslateUacValue(UserAccountControl);

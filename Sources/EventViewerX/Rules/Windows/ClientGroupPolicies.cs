@@ -1,8 +1,5 @@
-using EventViewerX;
 namespace EventViewerX.Rules.Windows;
 
-[NamedEvent(NamedEvents.ClientGroupPoliciesApplication, "Application", 4098)]
-[NamedEvent(NamedEvents.ClientGroupPoliciesSystem, "System", 1085)]
 public class ClientGroupPolicies : EventObjectSlim {
     public string Computer;
     public string Action;

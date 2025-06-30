@@ -1,13 +1,12 @@
-using EventViewerX;
-namespace EventViewerX.Rules.ActiveDirectory;
+﻿namespace EventViewerX.Rules.ActiveDirectory;
 
 /// <summary>
 /// Active Directory Group Enumeration
 /// 4798: A user's local group membership was enumerated
 /// 4799: A security-enabled local group membership was enumerated
 /// </summary>
-[NamedEvent(NamedEvents.ADGroupEnumeration, "Security", 4798, 4799)]
 public class ADGroupEnumeration : EventObjectSlim {
+
     public string Computer;
     public string Action;
     public string GroupName;
@@ -23,6 +22,7 @@ public class ADGroupEnumeration : EventObjectSlim {
 
         GroupName = _eventObject.GetValueFromDataDictionary("TargetUserName", "TargetDomainName", "\\", reverseOrder: true);
 
+        // common fields
         Who = _eventObject.GetValueFromDataDictionary("SubjectUserName", "SubjectDomainName", "\\", reverseOrder: true);
         When = _eventObject.TimeCreated;
     }

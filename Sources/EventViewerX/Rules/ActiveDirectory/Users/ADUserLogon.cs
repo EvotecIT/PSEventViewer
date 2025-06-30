@@ -1,39 +1,41 @@
-using EventViewerX;
-namespace EventViewerX.Rules.ActiveDirectory;
+﻿namespace EventViewerX.Rules.ActiveDirectory;
 
 /// <summary>
 /// Active Directory User Logon
 /// 4624: An account was successfully logged on
 /// </summary>
-[NamedEvent(NamedEvents.ADUserLogon, "Security", 4624)]
 public class ADUserLogon : EventObjectSlim {
     public string Computer;
     public string Action;
     public string IpAddress;
-    public string LogonType;
-    public string LogonProcess;
-    public string AuthenticationPackage;
-    public string LogonGuid;
-    public string TargetDomainName;
-    public string TargetUserName;
-    public string SubjectDomainName;
-    public string SubjectUserName;
+    public string IpPort;
+    public string ObjectAffected;
+    public string Who;
     public DateTime When;
+    public string LogonProcessName;
+    public ImpersonationLevel? ImpersonationLevel;
+    public VirtualAccount? VirtualAccount;
+    public ElevatedToken? ElevatedToken;
+    public LogonType? LogonType;
 
     public ADUserLogon(EventObject eventObject) : base(eventObject) {
         _eventObject = eventObject;
         Type = "ADUserLogon";
+
         Computer = _eventObject.ComputerName;
         Action = _eventObject.MessageSubject;
+
         IpAddress = _eventObject.GetValueFromDataDictionary("IpAddress");
-        LogonType = _eventObject.GetValueFromDataDictionary("LogonType");
-        LogonProcess = _eventObject.GetValueFromDataDictionary("LogonProcessName");
-        AuthenticationPackage = _eventObject.GetValueFromDataDictionary("AuthenticationPackageName");
-        LogonGuid = _eventObject.GetValueFromDataDictionary("LogonGuid");
-        TargetDomainName = _eventObject.GetValueFromDataDictionary("TargetDomainName");
-        TargetUserName = _eventObject.GetValueFromDataDictionary("TargetUserName");
-        SubjectDomainName = _eventObject.GetValueFromDataDictionary("SubjectDomainName");
-        SubjectUserName = _eventObject.GetValueFromDataDictionary("SubjectUserName");
+        IpPort = _eventObject.GetValueFromDataDictionary("IpPort");
+        LogonProcessName = _eventObject.GetValueFromDataDictionary("LogonProcessName");
+        ImpersonationLevel = EventsHelper.GetImpersonationLevel(_eventObject.GetValueFromDataDictionary("ImpersonationLevel"));
+        VirtualAccount = EventsHelper.GetVirtualAccount(_eventObject.GetValueFromDataDictionary("VirtualAccount"));
+        ElevatedToken = EventsHelper.GetElevatedToken(_eventObject.GetValueFromDataDictionary("ElevatedToken"));
+        LogonType = EventsHelper.GetLogonType(_eventObject.GetValueFromDataDictionary("LogonType"));
+
+        ObjectAffected = _eventObject.GetValueFromDataDictionary("TargetUserName", "TargetDomainName", "\\", reverseOrder: true);
+
+        Who = _eventObject.GetValueFromDataDictionary("SubjectUserName", "SubjectDomainName", "\\", reverseOrder: true);
         When = _eventObject.TimeCreated;
     }
 }

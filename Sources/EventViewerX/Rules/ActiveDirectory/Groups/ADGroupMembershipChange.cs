@@ -1,5 +1,4 @@
-using EventViewerX;
-namespace EventViewerX.Rules.ActiveDirectory;
+﻿namespace EventViewerX.Rules.ActiveDirectory;
 
 /// <summary>
 /// Active Directory Group Membership Changes
@@ -20,8 +19,8 @@ namespace EventViewerX.Rules.ActiveDirectory;
 /// 4787: A member was added to a security-enabled universal group
 /// 4788: A member was removed from a security-enabled universal group
 /// </summary>
-[NamedEvent(NamedEvents.ADGroupMembershipChange, "Security", 4728, 4729, 4732, 4733, 4746, 4747, 4751, 4752, 4756, 4757, 4761, 4762, 4785, 4786, 4787, 4788)]
 public class ADGroupMembershipChange : EventObjectSlim {
+
     public string Computer;
     public string Action;
     public string GroupName;
@@ -39,6 +38,7 @@ public class ADGroupMembershipChange : EventObjectSlim {
         GroupName = _eventObject.GetValueFromDataDictionary("TargetUserName", "TargetDomainName", "\\", reverseOrder: true);
         MemberName = _eventObject.GetValueFromDataDictionary("MemberNameWithoutCN");
 
+        // common fields
         Who = _eventObject.GetValueFromDataDictionary("SubjectUserName", "SubjectDomainName", "\\", reverseOrder: true);
         When = _eventObject.TimeCreated;
     }

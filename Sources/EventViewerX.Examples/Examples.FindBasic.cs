@@ -11,14 +11,14 @@ namespace EventViewerX.Examples {
                 Console.WriteLine("Type: " + foundObject.Type + ", " + foundObject.EventID + " " + foundObject.EventID + " " + foundObject.GatheredFrom);
 
                 if (foundObject is OSCrash osCrash) {
-                    // Display the properties of the OSCrash object
+                    //Display the properties of the ADComputerChangeDetailed object
                     Console.WriteLine("[*] Computer: " + osCrash.Computer);
-                    Console.WriteLine("[*] Action: " + osCrash.Action);
+                    Console.WriteLine("[*] Who: " + osCrash.Who);
                     Console.WriteLine("[*] When: " + osCrash.When);
                 } else if (foundObject is OSStartupShutdownCrash osStartupShutdownCrash) {
                     //Display the properties of the ADComputerChangeDetailed object
                     Console.WriteLine("[*] Computer: " + osStartupShutdownCrash.Computer);
-                    Console.WriteLine("[*] Action: " + osStartupShutdownCrash.Action);
+                    Console.WriteLine("[*] Who: " + osStartupShutdownCrash.Action);
                     Console.WriteLine("[*] When: " + osStartupShutdownCrash.When);
                 }
             }

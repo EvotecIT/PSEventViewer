@@ -35,6 +35,7 @@ public class ADComputerCreateChange : EventObjectSlim {
     public DateTime When;
 
     public ADComputerCreateChange(EventObject eventObject) : base(eventObject) {
+        // common fields
         _eventObject = eventObject;
         Type = "ADComputerChange";
 
@@ -64,6 +65,7 @@ public class ADComputerCreateChange : EventObjectSlim {
         Who = _eventObject.GetValueFromDataDictionary("SubjectUserName", "SubjectDomainName", "\\", reverseOrder: true);
         When = _eventObject.TimeCreated;
 
+        // let's try to translate them
         OldUacValue = TranslateUacValue(OldUacValue);
         NewUacValue = TranslateUacValue(NewUacValue);
         UserAccountControl = TranslateUacValue(UserAccountControl);

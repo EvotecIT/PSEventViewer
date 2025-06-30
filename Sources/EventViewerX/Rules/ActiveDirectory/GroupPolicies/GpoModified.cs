@@ -1,7 +1,5 @@
-using EventViewerX;
 namespace EventViewerX.Rules.ActiveDirectory;
 
-[NamedEvent(NamedEvents.GpoModified, "Security", 5136)]
 public class GpoModified : EventObjectSlim {
     public string Computer;
     public string Action;
@@ -22,9 +20,5 @@ public class GpoModified : EventObjectSlim {
         Who = _eventObject.GetValueFromDataDictionary("SubjectUserName", "SubjectDomainName", "\\", reverseOrder: true);
         When = _eventObject.TimeCreated;
     }
-
-    public static EventObjectSlim? TryCreate(EventObject e)
-    {
-        return e.Data.TryGetValue("ObjectClass", out var cls) && cls == "groupPolicyContainer" ? new GpoModified(e) : null;
-    }
 }
+
