@@ -1,7 +1,7 @@
 ﻿namespace EventViewerX.Examples {
     internal partial class Examples {
 
-        public static void QueryParallelWithCount() {
+        public static async Task QueryParallelWithCount() {
             var eventSearching = new SearchEvents {
                 Verbose = true,
                 Warning = true,
@@ -16,7 +16,7 @@
             // Initialize a dictionary to keep track of the number of events per server
             var eventCounts = new Dictionary<string, int>();
 
-            foreach (var eventObject in SearchEvents.QueryLogsParallel("Security", eventIds, machineNames)) {
+            await foreach (var eventObject in SearchEvents.QueryLogsParallel("Security", eventIds, machineNames)) {
                 // If the server is not yet in the dictionary, add it with a count of 1
                 if (!eventCounts.ContainsKey(eventObject.ComputerName)) {
                     eventCounts[eventObject.ComputerName] = 1;

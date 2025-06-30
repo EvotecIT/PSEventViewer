@@ -1,6 +1,7 @@
 ﻿using System.Diagnostics.Eventing.Reader;
 using System.IO;
 using System.Net;
+using System.Runtime.CompilerServices;
 using System.Threading;
 
 namespace EventViewerX;
@@ -346,7 +347,7 @@ public partial class SearchEvents : Settings {
         _ => logName.ToString()
     };
 
-    public static IEnumerable<EventObject> QueryLogsParallel(string logName, List<int> eventIds = null, List<string> machineNames = null, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null, int maxEvents = 0, int maxThreads = 8, List<long> eventRecordId = null, TimePeriod? timePeriod = null, CancellationToken cancellationToken = default) {
+    public static async IAsyncEnumerable<EventObject> QueryLogsParallel(string logName, List<int> eventIds = null, List<string> machineNames = null, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null, int maxEvents = 0, int maxThreads = 8, List<long> eventRecordId = null, TimePeriod? timePeriod = null, [EnumeratorCancellation] CancellationToken cancellationToken = default) {
         if (machineNames == null || !machineNames.Any()) {
             machineNames = new List<string> { null };
             _logger.WriteVerbose("No machine names provided, querying the local machine.");
@@ -382,15 +383,23 @@ public partial class SearchEvents : Settings {
             }
         }
 
-        Task.Factory.StartNew(() => {
-            Task.WaitAll(tasks.ToArray());
-            results.CompleteAdding();
-        });
+        var completionTask = Task.Run(async () => {
+            try {
+                await Task.WhenAll(tasks);
+            } finally {
+                results.CompleteAdding();
+            }
+        }, cancellationToken);
 
-        return results.GetConsumingEnumerable(cancellationToken);
+        foreach (var result in results.GetConsumingEnumerable(cancellationToken)) {
+            yield return result;
+            await Task.Yield();
+        }
+
+        await completionTask;
     }
 
-    public static IEnumerable<EventObject> QueryLogsParallel(KnownLog logName, List<int> eventIds = null, List<string> machineNames = null, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null, int maxEvents = 0, int maxThreads = 8, List<long> eventRecordId = null, TimePeriod? timePeriod = null, CancellationToken cancellationToken = default) {
+    public static IAsyncEnumerable<EventObject> QueryLogsParallel(KnownLog logName, List<int> eventIds = null, List<string> machineNames = null, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null, int maxEvents = 0, int maxThreads = 8, List<long> eventRecordId = null, TimePeriod? timePeriod = null, CancellationToken cancellationToken = default) {
         return QueryLogsParallel(LogNameToString(logName), eventIds, machineNames, providerName, keywords, level, startTime, endTime, userId, maxEvents, maxThreads, eventRecordId, timePeriod, cancellationToken);
     }
 
