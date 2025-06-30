@@ -185,6 +185,11 @@ namespace EventViewerX {
         DeviceRecognized,
 
         /// <summary>
+        /// Scheduled task deleted
+        /// </summary>
+        ScheduledTaskDeleted,
+
+        /// <summary>
         /// Unexpected system shutdown
         /// </summary>
         OSCrash,
@@ -264,6 +269,7 @@ namespace EventViewerX {
             { NamedEvents.FirewallRuleChange, (new List<int> { 4947 }, "Security") },
             { NamedEvents.BitLockerKeyChange, (new List<int> { 4673, 4692 }, "Security") },
             { NamedEvents.DeviceRecognized, (new List<int> { 6416 }, "Security") },
+            { NamedEvents.ScheduledTaskDeleted, (new List<int> { 4699 }, "Security") },
             // windows OS
             { NamedEvents.OSCrash, (new List<int> { 6008 }, "System") },
             { NamedEvents.OSStartupShutdownCrash,  (new List<int> { 12, 13, 41, 4608, 4621, 6008 }, "System") },
@@ -388,6 +394,8 @@ namespace EventViewerX {
                             return new BitLockerKeyChange(eventObject);
                         case NamedEvents.DeviceRecognized:
                             return new DeviceRecognized(eventObject);
+                        case NamedEvents.ScheduledTaskDeleted:
+                            return new ScheduledTaskDeleted(eventObject);
                         case NamedEvents.OSCrash:
                             return new OSCrash(eventObject);
                         case NamedEvents.OSStartupShutdownCrash:
