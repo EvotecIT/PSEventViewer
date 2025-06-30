@@ -208,7 +208,7 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
     /// <summary>
     /// Executes the event query based on provided parameters.
     /// </summary>
-    protected override Task ProcessRecordAsync() {
+    protected override async Task ProcessRecordAsync() {
         var results = AsArray ? new List<object>() : null;
 
         if (ParameterSetName == "ListLog") {
@@ -248,7 +248,7 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
             if (Type != null) {
                 // let's find the events prepared for search
                 List<NamedEvents> typeList = Type.ToList();
-                foreach (var eventObject in SearchEvents.FindEventsByNamedEvents(typeList, MachineName, StartTime, EndTime, TimePeriod, maxThreads: NumberOfThreads, maxEvents: MaxEvents, cancellationToken: CancelToken)) {
+                await foreach (var eventObject in SearchEvents.FindEventsByNamedEvents(typeList, MachineName, StartTime, EndTime, TimePeriod, maxThreads: NumberOfThreads, maxEvents: MaxEvents, cancellationToken: CancelToken)) {
                     if (!MessageMatches(eventObject._eventObject)) {
                         continue;
                     }
@@ -288,7 +288,7 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
                             }
                         }
                     } else if (ParallelOption == ParallelOption.Parallel) {
-                        foreach (var eventObject in SearchEvents.QueryLogsParallel(LogName, EventId, MachineName, ProviderName, Keywords, Level, StartTime, EndTime, UserId, MaxEvents, NumberOfThreads, EventRecordId, TimePeriod, CancelToken)) {
+                        await foreach (var eventObject in SearchEvents.QueryLogsParallel(LogName, EventId, MachineName, ProviderName, Keywords, Level, StartTime, EndTime, UserId, MaxEvents, NumberOfThreads, EventRecordId, TimePeriod, CancelToken)) {
                             if (!MessageMatches(eventObject)) {
                                 continue;
                             }
@@ -328,7 +328,7 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
                             }
                         }
                     } else if (ParallelOption == ParallelOption.Parallel) {
-                        foreach (var eventObject in SearchEvents.QueryLogsParallel(LogName, EventId, MachineName, ProviderName, Keywords, Level, StartTime, EndTime, UserId, MaxEvents, NumberOfThreads, EventRecordId, TimePeriod, CancelToken)) {
+                        await foreach (var eventObject in SearchEvents.QueryLogsParallel(LogName, EventId, MachineName, ProviderName, Keywords, Level, StartTime, EndTime, UserId, MaxEvents, NumberOfThreads, EventRecordId, TimePeriod, CancelToken)) {
                             if (!MessageMatches(eventObject)) {
                                 continue;
                             }
@@ -348,7 +348,7 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
             WriteObject(results.ToArray(), false);
         }
 
-        return Task.CompletedTask;
+        return;
     }
     /// <summary>
     /// Returns the expanded object - it takes the EventObject and returns the PSObject with the properties expanded from the Data property.
