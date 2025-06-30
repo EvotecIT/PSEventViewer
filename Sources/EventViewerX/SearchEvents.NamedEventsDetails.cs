@@ -193,6 +193,10 @@ namespace EventViewerX {
         /// Scheduled task deleted
         /// </summary>
         ScheduledTaskDeleted,
+        /// <summary>
+        /// Scheduled task created
+        /// </summary>
+        ScheduledTaskCreated,
 
         /// <summary>
         /// Unexpected system shutdown
@@ -276,6 +280,7 @@ namespace EventViewerX {
             { NamedEvents.DeviceRecognized, (new List<int> { 6416 }, "Security") },
             { NamedEvents.ObjectDeletion, (new List<int> { 4660 }, "Security") },
             { NamedEvents.ScheduledTaskDeleted, (new List<int> { 4699 }, "Security") },
+            { NamedEvents.ScheduledTaskCreated, (new List<int> { 4698 }, "Security") },
             // windows OS
             { NamedEvents.OSCrash, (new List<int> { 6008 }, "System") },
             { NamedEvents.OSStartupShutdownCrash,  (new List<int> { 12, 13, 41, 4608, 4621, 6008 }, "System") },
@@ -404,6 +409,8 @@ namespace EventViewerX {
                             return new ObjectDeletion(eventObject);
                         case NamedEvents.ScheduledTaskDeleted:
                             return new ScheduledTaskDeleted(eventObject);
+                        case NamedEvents.ScheduledTaskCreated:
+                            return new ScheduledTaskCreated(eventObject);
                         case NamedEvents.OSCrash:
                             return new OSCrash(eventObject);
                         case NamedEvents.OSStartupShutdownCrash:
