@@ -124,6 +124,10 @@ namespace EventViewerX {
         /// </summary>
         KerberosTicketFailure,
         /// <summary>
+        /// Kerberos policy changed
+        /// </summary>
+        KerberosPolicyChange,
+        /// <summary>
         /// Organizational unit created, deleted or moved
         /// </summary>
         ADOrganizationalUnitChangeDetailed,
@@ -174,6 +178,11 @@ namespace EventViewerX {
         /// BitLocker protection key changed or backed up
         /// </summary>
         BitLockerKeyChange,
+
+        /// <summary>
+        /// External device recognized by the system
+        /// </summary>
+        DeviceRecognized,
 
         /// <summary>
         /// Unexpected system shutdown
@@ -236,6 +245,7 @@ namespace EventViewerX {
             { NamedEvents.ADUserUnlocked, ([4767], "Security") },
             { NamedEvents.KerberosServiceTicket, (new List<int> { 4769, 4770 }, "Security") },
             { NamedEvents.KerberosTicketFailure, (new List<int> { 4771, 4772 }, "Security") },
+            { NamedEvents.KerberosPolicyChange, (new List<int> { 4713 }, "Security") },
             // other based events
             { NamedEvents.ADOtherChangeDetailed, (new List<int> { 5136, 5137, 5139, 5141 }, "Security") },
             // ldap events
@@ -253,6 +263,7 @@ namespace EventViewerX {
             { NamedEvents.AuditPolicyChange, (new List<int> { 4719 }, "Security") },
             { NamedEvents.FirewallRuleChange, (new List<int> { 4947 }, "Security") },
             { NamedEvents.BitLockerKeyChange, (new List<int> { 4673, 4692 }, "Security") },
+            { NamedEvents.DeviceRecognized, (new List<int> { 6416 }, "Security") },
             // windows OS
             { NamedEvents.OSCrash, (new List<int> { 6008 }, "System") },
             { NamedEvents.OSStartupShutdownCrash,  (new List<int> { 12, 13, 41, 4608, 4621, 6008 }, "System") },
@@ -341,6 +352,8 @@ namespace EventViewerX {
                             return new KerberosServiceTicket(eventObject);
                         case NamedEvents.KerberosTicketFailure:
                             return new KerberosTicketFailure(eventObject);
+                        case NamedEvents.KerberosPolicyChange:
+                            return new KerberosPolicyChange(eventObject);
                         // organizational unit and other events
                         case NamedEvents.ADOrganizationalUnitChangeDetailed:
                             if (objectClass == "organizationalUnit" && eventObject.Data["AttributeLDAPDisplayName"] != "qPLik") {
@@ -373,6 +386,8 @@ namespace EventViewerX {
                             return new FirewallRuleChange(eventObject);
                         case NamedEvents.BitLockerKeyChange:
                             return new BitLockerKeyChange(eventObject);
+                        case NamedEvents.DeviceRecognized:
+                            return new DeviceRecognized(eventObject);
                         case NamedEvents.OSCrash:
                             return new OSCrash(eventObject);
                         case NamedEvents.OSStartupShutdownCrash:

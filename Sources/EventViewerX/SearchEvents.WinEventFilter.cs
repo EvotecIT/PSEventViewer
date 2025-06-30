@@ -17,10 +17,10 @@ public partial class SearchEvents {
         var filter = string.Empty;
         foreach (var item in items) {
             var value = escapeItems ? EscapeXPathValue(item.ToString()) : item.ToString();
-            var formatted = string.Format(forEachFormatString, value);
+            var formatted = forEachFormatString.Replace("{0}", $"{value}");
             filter = JoinXPathFilter(formatted, filter, logic, noParenthesis);
         }
-        return string.Format(finalizeFormatString, filter);
+        return finalizeFormatString.Replace("{0}", $"{filter}");
     }
 
     private static IEnumerable<string> AsEnumerable(object obj) {
