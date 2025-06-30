@@ -1,9 +1,11 @@
-﻿namespace EventViewerX.Rules.ActiveDirectory;
+using EventViewerX;
+namespace EventViewerX.Rules.ActiveDirectory;
 
 /// <summary>
 /// Active Directory Computer Deleted
 /// 4743: A computer account was deleted
 /// </summary>
+[NamedEvent(NamedEvents.ADComputerDeleted, "Security", 4743)]
 public class ADComputerDeleted : EventObjectSlim {
     public string Computer;
     public string Action;
@@ -12,7 +14,6 @@ public class ADComputerDeleted : EventObjectSlim {
     public DateTime When;
 
     public ADComputerDeleted(EventObject eventObject) : base(eventObject) {
-        // common fields
         _eventObject = eventObject;
         Type = "ADComputerDeleted";
 

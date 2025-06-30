@@ -1,3 +1,4 @@
+using EventViewerX;
 ﻿namespace EventViewerX.Rules.ActiveDirectory;
 
 /// Active Directory Computer Change Detailed
@@ -5,6 +6,7 @@
 /// 5137: A directory service object was created
 /// 5139: A directory service object was deleted
 /// 5141: A directory service object was moved
+[NamedEvent(NamedEvents.ADComputerChangeDetailed, "Security", 5136, 5137, 5139, 5141)]
 public class ADComputerChangeDetailed : EventObjectSlim {
     public string Computer;
     public string Action;
@@ -59,4 +61,14 @@ public class ADComputerChangeDetailed : EventObjectSlim {
     //        return null;
     //    }
     //}
+    public static EventObjectSlim? TryCreate(EventObject e)
+    {
+        if (e.Data.TryGetValue("ObjectClass", out var cls) && cls == "computer")
+        {
+            return new ADComputerChangeDetailed(e);
+        }
+
+        return null;
+    }
+
 }

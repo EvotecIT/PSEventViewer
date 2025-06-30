@@ -1,10 +1,12 @@
-﻿namespace EventViewerX.Rules.ActiveDirectory;
+using EventViewerX;
+namespace EventViewerX.Rules.ActiveDirectory;
 
 /// <summary>
 /// Active Directory Computer Created or Changed
 /// 4741: A computer account was created
 /// 4742: A computer account was changed
 /// </summary>
+[NamedEvent(NamedEvents.ADComputerCreateChange, "Security", 4741, 4742)]
 public class ADComputerCreateChange : EventObjectSlim {
     public string Computer;
     public string Action;
@@ -33,7 +35,6 @@ public class ADComputerCreateChange : EventObjectSlim {
     public DateTime When;
 
     public ADComputerCreateChange(EventObject eventObject) : base(eventObject) {
-        // common fields
         _eventObject = eventObject;
         Type = "ADComputerChange";
 
@@ -63,7 +64,6 @@ public class ADComputerCreateChange : EventObjectSlim {
         Who = _eventObject.GetValueFromDataDictionary("SubjectUserName", "SubjectDomainName", "\\", reverseOrder: true);
         When = _eventObject.TimeCreated;
 
-        // let's try to translate them
         OldUacValue = TranslateUacValue(OldUacValue);
         NewUacValue = TranslateUacValue(NewUacValue);
         UserAccountControl = TranslateUacValue(UserAccountControl);

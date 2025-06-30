@@ -1,5 +1,7 @@
+using EventViewerX;
 namespace EventViewerX.Rules.ActiveDirectory;
 
+[NamedEvent(NamedEvents.GpoDeleted, "Security", 5141)]
 public class GpoDeleted : EventObjectSlim {
     public string Computer;
     public string Action;
@@ -16,5 +18,9 @@ public class GpoDeleted : EventObjectSlim {
         Who = _eventObject.GetValueFromDataDictionary("SubjectUserName", "SubjectDomainName", "\\", reverseOrder: true);
         When = _eventObject.TimeCreated;
     }
-}
 
+    public static EventObjectSlim? TryCreate(EventObject e)
+    {
+        return e.Data.TryGetValue("ObjectClass", out var cls) && cls == "groupPolicyContainer" ? new GpoDeleted(e) : null;
+    }
+}

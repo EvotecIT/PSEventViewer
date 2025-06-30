@@ -1,18 +1,17 @@
+using EventViewerX;
 namespace EventViewerX.Rules.CertificateAuthority;
 
 /// <summary>
 /// Certificate issued by Certificate Authority
-/// 4886: Certificate Services received a certificate request
-/// 4887: Certificate Services approved a certificate request and issued a certificate
 /// </summary>
+[NamedEvent(NamedEvents.CertificateIssued, "Security", 4886, 4887)]
 public class CertificateIssued : EventObjectSlim
 {
     public string Computer;
     public string Action;
-    public string CertificateTemplate;
     public string Requester;
+    public string Template;
     public string SerialNumber;
-    public string Who;
     public DateTime When;
 
     public CertificateIssued(EventObject eventObject) : base(eventObject)
@@ -21,36 +20,9 @@ public class CertificateIssued : EventObjectSlim
         Type = "CertificateIssued";
         Computer = _eventObject.ComputerName;
         Action = _eventObject.MessageSubject;
-        CertificateTemplate = DecodeHex(_eventObject.GetValueFromDataDictionary("CertificateTemplate", "CertificateTemplateOid"));
-        Requester = DecodeHex(_eventObject.GetValueFromDataDictionary("Requester", "RequestSubjectName"));
-        SerialNumber = DecodeHex(_eventObject.GetValueFromDataDictionary("SerialNumber"));
-        Who = _eventObject.GetValueFromDataDictionary("SubjectUserName", "SubjectDomainName", "\\", reverseOrder: true);
+        Requester = _eventObject.GetValueFromDataDictionary("RequestIdString");
+        Template = _eventObject.GetValueFromDataDictionary("CertificateTemplateOid");
+        SerialNumber = _eventObject.GetValueFromDataDictionary("SerialNumber");
         When = _eventObject.TimeCreated;
-    }
-
-    private static string DecodeHex(string value)
-    {
-        if (string.IsNullOrEmpty(value))
-        {
-            return string.Empty;
-        }
-        value = value.Replace(" ", string.Empty).Replace("0x", string.Empty);
-        if (value.Length % 2 != 0)
-        {
-            return value;
-        }
-        try
-        {
-            byte[] bytes = new byte[value.Length / 2];
-            for (int i = 0; i < bytes.Length; i++)
-            {
-                bytes[i] = Convert.ToByte(value.Substring(i * 2, 2), 16);
-            }
-            return System.Text.Encoding.ASCII.GetString(bytes);
-        }
-        catch
-        {
-            return value;
-        }
     }
 }

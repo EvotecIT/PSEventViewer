@@ -1,3 +1,4 @@
+using EventViewerX;
 ﻿namespace EventViewerX.Rules.ActiveDirectory;
 
 /// <summary>
@@ -11,6 +12,7 @@
 /// 4784: A security-enabled universal group was deleted
 /// 4791: A security-enabled global group was deleted
 /// </summary>
+[NamedEvent(NamedEvents.ADGroupChange, "Security", 4735, 4737, 4745, 4750, 4760, 4764, 4784, 4791)]
 public class ADGroupChange : EventObjectSlim {
 
     public string Computer;
@@ -37,4 +39,10 @@ public class ADGroupChange : EventObjectSlim {
         Who = _eventObject.GetValueFromDataDictionary("SubjectUserName", "SubjectDomainName", "\\", reverseOrder: true);
         When = _eventObject.TimeCreated;
     }
+    public static EventObjectSlim? TryCreate(EventObject e)
+    {
+        var obj = new ADGroupChange(e);
+        return obj.Who == "*ANONYMOUS*" ? null : obj;
+    }
+
 }
