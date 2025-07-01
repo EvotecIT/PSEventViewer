@@ -2,7 +2,7 @@
     internal partial class Examples {
 
         public static void EventWatchingBasic() {
-            WatchEvents c1 = new WatchEvents {
+            using var c1 = new WatchEvents {
                 Warning = true,
                 Verbose = true
             };
