@@ -116,6 +116,11 @@ namespace EventViewerX {
         /// </summary>
         ADUserUnlocked,
         /// <summary>
+        /// Kerberos TGT requests
+        /// </summary>
+        KerberosTGTRequest,
+
+        /// <summary>
         /// Kerberos service ticket requests and renewals
         /// </summary>
         KerberosServiceTicket,
@@ -257,6 +262,7 @@ namespace EventViewerX {
             { NamedEvents.ADUserLogonFailed, ([4625], "Security")},
             { NamedEvents.ADUserLogonKerberos, ([4768], "Security") },
             { NamedEvents.ADUserUnlocked, ([4767], "Security") },
+            { NamedEvents.KerberosTGTRequest, ([4768], "Security") },
             { NamedEvents.KerberosServiceTicket, (new List<int> { 4769, 4770 }, "Security") },
             { NamedEvents.KerberosTicketFailure, (new List<int> { 4771, 4772 }, "Security") },
             { NamedEvents.KerberosPolicyChange, (new List<int> { 4713 }, "Security") },
@@ -365,6 +371,8 @@ namespace EventViewerX {
                             return new ADUserLogonFailed(eventObject);
                         case NamedEvents.ADUserUnlocked:
                             return new ADUserUnlocked(eventObject);
+                        case NamedEvents.KerberosTGTRequest:
+                            return new KerberosTGTRequest(eventObject);
                         case NamedEvents.KerberosServiceTicket:
                             return new KerberosServiceTicket(eventObject);
                         case NamedEvents.KerberosTicketFailure:
