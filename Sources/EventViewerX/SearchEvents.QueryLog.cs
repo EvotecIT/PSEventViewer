@@ -24,6 +24,11 @@ public partial class SearchEvents : Settings {
     /// <param name="machineName">Name of the machine.</param>
     /// <returns></returns>
     private static EventLogReader CreateEventLogReader(EventLogQuery query, string machineName) {
+        if (query == null) {
+            _logger.WriteWarning($"An error occurred on {machineName} while creating the event log reader: Query cannot be null.");
+            return null;
+        }
+
         try {
             return new EventLogReader(query);
         } catch (EventLogException ex) {
