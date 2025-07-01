@@ -6,7 +6,7 @@ using System.Linq;
 using System.Threading;
 
 namespace EventViewerX {
-    public class WatchEvents : Settings {
+    public class WatchEvents : Settings, IDisposable {
         public static volatile int NumberOfEventsFound = 0;
         /// <summary>
         /// List of event IDs to watch for
@@ -23,6 +23,9 @@ namespace EventViewerX {
         /// </summary>
         readonly ConcurrentDictionary<EventObject, byte> WatchedEvents = new ConcurrentDictionary<EventObject, byte>();
 
+        private EventLogSession _eventLogSession;
+        private EventLogWatcher _eventLogWatcher;
+
         private string _machineName;
 
         public WatchEvents(InternalLogger internalLogger = null) {
@@ -32,21 +35,18 @@ namespace EventViewerX {
         }
 
         public void Watch(string machineName, string logName, List<int> eventId, Action<EventObject> eventAction = null, CancellationToken cancellationToken = default) {
+            Dispose();
             _machineName = machineName;
             _watchEventId = new ConcurrentBag<int>(eventId);
             _eventAction = eventAction;
             try {
-                var eventLogSession = new EventLogSession(machineName);
-                var eventLogWatcher = new EventLogWatcher(new EventLogQuery(logName, PathType.LogName) {
-                    Session = eventLogSession
+                _eventLogSession = new EventLogSession(machineName);
+                _eventLogWatcher = new EventLogWatcher(new EventLogQuery(logName, PathType.LogName) {
+                    Session = _eventLogSession
                 });
-                eventLogWatcher.EventRecordWritten += DetectEventsLogCallback;
-                eventLogWatcher.Enabled = true;
-                cancellationToken.Register(() => {
-                    eventLogWatcher.EventRecordWritten -= DetectEventsLogCallback;
-                    eventLogWatcher.Enabled = false;
-                    eventLogWatcher.Dispose();
-                });
+                _eventLogWatcher.EventRecordWritten += DetectEventsLogCallback;
+                _eventLogWatcher.Enabled = true;
+                cancellationToken.Register(() => Dispose());
                 _logger.WriteVerbose("Created event log subscription to {0}.", machineName);
             } catch (Exception ex) {
                 _logger.WriteWarning("Failed to create event log subscription to Target Machine {0}. Verify network connectivity, firewall settings, permissions, etc. Continuing on to next DC if applicable...  ({1})", machineName, ex.Message.Trim());
@@ -74,6 +74,17 @@ namespace EventViewerX {
             } else {
                 _logger.WriteWarning("Event log subscription callback was given invalid data. This shouldn't happen.");
             }
+        }
+
+        public void Dispose() {
+            if (_eventLogWatcher != null) {
+                _eventLogWatcher.EventRecordWritten -= DetectEventsLogCallback;
+                _eventLogWatcher.Enabled = false;
+                _eventLogWatcher.Dispose();
+                _eventLogWatcher = null;
+            }
+            _eventLogSession?.Dispose();
+            _eventLogSession = null;
         }
     }
 }
