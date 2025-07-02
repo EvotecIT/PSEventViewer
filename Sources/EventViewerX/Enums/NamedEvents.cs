@@ -249,9 +249,14 @@
 
         /// <summary>
         /// Unexpected system shutdown
-        /// </summary>      
+        /// </summary>
         OSCrash,
-      
+
+        /// <summary>
+        /// Bugcheck event describing a system crash
+        /// </summary>
+        OSBugCheck,
+
         /// <summary>
         /// System start-up, shutdown or crash events
         /// </summary>
