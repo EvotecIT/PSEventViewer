@@ -209,6 +209,11 @@
         FirewallRuleChange,
 
         /// <summary>
+        /// DHCP lease creation event
+        /// </summary>
+        DhcpLeaseCreated,
+
+        /// <summary>
         /// BitLocker protection key changed or backed up
         /// </summary>
         BitLockerKeyChange,
