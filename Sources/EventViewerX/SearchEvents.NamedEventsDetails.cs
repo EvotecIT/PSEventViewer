@@ -120,6 +120,10 @@ namespace EventViewerX {
         /// </summary>
         ADUserPrivilegeUse,
         /// <summary>
+        /// User rights assigned or removed
+        /// </summary>
+        ADUserRightsAssignment,
+        /// <summary>
         /// Kerberos TGT requests
         /// </summary>
         KerberosTGTRequest,
@@ -267,6 +271,7 @@ namespace EventViewerX {
             { NamedEvents.ADUserLogonKerberos, ([4768], "Security") },
             { NamedEvents.ADUserUnlocked, ([4767], "Security") },
             { NamedEvents.ADUserPrivilegeUse, ([4672], "Security") },
+            { NamedEvents.ADUserRightsAssignment, (new List<int> { 4704, 4705 }, "Security") },
             { NamedEvents.KerberosTGTRequest, ([4768], "Security") },
             { NamedEvents.KerberosServiceTicket, (new List<int> { 4769, 4770 }, "Security") },
             { NamedEvents.KerberosTicketFailure, (new List<int> { 4771, 4772 }, "Security") },
@@ -378,6 +383,8 @@ namespace EventViewerX {
                             return new ADUserUnlocked(eventObject);
                         case NamedEvents.ADUserPrivilegeUse:
                             return new ADUserPrivilegeUse(eventObject);
+                        case NamedEvents.ADUserRightsAssignment:
+                            return new ADUserRightsAssignment(eventObject);
                         case NamedEvents.KerberosTGTRequest:
                             return new KerberosTGTRequest(eventObject);
                         case NamedEvents.KerberosServiceTicket:
