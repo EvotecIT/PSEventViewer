@@ -44,6 +44,10 @@ public partial class SearchEvents : Settings {
     /// <param name="rawData">The raw data.</param>
     /// <param name="replacementStrings">The replacement strings.</param>
     public static void WriteEvent(string source, string log, string message, EventLogEntryType type, int category, int eventId, string machineName, byte[] rawData, params string[] replacementStrings) {
+        if (category is < short.MinValue or > short.MaxValue) {
+            throw new ArgumentOutOfRangeException(nameof(category), category, $"Category must fit into Int16 range ({short.MinValue} - {short.MaxValue}).");
+        }
+
         // Check if the event source exists. If not, create it.
         var sourceExists = CreateLogSource(source, log, machineName);
         if (sourceExists) {
