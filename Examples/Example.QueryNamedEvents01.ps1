@@ -1,7 +1,7 @@
 ﻿Clear-Host
 Import-Module $PSScriptRoot\..\PSEventViewer.psd1 -Force -Verbose
 
-Find-WinEvent -Machine AD0 -Type ADUserLogonKerberos -TimePeriod Last1Hours -Verbose  # | Format-Table
+Find-WinEvent -Machine AD0 -Type ADUserLogonKerberos -TimePeriod Last1Hour -Verbose  # | Format-Table
 
 $Data = Find-WinEvent -MachineName AD0 -EventRecordId '28907707' -LogName Security
 

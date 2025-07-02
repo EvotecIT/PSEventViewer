@@ -13,7 +13,7 @@ namespace EventViewerX {
         Last3Days,
         Last7Days,
         Last14Days,
-        Last1Hours,
+        Last1Hour,
         Last2Hours,
         Last3Hours,
         Last6Hours,
@@ -84,7 +84,7 @@ namespace EventViewerX {
                 case TimePeriod.Last14Days:
                     startTime = DateTime.UtcNow.Date.AddDays(-14);
                     break;
-                case TimePeriod.Last1Hours:
+                case TimePeriod.Last1Hour:
                     lastPeriod = TimeSpan.FromHours(1);
                     break;
                 case TimePeriod.Last2Hours:
