@@ -223,7 +223,7 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
         } else if (ParameterSetName == "PathEvents") {
             // Handle file path queries
             if (Expand == false) {
-                foreach (var eventObject in SearchEvents.QueryLogFile(Path, EventId, ProviderName, Keywords, Level, StartTime, EndTime, UserId, MaxEvents, null, TimePeriod, Oldest, NamedDataFilter, NamedDataExcludeFilter, CancelToken)) {
+                foreach (var eventObject in SearchEvents.QueryLogFile(Path, EventId, ProviderName, Keywords, Level, StartTime, EndTime, UserId, MaxEvents, null, null, null, TimePeriod, Oldest, NamedDataFilter, NamedDataExcludeFilter, CancelToken)) {
                     if (!MessageMatches(eventObject)) {
                         continue;
                     }
@@ -234,7 +234,7 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
                     }
                 }
             } else {
-                foreach (var eventObject in SearchEvents.QueryLogFile(Path, EventId, ProviderName, Keywords, Level, StartTime, EndTime, UserId, MaxEvents, null, TimePeriod, Oldest, NamedDataFilter, NamedDataExcludeFilter, CancelToken)) {
+                foreach (var eventObject in SearchEvents.QueryLogFile(Path, EventId, ProviderName, Keywords, Level, StartTime, EndTime, UserId, MaxEvents, null, null, null, TimePeriod, Oldest, NamedDataFilter, NamedDataExcludeFilter, CancelToken)) {
                     if (!MessageMatches(eventObject)) {
                         continue;
                     }

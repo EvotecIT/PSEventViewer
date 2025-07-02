@@ -46,6 +46,8 @@ public partial class SearchEvents {
     public static string BuildWinEventFilter(
         string[]? id = null,
         string[]? eventRecordId = null,
+        long? recordIdFrom = null,
+        long? recordIdTo = null,
         DateTime? startTime = null,
         DateTime? endTime = null,
         string[]? data = null,
@@ -65,6 +67,12 @@ public partial class SearchEvents {
         }
         if (eventRecordId != null && eventRecordId.Length > 0) {
             filter = JoinXPathFilter(InitializeXPathFilter(eventRecordId, "EventRecordID={0}", "*[System[{0}]]"), filter);
+        }
+        if (recordIdFrom.HasValue) {
+            filter = JoinXPathFilter($"*[System[EventRecordID &gt;= {recordIdFrom.Value}]]", filter);
+        }
+        if (recordIdTo.HasValue) {
+            filter = JoinXPathFilter($"*[System[EventRecordID &lt;= {recordIdTo.Value}]]", filter);
         }
         if (excludeId != null && excludeId.Length > 0) {
             filter = JoinXPathFilter(InitializeXPathFilter(excludeId, "EventID!={0}", "*[System[{0}]]"), filter);

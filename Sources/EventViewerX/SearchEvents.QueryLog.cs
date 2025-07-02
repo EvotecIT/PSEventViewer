@@ -71,12 +71,14 @@ public partial class SearchEvents : Settings {
     /// <param name="userId">Optional user ID to filter events by.</param>
     /// <param name="maxEvents">Maximum number of events to return. 0 means no limit.</param>
     /// <param name="eventRecordId">Optional list of specific event record IDs to retrieve.</param>
+    /// <param name="recordIdFrom">Optional starting event record ID for range filtering.</param>
+    /// <param name="recordIdTo">Optional ending event record ID for range filtering.</param>
     /// <param name="timePeriod">Optional predefined time period to filter events by.</param>
     /// <param name="oldest">If true, returns events in chronological order (oldest first). If false, returns newest first.</param>
     /// <param name="namedDataFilter">Optional hashtable containing named data filters to include events.</param>
     /// <param name="namedDataExcludeFilter">Optional hashtable containing named data filters to exclude events.</param>
     /// <returns>An enumerable collection of EventObject instances representing the filtered events from the log file.</returns>
-    public static IEnumerable<EventObject> QueryLogFile(string filePath, List<int> eventIds = null, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null, int maxEvents = 0, List<long> eventRecordId = null, TimePeriod? timePeriod = null, bool oldest = false, System.Collections.Hashtable namedDataFilter = null, System.Collections.Hashtable namedDataExcludeFilter = null, CancellationToken cancellationToken = default) {
+    public static IEnumerable<EventObject> QueryLogFile(string filePath, List<int> eventIds = null, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null, int maxEvents = 0, List<long> eventRecordId = null, long? recordIdFrom = null, long? recordIdTo = null, TimePeriod? timePeriod = null, bool oldest = false, System.Collections.Hashtable namedDataFilter = null, System.Collections.Hashtable namedDataExcludeFilter = null, CancellationToken cancellationToken = default) {
 
         string absolutePath = Path.GetFullPath(filePath);
 
@@ -91,11 +93,21 @@ public partial class SearchEvents : Settings {
         if (eventRecordId != null && eventRecordId.Any(id => id <= 0)) {
             throw new ArgumentException("Event record IDs must be positive.", nameof(eventRecordId));
         }
+        if (recordIdFrom.HasValue && recordIdFrom.Value <= 0) {
+            throw new ArgumentException("RecordIdFrom must be positive.", nameof(recordIdFrom));
+        }
+        if (recordIdTo.HasValue && recordIdTo.Value <= 0) {
+            throw new ArgumentException("RecordIdTo must be positive.", nameof(recordIdTo));
+        }
+        if (recordIdFrom.HasValue && recordIdTo.HasValue && recordIdFrom > recordIdTo) {
+            throw new ArgumentException("RecordIdFrom cannot be greater than RecordIdTo.");
+        }
 
         // Check if we have any filters that require an XML query
         bool hasFilters = namedDataFilter != null || namedDataExcludeFilter != null || eventIds != null ||
                          providerName != null || keywords != null || level != null || startTime != null ||
-                         endTime != null || userId != null || eventRecordId != null;
+                         endTime != null || userId != null || eventRecordId != null ||
+                         recordIdFrom != null || recordIdTo != null;
 
         EventLogQuery query;
 
@@ -113,6 +125,8 @@ public partial class SearchEvents : Settings {
             string queryString = BuildWinEventFilter(
                 id: idArray,
                 eventRecordId: eventRecordIdArray,
+                recordIdFrom: recordIdFrom,
+                recordIdTo: recordIdTo,
                 startTime: startTime,
                 endTime: endTime,
                 providerName: providerNameArray,

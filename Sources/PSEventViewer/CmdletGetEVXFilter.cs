@@ -107,6 +107,8 @@ public sealed class CmdletGetEVXFilter : AsyncPSCmdlet {
         var output = SearchEvents.BuildWinEventFilter(
             ID,
             EventRecordID,
+            null,
+            null,
             StartTime,
             EndTime,
             Data,
