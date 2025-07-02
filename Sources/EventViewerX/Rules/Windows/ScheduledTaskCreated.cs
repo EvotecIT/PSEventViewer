@@ -4,7 +4,15 @@ namespace EventViewerX.Rules.Windows;
 /// Scheduled task created
 /// 4698: A scheduled task was created
 /// </summary>
-public class ScheduledTaskCreated : EventObjectSlim {
+public class ScheduledTaskCreated : EventRuleBase {
+    public override List<int> EventIds => new() { 4698 };
+    public override string LogName => "Security";
+    public override NamedEvents NamedEvent => NamedEvents.ScheduledTaskCreated;
+
+    public override bool CanHandle(EventObject eventObject) {
+        // Simple rule - always handle if event ID and log name match
+        return true;
+    }
     public string Computer;
     public string TaskName;
     public string Author;
@@ -32,3 +40,4 @@ public class ScheduledTaskCreated : EventObjectSlim {
         When = _eventObject.TimeCreated;
     }
 }
+

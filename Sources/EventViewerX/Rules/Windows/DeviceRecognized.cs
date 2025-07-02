@@ -4,7 +4,15 @@ namespace EventViewerX.Rules.Windows;
 /// External device recognized by the system
 /// 6416: A new external device was recognized by the System.
 /// </summary>
-public class DeviceRecognized : EventObjectSlim {
+public class DeviceRecognized : EventRuleBase {
+    public override List<int> EventIds => new() { 6416 };
+    public override string LogName => "Security";
+    public override NamedEvents NamedEvent => NamedEvents.DeviceRecognized;
+
+    public override bool CanHandle(EventObject eventObject) {
+        // Simple rule - always handle if event ID and log name match
+        return true;
+    }
     public string Computer;
     public string DeviceId;
     public string DeviceName;
@@ -35,3 +43,4 @@ public class DeviceRecognized : EventObjectSlim {
         When = _eventObject.TimeCreated;
     }
 }
+

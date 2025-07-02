@@ -7,7 +7,7 @@
 /// 5139: A directory service object was deleted
 /// 5141: A directory service object was moved
 /// </summary>
-public class ADGroupChangeDetailed : EventObjectSlim {
+public class ADGroupChangeDetailed : EventRuleBase {
     public string Computer;
     public string Action;
     public string ObjectClass;
@@ -17,6 +17,15 @@ public class ADGroupChangeDetailed : EventObjectSlim {
     public string Group; // 'User Object'
     public string FieldChanged; // 'Field Changed'
     public string FieldValue; // 'Field Value'
+    public override List<int> EventIds => new() { 5136, 5137, 5139, 5141 };
+    public override string LogName => "Security";
+    public override NamedEvents NamedEvent => NamedEvents.ADGroupChangeDetailed;
+
+    public override bool CanHandle(EventObject eventObject) {
+        // Check if this is a group object change
+        return eventObject.Data.TryGetValue("ObjectClass", out var objectClass) &&
+               objectClass == "group";
+    }
 
     public ADGroupChangeDetailed(EventObject eventObject) : base(eventObject) {
         _eventObject = eventObject;

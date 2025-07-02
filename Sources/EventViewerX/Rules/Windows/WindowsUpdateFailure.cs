@@ -4,7 +4,15 @@ namespace EventViewerX.Rules.Windows;
 /// Windows Update installation failure
 /// 20: Installation Failure
 /// </summary>
-public class WindowsUpdateFailure : EventObjectSlim {
+public class WindowsUpdateFailure : EventRuleBase {
+    public override List<int> EventIds => new() { 20 };
+    public override string LogName => "Setup";
+    public override NamedEvents NamedEvent => NamedEvents.WindowsUpdateFailure;
+
+    public override bool CanHandle(EventObject eventObject) {
+        // Simple rule - always handle if event ID and log name match
+        return true;
+    }
     public string Computer;
     public string KB;
     public string Reason;
@@ -27,3 +35,4 @@ public class WindowsUpdateFailure : EventObjectSlim {
         When = _eventObject.TimeCreated;
     }
 }
+

@@ -5,7 +5,15 @@ namespace EventViewerX.Rules.ActiveDirectory;
 /// 4704: A user right was assigned
 /// 4705: A user right was removed
 /// </summary>
-public class ADUserRightsAssignment : EventObjectSlim {
+public class ADUserRightsAssignment : EventRuleBase {
+    public override List<int> EventIds => new() { 4704, 4705 };
+    public override string LogName => "Security";
+    public override NamedEvents NamedEvent => NamedEvents.ADUserRightsAssignment;
+
+    public override bool CanHandle(EventObject eventObject) {
+        // Simple rule - always handle if event ID and log name match
+        return true;
+    }
     public string Computer;
     public string Action;
     public string UserAffected;
@@ -47,3 +55,4 @@ public class ADUserRightsAssignment : EventObjectSlim {
         When = _eventObject.TimeCreated;
     }
 }
+

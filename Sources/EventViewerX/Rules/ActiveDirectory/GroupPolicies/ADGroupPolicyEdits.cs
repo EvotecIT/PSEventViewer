@@ -2,7 +2,7 @@
 
 namespace EventViewerX.Rules.ActiveDirectory;
 
-public class ADGroupPolicyEdits : EventObjectSlim {
+public class ADGroupPolicyEdits : EventRuleBase {
     public string Computer;
     public string Action;
     public string ObjectClass;
@@ -13,6 +13,21 @@ public class ADGroupPolicyEdits : EventObjectSlim {
     public string AttributeLDAPDisplayName;
     //public string AttributeValue;
     public GroupPolicy GroupPolicy { get; set; }
+    public override List<int> EventIds => new() { 5136, 5137, 5141 };
+    public override string LogName => "Security";
+    public override NamedEvents NamedEvent => NamedEvents.ADGroupPolicyEdits;
+
+    public override bool CanHandle(EventObject eventObject) {
+        // Check if this is a group policy container with versionNumber attribute
+        if (eventObject.Data.TryGetValue("ObjectClass", out var objectClass) && objectClass == "groupPolicyContainer") {
+            if (eventObject.Data.TryGetValue("AttributeLDAPDisplayName", out var ldapDisplayObjName) &&
+                ldapDisplayObjName is string ldapDisplayNameValue &&
+                ldapDisplayNameValue == "versionNumber") {
+                return true;
+            }
+        }
+        return false;
+    }
 
     public ADGroupPolicyEdits(EventObject eventObject) : base(eventObject) {
         _eventObject = eventObject;

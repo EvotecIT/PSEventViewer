@@ -1,4 +1,4 @@
-namespace EventViewerX.Rules.CertificateAuthority;
+﻿namespace EventViewerX.Rules.CertificateAuthority;
 
 /// <summary>
 /// Certificate issued by Certificate Authority
@@ -54,3 +54,4 @@ public class CertificateIssued : EventObjectSlim
         }
     }
 }
+

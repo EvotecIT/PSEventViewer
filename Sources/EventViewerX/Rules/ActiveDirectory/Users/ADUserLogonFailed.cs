@@ -1,4 +1,4 @@
-﻿namespace EventViewerX.Rules.ActiveDirectory;
+namespace EventViewerX.Rules.ActiveDirectory;
 
 //public enum FailureReason {
 //    UnknownUserNameOrBadPassword,
@@ -24,7 +24,15 @@
 ///
 /// Event ID: 4625
 /// </summary>
-public class ADUserLogonFailed : EventObjectSlim {
+public class ADUserLogonFailed : EventRuleBase {
+    public override List<int> EventIds => new() { 4625 };
+    public override string LogName => "Security";
+    public override NamedEvents NamedEvent => NamedEvents.ADUserLogonFailed;
+
+    public override bool CanHandle(EventObject eventObject) {
+        // Simple rule - always handle if event ID and log name match
+        return true;
+    }
     public string Computer;
     public string Action;
     public string PackageName;

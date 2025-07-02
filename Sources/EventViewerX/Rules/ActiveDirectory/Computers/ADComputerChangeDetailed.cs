@@ -5,7 +5,7 @@
 /// 5137: A directory service object was created
 /// 5139: A directory service object was deleted
 /// 5141: A directory service object was moved
-public class ADComputerChangeDetailed : EventObjectSlim {
+public class ADComputerChangeDetailed : EventRuleBase {
     public string Computer;
     public string Action;
     public string ObjectClass;
@@ -17,6 +17,21 @@ public class ADComputerChangeDetailed : EventObjectSlim {
     public string FieldValue;
 
     //public string ClientDNSName;
+
+    public override List<int> EventIds => new() { 5136, 5137, 5139, 5141 };
+    public override string LogName => "Security";
+    public override NamedEvents NamedEvent => NamedEvents.ADComputerChangeDetailed;
+
+    public override bool CanHandle(EventObject eventObject) {
+        // Check if this is a computer object change
+        return eventObject.Data.TryGetValue("ObjectClass", out var objectClass) &&
+               objectClass == "computer";
+    }
+
+    public static EventObjectSlim Create(EventObject eventObject) {
+        var rule = new ADComputerChangeDetailed(eventObject);
+        return rule.CanHandle(eventObject) ? rule : null;
+    }
 
     /// <summary>
     /// Active Directory Computer Change Detailed

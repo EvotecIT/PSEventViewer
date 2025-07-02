@@ -1,4 +1,4 @@
-﻿namespace EventViewerX.Rules.ActiveDirectory;
+namespace EventViewerX.Rules.ActiveDirectory;
 
 /// <summary>
 /// Active Directory Group Membership Changes
@@ -19,7 +19,15 @@
 /// 4787: A member was added to a security-enabled universal group
 /// 4788: A member was removed from a security-enabled universal group
 /// </summary>
-public class ADGroupMembershipChange : EventObjectSlim {
+public class ADGroupMembershipChange : EventRuleBase {
+    public override List<int> EventIds => new() { 4728, 4729, 4732, 4733, 4746, 4747, 4751, 4752, 4756, 4757, 4761, 4762, 4785, 4786, 4787, 4788 };
+    public override string LogName => "Security";
+    public override NamedEvents NamedEvent => NamedEvents.ADGroupMembershipChange;
+
+    public override bool CanHandle(EventObject eventObject) {
+        // Simple rule - always handle if event ID and log name match
+        return true;
+    }
 
     public string Computer;
     public string Action;

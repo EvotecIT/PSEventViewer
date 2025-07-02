@@ -1,7 +1,7 @@
 ﻿using System;
 
 namespace EventViewerX.Rules.ActiveDirectory {
-    public class ADOrganizationalUnitChangeDetailed : EventObjectSlim {
+    public class ADOrganizationalUnitChangeDetailed : EventRuleBase {
 
 
         //        ADOrganizationalUnitChangesDetailed = [ordered] @{
@@ -63,6 +63,16 @@ namespace EventViewerX.Rules.ActiveDirectory {
         public string OrganizationalUnit; // 'User Object'
         public string FieldChanged; // 'Field Changed'
         public string FieldValue; // 'Field Value'
+    public override List<int> EventIds => new() { 5136, 5137, 5139, 5141 };
+    public override string LogName => "Security";
+    public override NamedEvents NamedEvent => NamedEvents.ADOrganizationalUnitChangeDetailed;
+
+    public override bool CanHandle(EventObject eventObject) {
+        // Check if this is an organizational unit object and not the qPLik attribute
+        return eventObject.Data.TryGetValue("ObjectClass", out var objectClass) &&
+               objectClass == "organizationalUnit" &&
+               (!eventObject.Data.TryGetValue("AttributeLDAPDisplayName", out var attrName) || attrName != "qPLik");
+    }
 
 
         public ADOrganizationalUnitChangeDetailed(EventObject eventObject) : base(eventObject) {

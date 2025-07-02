@@ -4,7 +4,15 @@ namespace EventViewerX.Rules.Windows;
 /// Scheduled task deleted
 /// 4699: A scheduled task was deleted
 /// </summary>
-public class ScheduledTaskDeleted : EventObjectSlim {
+public class ScheduledTaskDeleted : EventRuleBase {
+    public override List<int> EventIds => new() { 4699 };
+    public override string LogName => "Security";
+    public override NamedEvents NamedEvent => NamedEvents.ScheduledTaskDeleted;
+
+    public override bool CanHandle(EventObject eventObject) {
+        // Simple rule - always handle if event ID and log name match
+        return true;
+    }
     public string Computer;
     public string TaskName;
     public string Who;
@@ -19,3 +27,4 @@ public class ScheduledTaskDeleted : EventObjectSlim {
         When = _eventObject.TimeCreated;
     }
 }
+

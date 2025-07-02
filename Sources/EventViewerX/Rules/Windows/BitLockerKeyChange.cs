@@ -5,7 +5,15 @@ namespace EventViewerX.Rules.Windows;
 /// 4673: A privileged service was called
 /// 4692: Backup of data protection master key was attempted
 /// </summary>
-public class BitLockerKeyChange : EventObjectSlim {
+public class BitLockerKeyChange : EventRuleBase {
+    public override List<int> EventIds => new() { 4673, 4692 };
+    public override string LogName => "Security";
+    public override NamedEvents NamedEvent => NamedEvents.BitLockerKeyChange;
+
+    public override bool CanHandle(EventObject eventObject) {
+        // Simple rule - always handle if event ID and log name match
+        return true;
+    }
     public string Computer;
     public string Action;
     public BitLockerVolumeType? Volume;
@@ -32,3 +40,4 @@ public class BitLockerKeyChange : EventObjectSlim {
         When = _eventObject.TimeCreated;
     }
 }
+

@@ -1,11 +1,19 @@
-﻿namespace EventViewerX.Rules.ActiveDirectory;
+namespace EventViewerX.Rules.ActiveDirectory;
 
 /// <summary>
 /// Active Directory Computer Created or Changed
 /// 4741: A computer account was created
 /// 4742: A computer account was changed
 /// </summary>
-public class ADComputerCreateChange : EventObjectSlim {
+public class ADComputerCreateChange : EventRuleBase {
+    public override List<int> EventIds => new() { 4741, 4742 };
+    public override string LogName => "Security";
+    public override NamedEvents NamedEvent => NamedEvents.ADComputerCreateChange;
+
+    public override bool CanHandle(EventObject eventObject) {
+        // Simple rule - always handle if event ID and log name match
+        return true;
+    }
     public string Computer;
     public string Action;
     public string ComputerAffected;

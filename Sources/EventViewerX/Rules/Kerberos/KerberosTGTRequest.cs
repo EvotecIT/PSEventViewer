@@ -1,4 +1,4 @@
-namespace EventViewerX.Rules.Kerberos;
+﻿namespace EventViewerX.Rules.Kerberos;
 
 public class KerberosTGTRequest : EventObjectSlim
 {
@@ -40,3 +40,4 @@ public class KerberosTGTRequest : EventObjectSlim
         }
     }
 }
+

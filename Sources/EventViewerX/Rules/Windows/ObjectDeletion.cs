@@ -4,7 +4,15 @@ namespace EventViewerX.Rules.Windows;
 /// Object deleted
 /// 4660: An object was deleted
 /// </summary>
-public class ObjectDeletion : EventObjectSlim {
+public class ObjectDeletion : EventRuleBase {
+    public override List<int> EventIds => new() { 4660 };
+    public override string LogName => "Security";
+    public override NamedEvents NamedEvent => NamedEvents.ObjectDeletion;
+
+    public override bool CanHandle(EventObject eventObject) {
+        // Simple rule - always handle if event ID and log name match
+        return true;
+    }
     public string Computer;
     public string Path;
     public string Who;
@@ -19,3 +27,4 @@ public class ObjectDeletion : EventObjectSlim {
         When = _eventObject.TimeCreated;
     }
 }
+

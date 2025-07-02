@@ -1,4 +1,4 @@
-namespace EventViewerX.Rules.Kerberos;
+﻿namespace EventViewerX.Rules.Kerberos;
 
 public class KerberosServiceTicket : EventObjectSlim
 {
@@ -36,3 +36,4 @@ public class KerberosServiceTicket : EventObjectSlim
         UnusualTicketOptions = !(TicketOptions?.Equals("0x40810010", StringComparison.OrdinalIgnoreCase) ?? false);
     }
 }
+

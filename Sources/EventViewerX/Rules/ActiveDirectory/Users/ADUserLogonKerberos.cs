@@ -1,10 +1,18 @@
-﻿namespace EventViewerX.Rules.ActiveDirectory;
+namespace EventViewerX.Rules.ActiveDirectory;
 
 /// <summary>
 /// Active Directory User Logon Kerberos
 /// 4768: A Kerberos authentication ticket (TGT) was requested
 /// </summary>
-public class ADUserLogonKerberos : EventObjectSlim {
+public class ADUserLogonKerberos : EventRuleBase {
+    public override List<int> EventIds => new() { 4768 };
+    public override string LogName => "Security";
+    public override NamedEvents NamedEvent => NamedEvents.ADUserLogonKerberos;
+
+    public override bool CanHandle(EventObject eventObject) {
+        // Simple rule - always handle if event ID and log name match
+        return true;
+    }
     public string Computer;
     public string Action;
     public string ObjectAffected;

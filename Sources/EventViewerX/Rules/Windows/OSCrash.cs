@@ -1,10 +1,18 @@
-﻿namespace EventViewerX.Rules.Windows;
+namespace EventViewerX.Rules.Windows;
 
 /// <summary>
 /// Windows OS Crash
 /// 6008: The previous system shutdown at time on date was unexpected.
 /// </summary>
-public class OSCrash : EventObjectSlim {
+public class OSCrash : EventRuleBase {
+    public override List<int> EventIds => new() { 6008 };
+    public override string LogName => "System";
+    public override NamedEvents NamedEvent => NamedEvents.OSCrash;
+
+    public override bool CanHandle(EventObject eventObject) {
+        // Simple rule - always handle if event ID and log name match
+        return true;
+    }
     public string Computer;
     public string Action;
     public string ObjectAffected;
