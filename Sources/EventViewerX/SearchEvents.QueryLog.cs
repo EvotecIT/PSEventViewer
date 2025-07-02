@@ -182,56 +182,61 @@ public partial class SearchEvents : Settings {
     /// <param name="timePeriod">The time period.</param>
     /// <returns>Enumerable collection of matching events.</returns>
     public static IEnumerable<EventObject> QueryLog(string logName, List<int> eventIds = null, string machineName = null, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null, int maxEvents = 0, List<long> eventRecordId = null, TimePeriod? timePeriod = null, CancellationToken cancellationToken = default) {
-        if (eventIds != null && eventIds.Any(id => id <= 0)) {
-            throw new ArgumentException("Event IDs must be positive.", nameof(eventIds));
-        }
-
-        if (eventRecordId != null && eventRecordId.Any(id => id <= 0)) {
-            throw new ArgumentException("Event record IDs must be positive.", nameof(eventRecordId));
-        }
-
-        string queryString;
-        if (eventRecordId != null) {
-            // If eventRecordId is provided, query the log for the specific event record ID
-            queryString = BuildQueryString(eventRecordId);
-        } else {
-            // If eventRecordId is not provided, query the log for events based on the provided parameters
-            queryString = BuildQueryString(logName, eventIds, providerName, keywords, level, startTime, endTime, userId, timePeriod: timePeriod);
-        }
-
-        _logger.WriteVerbose($"Querying log '{logName}' on '{machineName} with query: {queryString}");
-
-        EventLogQuery query = new EventLogQuery(logName, PathType.LogName, queryString);
-        if (machineName != null) {
-            query.Session = new EventLogSession(machineName);
-        }
-
-        // If machineName is null, the query will be executed on the local machine
-        // , but we still want to know the fully qualified domain name of the machine for logging purposes
-        var queriedMachine = machineName ?? GetFQDN();
-
-        // We need to keep record not disposed to be able to access it after the using block
-        // Maybe there's a better way to do this
-        EventRecord record;
-        using (EventLogReader reader = CreateEventLogReader(query, machineName)) {
-            if (reader != null) {
-                int eventCount = 0;
-                while (!cancellationToken.IsCancellationRequested && (record = reader.ReadEvent()) != null) {
-                    // using (record) {
-                    EventObject eventObject = new EventObject(record, queriedMachine);
-                    yield return eventObject;
-                    eventCount++;
-                    if (maxEvents > 0 && eventCount >= maxEvents) {
-                        break;
-                    }
-                    // }
-                }
-            }
-        }
+        return QueryLogAsync(logName, eventIds, machineName, providerName, keywords, level, startTime, endTime, userId, maxEvents, eventRecordId, timePeriod, cancellationToken).GetAwaiter().GetResult();
     }
 
     public static IEnumerable<EventObject> QueryLog(KnownLog logName, List<int> eventIds = null, string machineName = null, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null, int maxEvents = 0, List<long> eventRecordId = null, TimePeriod? timePeriod = null, CancellationToken cancellationToken = default) {
         return QueryLog(LogNameToString(logName), eventIds, machineName, providerName, keywords, level, startTime, endTime, userId, maxEvents, eventRecordId, timePeriod, cancellationToken);
+    }
+
+    public static async Task<IEnumerable<EventObject>> QueryLogAsync(string logName, List<int> eventIds = null, string machineName = null, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null, int maxEvents = 0, List<long> eventRecordId = null, TimePeriod? timePeriod = null, CancellationToken cancellationToken = default) {
+        IEnumerable<EventObject> Query() {
+            if (eventIds != null && eventIds.Any(id => id <= 0)) {
+                throw new ArgumentException("Event IDs must be positive.", nameof(eventIds));
+            }
+
+            if (eventRecordId != null && eventRecordId.Any(id => id <= 0)) {
+                throw new ArgumentException("Event record IDs must be positive.", nameof(eventRecordId));
+            }
+
+            string queryString;
+            if (eventRecordId != null) {
+                // If eventRecordId is provided, query the log for the specific event record ID
+                queryString = BuildQueryString(eventRecordId);
+            } else {
+                // If eventRecordId is not provided, query the log for events based on the provided parameters
+                queryString = BuildQueryString(logName, eventIds, providerName, keywords, level, startTime, endTime, userId, timePeriod: timePeriod);
+            }
+
+            _logger.WriteVerbose($"Querying log '{logName}' on '{machineName} with query: {queryString}");
+
+            EventLogQuery query = new EventLogQuery(logName, PathType.LogName, queryString);
+            if (machineName != null) {
+                query.Session = new EventLogSession(machineName);
+            }
+
+            // If machineName is null, the query will be executed on the local machine
+            // , but we still want to know the fully qualified domain name of the machine for logging purposes
+            var queriedMachine = machineName ?? GetFQDN();
+
+            // We need to keep record not disposed to be able to access it after the using block
+            EventRecord record;
+            using (EventLogReader reader = CreateEventLogReader(query, machineName)) {
+                if (reader != null) {
+                    int eventCount = 0;
+                    while (!cancellationToken.IsCancellationRequested && (record = reader.ReadEvent()) != null) {
+                        EventObject eventObject = new EventObject(record, queriedMachine);
+                        yield return eventObject;
+                        eventCount++;
+                        if (maxEvents > 0 && eventCount >= maxEvents) {
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        return await Task.Run(() => Query().ToList().AsEnumerable(), cancellationToken);
     }
 
     /// <summary>
@@ -406,8 +411,20 @@ public partial class SearchEvents : Settings {
         await completionTask;
     }
 
+    public static async Task<IEnumerable<EventObject>> QueryLogsParallelAsync(string logName, List<int> eventIds = null, List<string> machineNames = null, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null, int maxEvents = 0, int maxThreads = 8, List<long> eventRecordId = null, TimePeriod? timePeriod = null, CancellationToken cancellationToken = default) {
+        var results = new List<EventObject>();
+        await foreach (var ev in QueryLogsParallel(logName, eventIds, machineNames, providerName, keywords, level, startTime, endTime, userId, maxEvents, maxThreads, eventRecordId, timePeriod, cancellationToken)) {
+            results.Add(ev);
+        }
+        return results;
+    }
+
     public static IAsyncEnumerable<EventObject> QueryLogsParallel(KnownLog logName, List<int> eventIds = null, List<string> machineNames = null, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null, int maxEvents = 0, int maxThreads = 8, List<long> eventRecordId = null, TimePeriod? timePeriod = null, CancellationToken cancellationToken = default) {
         return QueryLogsParallel(LogNameToString(logName), eventIds, machineNames, providerName, keywords, level, startTime, endTime, userId, maxEvents, maxThreads, eventRecordId, timePeriod, cancellationToken);
+    }
+
+    public static Task<IEnumerable<EventObject>> QueryLogsParallelAsync(KnownLog logName, List<int> eventIds = null, List<string> machineNames = null, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null, int maxEvents = 0, int maxThreads = 8, List<long> eventRecordId = null, TimePeriod? timePeriod = null, CancellationToken cancellationToken = default) {
+        return QueryLogsParallelAsync(LogNameToString(logName), eventIds, machineNames, providerName, keywords, level, startTime, endTime, userId, maxEvents, maxThreads, eventRecordId, timePeriod, cancellationToken);
     }
 
     private static Task CreateTask(string machineName, string logName, List<int> eventIds, string providerName, Keywords? keywords, Level? level, DateTime? startTime, DateTime? endTime, string userId, int maxEvents, SemaphoreSlim semaphore, BlockingCollection<EventObject> results, CancellationToken cancellationToken, List<long> eventRecordId = null, TimePeriod? timePeriod = null) {
@@ -415,7 +432,7 @@ public partial class SearchEvents : Settings {
             _logger.WriteVerbose($"Querying log on machine: {machineName}, logName: {logName}, event ids: " + string.Join(", ", eventIds ?? new List<int>()));
             await semaphore.WaitAsync(cancellationToken);
             try {
-                var queryResults = QueryLog(logName, eventIds, machineName, providerName, keywords, level, startTime, endTime, userId, maxEvents, eventRecordId, timePeriod, cancellationToken);
+                var queryResults = await QueryLogAsync(logName, eventIds, machineName, providerName, keywords, level, startTime, endTime, userId, maxEvents, eventRecordId, timePeriod, cancellationToken);
                 foreach (var result in queryResults) {
                     if (cancellationToken.IsCancellationRequested) break;
                     results.Add(result, cancellationToken);
