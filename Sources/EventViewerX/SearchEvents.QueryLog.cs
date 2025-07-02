@@ -369,7 +369,7 @@ public partial class SearchEvents : Settings {
         var semaphore = new SemaphoreSlim(maxThreads);
         var results = new BlockingCollection<EventObject>();
 
-        var tasks = new List<Task>();
+        var tasks = new ConcurrentBag<Task>();
         foreach (var machineName in machineNames) {
             if (eventIds != null) {
                 var eventIdsChunks = eventIds.Select((x, i) => new { Index = i, Value = x })

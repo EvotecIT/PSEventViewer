@@ -33,5 +33,4 @@ public class Settings {
     /// </summary>
     public int NumberOfThreads = 8;
 
-    protected readonly object _LockObject = new object();
 }
