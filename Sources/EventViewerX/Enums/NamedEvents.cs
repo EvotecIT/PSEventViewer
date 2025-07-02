@@ -293,6 +293,11 @@
         HyperVVirtualMachineStarted,
 
         /// <summary>
+        /// IIS site failed to register binding (W3SVC event 1007)
+        /// </summary>
+        IisSiteBindingFailure,
+      
+        /// <summary>
         /// Hyper-V checkpoint created
         /// </summary>
         HyperVCheckpointCreated,
