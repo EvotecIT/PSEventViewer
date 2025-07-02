@@ -283,6 +283,11 @@
         HyperVVirtualMachineStarted,
 
         /// <summary>
+        /// Exchange mailbox database mounted successfully
+        /// </summary>
+        ExchangeDatabaseMounted,
+      
+        /// <summary>
         /// DFS Replication partner error
         /// </summary>
         DfsReplicationError,
