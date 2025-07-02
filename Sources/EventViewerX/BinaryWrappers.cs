@@ -91,7 +91,7 @@ namespace EventViewerX {
                 string metadata = GetProviderMetadata(provider);
                 string name = GetMetadataProperty(metadata, "name");
                 string guid = GetMetadataProperty(metadata, "guid");
-                string[] logNames = GetMetadataProperty(metadata, "channelReferences").Split(new[] { '\n' }, StringSplitOptions.RemoveEmptyEntries).Select(s => s.Trim()).ToArray();
+                string[] logNames = GetMetadataProperty(metadata, "channelReferences")?.Split(new[] { '\n' }, StringSplitOptions.RemoveEmptyEntries).Select(s => s.Trim()).ToArray() ?? Array.Empty<string>();
                 Console.WriteLine($"Provider Name: {name}, Provider GUID: {guid}, Log Names: {string.Join(", ", logNames)}");
             }
         }
