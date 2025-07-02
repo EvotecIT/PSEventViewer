@@ -1,5 +1,6 @@
 ﻿using System.Collections;
 using System.Text.RegularExpressions;
+using System.Linq;
 
 namespace PSEventViewer;
 
@@ -368,16 +369,7 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
     private PSObject GetExpandedObject(EventObject eventObject) {
         PSObject outputObj = new(eventObject); // => it's the preferred way to create a wrapper pso when you already know it's not a pso
                                                // PSObject outputObj = PSObject.AsPSObject(eventObject); => this is the preferred way to convert from PSO to PSObject
-        foreach (var property in eventObject.Data) {
-            //// if the property already exists, add it as new property with +1
-            //if (outputObj.Properties[property.Key] != null) {
-            //    outputObj.Properties.Add(new PSNoteProperty(property.Key + "1", property.Value));
-            //} else {
-            //    outputObj.Properties.Add(new PSNoteProperty(property.Key, property.Value));
-            //}
-            //if (outputObj.Properties[property.Key] != null) {
-            //    outputObj.Properties.Remove(property.Key);
-            //}
+        foreach (var property in eventObject.Data.OrderBy(static d => d.Key, StringComparer.OrdinalIgnoreCase)) {
             outputObj.Properties.Add(new PSNoteProperty(property.Key, property.Value));
         }
         return outputObj;
