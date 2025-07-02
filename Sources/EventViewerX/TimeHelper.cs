@@ -34,7 +34,7 @@ namespace EventViewerX {
 
     internal static class TimeHelper {
         internal static (DateTime? StartTime, DateTime? EndTime, TimeSpan? LastPeriod) GetTimePeriod(TimePeriod timePeriod) {
-            DateTime now = DateTime.UtcNow;
+            DateTime now = DateTime.Now;
             DateTime? startTime = null;
             DateTime? endTime = null;
             TimeSpan? lastPeriod = null;
@@ -76,13 +76,13 @@ namespace EventViewerX {
                     endTime = startTime.Value.AddMonths(3);
                     break;
                 case TimePeriod.Last3Days:
-                    startTime = DateTime.UtcNow.Date.AddDays(-3);
+                    startTime = now.Date.AddDays(-3);
                     break;
                 case TimePeriod.Last7Days:
-                    startTime = DateTime.UtcNow.Date.AddDays(-7);
+                    startTime = now.Date.AddDays(-7);
                     break;
                 case TimePeriod.Last14Days:
-                    startTime = DateTime.UtcNow.Date.AddDays(-14);
+                    startTime = now.Date.AddDays(-14);
                     break;
                 case TimePeriod.Last1Hours:
                     lastPeriod = TimeSpan.FromHours(1);

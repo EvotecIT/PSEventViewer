@@ -15,9 +15,14 @@
         <SupportedOSPlatform>windows</SupportedOSPlatform>
     </PropertyGroup>
 
-    <ItemGroup>
+  <ItemGroup>
         <PackageReference Include="DnsClientX" Version="0.4.0" />
-    </ItemGroup>
+  </ItemGroup>
+  <ItemGroup>
+        <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+            <_Parameter1>EventViewerX.Tests</_Parameter1>
+        </AssemblyAttribute>
+  </ItemGroup>
 
     <ItemGroup Condition="'$(TargetFramework)' == 'net8.0'">
         <PackageReference Include="System.DirectoryServices" Version="8.0.0" />
