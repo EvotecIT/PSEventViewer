@@ -1,5 +1,8 @@
 ﻿namespace EventViewerX.Rules.Kerberos;
 
+/// <summary>
+/// Kerberos policy configuration change event details.
+/// </summary>
 public class KerberosPolicyChange : EventObjectSlim
 {
     public string Computer;

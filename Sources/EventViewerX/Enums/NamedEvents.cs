@@ -209,14 +209,29 @@
         FirewallRuleChange,
 
         /// <summary>
+        /// DHCP lease creation event
+        /// </summary>
+        DhcpLeaseCreated,
+
+        /// <summary>
         /// BitLocker protection key changed or backed up
         /// </summary>
         BitLockerKeyChange,
 
         /// <summary>
+        /// BitLocker protection was suspended
+        /// </summary>
+        BitLockerSuspended,
+
+        /// <summary>
         /// External device recognized by the system
         /// </summary>
         DeviceRecognized,
+
+        /// <summary>
+        /// Device was disabled
+        /// </summary>
+        DeviceDisabled,
 
         /// <summary>
         /// Object deleted
@@ -234,9 +249,14 @@
 
         /// <summary>
         /// Unexpected system shutdown
-        /// </summary>      
+        /// </summary>
         OSCrash,
-      
+
+        /// <summary>
+        /// Bugcheck event describing a system crash
+        /// </summary>
+        OSBugCheck,
+
         /// <summary>
         /// System start-up, shutdown or crash events
         /// </summary>
@@ -276,5 +296,20 @@
         /// Hyper-V checkpoint created
         /// </summary>
         HyperVCheckpointCreated,
+      
+        /// <summary>
+        /// IIS website stopped
+        /// </summary>
+        IISSiteStopped,
+      
+        /// <summary>
+        /// Exchange mailbox database mounted successfully
+        /// </summary>
+        ExchangeDatabaseMounted,
+      
+        /// <summary>
+        /// DFS Replication partner error
+        /// </summary>
+        DfsReplicationError,
     }
 }

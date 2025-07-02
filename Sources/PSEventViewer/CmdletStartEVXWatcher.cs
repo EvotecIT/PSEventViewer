@@ -42,7 +42,7 @@ namespace PSEventViewer {
         /// Number of threads used for event processing.
         /// </summary>
         [Parameter(Mandatory = false)]
-        [ValidateRange(1, int.MaxValue)]
+        [ValidateRange(1, 1024)]
         public int NumberOfThreads { get; set; } = 8;
 
         /// <summary>
