@@ -271,5 +271,10 @@
         /// Hyper-V virtual machine started
         /// </summary>
         HyperVVirtualMachineStarted,
+
+        /// <summary>
+        /// IIS site failed to register binding (W3SVC event 1007)
+        /// </summary>
+        IisSiteBindingFailure,
     }
 }
