@@ -219,6 +219,11 @@
         DeviceRecognized,
 
         /// <summary>
+        /// Device was disabled
+        /// </summary>
+        DeviceDisabled,
+
+        /// <summary>
         /// Object deleted
         /// </summary>
         ObjectDeletion,
