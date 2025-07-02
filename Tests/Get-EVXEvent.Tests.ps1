@@ -163,3 +163,9 @@ Describe 'Get-EVXEvent - MessageRegex' {
         $events.Count | Should -Be 1
     }
 }
+
+Describe 'Get-EVXEvent - Parameter validation' {
+    It 'Fails when NumberOfThreads is less than 1' {
+        { Get-EVXEvent -LogName 'Application' -NumberOfThreads 0 } | Should -Throw
+    }
+}
