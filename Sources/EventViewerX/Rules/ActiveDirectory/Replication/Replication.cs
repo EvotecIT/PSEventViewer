@@ -1,5 +1,8 @@
 ﻿namespace EventViewerX.Rules.ActiveDirectory;
 
+/// <summary>
+/// Placeholder for Active Directory replication events documentation.
+/// </summary>
 internal class Replication {
 
     //Log Name:      Directory Service

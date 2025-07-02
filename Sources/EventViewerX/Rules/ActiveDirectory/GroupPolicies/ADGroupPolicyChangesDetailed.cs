@@ -1,5 +1,8 @@
 ﻿namespace EventViewerX.Rules.ActiveDirectory;
 
+/// <summary>
+/// Detailed audit information for group policy changes.
+/// </summary>
 public class ADGroupPolicyChangesDetailed : EventObjectSlim {
     public string Computer;
     public string Action;

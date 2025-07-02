@@ -36,7 +36,7 @@ public class ADComputerChangeDetailed : EventRuleBase {
     /// <summary>
     /// Active Directory Computer Change Detailed
     /// </summary>
-    /// <param name="eventObject"></param>
+    /// <param name="eventObject">Underlying event record.</param>
     public ADComputerChangeDetailed(EventObject eventObject) : base(eventObject) {
         // common fields
         _eventObject = eventObject;

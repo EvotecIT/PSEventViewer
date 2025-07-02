@@ -1,5 +1,8 @@
 ﻿namespace EventViewerX.Rules.Kerberos;
 
+/// <summary>
+/// Represents a Kerberos service ticket request event.
+/// </summary>
 public class KerberosServiceTicket : EventObjectSlim
 {
     public string Computer;
