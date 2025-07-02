@@ -1,6 +1,9 @@
 ﻿using System;
 
 namespace EventViewerX.Rules.ActiveDirectory {
+    /// <summary>
+    /// Represents detailed organizational unit change events.
+    /// </summary>
     public class ADOrganizationalUnitChangeDetailed : EventRuleBase {
 
 

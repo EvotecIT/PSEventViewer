@@ -1,5 +1,8 @@
 ﻿namespace EventViewerX.Rules.Kerberos;
 
+/// <summary>
+/// Represents a Kerberos TGT request event.
+/// </summary>
 public class KerberosTGTRequest : EventObjectSlim
 {
     public string Computer;

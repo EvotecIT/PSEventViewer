@@ -1,5 +1,8 @@
 ﻿namespace EventViewerX.Rules.ActiveDirectory;
 
+/// <summary>
+/// Represents a newly created group policy object event.
+/// </summary>
 public class GpoCreated : EventRuleBase {
     public string Computer;
     public string Action;

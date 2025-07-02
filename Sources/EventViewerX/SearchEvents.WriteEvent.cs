@@ -96,7 +96,7 @@ public partial class SearchEvents : Settings {
     /// <param name="source">The source.</param>
     /// <param name="log">The log.</param>
     /// <param name="machineName">Name of the machine.</param>
-    /// <returns></returns>
+    /// <returns><c>true</c> when source exists or is created.</returns>
     public static bool CreateLogSource(string source, string log, string machineName = null) {
         try {
             if (string.IsNullOrEmpty(machineName)) {

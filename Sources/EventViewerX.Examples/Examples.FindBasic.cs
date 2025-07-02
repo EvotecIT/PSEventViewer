@@ -5,7 +5,7 @@ namespace EventViewerX.Examples {
     internal partial class Examples {
         public static async Task FindEventsTargetedBasic() {
 
-            await foreach (var foundObject in SearchEvents.FindEventsByNamedEvents([NamedEvents.OSCrash, NamedEvents.OSStartupShutdownCrash])) {
+            await foreach (var foundObject in SearchEvents.FindEventsByNamedEvents([NamedEvents.OSCrash, NamedEvents.OSStartupShutdownCrash, NamedEvents.OSBugCheck])) {
 
                 Console.WriteLine("Event ID: {0}", foundObject.EventID + ", " + foundObject.Type + " " + foundObject.GatheredFrom);
                 Console.WriteLine("Type: " + foundObject.Type + ", " + foundObject.EventID + " " + foundObject.EventID + " " + foundObject.GatheredFrom);
@@ -20,6 +20,10 @@ namespace EventViewerX.Examples {
                     Console.WriteLine("[*] Computer: " + osStartupShutdownCrash.Computer);
                     Console.WriteLine("[*] Who: " + osStartupShutdownCrash.Action);
                     Console.WriteLine("[*] When: " + osStartupShutdownCrash.When);
+                } else if (foundObject is OSBugCheck bugCheck) {
+                    Console.WriteLine("[*] Computer: " + bugCheck.Computer);
+                    Console.WriteLine("[*] Bugcheck: " + bugCheck.BugCheckCode);
+                    Console.WriteLine("[*] When: " + bugCheck.When);
                 }
             }
         }

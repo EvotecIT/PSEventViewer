@@ -2,6 +2,9 @@
 
 namespace EventViewerX.Rules.ActiveDirectory;
 
+/// <summary>
+/// Represents edits made to group policy objects.
+/// </summary>
 public class ADGroupPolicyEdits : EventRuleBase {
     public string Computer;
     public string Action;
