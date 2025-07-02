@@ -56,3 +56,11 @@ Our module tries to improve on that by providing a bit more flexibility and spee
 - [PowerShell - Everything you wanted to know about Event Logs and then some](https://evotec.xyz/powershell-everything-you-wanted-to-know-about-event-logs/)
 - [Sending information to Event Log with extended fields using PowerShell](https://evotec.xyz/sending-information-to-event-log-with-extended-fields-using-powershell/)
 - [The only PowerShell Command you will ever need to find out who did what in Active Directory](https://evotec.xyz/the-only-powershell-command-you-will-ever-need-to-find-out-who-did-what-in-active-directory/)
+
+### Long-running monitoring jobs
+
+`Get-EVXEvent` can keep track of the last processed record. Specify `-RecordIdFile` with a file path. The cmdlet stores the newest record ID there and automatically skips older events on the next run. When multiple monitoring jobs share the same file, use `-RecordIdKey` to persist a value per job.
+
+```powershell
+Get-EVXEvent -LogName Security -RecordIdFile C:\Temp\evx.state -RecordIdKey Machine1
+```
