@@ -271,5 +271,10 @@
         /// Hyper-V virtual machine started
         /// </summary>
         HyperVVirtualMachineStarted,
+
+        /// <summary>
+        /// IIS website stopped
+        /// </summary>
+        IISSiteStopped,
     }
 }
