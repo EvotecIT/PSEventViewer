@@ -1,4 +1,7 @@
 ﻿using System.Collections;
+using System.Collections.Generic;
+using System.IO;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 
 namespace PSEventViewer;
@@ -14,6 +17,10 @@ namespace PSEventViewer;
 [Cmdlet(VerbsCommon.Get, "EVXEvent", DefaultParameterSetName = "GenericEvents")]
 [Alias("Get-EventViewerXEvent", "Find-WinEvent", "Get-Events")]
 public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
+    private long? _resumeRecordId;
+    private long? _highestRecordId;
+    private string _recordIdKey = string.Empty;
+    private Dictionary<string, long> _recordMap = new();
     /// <summary>
     /// Name of the log to query.
     /// </summary>
@@ -41,6 +48,24 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
     [Alias("RecordId")]
     [Parameter(Mandatory = false, Position = 1, ParameterSetName = "RecordId")]
     public List<long> EventRecordId = null;
+
+    /// <summary>
+    /// Path to a file storing last processed record ID.
+    /// </summary>
+    [Parameter(Mandatory = false, ParameterSetName = "RecordId")]
+    [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
+    public string RecordIdFile;
+
+    /// <summary>
+    /// Identifier used when persisting record IDs to allow multiple jobs to share a file.
+    /// </summary>
+    [Parameter(Mandatory = false, ParameterSetName = "RecordId")]
+    [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
+    public string RecordIdKey;
 
     /// <summary>
     /// Computer names against which to run the query.
@@ -204,6 +229,20 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
         var internalLogger = new InternalLogger(false);
         var internalLoggerPowerShell = new InternalLoggerPowerShell(internalLogger, this.WriteVerbose, this.WriteWarning, this.WriteDebug, this.WriteError, this.WriteProgress, this.WriteInformation);
         var searchEvents = new SearchEvents(internalLogger);
+        if (!string.IsNullOrEmpty(RecordIdFile) && File.Exists(RecordIdFile)) {
+            try {
+                var json = File.ReadAllText(RecordIdFile);
+                _recordMap = JsonSerializer.Deserialize<Dictionary<string, long>>(json) ?? new();
+            } catch {
+                _recordMap = new Dictionary<string, long>();
+            }
+        }
+        _recordIdKey = !string.IsNullOrEmpty(RecordIdKey)
+            ? RecordIdKey
+            : $"{LogName ?? Path ?? "unknown"}|{string.Join(",", MachineName ?? new List<string>())}";
+        if (_recordMap.TryGetValue(_recordIdKey, out var lastId)) {
+            _resumeRecordId = lastId;
+        }
         return Task.CompletedTask;
     }
     /// <summary>
@@ -224,7 +263,7 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
             // Handle file path queries
             if (Expand == false) {
                 foreach (var eventObject in SearchEvents.QueryLogFile(Path, EventId, ProviderName, Keywords, Level, StartTime, EndTime, UserId, MaxEvents, null, TimePeriod, Oldest, NamedDataFilter, NamedDataExcludeFilter, CancelToken)) {
-                    if (!MessageMatches(eventObject)) {
+                    if (!MessageMatches(eventObject) || !ShouldOutput(eventObject)) {
                         continue;
                     }
                     if (AsArray) {
@@ -235,7 +274,7 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
                 }
             } else {
                 foreach (var eventObject in SearchEvents.QueryLogFile(Path, EventId, ProviderName, Keywords, Level, StartTime, EndTime, UserId, MaxEvents, null, TimePeriod, Oldest, NamedDataFilter, NamedDataExcludeFilter, CancelToken)) {
-                    if (!MessageMatches(eventObject)) {
+                    if (!MessageMatches(eventObject) || !ShouldOutput(eventObject)) {
                         continue;
                     }
                     if (AsArray) {
@@ -250,7 +289,7 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
                 // let's find the events prepared for search
                 List<NamedEvents> typeList = Type.ToList();
                 await foreach (var eventObject in SearchEvents.FindEventsByNamedEvents(typeList, MachineName, StartTime, EndTime, TimePeriod, maxThreads: NumberOfThreads, maxEvents: MaxEvents, cancellationToken: CancelToken)) {
-                    if (!MessageMatches(eventObject._eventObject)) {
+                    if (!MessageMatches(eventObject._eventObject) || !ShouldOutput(eventObject._eventObject)) {
                         continue;
                     }
                     if (AsArray) {
@@ -265,7 +304,7 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
                     if (ParallelOption == ParallelOption.Disabled) {
                         if (MachineName == null) {
                             foreach (var eventObject in SearchEvents.QueryLog(LogName, EventId, null, ProviderName, Keywords, Level, StartTime, EndTime, UserId, MaxEvents, EventRecordId, TimePeriod, CancelToken)) {
-                                if (!MessageMatches(eventObject)) {
+                                if (!MessageMatches(eventObject) || !ShouldOutput(eventObject)) {
                                     continue;
                                 }
                                 if (AsArray) {
@@ -290,7 +329,7 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
                         }
                     } else if (ParallelOption == ParallelOption.Parallel) {
                         await foreach (var eventObject in SearchEvents.QueryLogsParallel(LogName, EventId, MachineName, ProviderName, Keywords, Level, StartTime, EndTime, UserId, MaxEvents, NumberOfThreads, EventRecordId, TimePeriod, CancelToken)) {
-                            if (!MessageMatches(eventObject)) {
+                            if (!MessageMatches(eventObject) || !ShouldOutput(eventObject)) {
                                 continue;
                             }
                             if (AsArray) {
@@ -305,7 +344,7 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
                     if (ParallelOption == ParallelOption.Disabled) {
                         if (MachineName == null) {
                             foreach (var eventObject in SearchEvents.QueryLog(LogName, EventId, null, ProviderName, Keywords, Level, StartTime, EndTime, UserId, MaxEvents, EventRecordId, TimePeriod, CancelToken)) {
-                                if (!MessageMatches(eventObject)) {
+                                if (!MessageMatches(eventObject) || !ShouldOutput(eventObject)) {
                                     continue;
                                 }
                                 if (AsArray) {
@@ -317,7 +356,7 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
                         } else {
                             foreach (var machine in MachineName) {
                                 foreach (var eventObject in SearchEvents.QueryLog(LogName, EventId, machine, ProviderName, Keywords, Level, StartTime, EndTime, UserId, MaxEvents, EventRecordId, TimePeriod, CancelToken)) {
-                                    if (!MessageMatches(eventObject)) {
+                                    if (!MessageMatches(eventObject) || !ShouldOutput(eventObject)) {
                                         continue;
                                     }
                                     if (AsArray) {
@@ -330,7 +369,7 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
                         }
                     } else if (ParallelOption == ParallelOption.Parallel) {
                         await foreach (var eventObject in SearchEvents.QueryLogsParallel(LogName, EventId, MachineName, ProviderName, Keywords, Level, StartTime, EndTime, UserId, MaxEvents, NumberOfThreads, EventRecordId, TimePeriod, CancelToken)) {
-                            if (!MessageMatches(eventObject)) {
+                            if (!MessageMatches(eventObject) || !ShouldOutput(eventObject)) {
                                 continue;
                             }
                             if (AsArray) {
@@ -350,6 +389,19 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
         }
 
         return;
+    }
+
+    private bool ShouldOutput(EventObject eventObject) {
+        if (_resumeRecordId.HasValue && eventObject.RecordId.HasValue && eventObject.RecordId.Value <= _resumeRecordId.Value) {
+            return false;
+        }
+        if (eventObject.RecordId.HasValue) {
+            var id = eventObject.RecordId.Value;
+            if (!_highestRecordId.HasValue || id > _highestRecordId.Value) {
+                _highestRecordId = id;
+            }
+        }
+        return true;
     }
     /// <summary>
     /// Returns the expanded object - it takes the EventObject and returns the PSObject with the properties expanded from the Data property.
@@ -395,5 +447,13 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
 
         var message = eventObject?.Message ?? string.Empty;
         return MessageRegex.IsMatch(message);
+    }
+
+    protected override Task EndProcessingAsync() {
+        if (!string.IsNullOrEmpty(RecordIdFile) && _highestRecordId.HasValue) {
+            _recordMap[_recordIdKey] = _highestRecordId.Value;
+            File.WriteAllText(RecordIdFile, JsonSerializer.Serialize(_recordMap));
+        }
+        return Task.CompletedTask;
     }
 }

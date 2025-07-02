@@ -16,9 +16,13 @@
     <ItemGroup>
         <PackageReference Include="PowerShellStandard.Library" Version="5.1.1" PrivateAssets="all" />
     </ItemGroup>
-    <ItemGroup>
-        <ProjectReference Include="..\EventViewerX\EventViewerX.csproj" />
-    </ItemGroup>
+  <ItemGroup>
+      <ProjectReference Include="..\EventViewerX\EventViewerX.csproj" />
+  </ItemGroup>
+
+  <ItemGroup Condition=" '$(TargetFramework)' == 'net472' or '$(TargetFramework)' == 'netstandard2.0' ">
+      <PackageReference Include="System.Text.Json" Version="9.0.0" />
+  </ItemGroup>
 
     <!-- Make sure the output DLL's from library are included in the output -->
     <PropertyGroup>
