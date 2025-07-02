@@ -293,6 +293,11 @@
         HyperVVirtualMachineStarted,
 
         /// <summary>
+        /// Hyper-V checkpoint created
+        /// </summary>
+        HyperVCheckpointCreated,
+      
+        /// <summary>
         /// IIS website stopped
         /// </summary>
         IISSiteStopped,
