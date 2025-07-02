@@ -227,5 +227,9 @@
         /// Group Policy client-side processing events from System log
         /// </summary>
         ClientGroupPoliciesSystem,
+        /// <summary>
+        /// Hyper-V virtual machine started
+        /// </summary>
+        HyperVVirtualMachineStarted,
     }
 }
