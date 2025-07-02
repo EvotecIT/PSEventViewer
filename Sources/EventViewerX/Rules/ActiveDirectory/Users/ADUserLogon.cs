@@ -4,7 +4,7 @@
 /// Active Directory User Logon
 /// 4624: An account was successfully logged on
 /// </summary>
-public class ADUserLogon : EventObjectSlim {
+public class ADUserLogon : EventRuleBase {
     public string Computer;
     public string Action;
     public string IpAddress;
@@ -17,6 +17,15 @@ public class ADUserLogon : EventObjectSlim {
     public VirtualAccount? VirtualAccount;
     public ElevatedToken? ElevatedToken;
     public LogonType? LogonType;
+
+    public override List<int> EventIds => new() { 4624 };
+    public override string LogName => "Security";
+    public override NamedEvents NamedEvent => NamedEvents.ADUserLogon;
+
+    public override bool CanHandle(EventObject eventObject) {
+        // Simple rule - always handle if event ID and log name match
+        return true;
+    }
 
     public ADUserLogon(EventObject eventObject) : base(eventObject) {
         _eventObject = eventObject;

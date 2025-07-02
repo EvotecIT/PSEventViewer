@@ -48,7 +48,7 @@ namespace EventViewerX.Rules.ActiveDirectory;
 /// </Event>
 /// </code>
 /// </remarks>
-public class ADGroupPolicyLinks : EventObjectSlim {
+public class ADGroupPolicyLinks : EventRuleBase {
     public string Computer;
     public string Action;
     public string OperationType;
@@ -66,6 +66,19 @@ public class ADGroupPolicyLinks : EventObjectSlim {
     /// <summary>
     /// Initializes a new instance of the ADGroupPolicyLinks class using a specified event object.
     /// </summary>
+    public override List<int> EventIds => new() { 5136, 5137, 5141 };
+    public override string LogName => "Security";
+    public override NamedEvents NamedEvent => NamedEvents.ADGroupPolicyLinks;
+
+    public override bool CanHandle(EventObject eventObject) {
+        // Check if this is a domain DNS, organizational unit, or site object with gpLink attribute
+        if (eventObject.Data.TryGetValue("ObjectClass", out var objectClass)) {
+            bool isValidObjectClass = objectClass == "domainDNS" || objectClass == "organizationalUnit" || objectClass == "site";
+            bool hasGpLinkAttribute = eventObject.ValueMatches("AttributeLDAPDisplayName", "gpLink");
+            return isValidObjectClass && hasGpLinkAttribute;
+        }
+        return false;
+    }
     public ADGroupPolicyLinks(EventObject eventObject) : base(eventObject) {
         _eventObject = eventObject;
         Type = "ADGroupPolicyLinks";

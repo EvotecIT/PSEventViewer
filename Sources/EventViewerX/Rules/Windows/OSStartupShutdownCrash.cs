@@ -1,4 +1,4 @@
-﻿namespace EventViewerX.Rules.Windows;
+namespace EventViewerX.Rules.Windows;
 
 /// <summary>
 /// OS Startup, Shutdown, Crash
@@ -9,7 +9,15 @@
 /// 4621: Administrator recovered system from CrashOnAuditFail
 /// 6008: The previous system shutdown at time on date was unexpected.
 /// </summary>
-public class OSStartupShutdownCrash : EventObjectSlim {
+public class OSStartupShutdownCrash : EventRuleBase {
+    public override List<int> EventIds => new() { 12, 13, 41, 4608, 4621, 6008 };
+    public override string LogName => "System";
+    public override NamedEvents NamedEvent => NamedEvents.OSStartupShutdownCrash;
+
+    public override bool CanHandle(EventObject eventObject) {
+        // Simple rule - always handle if event ID and log name match
+        return true;
+    }
     public string Computer;
     public string Action;
     public string ObjectAffected;

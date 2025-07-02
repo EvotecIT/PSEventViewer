@@ -11,7 +11,7 @@
 /// 4784: A security-enabled universal group was deleted
 /// 4791: A security-enabled global group was deleted
 /// </summary>
-public class ADGroupChange : EventObjectSlim {
+public class ADGroupChange : EventRuleBase {
 
     public string Computer;
     public string Action;
@@ -21,6 +21,15 @@ public class ADGroupChange : EventObjectSlim {
     public string GroupTypeChange;
     public string SamAccountName;
     public string SidHistory;
+    public override List<int> EventIds => new() { 4735, 4737, 4745, 4750, 4760, 4764, 4784, 4791 };
+    public override string LogName => "Security";
+    public override NamedEvents NamedEvent => NamedEvents.ADGroupChange;
+
+    public override bool CanHandle(EventObject eventObject) {
+        // Ignore *ANONYMOUS* events as they are not useful and clutter the view
+        var who = eventObject.GetValueFromDataDictionary("SubjectUserName", "SubjectDomainName", "\\", reverseOrder: true);
+        return who != "*ANONYMOUS*";
+    }
     public ADGroupChange(EventObject eventObject) : base(eventObject) {
         _eventObject = eventObject;
         Type = "ADGroupChange";

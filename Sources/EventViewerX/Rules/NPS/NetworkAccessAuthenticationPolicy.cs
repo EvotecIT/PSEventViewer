@@ -1,11 +1,19 @@
-﻿namespace EventViewerX.Rules.NPS;
+namespace EventViewerX.Rules.NPS;
 
 /// <summary>
 /// Network Access Authentication Policy
 /// 6272: Network Policy Server granted access to a user
 /// 6273: Network Policy Server denied access to a user
 /// </summary>
-public class NetworkAccessAuthenticationPolicy : EventObjectSlim {
+public class NetworkAccessAuthenticationPolicy : EventRuleBase {
+    public override List<int> EventIds => new() { 6272, 6273 };
+    public override string LogName => "Security";
+    public override NamedEvents NamedEvent => NamedEvents.NetworkAccessAuthenticationPolicy;
+
+    public override bool CanHandle(EventObject eventObject) {
+        // Simple rule - always handle if event ID and log name match
+        return true;
+    }
     public string Computer;
     public string Action;
     public string SecurityID;

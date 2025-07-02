@@ -1,10 +1,18 @@
-﻿namespace EventViewerX.Rules.ActiveDirectory;
+namespace EventViewerX.Rules.ActiveDirectory;
 
 /// <summary>
 /// Active Directory User Lockouts
 /// 4740: A user account was locked out
 /// </summary>
-public class ADUserLockouts : EventObjectSlim {
+public class ADUserLockouts : EventRuleBase {
+    public override List<int> EventIds => new() { 4740 };
+    public override string LogName => "Security";
+    public override NamedEvents NamedEvent => NamedEvents.ADUserLockouts;
+
+    public override bool CanHandle(EventObject eventObject) {
+        // Simple rule - always handle if event ID and log name match
+        return true;
+    }
     public string Computer;
     public string Action;
     public string ComputerLockoutOn;

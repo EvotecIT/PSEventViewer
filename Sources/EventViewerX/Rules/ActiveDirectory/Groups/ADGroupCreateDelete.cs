@@ -1,4 +1,4 @@
-﻿namespace EventViewerX.Rules.ActiveDirectory;
+namespace EventViewerX.Rules.ActiveDirectory;
 
 /// <summary>
 /// Active Directory Group Create Delete
@@ -15,7 +15,15 @@
 /// 4759: 
 /// 4763: 
 /// </summary>
-public class ADGroupCreateDelete : EventObjectSlim {
+public class ADGroupCreateDelete : EventRuleBase {
+    public override List<int> EventIds => new() { 4727, 4730, 4731, 4734, 4744, 4748, 4749, 4753, 4754, 4758, 4759, 4763 };
+    public override string LogName => "Security";
+    public override NamedEvents NamedEvent => NamedEvents.ADGroupCreateDelete;
+
+    public override bool CanHandle(EventObject eventObject) {
+        // Simple rule - always handle if event ID and log name match
+        return true;
+    }
     public string Computer;
     public string Action;
     public string GroupName;

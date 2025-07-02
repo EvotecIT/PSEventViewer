@@ -1,4 +1,4 @@
-namespace EventViewerX.Rules.Kerberos;
+﻿namespace EventViewerX.Rules.Kerberos;
 
 public class KerberosTicketFailure : EventObjectSlim
 {
@@ -31,3 +31,4 @@ public class KerberosTicketFailure : EventObjectSlim
             or TicketEncryptionType.RC4_HMAC_EXP;
     }
 }
+

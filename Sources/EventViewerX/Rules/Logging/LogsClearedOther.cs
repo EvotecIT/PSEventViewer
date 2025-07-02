@@ -1,10 +1,18 @@
-﻿namespace EventViewerX.Rules.Logging;
+namespace EventViewerX.Rules.Logging;
 
 /// <summary>
 /// Logs Cleared Application, System, Others
 /// 104: The audit log was cleared
 /// </summary>
-public class LogsClearedOther : EventObjectSlim {
+public class LogsClearedOther : EventRuleBase {
+    public override List<int> EventIds => new() { 104 };
+    public override string LogName => "System";
+    public override NamedEvents NamedEvent => NamedEvents.LogsClearedOther;
+
+    public override bool CanHandle(EventObject eventObject) {
+        // Simple rule - always handle if event ID and log name match
+        return true;
+    }
     public string Computer;
     public string Action;
     public string BackupPath;

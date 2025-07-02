@@ -4,7 +4,15 @@ namespace EventViewerX.Rules.ActiveDirectory;
 /// Special privileges assigned to new logon
 /// 4672: Special privileges assigned to new logon
 /// </summary>
-public class ADUserPrivilegeUse : EventObjectSlim {
+public class ADUserPrivilegeUse : EventRuleBase {
+    public override List<int> EventIds => new() { 4672 };
+    public override string LogName => "Security";
+    public override NamedEvents NamedEvent => NamedEvents.ADUserPrivilegeUse;
+
+    public override bool CanHandle(EventObject eventObject) {
+        // Simple rule - always handle if event ID and log name match
+        return true;
+    }
     public string Computer;
     public string Action;
     public string Who;
@@ -32,3 +40,4 @@ public class ADUserPrivilegeUse : EventObjectSlim {
         }
     }
 }
+

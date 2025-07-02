@@ -1,4 +1,4 @@
-namespace EventViewerX.Rules.Kerberos;
+﻿namespace EventViewerX.Rules.Kerberos;
 
 public class KerberosPolicyChange : EventObjectSlim
 {
@@ -57,3 +57,4 @@ public class KerberosPolicyChange : EventObjectSlim
         }
     }
 }
+

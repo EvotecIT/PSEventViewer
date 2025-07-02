@@ -9,7 +9,7 @@ namespace EventViewerX.Rules.ActiveDirectory {
     /// 5139: A directory service object was deleted
     /// 5141: A directory service object was moved
     /// </summary>
-    public class ADOtherChangeDetailed : EventObjectSlim {
+    public class ADOtherChangeDetailed : EventRuleBase {
 
         public string Computer;
         public string Action;
@@ -20,6 +20,18 @@ namespace EventViewerX.Rules.ActiveDirectory {
         public string User; // 'User Object'
         public string FieldChanged; // 'Field Changed'
         public string FieldValue; // 'Field Value'
+    public override List<int> EventIds => new() { 5136, 5137, 5139, 5141 };
+    public override string LogName => "Security";
+    public override NamedEvents NamedEvent => NamedEvents.ADOtherChangeDetailed;
+
+    public override bool CanHandle(EventObject eventObject) {
+        // Only handle objects that are NOT user, computer, organizationalUnit, or group
+        if (eventObject.Data.TryGetValue("ObjectClass", out var objectClass)) {
+            return objectClass != "user" && objectClass != "computer" &&
+                   objectClass != "organizationalUnit" && objectClass != "group";
+        }
+        return false;
+    }
 
 
         public ADOtherChangeDetailed(EventObject eventObject) : base(eventObject) {

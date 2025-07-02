@@ -1,10 +1,18 @@
-﻿namespace EventViewerX.Rules.ActiveDirectory;
+namespace EventViewerX.Rules.ActiveDirectory;
 
 /// <summary>
 /// Active Directory User Unlocked
 /// 4767: A user account was unlocked
 /// </summary>
-public class ADUserUnlocked : EventObjectSlim {
+public class ADUserUnlocked : EventRuleBase {
+    public override List<int> EventIds => new() { 4767 };
+    public override string LogName => "Security";
+    public override NamedEvents NamedEvent => NamedEvents.ADUserUnlocked;
+
+    public override bool CanHandle(EventObject eventObject) {
+        // Simple rule - always handle if event ID and log name match
+        return true;
+    }
     public string Computer;
     public string Action;
     public string ComputerLockoutOn;

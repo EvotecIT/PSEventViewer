@@ -1,11 +1,19 @@
-﻿namespace EventViewerX.Rules.ActiveDirectory;
+namespace EventViewerX.Rules.ActiveDirectory;
 
 /// <summary>
 /// Includes users added or modified in Active Directory
 /// 4720: A user account was created
 /// 4738: A user account was changed
 /// </summary>
-public class ADUserCreateChange : EventObjectSlim {
+public class ADUserCreateChange : EventRuleBase {
+    public override List<int> EventIds => new() { 4720, 4738 };
+    public override string LogName => "Security";
+    public override NamedEvents NamedEvent => NamedEvents.ADUserCreateChange;
+
+    public override bool CanHandle(EventObject eventObject) {
+        // Simple rule - always handle if event ID and log name match
+        return true;
+    }
     public string Computer;
     public string Action;
     public string UserAffected;

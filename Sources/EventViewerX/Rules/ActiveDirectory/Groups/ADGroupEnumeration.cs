@@ -1,11 +1,19 @@
-﻿namespace EventViewerX.Rules.ActiveDirectory;
+namespace EventViewerX.Rules.ActiveDirectory;
 
 /// <summary>
 /// Active Directory Group Enumeration
 /// 4798: A user's local group membership was enumerated
 /// 4799: A security-enabled local group membership was enumerated
 /// </summary>
-public class ADGroupEnumeration : EventObjectSlim {
+public class ADGroupEnumeration : EventRuleBase {
+    public override List<int> EventIds => new() { 4798, 4799 };
+    public override string LogName => "Security";
+    public override NamedEvents NamedEvent => NamedEvents.ADGroupEnumeration;
+
+    public override bool CanHandle(EventObject eventObject) {
+        // Simple rule - always handle if event ID and log name match
+        return true;
+    }
 
     public string Computer;
     public string Action;

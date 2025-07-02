@@ -1,6 +1,6 @@
-namespace EventViewerX.Rules.ActiveDirectory;
+﻿namespace EventViewerX.Rules.ActiveDirectory;
 
-public class GpoModified : EventObjectSlim {
+public class GpoModified : EventRuleBase {
     public string Computer;
     public string Action;
     public string GpoName;
@@ -8,6 +8,15 @@ public class GpoModified : EventObjectSlim {
     public string AttributeValue;
     public string Who;
     public DateTime When;
+    public override List<int> EventIds => new() { 5136 };
+    public override string LogName => "Security";
+    public override NamedEvents NamedEvent => NamedEvents.GpoModified;
+
+    public override bool CanHandle(EventObject eventObject) {
+        // Check if this is a group policy container object
+        return eventObject.Data.TryGetValue("ObjectClass", out var objectClass) &&
+               objectClass == "groupPolicyContainer";
+    }
 
     public GpoModified(EventObject eventObject) : base(eventObject) {
         _eventObject = eventObject;
@@ -21,4 +30,5 @@ public class GpoModified : EventObjectSlim {
         When = _eventObject.TimeCreated;
     }
 }
+
 
