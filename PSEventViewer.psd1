@@ -6,7 +6,7 @@
     CompatiblePSEditions = @('Desktop', 'Core')
     Copyright            = '(c) 2011 - 2025 Przemyslaw Klys @ Evotec. All rights reserved.'
     Description          = 'Simple module allowing parsing of event logs. Has its own quirks...'
-    FunctionsToExport    = @()
+    FunctionsToExport    = @('New-EVXSubscriptionXml', 'Deploy-EVXSubscription')
     GUID                 = '5df72a79-cdf6-4add-b38d-bcacf26fb7bc'
     ModuleVersion        = '3.0.0'
     PowerShellVersion    = '5.1'
