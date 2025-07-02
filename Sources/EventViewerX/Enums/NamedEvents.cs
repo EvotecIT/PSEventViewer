@@ -288,6 +288,11 @@
         HyperVVirtualMachineStarted,
 
         /// <summary>
+        /// IIS website stopped
+        /// </summary>
+        IISSiteStopped,
+      
+        /// <summary>
         /// Exchange mailbox database mounted successfully
         /// </summary>
         ExchangeDatabaseMounted,
