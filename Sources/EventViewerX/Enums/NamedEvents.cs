@@ -271,5 +271,10 @@
         /// Hyper-V virtual machine started
         /// </summary>
         HyperVVirtualMachineStarted,
+
+        /// <summary>
+        /// Exchange mailbox database mounted successfully
+        /// </summary>
+        ExchangeDatabaseMounted,
     }
 }
