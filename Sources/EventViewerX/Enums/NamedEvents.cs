@@ -271,5 +271,10 @@
         /// Hyper-V virtual machine started
         /// </summary>
         HyperVVirtualMachineStarted,
+
+        /// <summary>
+        /// DFS Replication partner error
+        /// </summary>
+        DfsReplicationError,
     }
 }
