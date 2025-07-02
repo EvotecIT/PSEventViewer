@@ -3,6 +3,9 @@ using System.Runtime.InteropServices;
 using System.Text;
 
 namespace EventViewerX {
+    /// <summary>
+    /// Advanced helpers for writing custom events via EventWriteEx.
+    /// </summary>
     public partial class SearchEvents : Settings {
 
         [DllImport("advapi32.dll", CharSet = CharSet.Unicode, SetLastError = true)]

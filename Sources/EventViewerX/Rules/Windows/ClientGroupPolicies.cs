@@ -1,5 +1,8 @@
 namespace EventViewerX.Rules.Windows;
 
+/// <summary>
+/// Represents client side group policy processing details.
+/// </summary>
 public class ClientGroupPolicies : EventObjectSlim {
     public string Computer;
     public string Action;

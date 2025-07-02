@@ -1,5 +1,8 @@
 ﻿namespace EventViewerX.Rules.ActiveDirectory;
 
+/// <summary>
+/// Represents a modified group policy object event.
+/// </summary>
 public class GpoModified : EventRuleBase {
     public string Computer;
     public string Action;

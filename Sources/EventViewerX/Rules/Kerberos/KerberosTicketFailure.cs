@@ -1,5 +1,8 @@
 ﻿namespace EventViewerX.Rules.Kerberos;
 
+/// <summary>
+/// Represents a failed Kerberos ticket request event.
+/// </summary>
 public class KerberosTicketFailure : EventObjectSlim
 {
     public string Computer;

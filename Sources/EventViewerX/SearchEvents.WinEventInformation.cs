@@ -6,6 +6,9 @@ using System.Linq;
 using System.Security.AccessControl;
 
 namespace EventViewerX {
+    /// <summary>
+    /// Utility methods for retrieving basic Windows event log information.
+    /// </summary>
     public partial class SearchEvents : Settings {
         public static IEnumerable<WinEventInformation> GetWinEventInformation(string[]? logNames, List<string>? machines, List<string>? filePaths, int maxDegreeOfParallelism = 50) {
             if (machines == null || machines.Count == 0) {

@@ -3,6 +3,9 @@ using System.Text.RegularExpressions;
 
 namespace EventViewerX;
 
+/// <summary>
+/// Helper methods for retrieving event log configuration details.
+/// </summary>
 public partial class SearchEvents : Settings {
 
     public static IEnumerable<EventLogDetails> DisplayEventLogs(string[] listLog = null, string machineName = null) {
