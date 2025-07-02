@@ -18,17 +18,25 @@ namespace EventViewerX {
                 CreateNoWindow = true
             };
 
-            Process process = new Process { StartInfo = startInfo };
-            process.Start();
+            try {
+                using (Process process = new Process { StartInfo = startInfo }) {
+                    if (!process.Start()) {
+                        Console.WriteLine("`wevtutil.exe` is not available.");
+                        return;
+                    }
 
-            string output = process.StandardOutput.ReadToEnd();
-            process.WaitForExit();
+                    string output = process.StandardOutput.ReadToEnd();
+                    process.WaitForExit();
 
-            if (process.ExitCode == 0) {
-                Console.WriteLine("Manifest imported successfully.");
-            } else {
-                Console.WriteLine($"Failed to import manifest. Exit code: {process.ExitCode}");
-                Console.WriteLine($"Output: {output}");
+                    if (process.ExitCode == 0) {
+                        Console.WriteLine("Manifest imported successfully.");
+                    } else {
+                        Console.WriteLine($"Failed to import manifest. Exit code: {process.ExitCode}");
+                        Console.WriteLine($"Output: {output}");
+                    }
+                }
+            } catch (System.ComponentModel.Win32Exception) {
+                Console.WriteLine("`wevtutil.exe` is not available.");
             }
         }
 
@@ -61,20 +69,21 @@ namespace EventViewerX {
             };
 
             try {
-                Process process = Process.Start(startInfo);
-                if (process == null) {
-                    Console.WriteLine("`mc.exe` is not available.");
-                    return;
-                }
+                using (Process process = Process.Start(startInfo)) {
+                    if (process == null) {
+                        Console.WriteLine("`mc.exe` is not available.");
+                        return;
+                    }
 
-                string output = process.StandardOutput.ReadToEnd();
-                process.WaitForExit();
+                    string output = process.StandardOutput.ReadToEnd();
+                    process.WaitForExit();
 
-                if (process.ExitCode == 0) {
-                    Console.WriteLine("Manifest compiled successfully.");
-                } else {
-                    Console.WriteLine($"Failed to compile manifest. Exit code: {process.ExitCode}");
-                    Console.WriteLine($"Output: {output}");
+                    if (process.ExitCode == 0) {
+                        Console.WriteLine("Manifest compiled successfully.");
+                    } else {
+                        Console.WriteLine($"Failed to compile manifest. Exit code: {process.ExitCode}");
+                        Console.WriteLine($"Output: {output}");
+                    }
                 }
             } catch (System.ComponentModel.Win32Exception) {
                 Console.WriteLine("`mc.exe` is not available.");
