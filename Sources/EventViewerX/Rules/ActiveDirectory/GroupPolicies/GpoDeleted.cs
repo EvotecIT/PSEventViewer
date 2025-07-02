@@ -1,5 +1,8 @@
 ﻿namespace EventViewerX.Rules.ActiveDirectory;
 
+/// <summary>
+/// Represents a deleted group policy object event.
+/// </summary>
 public class GpoDeleted : EventRuleBase {
     public string Computer;
     public string Action;

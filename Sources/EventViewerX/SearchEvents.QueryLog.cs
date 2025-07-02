@@ -24,7 +24,7 @@ public partial class SearchEvents : Settings {
     /// </summary>
     /// <param name="query">The query.</param>
     /// <param name="machineName">Name of the machine.</param>
-    /// <returns></returns>
+    /// <returns>Initialized <see cref="EventLogReader"/> or null when failed.</returns>
     private static EventLogReader CreateEventLogReader(EventLogQuery query, string machineName) {
         if (query == null) {
             _logger.WriteWarning($"An error occurred on {machineName} while creating the event log reader: Query cannot be null.");
@@ -48,7 +48,7 @@ public partial class SearchEvents : Settings {
     /// <summary>
     /// Get the fully qualified domain name of the machine
     /// </summary>
-    /// <returns></returns>
+    /// <returns>Machine FQDN.</returns>
     private static string GetFQDN() {
         try {
             return Dns.GetHostEntry("").HostName;
@@ -180,7 +180,7 @@ public partial class SearchEvents : Settings {
     /// <param name="maxEvents">The maximum events.</param>
     /// <param name="eventRecordId">The event record identifier.</param>
     /// <param name="timePeriod">The time period.</param>
-    /// <returns></returns>
+    /// <returns>Enumerable collection of matching events.</returns>
     public static IEnumerable<EventObject> QueryLog(string logName, List<int> eventIds = null, string machineName = null, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null, int maxEvents = 0, List<long> eventRecordId = null, TimePeriod? timePeriod = null, CancellationToken cancellationToken = default) {
         if (eventIds != null && eventIds.Any(id => id <= 0)) {
             throw new ArgumentException("Event IDs must be positive.", nameof(eventIds));
@@ -237,8 +237,8 @@ public partial class SearchEvents : Settings {
     /// <summary>
     /// Build a query string for querying a log for a specific event record ID or IDs
     /// </summary>
-    /// <param name="eventRecordIds"></param>
-    /// <returns></returns>
+    /// <param name="eventRecordIds">Event record identifiers.</param>
+    /// <returns>XML query string.</returns>
     private static string BuildQueryString(List<long> eventRecordIds) {
         if (eventRecordIds != null) {
             var validIds = eventRecordIds.Where(id => id > 0).ToList();
@@ -265,7 +265,7 @@ public partial class SearchEvents : Settings {
     /// <param name="tasks">The tasks.</param>
     /// <param name="opcodes">The opcodes.</param>
     /// <param name="timePeriod">The time period.</param>
-    /// <returns></returns>
+    /// <returns>XML query string.</returns>
     private static string BuildQueryString(string logName, List<int> eventIds = null, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null, List<int> tasks = null, List<int> opcodes = null, TimePeriod? timePeriod = null) {
         TimeSpan? lastPeriod = null;
         if (timePeriod.HasValue) {

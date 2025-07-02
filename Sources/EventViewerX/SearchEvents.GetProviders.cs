@@ -1,4 +1,7 @@
 ﻿namespace EventViewerX {
+    /// <summary>
+    /// Placeholder for future provider related methods.
+    /// </summary>
     public partial class SearchEvents : Settings {
 
         //public static void GetProviderList() {
