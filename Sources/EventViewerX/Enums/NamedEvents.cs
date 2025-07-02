@@ -214,9 +214,19 @@
         BitLockerKeyChange,
 
         /// <summary>
+        /// BitLocker protection was suspended
+        /// </summary>
+        BitLockerSuspended,
+
+        /// <summary>
         /// External device recognized by the system
         /// </summary>
         DeviceRecognized,
+
+        /// <summary>
+        /// Device was disabled
+        /// </summary>
+        DeviceDisabled,
 
         /// <summary>
         /// Object deleted
@@ -276,5 +286,10 @@
         /// Exchange mailbox database mounted successfully
         /// </summary>
         ExchangeDatabaseMounted,
+      
+        /// <summary>
+        /// DFS Replication partner error
+        /// </summary>
+        DfsReplicationError,
     }
 }

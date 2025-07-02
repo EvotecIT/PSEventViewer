@@ -12,9 +12,9 @@ namespace EventViewerX {
         /// <summary>
         /// Builds the appropriate event object based on the NamedEvents value
         /// </summary>
-        /// <param name="eventObject"></param>
-        /// <param name="typeEventsList"></param>
-        /// <returns></returns>
+        /// <param name="eventObject">Event to evaluate.</param>
+        /// <param name="typeEventsList">List of target event types.</param>
+        /// <returns>Concrete event rule instance or null.</returns>
         /// <exception cref="ArgumentException"></exception>
         private static EventObjectSlim BuildTargetEvents(EventObject eventObject, List<NamedEvents> typeEventsList) {
             // Use the new reflection-based system - let each rule decide if it can handle the event

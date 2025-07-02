@@ -5,6 +5,9 @@ using System.Diagnostics.Eventing.Reader;
 using System.Linq;
 
 namespace EventViewerX {
+    /// <summary>
+    /// Functions for retrieving event provider metadata.
+    /// </summary>
     public partial class SearchEvents : Settings {
 
         /// <summary>
@@ -12,6 +15,10 @@ namespace EventViewerX {
         /// </summary>
         private static readonly ConcurrentDictionary<string, Metadata> _providerMetadataCache = new(StringComparer.OrdinalIgnoreCase);
 
+        /// <summary>
+        /// Retrieves available event providers on the local machine.
+        /// </summary>
+        /// <returns>Enumeration of provider metadata.</returns>
         public static IEnumerable<Metadata> GetProviders() {
             EventLogSession session = new EventLogSession();
             foreach (string providerName in session.GetProviderNames()) {
@@ -37,12 +44,18 @@ namespace EventViewerX {
             }
         }
 
+        /// <summary>
+        /// Returns provider metadata as a list.
+        /// </summary>
         public static List<Metadata> GetProviderList() {
             return GetProviders().ToList();
         }
 
     }
 
+    /// <summary>
+    /// Lightweight provider metadata container.
+    /// </summary>
     public class Metadata {
         public string ProviderName;
         public string DisplayName;

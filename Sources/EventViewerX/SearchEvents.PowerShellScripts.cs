@@ -6,6 +6,9 @@ using System.Text;
 using System.Xml.Linq;
 
 namespace EventViewerX {
+    /// <summary>
+    /// Methods for working with PowerShell script execution events.
+    /// </summary>
     public partial class SearchEvents {
         public static IEnumerable<PowerShellScriptExecutionInfo> GetPowerShellScriptExecution(
             PowerShellEdition type,

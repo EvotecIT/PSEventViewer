@@ -1,5 +1,8 @@
 ﻿namespace EventViewerX.Rules.ActiveDirectory;
 
+/// <summary>
+/// Summary information for group policy change events.
+/// </summary>
 public class ADGroupPolicyChanges : EventRuleBase {
     public string Computer;
     public string Action;
