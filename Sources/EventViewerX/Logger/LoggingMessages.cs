@@ -28,5 +28,4 @@ public class LoggingMessages {
         set => Logger.IsDebug = value;
     }
 
-    internal static object _LockObject = new object();
 }
