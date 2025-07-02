@@ -153,10 +153,10 @@ namespace EventViewerX {
 
             XMLData = eventRecord.ToXml();
             // Create a dictionary to hold the xml data
-            Data = ParseXML(XMLData);
+            Data = ParseXML<Dictionary<string, string>>(XMLData);
             // Create a dictionary to hold the message data
             try {
-                MessageData = ParseMessage(eventRecord.FormatDescription());
+                MessageData = ParseMessage<Dictionary<string, string>>(eventRecord.FormatDescription());
             } catch {
                 MessageData = new Dictionary<string, string>();
                 //_logger.WriteError("Error parsing message");
@@ -169,8 +169,8 @@ namespace EventViewerX {
         /// </summary>
         /// <param name="message"></param>
         /// <returns></returns>
-        private Dictionary<string, string> ParseMessage(string message) {
-            Dictionary<string, string> data = new Dictionary<string, string>();
+        private T ParseMessage<T>(string message) where T : IDictionary<string, string>, new() {
+            T data = new();
 
             // Split the message into lines
             string[] lines = Regex.Split(message, "\r?\n");
@@ -242,8 +242,8 @@ namespace EventViewerX {
         /// </summary>
         /// <param name="xmlData">The XML data.</param>
         /// <returns></returns>
-        private Dictionary<string, string> ParseXML(string xmlData) {
-            Dictionary<string, string> data = new Dictionary<string, string>();
+        private T ParseXML<T>(string xmlData) where T : IDictionary<string, string>, new() {
+            T data = new();
 
             // Parse the XML data into an XElement
             XElement root;
