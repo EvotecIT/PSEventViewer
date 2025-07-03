@@ -371,7 +371,7 @@ public partial class SearchEvents : Settings {
 
         var tasks = new ConcurrentBag<Task>();
         foreach (var machineName in machineNames) {
-            if (eventIds != null) {
+            if (eventIds != null && eventIds.Any()) {
                 var eventIdsChunks = eventIds.Select((x, i) => new { Index = i, Value = x })
                     .GroupBy(x => x.Index / 22)
                     .Select(x => x.Select(v => v.Value).ToList())
@@ -380,7 +380,7 @@ public partial class SearchEvents : Settings {
                 foreach (var chunk in eventIdsChunks) {
                     tasks.Add(CreateTask(machineName, logName, chunk, providerName, keywords, level, startTime, endTime, userId, maxEvents, semaphore, results, cancellationToken, timePeriod: timePeriod));
                 }
-            } else if (eventRecordId != null) {
+            } else if (eventRecordId != null && eventRecordId.Any()) {
                 var eventRecordIdChunks = eventRecordId.Select((x, i) => new { Index = i, Value = x })
                     .GroupBy(x => x.Index / 22)
                     .Select(x => x.Select(v => v.Value).ToList())
@@ -390,7 +390,7 @@ public partial class SearchEvents : Settings {
                     tasks.Add(CreateTask(machineName, logName, null, providerName, keywords, level, startTime, endTime, userId, maxEvents, semaphore, results, cancellationToken, chunk, timePeriod: timePeriod));
                 }
             } else {
-                // event ids are null, so we don't need to chunk them
+                // event ids are null or empty, so we don't need to chunk them
                 tasks.Add(CreateTask(machineName, logName, eventIds, providerName, keywords, level, startTime, endTime, userId, maxEvents, semaphore, results, cancellationToken, timePeriod: timePeriod));
             }
         }
