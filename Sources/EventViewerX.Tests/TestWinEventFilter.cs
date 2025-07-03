@@ -64,7 +64,7 @@ namespace EventViewerX.Tests {
         public void IdMultipleValuesXmlQuery() {
             var result = SearchEvents.BuildWinEventFilter(id: ["1", "2"], logName: "Log");
             Assert.StartsWith("<QueryList>", result);
-            Assert.Contains("(EventID=1) or (EventID=2)", result);
+            Assert.Contains("(EventID=1) or\n(EventID=2)", result);
         }
 
         [Fact]

@@ -148,6 +148,10 @@ public partial class SearchEvents {
             filter = JoinXPathFilter(InitializeXPathFilter(items, "{0}", "*[EventData[{0}]]", escapeItems: false), filter);
         }
 
+        if (!xpathOnly && !string.IsNullOrEmpty(filter)) {
+            filter = filter.Replace(" and ", " and\n").Replace(" or ", " or\n");
+        }
+
         if (xpathOnly) {
             return filter;
         }

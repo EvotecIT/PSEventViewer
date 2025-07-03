@@ -64,3 +64,8 @@ Our module tries to improve on that by providing a bit more flexibility and spee
 ```powershell
 Get-EVXEvent -LogName Security -RecordIdFile C:\Temp\evx.state -RecordIdKey Machine1
 ```
+
+### Debugging query strings
+
+`BuildWinEventFilter` now inserts a newline between each query clause when `xpathOnly` is set to `$false`.
+The additional line breaks make complex XML queries easier to read in logs or debug output.
