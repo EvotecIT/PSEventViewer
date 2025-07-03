@@ -285,7 +285,7 @@
         /// <summary>
         /// Hyper-V virtual machine was shut down
         /// </summary>
-        HyperVVmShutdown,
+        HyperVVirtualMachineShutdown,
       
         /// <summary>
         /// Hyper-V virtual machine started
@@ -295,7 +295,7 @@
         /// <summary>
         /// IIS site failed to register binding (W3SVC event 1007)
         /// </summary>
-        IisSiteBindingFailure,
+        IISSiteBindingFailure,
       
         /// <summary>
         /// Hyper-V checkpoint created
@@ -328,14 +328,19 @@
         SyncCompleted,
       
         /// <summary>
+        /// Azure AD Connect staging mode enabled
+        /// </summary>
+        AADConnectStagingEnabled,
+
+        /// <summary>
         /// Azure AD Connect staging mode disabled
         /// </summary>
         AADConnectStagingDisabled,
       
         /// <summary>
-        /// Password synchronization failure
+        /// Azure AD Connect password synchronization failed
         /// </summary>
-        PasswordSyncFailed,
+        AADConnectPasswordSyncFailed,
       
         /// <summary>
         /// Azure AD Connect run profile completed

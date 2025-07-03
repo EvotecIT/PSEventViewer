@@ -10,7 +10,7 @@ namespace EventViewerX.Rules.ActiveDirectory;
 public class PasswordSyncFailed : EventRuleBase {
     public override List<int> EventIds => new() { 611 };
     public override string LogName => "Application";
-    public override NamedEvents NamedEvent => NamedEvents.PasswordSyncFailed;
+    public override NamedEvents NamedEvent => NamedEvents.AADConnectPasswordSyncFailed;
 
     public override bool CanHandle(EventObject eventObject) {
         return true;
@@ -23,7 +23,7 @@ public class PasswordSyncFailed : EventRuleBase {
 
     public PasswordSyncFailed(EventObject eventObject) : base(eventObject) {
         _eventObject = eventObject;
-        Type = "PasswordSyncFailed";
+        Type = "AADConnectPasswordSyncFailed";
         Computer = _eventObject.ComputerName;
         User = _eventObject.GetValueFromDataDictionary("User", "AccountName");
         Error = _eventObject.GetValueFromDataDictionary("ErrorCode", "FailureCode");

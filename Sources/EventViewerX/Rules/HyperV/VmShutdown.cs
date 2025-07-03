@@ -7,7 +7,7 @@ namespace EventViewerX.Rules.HyperV;
 public class VmShutdown : EventRuleBase {
     public override List<int> EventIds => new() { 18560 };
     public override string LogName => "Microsoft-Windows-Hyper-V-Worker/Operational";
-    public override NamedEvents NamedEvent => NamedEvents.HyperVVmShutdown;
+    public override NamedEvents NamedEvent => NamedEvents.HyperVVirtualMachineShutdown;
 
     public override bool CanHandle(EventObject eventObject) {
         // Simple rule - always handle if event ID and log name match
@@ -21,7 +21,7 @@ public class VmShutdown : EventRuleBase {
 
     public VmShutdown(EventObject eventObject) : base(eventObject) {
         _eventObject = eventObject;
-        Type = "VmShutdown";
+        Type = "HyperVVirtualMachineShutdown";
         Computer = _eventObject.ComputerName;
         VmName = _eventObject.GetValueFromDataDictionary("VmName");
         if (string.IsNullOrEmpty(VmName)) {
