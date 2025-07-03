@@ -83,6 +83,7 @@ namespace EventViewerX {
                 _eventLogWatcher.Dispose();
                 _eventLogWatcher = null;
             }
+            _watchEventId = new ConcurrentBag<int>();
             _eventLogSession?.Dispose();
             _eventLogSession = null;
         }
