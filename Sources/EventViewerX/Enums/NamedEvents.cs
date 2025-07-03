@@ -323,6 +323,11 @@
         SqlDatabaseCreated,
 
         /// <summary>
+        /// Azure AD Connect staging mode disabled
+        /// </summary>
+        AADConnectStagingDisabled,
+      
+        /// <summary>
         /// Password synchronization failure
         /// </summary>
         PasswordSyncFailed,
