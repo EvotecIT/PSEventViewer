@@ -429,9 +429,9 @@ public partial class SearchEvents : Settings {
 
     private static Task CreateTask(string machineName, string logName, List<int> eventIds, string providerName, Keywords? keywords, Level? level, DateTime? startTime, DateTime? endTime, string userId, int maxEvents, SemaphoreSlim semaphore, BlockingCollection<EventObject> results, CancellationToken cancellationToken, List<long> eventRecordId = null, TimePeriod? timePeriod = null) {
         return Task.Run(async () => {
-            _logger.WriteVerbose($"Querying log on machine: {machineName}, logName: {logName}, event ids: " + string.Join(", ", eventIds ?? new List<int>()));
             await semaphore.WaitAsync(cancellationToken);
             try {
+                _logger.WriteVerbose($"Querying log on machine: {machineName}, logName: {logName}, event ids: " + string.Join(", ", eventIds ?? new List<int>()));
                 var queryResults = await QueryLogAsync(logName, eventIds, machineName, providerName, keywords, level, startTime, endTime, userId, maxEvents, eventRecordId, timePeriod, cancellationToken);
                 foreach (var result in queryResults) {
                     if (cancellationToken.IsCancellationRequested) break;
