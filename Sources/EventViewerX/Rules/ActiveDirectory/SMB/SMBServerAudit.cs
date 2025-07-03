@@ -1,5 +1,7 @@
 ﻿using DnsClientX;
 
+using EventViewerX;
+
 namespace EventViewerX.Rules.ActiveDirectory;
 /// <summary>
 /// SMB Server Audit
@@ -12,6 +14,7 @@ namespace EventViewerX.Rules.ActiveDirectory;
 /// HKLM\SYSTEM\CurrentControlSet\Services\LanmanServer\Parameters
 /// AuditSmb1Access => REG_DWORD => 1
 /// </summary>
+[EventRule(NamedEvents.ADSMBServerAuditV1, "Microsoft-Windows-SMBServer/Audit", 3000)]
 public class SMBServerAudit : EventObjectSlim {
     // public EventObject EventObject { get; }
     public string Computer;
@@ -20,8 +23,8 @@ public class SMBServerAudit : EventObjectSlim {
     public string ClientDNSName = string.Empty;
     public DateTime When;
 
-    // private ctor that performs partial initialization
-    private SMBServerAudit(EventObject eventObject) : base(eventObject) {
+    // public ctor that performs partial initialization
+    public SMBServerAudit(EventObject eventObject) : base(eventObject) {
         //EventObject = eventObject;
 
         _eventObject = eventObject;
@@ -30,14 +33,7 @@ public class SMBServerAudit : EventObjectSlim {
         Action = _eventObject.MessageSubject;
         ClientAddress = _eventObject.GetValueFromDataDictionary("ClientName");
         When = _eventObject.TimeCreated;
-    }
-
-    // static instance creation method to hide the async initialization
-    public static SMBServerAudit Create(EventObject eventObject) {
-        var smbAudit = new SMBServerAudit(eventObject);
-        // smbAudit.ClientDNSName = QueryDnsAsync(smbAudit.ClientAddress).ConfigureAwait(false).GetAwaiter().GetResult();
-        smbAudit.ClientDNSName = Task.Run(() => QueryDnsAsync(smbAudit.ClientAddress)).Result;
-        return smbAudit;
+        ClientDNSName = Task.Run(() => QueryDnsAsync(ClientAddress)).Result;
     }
 
 
