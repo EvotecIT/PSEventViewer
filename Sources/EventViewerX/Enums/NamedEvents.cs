@@ -323,6 +323,11 @@
         SqlDatabaseCreated,
 
         /// <summary>
+        /// Synchronization finished successfully
+        /// </summary>
+        SyncCompleted,
+      
+        /// <summary>
         /// Azure AD Connect staging mode disabled
         /// </summary>
         AADConnectStagingDisabled,
