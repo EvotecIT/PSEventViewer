@@ -316,5 +316,10 @@
         /// DFS Replication partner error
         /// </summary>
         DfsReplicationError,
+
+        /// <summary>
+        /// SQL Server database created
+        /// </summary>
+        SqlDatabaseCreated,
     }
 }
