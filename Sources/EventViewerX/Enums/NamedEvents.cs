@@ -321,5 +321,10 @@
         /// SQL Server database created
         /// </summary>
         SqlDatabaseCreated,
+
+        /// <summary>
+        /// Azure AD Connect run profile completed
+        /// </summary>
+        AADConnectRunProfile,
     }
 }
