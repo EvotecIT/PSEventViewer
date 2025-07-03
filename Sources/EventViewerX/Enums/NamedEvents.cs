@@ -326,5 +326,10 @@
         /// Password synchronization failure
         /// </summary>
         PasswordSyncFailed,
+      
+        /// <summary>
+        /// Azure AD Connect run profile completed
+        /// </summary>
+        AADConnectRunProfile,
     }
 }
