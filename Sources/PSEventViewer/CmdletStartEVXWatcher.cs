@@ -33,6 +33,12 @@ namespace PSEventViewer {
         public int[] EventId { get; set; }
 
         /// <summary>
+        /// Enables staging mode which also watches for event ID 350.
+        /// </summary>
+        [Parameter(Mandatory = false)]
+        public SwitchParameter Staging { get; set; }
+
+        /// <summary>
         /// Script block executed when matching events are detected.
         /// </summary>
         [Parameter(Mandatory = true, Position = 3)]
@@ -62,7 +68,8 @@ namespace PSEventViewer {
         /// Starts watching for events and invokes the provided action.
         /// </summary>
         protected override Task ProcessRecordAsync() {
-            EventWatching.Watch(MachineName, LogName, EventId.ToList(), e => Action.Invoke(e), CancelToken);
+            var ids = EventId.ToList();
+            EventWatching.Watch(MachineName, LogName, ids, e => Action.Invoke(e), CancelToken, Staging.IsPresent, Environment.UserName);
             return Task.CompletedTask;
         }
         /// <summary>
