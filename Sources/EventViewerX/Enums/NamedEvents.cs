@@ -285,7 +285,7 @@
         /// <summary>
         /// Hyper-V virtual machine was shut down
         /// </summary>
-        HyperVVmShutdown,
+        HyperVVirtualMachineShutdown,
       
         /// <summary>
         /// Hyper-V virtual machine started
@@ -295,7 +295,7 @@
         /// <summary>
         /// IIS site failed to register binding (W3SVC event 1007)
         /// </summary>
-        IisSiteBindingFailure,
+        IISSiteBindingFailure,
       
         /// <summary>
         /// Hyper-V checkpoint created
