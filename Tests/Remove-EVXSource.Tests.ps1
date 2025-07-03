@@ -10,4 +10,8 @@ describe 'Remove-EVXSource cmdlet' {
         Remove-EVXSource -SourceName $script:source | Should -Be $true
         [System.Diagnostics.EventLog]::SourceExists($script:source) | Should -Be $false
     }
+
+    It 'does not expose RecordId parameter' {
+        (Get-Command Write-EVXEntry).Parameters.Keys | Should -NotContain 'RecordId'
+    }
 }

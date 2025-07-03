@@ -3,6 +3,7 @@
 /// <summary>
 /// Writes custom events to Windows Event Logs for testing, debugging, or application logging.
 /// Supports creating events with custom data, providers, and event IDs.
+/// Only the "GenericEvents" parameter set is currently supported.
 /// </summary>
 [Cmdlet(VerbsCommunications.Write, "EVXEntry")]
 [Alias("Write-EventViewerXEntry", "Write-WinEvent")]
@@ -18,7 +19,6 @@ public sealed class CmdletWriteEVXEntry : AsyncPSCmdlet {
     /// <summary>
     /// Name of the event log where the entry will be written.
     /// </summary>
-    [Parameter(Mandatory = true, Position = 0, ParameterSetName = "RecordId")]
     [Parameter(Mandatory = true, Position = 0, ParameterSetName = "GenericEvents")]
     public string LogName;
 
