@@ -2,6 +2,7 @@
 
 #### 2.3.0 - 2024.11.25 *EXPERIMENTAL*
 - Fix for SMBv1
+- `BuildWinEventFilter` adds newlines between clauses for easier debugging when `xpathOnly` is `$false`
 
 **Full Changelog**: https://github.com/EvotecIT/PSEventViewer/compare/v2.2.0...v2.3.0
 
