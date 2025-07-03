@@ -76,5 +76,19 @@ namespace EventViewerX.Tests {
             Assert.Contains("TimeCreated[timediff(@SystemTime) &gt;=", result);
             Assert.DoesNotContain("<QueryList>", result);
         }
+
+        [Fact]
+        public void FutureStartTimeIsClamped() {
+            var start = DateTime.Now.AddMinutes(10);
+            var result = SearchEvents.BuildWinEventFilter(startTime: start, logName: "x", xpathOnly: true);
+            Assert.Contains("timediff(@SystemTime) &lt;= 0", result);
+        }
+
+        [Fact]
+        public void FutureEndTimeIsClamped() {
+            var end = DateTime.Now.AddMinutes(5);
+            var result = SearchEvents.BuildWinEventFilter(endTime: end, logName: "x", xpathOnly: true);
+            Assert.Contains("timediff(@SystemTime) &gt;= 0", result);
+        }
     }
 }
