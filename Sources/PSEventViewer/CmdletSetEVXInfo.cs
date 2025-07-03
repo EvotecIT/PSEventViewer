@@ -64,7 +64,7 @@ public sealed class CmdletSetEVXInfo : AsyncPSCmdlet {
                 : new EventLogSession(ComputerName);
             _log = new EventLogConfiguration(LogName, session);
         } catch (Exception ex) {
-            WriteWarning($"Set-WinEventSettings - Error occured during reading {LogName} log - {ex.Message}");
+            WriteWarning($"Set‑EVXInfo - Error occured during reading {LogName} log - {ex.Message}");
         }
         return Task.CompletedTask;
     }
@@ -102,7 +102,7 @@ public sealed class CmdletSetEVXInfo : AsyncPSCmdlet {
             try {
                 _log.SaveChanges();
             } catch (Exception ex) {
-                WriteWarning($"Set-WinEventSettings - Error occured during saving of changes for {LogName} log - {ex.Message}");
+                WriteWarning($"Set‑EVXInfo - Error occured during saving of changes for {LogName} log - {ex.Message}");
             }
         }
 
