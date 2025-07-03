@@ -29,4 +29,14 @@ Describe "Get-EventFilters using Path and NamendDataFilter" {
         $XML | Should -BeLike '*Query Id="0" Path="file://*'    -Because 'We wanted to query a filepath'
         $XML | Should -Not -Belike '*Select Path*'              -Because 'Queries using eventfiles do not have a Channel'
     }
+
+    It '-Keywords single value should produce band filter' {
+        $XPath = Get-EVXFilter -Keywords 1125899906842624 -LogName 'xx' -XPathOnly
+        $XPath | Should -Be '*[System[band(Keywords,1125899906842624)]]'
+    }
+
+    It '-Keywords multiple values should OR them in band filter' {
+        $XPath = Get-EVXFilter -Keywords 1125899906842624,281474976710656 -LogName 'xx' -XPathOnly
+        $XPath | Should -Be '*[System[band(Keywords,1407374883553280)]]'
+    }
 }
