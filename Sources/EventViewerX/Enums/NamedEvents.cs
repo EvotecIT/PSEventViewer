@@ -321,5 +321,10 @@
         /// SQL Server database created
         /// </summary>
         SqlDatabaseCreated,
+
+        /// <summary>
+        /// Synchronization finished successfully
+        /// </summary>
+        SyncCompleted,
     }
 }
