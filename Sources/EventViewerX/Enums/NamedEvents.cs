@@ -321,5 +321,10 @@
         /// SQL Server database created
         /// </summary>
         SqlDatabaseCreated,
+
+        /// <summary>
+        /// Password synchronization failure
+        /// </summary>
+        PasswordSyncFailed,
     }
 }
