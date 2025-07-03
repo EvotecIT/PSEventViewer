@@ -326,5 +326,15 @@
         /// Azure AD Connect staging mode disabled
         /// </summary>
         AADConnectStagingDisabled,
+      
+        /// <summary>
+        /// Password synchronization failure
+        /// </summary>
+        PasswordSyncFailed,
+      
+        /// <summary>
+        /// Azure AD Connect run profile completed
+        /// </summary>
+        AADConnectRunProfile,
     }
 }

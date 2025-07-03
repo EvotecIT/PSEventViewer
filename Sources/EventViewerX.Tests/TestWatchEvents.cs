@@ -30,5 +30,14 @@ namespace EventViewerX.Tests {
             Assert.DoesNotContain(1, ids);
             Assert.Contains(2, ids);
         }
+
+        [Fact]
+        public void StagingAddsEvent350AndRecordsUser() {
+            var watcher = new WatchEvents();
+            watcher.Watch(Environment.MachineName, "Application", new List<int> { 1 }, null, default, true, "tester");
+            var ids = GetIds(watcher);
+            Assert.Contains(350, ids);
+            Assert.Equal("tester", watcher.StagingEnabledBy);
+        }
     }
 }
