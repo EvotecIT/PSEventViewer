@@ -45,6 +45,7 @@ namespace EventViewerX {
         }
 
         public void Watch(string machineName, string logName, List<int> eventId, Action<EventObject> eventAction = null, CancellationToken cancellationToken = default, bool staging = false, string enabledBy = null) {
+            NumberOfEventsFound = 0;
             Dispose();
             _machineName = machineName;
             if (staging && !eventId.Contains(350)) {

@@ -39,5 +39,13 @@ namespace EventViewerX.Tests {
             Assert.Contains(350, ids);
             Assert.Equal("tester", watcher.StagingEnabledBy);
         }
+
+        [Fact]
+        public void WatchResetsNumberOfEventsFound() {
+            WatchEvents.NumberOfEventsFound = 5;
+            var watcher = new WatchEvents();
+            watcher.Watch(Environment.MachineName, "Application", new List<int> { 1 });
+            Assert.Equal(0, WatchEvents.NumberOfEventsFound);
+        }
     }
 }
