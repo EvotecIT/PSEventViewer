@@ -73,10 +73,16 @@ public partial class SearchEvents {
         var now = DateTime.Now;
         if (startTime.HasValue) {
             var diff = Math.Round(now.Subtract(startTime.Value).TotalMilliseconds);
+            if (diff < 0) {
+                diff = 0;
+            }
             filter = JoinXPathFilter($"*[System[TimeCreated[timediff(@SystemTime) &lt;= {diff}]]]", filter);
         }
         if (endTime.HasValue) {
             var diff = Math.Round(now.Subtract(endTime.Value).TotalMilliseconds);
+            if (diff < 0) {
+                diff = 0;
+            }
             filter = JoinXPathFilter($"*[System[TimeCreated[timediff(@SystemTime) &gt;= {diff}]]]", filter);
         }
         if (data != null && data.Length > 0) {
