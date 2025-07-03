@@ -298,7 +298,7 @@ public partial class SearchEvents : Settings {
 
         // Add keywords to the query
         if (keywords.HasValue) {
-            AddCondition(queryString, $"Keywords={(long)keywords.Value}");
+            AddCondition(queryString, $"band(Keywords,{(long)keywords.Value})");
         }
 
         // Add level to the query
