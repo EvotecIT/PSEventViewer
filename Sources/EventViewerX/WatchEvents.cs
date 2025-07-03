@@ -14,6 +14,16 @@ namespace EventViewerX {
         private ConcurrentBag<int> _watchEventId = new ConcurrentBag<int>();
 
         /// <summary>
+        /// Indicates whether staging is enabled.
+        /// </summary>
+        public bool StagingEnabled { get; private set; }
+
+        /// <summary>
+        /// Username of the account that enabled staging.
+        /// </summary>
+        public string StagingEnabledBy { get; private set; }
+
+        /// <summary>
         /// Action executed when an event matching the filter is detected.
         /// </summary>
         private Action<EventObject> _eventAction;
@@ -34,9 +44,17 @@ namespace EventViewerX {
             }
         }
 
-        public void Watch(string machineName, string logName, List<int> eventId, Action<EventObject> eventAction = null, CancellationToken cancellationToken = default) {
+        public void Watch(string machineName, string logName, List<int> eventId, Action<EventObject> eventAction = null, CancellationToken cancellationToken = default, bool staging = false, string enabledBy = null) {
             Dispose();
             _machineName = machineName;
+            if (staging && !eventId.Contains(350)) {
+                eventId.Add(350);
+                StagingEnabled = true;
+                StagingEnabledBy = enabledBy ?? Environment.UserName;
+            } else {
+                StagingEnabled = false;
+                StagingEnabledBy = null;
+            }
             _watchEventId = new ConcurrentBag<int>(eventId);
             _eventAction = eventAction;
             try {
@@ -84,6 +102,8 @@ namespace EventViewerX {
                 _eventLogWatcher = null;
             }
             _watchEventId = new ConcurrentBag<int>();
+            StagingEnabled = false;
+            StagingEnabledBy = null;
             _eventLogSession?.Dispose();
             _eventLogSession = null;
         }
