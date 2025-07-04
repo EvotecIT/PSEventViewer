@@ -55,4 +55,37 @@ Our module tries to improve on that by providing a bit more flexibility and spee
 - [Documentation for PSEventViewer (examples and how things are different)](https://evotec.xyz/working-with-windows-events-with-powershell/)
 - [PowerShell - Everything you wanted to know about Event Logs and then some](https://evotec.xyz/powershell-everything-you-wanted-to-know-about-event-logs/)
 - [Sending information to Event Log with extended fields using PowerShell](https://evotec.xyz/sending-information-to-event-log-with-extended-fields-using-powershell/)
-- [The only PowerShell Command you will ever need to find out who did what in Active Directory](https://evotec.xyz/the-only-powershell-command-you-will-ever-need-to-find-out-who-did-what-in-active-directory/)
+ - [The only PowerShell Command you will ever need to find out who did what in Active Directory](https://evotec.xyz/the-only-powershell-command-you-will-ever-need-to-find-out-who-did-what-in-active-directory/)
+
+## Real-time Event Watching
+
+`Register-EVXWatcher` stores a watcher definition for later use, while `Start-EVXWatcher` can start a watcher directly or by name.
+
+```powershell
+# register and run later
+Register-EVXWatcher -Name 'AppErrors' -MachineName $env:COMPUTERNAME -LogName 'Application' -EventId 1000 -Action {
+    Write-Host "Application error: $($_.Message)"
+}
+
+# start by name and capture watcher id
+$id = Start-EVXWatcher -Name 'AppErrors'
+
+# or run immediately without registration
+Start-EVXWatcher -MachineName $env:COMPUTERNAME -LogName 'Application' -EventId 1000 -Action {
+    Write-Host "Application error: $($_.Message)"
+}
+```
+
+Use `Get-EVXWatcher -Running` to list active watchers and `Remove-EVXWatcher -Name $id` to stop them.
+
+It supports automatic stop conditions:
+
+- `-TimeoutSeconds` – stop after a period of time
+- `-StopOnMatch` – stop when the first matching event is found
+- `-StopAfter` – stop after a given number of matches
+- `-Until` – script block evaluated for each event and stopping when it returns `$true`
+
+Additional sample scripts are available in the `Examples` directory, including:
+- Example.StartWatcherSimple.ps1
+- Example.StartWatcherAdvanced.ps1
+- Example.WatcherStopConditions.ps1
