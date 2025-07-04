@@ -8,11 +8,10 @@ namespace PSEventViewer {
     /// Starts real-time monitoring of Windows Event Logs with customizable filters and actions.
     /// Provides continuous event watching with scriptblock execution for matched events.
     /// </summary>
-    [Cmdlet(VerbsLifecycle.Start, "EVXWatcher")]
+    [Cmdlet(VerbsLifecycle.Start, "EVXWatcher", DefaultParameterSetName = "EventId")]
     [Alias("Start-EventViewerXWatcher", "Start-EventWatching")]
-    [OutputType(typeof(void))]
+    [OutputType(typeof(WatcherInfo))]
     public sealed class CmdletStartEVXWatcher : AsyncPSCmdlet {
-        private WatchEvents EventWatching { get; set; }
 
         /// <summary>
         /// Name of the computer to monitor events on.
@@ -29,8 +28,11 @@ namespace PSEventViewer {
         /// <summary>
         /// Array of event identifiers to monitor.
         /// </summary>
-        [Parameter(Mandatory = true, Position = 2)]
+        [Parameter(Mandatory = true, Position = 2, ParameterSetName = "EventId")]
         public int[] EventId { get; set; }
+
+        [Parameter(Mandatory = true, Position = 2, ParameterSetName = "NamedEvent")]
+        public NamedEvents[] NamedEvent { get; set; }
 
         /// <summary>
         /// Enables staging mode which also watches for event ID 350.
@@ -44,6 +46,18 @@ namespace PSEventViewer {
         [Parameter(Mandatory = true, Position = 3)]
         public ScriptBlock Action { get; set; }
 
+        [Parameter]
+        public string Name { get; set; }
+
+        [Parameter]
+        public TimeSpan? TimeOut { get; set; }
+
+        [Parameter]
+        public SwitchParameter StopOnMatch { get; set; }
+
+        [Parameter]
+        public int StopAfter { get; set; }
+
         /// <summary>
         /// Number of threads used for event processing.
         /// </summary>
@@ -51,32 +65,32 @@ namespace PSEventViewer {
         [ValidateRange(1, 1024)]
         public int NumberOfThreads { get; set; } = 8;
 
-        /// <summary>
-        /// Initializes resources prior to processing.
-        /// </summary>
-        protected override Task BeginProcessingAsync() {
-            // Initialize the logger to be able to see verbose, warning, debug, error, progress, and information messages.
-            var internalLogger = new InternalLogger(false);
-            var internalLoggerPowerShell = new InternalLoggerPowerShell(internalLogger, this.WriteVerbose, this.WriteWarning, this.WriteDebug, this.WriteError, this.WriteProgress, this.WriteInformation);
-
-            EventWatching = new WatchEvents(internalLogger) {
-                NumberOfThreads = NumberOfThreads
-            };
-            return Task.CompletedTask;
-        }
-        /// <summary>
-        /// Starts watching for events and invokes the provided action.
-        /// </summary>
         protected override Task ProcessRecordAsync() {
-            var ids = EventId.ToList();
-            EventWatching.Watch(MachineName, LogName, ids, e => Action.Invoke(e), CancelToken, Staging.IsPresent, Environment.UserName);
-            return Task.CompletedTask;
-        }
-        /// <summary>
-        /// Performs cleanup after event processing completes.
-        /// </summary>
-        protected override Task EndProcessingAsync() {
+            var ids = new System.Collections.Generic.List<int>();
+            if (ParameterSetName == "EventId" && EventId != null) {
+                ids.AddRange(EventId);
+            } else if (ParameterSetName == "NamedEvent" && NamedEvent != null) {
+                var dict = EventObjectSlim.GetEventInfoForNamedEvents(NamedEvent.ToList());
+                if (dict.TryGetValue(LogName, out var set)) {
+                    ids.AddRange(set);
+                } else {
+                    WriteWarning($"No events found for named events in log {LogName}.");
+                }
+            }
 
+            var watcher = WatcherManager.StartWatcher(
+                Name,
+                MachineName,
+                LogName,
+                ids,
+                ParameterSetName == "NamedEvent" ? NamedEvent.ToList() : new System.Collections.Generic.List<NamedEvents>(),
+                e => Action.Invoke(e),
+                NumberOfThreads,
+                Staging.IsPresent,
+                StopOnMatch.IsPresent,
+                StopAfter,
+                TimeOut);
+            WriteObject(watcher);
             return Task.CompletedTask;
         }
     }

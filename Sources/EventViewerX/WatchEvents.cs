@@ -8,6 +8,9 @@ using System.Threading;
 namespace EventViewerX {
     public class WatchEvents : Settings, IDisposable {
         public static volatile int NumberOfEventsFound = 0;
+        private int _eventsFound;
+        public int EventsFound => _eventsFound;
+        public DateTime StartTime { get; private set; }
         /// <summary>
         /// List of event IDs to watch for
         /// </summary>
@@ -46,6 +49,8 @@ namespace EventViewerX {
 
         public void Watch(string machineName, string logName, List<int> eventId, Action<EventObject> eventAction = null, CancellationToken cancellationToken = default, bool staging = false, string enabledBy = null) {
             NumberOfEventsFound = 0;
+            _eventsFound = 0;
+            StartTime = DateTime.UtcNow;
             Dispose();
             _machineName = machineName;
             if (staging && !eventId.Contains(350)) {
@@ -84,6 +89,7 @@ namespace EventViewerX {
                 var Event = Args.EventRecord;
                 if (_watchEventId.Contains(Event.Id)) {
                     Interlocked.Increment(ref NumberOfEventsFound);
+                    Interlocked.Increment(ref _eventsFound);
                     _logger.WriteVerbose("Found event id {0} on {1}.", Event.Id, Event.MachineName);
 
                     var eventObject = new EventObject(Event, _machineName);
@@ -107,6 +113,7 @@ namespace EventViewerX {
             StagingEnabledBy = null;
             _eventLogSession?.Dispose();
             _eventLogSession = null;
+            StartTime = default;
         }
     }
 }
