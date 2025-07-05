@@ -1,12 +1,21 @@
-﻿namespace EventViewerX.Rules.CertificateAuthority;
+namespace EventViewerX.Rules.CertificateAuthority;
 
 /// <summary>
 /// Certificate issued by Certificate Authority
 /// 4886: Certificate Services received a certificate request
 /// 4887: Certificate Services approved a certificate request and issued a certificate
 /// </summary>
-public class CertificateIssued : EventObjectSlim
+public class CertificateIssued : EventRuleBase
 {
+    public override List<int> EventIds => new() { 4886, 4887 };
+    public override string LogName => "Security";
+    public override NamedEvents NamedEvent => NamedEvents.CertificateIssued;
+
+    public override bool CanHandle(EventObject eventObject)
+    {
+        // Simple rule - always handle if event ID and log name match
+        return true;
+    }
     public string Computer;
     public string Action;
     public string CertificateTemplate;

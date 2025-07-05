@@ -1,10 +1,19 @@
-﻿namespace EventViewerX.Rules.Kerberos;
+namespace EventViewerX.Rules.Kerberos;
 
 /// <summary>
 /// Kerberos policy configuration change event details.
 /// </summary>
-public class KerberosPolicyChange : EventObjectSlim
+public class KerberosPolicyChange : EventRuleBase
 {
+    public override List<int> EventIds => new() { 4713 };
+    public override string LogName => "Security";
+    public override NamedEvents NamedEvent => NamedEvents.KerberosPolicyChange;
+
+    public override bool CanHandle(EventObject eventObject)
+    {
+        // Simple rule - always handle if event ID and log name match
+        return true;
+    }
     public string Computer;
     public string Who;
     public string PolicyChanges;
