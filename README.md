@@ -69,3 +69,38 @@ Get-EVXEvent -LogName Security -RecordIdFile C:\Temp\evx.state -RecordIdKey Mach
 
 `BuildWinEventFilter` now inserts a newline between each query clause when `xpathOnly` is set to `$false`.
 The additional line breaks make complex XML queries easier to read in logs or debug output.
+### TimePeriod values
+
+The `TimePeriod` enumeration simplifies building date ranges. Each option sets the start time, end time or relative period used by the cmdlets.
+
+| Value | Description |
+|-------|-------------|
+| PastHour | Previous hour at the top of the hour |
+| CurrentHour | Current hour |
+| PastDay | Previous day |
+| CurrentDay | Current day |
+| PastMonth | Previous calendar month |
+| CurrentMonth | Current calendar month |
+| PastQuarter | Previous calendar quarter |
+| CurrentQuarter | Current calendar quarter |
+| Last3Days | Last three days from now |
+| Last7Days | Last seven days from now |
+| Last14Days | Last fourteen days from now |
+| Last1Hour | Last one hour from now |
+| Last2Hours | Last two hours from now |
+| Last3Hours | Last three hours from now |
+| Last6Hours | Last six hours from now |
+| Last12Hours | Last twelve hours from now |
+| Last16Hours | Last sixteen hours from now |
+| Last24Hours | Last twenty-four hours from now |
+| Today | Today's events |
+| Yesterday | Yesterday's events |
+| Everything | No time filtering |
+| TillLastMonday | Since last Monday |
+| TillLastTuesday | Since last Tuesday |
+| TillLastWednesday | Since last Wednesday |
+| TillLastThursday | Since last Thursday |
+| TillLastFriday | Since last Friday |
+| TillLastSaturday | Since last Saturday |
+| TillLastSunday | Since last Sunday |
+
