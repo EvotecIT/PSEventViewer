@@ -59,6 +59,11 @@
         ADGroupPolicyLinks,
 
         /// <summary>
+        /// Detailed audit information for group policy changes
+        /// </summary>
+        ADGroupPolicyChangesDetailed,
+
+        /// <summary>
         /// Group Policy Object created
         /// </summary>
         GpoCreated,

@@ -1,9 +1,9 @@
-﻿namespace EventViewerX.Rules.ActiveDirectory;
+namespace EventViewerX.Rules.ActiveDirectory;
 
 /// <summary>
 /// Detailed audit information for group policy changes.
 /// </summary>
-public class ADGroupPolicyChangesDetailed : EventObjectSlim {
+public class ADGroupPolicyChangesDetailed : EventRuleBase {
     public string Computer;
     public string Action;
     public string ObjectClass;
@@ -13,6 +13,14 @@ public class ADGroupPolicyChangesDetailed : EventObjectSlim {
     public string GpoName;
     public string AttributeLDAPDisplayName;
     public string AttributeValue;
+    public override List<int> EventIds => new() { 5136, 5137, 5139, 5141 };
+    public override string LogName => "Security";
+    public override NamedEvents NamedEvent => NamedEvents.ADGroupPolicyChangesDetailed;
+
+    public override bool CanHandle(EventObject eventObject) {
+        return eventObject.Data.TryGetValue("ObjectClass", out var objectClass) &&
+               objectClass == "groupPolicyContainer";
+    }
 
     public ADGroupPolicyChangesDetailed(EventObject eventObject) : base(eventObject) {
         _eventObject = eventObject;

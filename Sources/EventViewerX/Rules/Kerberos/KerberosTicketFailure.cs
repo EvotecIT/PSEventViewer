@@ -1,10 +1,19 @@
-﻿namespace EventViewerX.Rules.Kerberos;
+namespace EventViewerX.Rules.Kerberos;
 
 /// <summary>
 /// Represents a failed Kerberos ticket request event.
 /// </summary>
-public class KerberosTicketFailure : EventObjectSlim
+public class KerberosTicketFailure : EventRuleBase
 {
+    public override List<int> EventIds => new() { 4771, 4772 };
+    public override string LogName => "Security";
+    public override NamedEvents NamedEvent => NamedEvents.KerberosTicketFailure;
+
+    public override bool CanHandle(EventObject eventObject)
+    {
+        // Simple rule - always handle if event ID and log name match
+        return true;
+    }
     public string Computer;
     public string Action;
     public string AccountName;

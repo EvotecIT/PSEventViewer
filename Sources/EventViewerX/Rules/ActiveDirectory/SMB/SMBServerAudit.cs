@@ -14,14 +14,21 @@ namespace EventViewerX.Rules.ActiveDirectory;
 /// HKLM\SYSTEM\CurrentControlSet\Services\LanmanServer\Parameters
 /// AuditSmb1Access => REG_DWORD => 1
 /// </summary>
-[EventRule(NamedEvents.ADSMBServerAuditV1, "Microsoft-Windows-SMBServer/Audit", 3000)]
-public class SMBServerAudit : EventObjectSlim {
+public class SMBServerAudit : EventRuleBase {
     // public EventObject EventObject { get; }
     public string Computer;
     public string Action;
     public string ClientAddress;
     public string ClientDNSName = string.Empty;
     public DateTime When;
+    public override List<int> EventIds => new() { 3000 };
+    public override string LogName => "Microsoft-Windows-SMBServer/Audit";
+    public override NamedEvents NamedEvent => NamedEvents.ADSMBServerAuditV1;
+
+    public override bool CanHandle(EventObject eventObject) {
+        // Simple rule - always handle if event ID and log name match
+        return true;
+    }
 
     // public ctor that performs partial initialization
     public SMBServerAudit(EventObject eventObject) : base(eventObject) {

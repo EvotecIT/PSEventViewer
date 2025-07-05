@@ -1,10 +1,19 @@
-﻿namespace EventViewerX.Rules.Kerberos;
+namespace EventViewerX.Rules.Kerberos;
 
 /// <summary>
 /// Represents a Kerberos service ticket request event.
 /// </summary>
-public class KerberosServiceTicket : EventObjectSlim
+public class KerberosServiceTicket : EventRuleBase
 {
+    public override List<int> EventIds => new() { 4769, 4770 };
+    public override string LogName => "Security";
+    public override NamedEvents NamedEvent => NamedEvents.KerberosServiceTicket;
+
+    public override bool CanHandle(EventObject eventObject)
+    {
+        // Simple rule - always handle if event ID and log name match
+        return true;
+    }
     public string Computer;
     public string Action;
     public string AccountName;

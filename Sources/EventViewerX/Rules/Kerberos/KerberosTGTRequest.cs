@@ -1,10 +1,19 @@
-﻿namespace EventViewerX.Rules.Kerberos;
+namespace EventViewerX.Rules.Kerberos;
 
 /// <summary>
 /// Represents a Kerberos TGT request event.
 /// </summary>
-public class KerberosTGTRequest : EventObjectSlim
+public class KerberosTGTRequest : EventRuleBase
 {
+    public override List<int> EventIds => new() { 4768 };
+    public override string LogName => "Security";
+    public override NamedEvents NamedEvent => NamedEvents.KerberosTGTRequest;
+
+    public override bool CanHandle(EventObject eventObject)
+    {
+        // Simple rule - always handle if event ID and log name match
+        return true;
+    }
     public string Computer;
     public string Action;
     public string AccountName;
