@@ -3,6 +3,7 @@
   <a href="https://www.powershellgallery.com/packages/PSEventViewer"><img src="https://img.shields.io/powershellgallery/v/PSEventViewer.svg"></a>
   <a href="https://www.powershellgallery.com/packages/PSEventViewer"><img src="https://img.shields.io/powershellgallery/vpre/PSEventViewer.svg?label=powershell%20gallery%20preview&colorB=yellow"></a>
   <a href="https://github.com/EvotecIT/PSEventViewer"><img src="https://img.shields.io/github/license/EvotecIT/PSEventViewer.svg"></a>
+  <a href="https://codecov.io/gh/EvotecIT/PSEventViewer"><img src="https://codecov.io/gh/EvotecIT/PSEventViewer/branch/master/graph/badge.svg"></a>
 </p>
 
 <p align="center">
