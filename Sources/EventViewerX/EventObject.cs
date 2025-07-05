@@ -109,6 +109,11 @@ namespace EventViewerX {
         public string MessageSubject;
 
         /// <summary>
+        /// Attachments extracted from the event if present
+        /// </summary>
+        public IReadOnlyList<byte[]> Attachments { get; private set; }
+
+        /// <summary>
         /// Data available in XML format
         /// </summary>
         public string XMLData;
@@ -162,6 +167,7 @@ namespace EventViewerX {
                 //_logger.WriteError("Error parsing message");
             }
             NicIdentifiers = ExtractNicIdentifiers();
+            Attachments = ExtractAttachments(XMLData);
         }
 
         /// <summary>
@@ -341,6 +347,73 @@ namespace EventViewerX {
                 }
             }
             return nics;
+        }
+
+        private static List<byte[]> ExtractAttachments(string xmlData) {
+            var attachments = new List<byte[]>();
+            try {
+                var root = XElement.Parse(xmlData);
+                XNamespace ns = root.GetDefaultNamespace();
+                var eventData = root.Element(ns + "EventData");
+                if (eventData == null) {
+                    eventData = root.Element(ns + "UserData")?.Elements().FirstOrDefault();
+                }
+
+                if (eventData != null) {
+                    foreach (var binary in eventData.Elements(ns + "Binary")) {
+                        var value = binary.Value;
+                        if (TryDecodeBinary(value, out var bytes)) {
+                            attachments.Add(bytes);
+                        }
+                    }
+
+                    foreach (var dataElement in eventData.Elements(ns + "Data")) {
+                        if (string.Equals(dataElement.Attribute("Type")?.Value, "Binary", StringComparison.OrdinalIgnoreCase)) {
+                            var value = dataElement.Value;
+                            if (TryDecodeBinary(value, out var bytes)) {
+                                attachments.Add(bytes);
+                            }
+                        }
+                    }
+                }
+            } catch (Exception ex) {
+                Settings._logger.WriteWarning($"Failed to parse attachments. Error: {ex.Message}");
+            }
+
+            return attachments;
+        }
+
+        private static bool TryDecodeBinary(string value, out byte[] bytes) {
+            bytes = Array.Empty<byte>();
+            if (string.IsNullOrWhiteSpace(value)) {
+                return false;
+            }
+
+            value = value.Trim();
+            value = value.Replace(" ", string.Empty);
+
+            if (value.StartsWith("0x", StringComparison.OrdinalIgnoreCase)) {
+                value = value.Substring(2);
+            }
+
+            if (System.Text.RegularExpressions.Regex.IsMatch(value, "^([0-9a-fA-F]{2})+$")) {
+                try {
+                    bytes = new byte[value.Length / 2];
+                    for (int i = 0; i < bytes.Length; i++) {
+                        bytes[i] = Convert.ToByte(value.Substring(i * 2, 2), 16);
+                    }
+                    return true;
+                } catch {
+                    return false;
+                }
+            }
+
+            try {
+                bytes = Convert.FromBase64String(value);
+                return true;
+            } catch {
+                return false;
+            }
         }
     }
 }
