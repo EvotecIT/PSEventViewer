@@ -5,17 +5,64 @@
 /// 4624: An account was successfully logged on
 /// </summary>
 public class ADUserLogon : EventRuleBase {
+    /// <summary>
+    /// Computer on which the logon occurred.
+    /// </summary>
     public string Computer;
+
+    /// <summary>
+    /// Description of the logon action.
+    /// </summary>
     public string Action;
+
+    /// <summary>
+    /// IP address of the source.
+    /// </summary>
     public string IpAddress;
+
+    /// <summary>
+    /// Source port number.
+    /// </summary>
     public string IpPort;
+
+    /// <summary>
+    /// Account that logged on.
+    /// </summary>
     public string ObjectAffected;
+
+    /// <summary>
+    /// User initiating the logon.
+    /// </summary>
     public string Who;
+
+    /// <summary>
+    /// Time when the logon happened.
+    /// </summary>
     public DateTime When;
+
+    /// <summary>
+    /// Name of the logon process.
+    /// </summary>
     public string LogonProcessName;
+
+    /// <summary>
+    /// Impersonation level used.
+    /// </summary>
     public ImpersonationLevel? ImpersonationLevel;
+
+    /// <summary>
+    /// Indicates if a virtual account was used.
+    /// </summary>
     public VirtualAccount? VirtualAccount;
+
+    /// <summary>
+    /// Indicates if an elevated token was used.
+    /// </summary>
     public ElevatedToken? ElevatedToken;
+
+    /// <summary>
+    /// Logon type value.
+    /// </summary>
     public LogonType? LogonType;
 
     public override List<int> EventIds => new() { 4624 };

@@ -33,24 +33,94 @@ public class ADUserLogonFailed : EventRuleBase {
         // Simple rule - always handle if event ID and log name match
         return true;
     }
+    /// <summary>
+    /// Computer on which the failed logon occurred.
+    /// </summary>
     public string Computer;
+
+    /// <summary>
+    /// Description of the failure.
+    /// </summary>
     public string Action;
+
+    /// <summary>
+    /// Authentication package name.
+    /// </summary>
     public string PackageName;
+
+    /// <summary>
+    /// IP address of the source.
+    /// </summary>
     public string IpAddress;
+
+    /// <summary>
+    /// Source port number.
+    /// </summary>
     public string IpPort;
     //public string WorkstationName;
+    /// <summary>
+    /// Account that attempted the logon.
+    /// </summary>
     public string ObjectAffected;
+
+    /// <summary>
+    /// Machine initiating the logon attempt.
+    /// </summary>
     public string Who;
+
+    /// <summary>
+    /// Time when the logon failed.
+    /// </summary>
     public DateTime When;
+
+    /// <summary>
+    /// Logon process name.
+    /// </summary>
     public string LogonProcessName;
+
+    /// <summary>
+    /// Logon type value.
+    /// </summary>
     public LogonType? LogonType;
+
+    /// <summary>
+    /// Status code returned by authentication.
+    /// </summary>
     public StatusCode? Status { get; private set; }
+
+    /// <summary>
+    /// Sub status code for the failure.
+    /// </summary>
     public SubStatusCode? SubStatus { get; private set; }
+
+    /// <summary>
+    /// Reason of the failure if available.
+    /// </summary>
     public FailureReason? FailureReason { get; private set; }
+
+    /// <summary>
+    /// LM package name used.
+    /// </summary>
     public string LmPackageName;
+
+    /// <summary>
+    /// Length of the key.
+    /// </summary>
     public string KeyLength;
+
+    /// <summary>
+    /// Process identifier of the caller.
+    /// </summary>
     public string ProcessId;
+
+    /// <summary>
+    /// Name of the process.
+    /// </summary>
     public string ProcessName;
+
+    /// <summary>
+    /// Services requested during authentication.
+    /// </summary>
     public string TransmittedServices;
 
 
