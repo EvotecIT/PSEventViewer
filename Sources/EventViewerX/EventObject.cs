@@ -38,46 +38,103 @@ namespace EventViewerX {
         /// </summary>
         public string ComputerName => _eventRecord.MachineName;
 
+        /// <summary>
+        /// Human readable event level name.
+        /// </summary>
         public string LevelDisplayName => _eventRecord.LevelDisplayName;
 
+        /// <summary>
+        /// Provider that generated the event.
+        /// </summary>
         public string ProviderName => _eventRecord.ProviderName;
 
+        /// <summary>
+        /// Additional event qualifiers if present.
+        /// </summary>
         public string Qualifiers => _eventRecord.Qualifiers?.ToString();
 
+        /// <summary>
+        /// Opcode of the event record.
+        /// </summary>
         public short? Opcode => _eventRecord.Opcode;
 
+        /// <summary>
+        /// Identifier of the event provider.
+        /// </summary>
         public Guid? ProviderId => _eventRecord.ProviderId;
 
+        /// <summary>
+        /// Related activity identifier if any.
+        /// </summary>
         public Guid? RelatedActivityId => _eventRecord.RelatedActivityId;
 
+        /// <summary>
+        /// Activity identifier for correlation.
+        /// </summary>
         public Guid? ActivityId => _eventRecord.ActivityId;
 
+        /// <summary>
+        /// Security identifier associated with the event.
+        /// </summary>
         public SecurityIdentifier UserId => _eventRecord.UserId;
 
+        /// <summary>
+        /// Event bookmark for resuming queries.
+        /// </summary>
         public EventBookmark Bookmark => _eventRecord.Bookmark;
 
+        /// <summary>
+        /// Formatted event message.
+        /// </summary>
         public string Message => _eventRecord.FormatDescription() ?? string.Empty;
 
+        /// <summary>
+        /// Display name of the task.
+        /// </summary>
         public string TaskDisplayName => _eventRecord.TaskDisplayName;
 
+        /// <summary>
+        /// Display name of the opcode.
+        /// </summary>
         public string OpcodeDisplayName => _eventRecord.OpcodeDisplayName;
 
+        /// <summary>
+        /// Keyword display names associated with the event.
+        /// </summary>
         public IEnumerable<string> KeywordsDisplayNames => _eventRecord.KeywordsDisplayNames;
 
+        /// <summary>
+        /// Keyword flags associated with the event.
+        /// </summary>
         public long? Keywords => _eventRecord.Keywords;
 
+        /// <summary>
+        /// Numeric level of the event.
+        /// </summary>
         public byte? Level => _eventRecord.Level;
 
         //public Level? Level => (Level?)_eventRecord.Level;
 
         //public Keywords? Keywords => (Keywords?)_eventRecord.Keywords;
 
+        /// <summary>
+        /// Version of the event record.
+        /// </summary>
         public byte? Version => _eventRecord.Version;
 
+        /// <summary>
+        /// Task identifier if available.
+        /// </summary>
         public int? Task => _eventRecord.Task;
 
+        /// <summary>
+        /// Identifier of the process that logged the event.
+        /// </summary>
         public int? ProcessId => _eventRecord.ProcessId;
 
+        /// <summary>
+        /// Identifier of the thread that logged the event.
+        /// </summary>
         public int? ThreadId => _eventRecord.ThreadId;
 
         /// <summary>
@@ -106,6 +163,9 @@ namespace EventViewerX {
         /// </summary>
         public Dictionary<string, string> MessageData { get; private set; }
 
+        /// <summary>
+        /// First line of the formatted message.
+        /// </summary>
         public string MessageSubject;
 
         /// <summary>
@@ -119,17 +179,20 @@ namespace EventViewerX {
         public string XMLData;
 
         /// <summary>
-        /// Machine where the event was queried from
+        /// <summary>
+        /// Machine from which the event was queried.
         /// </summary>
         public string QueriedMachine;
 
         /// <summary>
-        /// Source where the event was gathered from (computer name or file path)
+        /// <summary>
+        /// Source from which the event was gathered (computer name or file path).
         /// </summary>
         public string GatheredFrom;
 
         /// <summary>
-        /// Log name where the event was gathered from
+        /// <summary>
+        /// Log name that contained the event.
         /// </summary>
         public string GatheredLogName;
 

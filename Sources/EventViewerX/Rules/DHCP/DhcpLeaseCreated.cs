@@ -14,9 +14,24 @@ public class DhcpLeaseCreated : EventRuleBase {
         return true;
     }
 
+    /// <summary>
+    /// Computer that issued the lease.
+    /// </summary>
     public string Computer;
+
+    /// <summary>
+    /// IP address leased to the client.
+    /// </summary>
     public string IPAddress;
+
+    /// <summary>
+    /// MAC address of the client.
+    /// </summary>
     public string MacAddress;
+
+    /// <summary>
+    /// Time when the lease was created.
+    /// </summary>
     public DateTime When;
 
     public DhcpLeaseCreated(EventObject eventObject) : base(eventObject) {

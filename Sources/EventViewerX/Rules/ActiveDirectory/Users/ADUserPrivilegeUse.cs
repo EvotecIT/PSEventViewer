@@ -13,11 +13,34 @@ public class ADUserPrivilegeUse : EventRuleBase {
         // Simple rule - always handle if event ID and log name match
         return true;
     }
+    /// <summary>
+    /// Computer where the privileges were assigned.
+    /// </summary>
     public string Computer;
+
+    /// <summary>
+    /// Description of the event action.
+    /// </summary>
     public string Action;
+
+    /// <summary>
+    /// Account receiving the privileges.
+    /// </summary>
     public string Who;
+
+    /// <summary>
+    /// Time when privileges were granted.
+    /// </summary>
     public DateTime When;
+
+    /// <summary>
+    /// List of privilege names.
+    /// </summary>
     public List<string> Privileges;
+
+    /// <summary>
+    /// Translated privilege descriptions.
+    /// </summary>
     public List<string> PrivilegesTranslated;
 
     public ADUserPrivilegeUse(EventObject eventObject) : base(eventObject) {

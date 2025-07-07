@@ -19,10 +19,29 @@ public class ADUserStatus : EventRuleBase {
         return true;
     }
 
+    /// <summary>
+    /// Computer where the status change occurred.
+    /// </summary>
     public string Computer;
+
+    /// <summary>
+    /// Short description of the action.
+    /// </summary>
     public string Action;
+
+    /// <summary>
+    /// User performing the change.
+    /// </summary>
     public string Who;
+
+    /// <summary>
+    /// Time of the status change.
+    /// </summary>
     public DateTime When;
+
+    /// <summary>
+    /// Account affected by the action.
+    /// </summary>
     public string UserAffected;
 
     public ADUserStatus(EventObject eventObject) : base(eventObject) {

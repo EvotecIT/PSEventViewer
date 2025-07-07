@@ -14,34 +14,124 @@ public class NetworkAccessAuthenticationPolicy : EventRuleBase {
         // Simple rule - always handle if event ID and log name match
         return true;
     }
+    /// <summary>
+    /// Computer where the policy event originated.
+    /// </summary>
     public string Computer;
+
+    /// <summary>
+    /// Brief description of the action.
+    /// </summary>
     public string Action;
+
+    /// <summary>
+    /// Security identifier of the user.
+    /// </summary>
     public string SecurityID;
+
+    /// <summary>
+    /// Account name of the user.
+    /// </summary>
     public string AccountName;
+
+    /// <summary>
+    /// Domain of the user account.
+    /// </summary>
     public string AccountDomain;
+
+    /// <summary>
+    /// Called station identifier.
+    /// </summary>
     public string CalledStationID;
+
+    /// <summary>
+    /// Calling station identifier.
+    /// </summary>
     public string CallingStationID;
 
+    /// <summary>
+    /// IPv4 address of the NAS device.
+    /// </summary>
     public string NASIPv4Address;
+
+    /// <summary>
+    /// IPv6 address of the NAS device.
+    /// </summary>
     public string NASIPv6Address;
+
+    /// <summary>
+    /// NAS identifier string.
+    /// </summary>
     public string NASIdentifier;
+
+    /// <summary>
+    /// Type of the NAS port.
+    /// </summary>
     public string NASPortType;
+
+    /// <summary>
+    /// NAS port number.
+    /// </summary>
     public string NASPort;
 
+    /// <summary>
+    /// Friendly name of the client.
+    /// </summary>
     public string ClientFriendlyName;
+
+    /// <summary>
+    /// Client IP address in readable form.
+    /// </summary>
     public string ClientFriendlyIPAddress;
 
+    /// <summary>
+    /// Connection request policy name.
+    /// </summary>
     public string ConnectionRequestPolicyName;
+
+    /// <summary>
+    /// Network policy name applied.
+    /// </summary>
     public string NetworkPolicyName;
+
+    /// <summary>
+    /// Authentication provider used.
+    /// </summary>
     public string AuthenticationProvider;
+
+    /// <summary>
+    /// Server performing the authentication.
+    /// </summary>
     public string AuthenticationServer;
+
+    /// <summary>
+    /// Authentication type selected.
+    /// </summary>
     public string AuthenticationType;
+
+    /// <summary>
+    /// EAP type value if applicable.
+    /// </summary>
     public string EAPType;
 
+    /// <summary>
+    /// Human readable reason string.
+    /// </summary>
     public string Reason;
+
+    /// <summary>
+    /// Numeric reason code.
+    /// </summary>
     public string ReasonCode;
 
+    /// <summary>
+    /// User that triggered the policy event.
+    /// </summary>
     public string Who;
+
+    /// <summary>
+    /// Time when the policy event occurred.
+    /// </summary>
     public DateTime When;
 
     public NetworkAccessAuthenticationPolicy(EventObject eventObject) : base(eventObject) {

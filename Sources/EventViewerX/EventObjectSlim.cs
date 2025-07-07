@@ -9,11 +9,34 @@ using EventViewerX.Rules.NPS;
 namespace EventViewerX;
 
 public class EventObjectSlim {
+    /// <summary>
+    /// Reference to the detailed event object.
+    /// </summary>
     public EventObject _eventObject;
+
+    /// <summary>
+    /// Identifier of the event.
+    /// </summary>
     public int EventID; // = _eventObject.Id;
+
+    /// <summary>
+    /// Record identifier of the event.
+    /// </summary>
     public long? RecordID; // = _eventObject.RecordId;
+
+    /// <summary>
+    /// Source machine from which the event was gathered.
+    /// </summary>
     public string GatheredFrom; // = _eventObject.MachineName;
+
+    /// <summary>
+    /// Log name where the event originated.
+    /// </summary>
     public string GatheredLogName; // = _eventObject.LogName;
+
+    /// <summary>
+    /// Name of the rule type handling the event.
+    /// </summary>
     public string Type;
 
     private static readonly Dictionary<NamedEvents, Type> _eventRuleTypes = new();
