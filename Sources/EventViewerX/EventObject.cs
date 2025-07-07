@@ -7,6 +7,9 @@ using System.Xml.Linq;
 using System.Text.RegularExpressions;
 
 namespace EventViewerX {
+    /// <summary>
+    /// Detailed representation of a Windows event record.
+    /// </summary>
     public class EventObject {
         /// <summary>
         /// Time and date when the event was created

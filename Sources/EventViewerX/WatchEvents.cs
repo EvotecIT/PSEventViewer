@@ -6,10 +6,16 @@ using System.Linq;
 using System.Threading;
 
 namespace EventViewerX {
+    /// <summary>
+    /// Watches event logs and invokes callbacks when matching events appear.
+    /// </summary>
     public class WatchEvents : Settings, IDisposable {
+        /// <summary>Global count of all events detected.</summary>
         public static volatile int NumberOfEventsFound = 0;
         private int _eventsFound;
+        /// <summary>Number of events captured during the current watch session.</summary>
         public int EventsFound => _eventsFound;
+        /// <summary>Time when event watching started.</summary>
         public DateTime StartTime { get; private set; }
         /// <summary>
         /// List of event IDs to watch for
@@ -41,12 +47,26 @@ namespace EventViewerX {
 
         private string _machineName;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="WatchEvents"/> class.
+        /// </summary>
+        /// <param name="internalLogger">Optional logger for verbose output.</param>
         public WatchEvents(InternalLogger internalLogger = null) {
             if (internalLogger != null) {
                 _logger = internalLogger;
             }
         }
 
+        /// <summary>
+        /// Starts watching for specified event IDs.
+        /// </summary>
+        /// <param name="machineName">Target machine name.</param>
+        /// <param name="logName">Event log name.</param>
+        /// <param name="eventId">Event identifiers to monitor.</param>
+        /// <param name="eventAction">Callback when event is detected.</param>
+        /// <param name="cancellationToken">Cancellation token to stop watching.</param>
+        /// <param name="staging">Whether to use staging mode.</param>
+        /// <param name="enabledBy">Account that enabled staging.</param>
         public void Watch(string machineName, string logName, List<int> eventId, Action<EventObject> eventAction = null, CancellationToken cancellationToken = default, bool staging = false, string enabledBy = null) {
             NumberOfEventsFound = 0;
             _eventsFound = 0;
@@ -101,6 +121,9 @@ namespace EventViewerX {
             }
         }
 
+        /// <summary>
+        /// Stops watching and cleans up resources.
+        /// </summary>
         public void Dispose() {
             if (_eventLogWatcher != null) {
                 _eventLogWatcher.EventRecordWritten -= DetectEventsLogCallback;

@@ -159,6 +159,9 @@ public class InternalLogger {
     }
 }
 
+/// <summary>
+/// Event arguments used by <see cref="InternalLogger"/> events.
+/// </summary>
 public class LogEventArgs : EventArgs {
     /// <summary>
     /// Progress percentage

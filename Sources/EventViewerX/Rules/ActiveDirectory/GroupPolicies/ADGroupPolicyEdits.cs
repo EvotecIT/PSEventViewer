@@ -6,13 +6,21 @@ namespace EventViewerX.Rules.ActiveDirectory;
 /// Represents edits made to group policy objects.
 /// </summary>
 public class ADGroupPolicyEdits : EventRuleBase {
+    /// <summary>Computer where the edit occurred.</summary>
     public string Computer;
+    /// <summary>Description of the action.</summary>
     public string Action;
+    /// <summary>Class of the object modified.</summary>
     public string ObjectClass;
+    /// <summary>Operation type value.</summary>
     public string OperationType;
+    /// <summary>User performing the edit.</summary>
     public string Who;
+    /// <summary>Time the edit occurred.</summary>
     public DateTime When;
+    /// <summary>Display name of the GPO.</summary>
     public string GroupPolicyDisplayName;
+    /// <summary>LDAP display name of the attribute.</summary>
     public string AttributeLDAPDisplayName;
     //public string AttributeValue;
     public GroupPolicy GroupPolicy { get; set; }

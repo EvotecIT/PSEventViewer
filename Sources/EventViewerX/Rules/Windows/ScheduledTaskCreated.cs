@@ -13,10 +13,15 @@ public class ScheduledTaskCreated : EventRuleBase {
         // Simple rule - always handle if event ID and log name match
         return true;
     }
+    /// <summary>Computer where the task was created.</summary>
     public string Computer;
+    /// <summary>Name of the created task.</summary>
     public string TaskName;
+    /// <summary>Author of the task definition.</summary>
     public string Author;
+    /// <summary>Creation timestamp read from the task XML.</summary>
     public DateTime? Created;
+    /// <summary>Time the event occurred.</summary>
     public DateTime When;
 
     public ScheduledTaskCreated(EventObject eventObject) : base(eventObject) {

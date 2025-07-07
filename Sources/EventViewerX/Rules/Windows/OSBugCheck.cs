@@ -14,14 +14,23 @@ public class OSBugCheck : EventRuleBase {
         return true;
     }
 
+    /// <summary>Computer where the bugcheck occurred.</summary>
     public string Computer;
+    /// <summary>Bugcheck code.</summary>
     public string BugCheckCode;
+    /// <summary>First bugcheck parameter.</summary>
     public string Parameter1;
+    /// <summary>Second bugcheck parameter.</summary>
     public string Parameter2;
+    /// <summary>Third bugcheck parameter.</summary>
     public string Parameter3;
+    /// <summary>Fourth bugcheck parameter.</summary>
     public string Parameter4;
+    /// <summary>Path to created dump file.</summary>
     public string DumpFile;
+    /// <summary>Report identifier.</summary>
     public string ReportId;
+    /// <summary>Event time.</summary>
     public DateTime When;
 
     public OSBugCheck(EventObject eventObject) : base(eventObject) {
