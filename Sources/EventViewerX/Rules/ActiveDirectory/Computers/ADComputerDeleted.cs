@@ -1,8 +1,7 @@
 namespace EventViewerX.Rules.ActiveDirectory;
 
 /// <summary>
-/// Active Directory Computer Deleted
-/// 4743: A computer account was deleted
+/// Represents deletion of a computer account (event 4743).
 /// </summary>
 public class ADComputerDeleted : EventRuleBase {
     public override List<int> EventIds => new() { 4743 };
@@ -13,10 +12,15 @@ public class ADComputerDeleted : EventRuleBase {
         // Simple rule - always handle if event ID and log name match
         return true;
     }
+    /// <summary>Machine where deletion occurred.</summary>
     public string Computer;
+    /// <summary>Short description of the deletion.</summary>
     public string Action;
+    /// <summary>Computer account deleted.</summary>
     public string ComputerAffected;
+    /// <summary>User performing the deletion.</summary>
     public string Who;
+    /// <summary>Time of deletion.</summary>
     public DateTime When;
 
     public ADComputerDeleted(EventObject eventObject) : base(eventObject) {

@@ -1,9 +1,7 @@
 namespace EventViewerX.Rules.ActiveDirectory;
 
 /// <summary>
-/// A user right was assigned or removed
-/// 4704: A user right was assigned
-/// 4705: A user right was removed
+/// Handles assignment or removal of user rights (events 4704 and 4705).
 /// </summary>
 public class ADUserRightsAssignment : EventRuleBase {
     public override List<int> EventIds => new() { 4704, 4705 };
@@ -14,12 +12,19 @@ public class ADUserRightsAssignment : EventRuleBase {
         // Simple rule - always handle if event ID and log name match
         return true;
     }
+    /// <summary>Machine where the change occurred.</summary>
     public string Computer;
+    /// <summary>Description of the action.</summary>
     public string Action;
+    /// <summary>User account affected.</summary>
     public string UserAffected;
+    /// <summary>User performing the action.</summary>
     public string Who;
+    /// <summary>Time of the change.</summary>
     public DateTime When;
+    /// <summary>List of user rights assigned or removed.</summary>
     public List<string> Rights;
+    /// <summary>Translated user rights.</summary>
     public List<string> RightsTranslated;
 
     public ADUserRightsAssignment(EventObject eventObject) : base(eventObject) {
