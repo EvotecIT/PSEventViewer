@@ -4,8 +4,15 @@ using System.IO;
 using System.Linq;
 
 namespace EventViewerX {
+    /// <summary>
+    /// Helper methods that wrap <c>wevtutil.exe</c> and related utilities.
+    /// </summary>
     public class BinaryWrappers {
 
+        /// <summary>
+        /// Imports a compiled manifest file using <c>wevtutil.exe</c>.
+        /// </summary>
+        /// <param name="manifestPath">Path to the manifest file.</param>
         public static void ImportManifest(string manifestPath) {
 
             //string manifestPath = @"C:\path\to\your\manifest.man";
@@ -41,6 +48,12 @@ namespace EventViewerX {
         }
 
 
+        /// <summary>
+        /// Compiles a manifest XML file into a <c>.man</c> file using <c>mc.exe</c>.
+        /// </summary>
+        /// <param name="xmlPath">Path to the manifest XML.</param>
+        /// <param name="manPath">Path to the output <c>.man</c> file.</param>
+        /// <param name="mcPath">Optional explicit path to <c>mc.exe</c>.</param>
         public static void ConvertXMLtoMAN(string xmlPath, string manPath, string mcPath = null) {
             //string xmlPath = @"C:\path\to\your\manifest.xml";
             //string manPath = @"C:\path\to\output\manifest.man";
@@ -91,6 +104,9 @@ namespace EventViewerX {
         }
 
 
+        /// <summary>
+        /// Displays provider names, GUIDs and associated log names.
+        /// </summary>
         public static void GetProvidersResults() {
             // Get the list of providers
             string[] providers = GetProviders();
@@ -105,14 +121,29 @@ namespace EventViewerX {
             }
         }
 
+        /// <summary>
+        /// Retrieves all registered event providers.
+        /// </summary>
+        /// <returns>Array of provider names.</returns>
         private static string[] GetProviders() {
             return RunCommand("wevtutil.exe", "ep").Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
         }
 
+        /// <summary>
+        /// Gets provider metadata text using <c>wevtutil.exe</c>.
+        /// </summary>
+        /// <param name="provider">Provider name.</param>
+        /// <returns>Metadata text.</returns>
         private static string GetProviderMetadata(string provider) {
             return RunCommand("wevtutil.exe", $"gp \"{provider}\"");
         }
 
+        /// <summary>
+        /// Extracts a property value from provider metadata text.
+        /// </summary>
+        /// <param name="metadata">Metadata text.</param>
+        /// <param name="propertyName">Property name to search for.</param>
+        /// <returns>Property value if found, otherwise <c>null</c>.</returns>
         private static string GetMetadataProperty(string metadata, string propertyName) {
             string marker = propertyName + ":";
             int startIndex = metadata.IndexOf(marker);
@@ -129,6 +160,12 @@ namespace EventViewerX {
             return metadata.Substring(startIndex, endIndex - startIndex).Trim();
         }
 
+        /// <summary>
+        /// Executes a command line process and returns the standard output.
+        /// </summary>
+        /// <param name="fileName">Executable name.</param>
+        /// <param name="arguments">Command line arguments.</param>
+        /// <returns>Process output.</returns>
         private static string RunCommand(string fileName, string arguments) {
             ProcessStartInfo startInfo = new ProcessStartInfo {
                 FileName = fileName,

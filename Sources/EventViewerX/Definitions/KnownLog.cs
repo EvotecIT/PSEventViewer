@@ -1,5 +1,8 @@
 namespace EventViewerX;
 
+/// <summary>
+/// Enumerates common Windows event logs.
+/// </summary>
 public enum KnownLog {
     Application,
     System,
