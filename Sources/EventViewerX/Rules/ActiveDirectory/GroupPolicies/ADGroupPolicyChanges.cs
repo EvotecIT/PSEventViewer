@@ -4,14 +4,23 @@
 /// Summary information for group policy change events.
 /// </summary>
 public class ADGroupPolicyChanges : EventRuleBase {
+    /// <summary>Computer where the change occurred.</summary>
     public string Computer;
+    /// <summary>Description of the action.</summary>
     public string Action;
+    /// <summary>Class of the object modified.</summary>
     public string ObjectClass;
+    /// <summary>Operation type value.</summary>
     public string OperationType;
+    /// <summary>User performing the action.</summary>
     public string Who;
+    /// <summary>Timestamp of the event.</summary>
     public DateTime When;
+    /// <summary>Distinguished name of the GPO.</summary>
     public string GpoName;
+    /// <summary>LDAP display name of the attribute.</summary>
     public string AttributeLDAPDisplayName;
+    /// <summary>Value of the attribute.</summary>
     public string AttributeValue;
     public override List<int> EventIds => new() { 5136, 5137, 5141 };
     public override string LogName => "Security";

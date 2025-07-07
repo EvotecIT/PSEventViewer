@@ -13,9 +13,13 @@ public class ScheduledTaskDeleted : EventRuleBase {
         // Simple rule - always handle if event ID and log name match
         return true;
     }
+    /// <summary>Computer where the task was deleted.</summary>
     public string Computer;
+    /// <summary>Name of the task.</summary>
     public string TaskName;
+    /// <summary>User that deleted the task.</summary>
     public string Who;
+    /// <summary>Time the event occurred.</summary>
     public DateTime When;
 
     public ScheduledTaskDeleted(EventObject eventObject) : base(eventObject) {

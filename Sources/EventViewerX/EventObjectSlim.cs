@@ -8,6 +8,9 @@ using EventViewerX.Rules.NPS;
 
 namespace EventViewerX;
 
+/// <summary>
+/// Lightweight representation of an event used for rule processing.
+/// </summary>
 public class EventObjectSlim {
     /// <summary>
     /// Reference to the detailed event object.

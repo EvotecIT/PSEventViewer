@@ -13,9 +13,13 @@ public class DfsReplicationError : EventRuleBase {
         return true;
     }
 
+    /// <summary>Replication group affected.</summary>
     public string ReplicationGroup;
+    /// <summary>Error code reported.</summary>
     public string ErrorCode;
+    /// <summary>Replication partner.</summary>
     public string Partner;
+    /// <summary>Event time.</summary>
     public DateTime When;
 
     public DfsReplicationError(EventObject eventObject) : base(eventObject) {

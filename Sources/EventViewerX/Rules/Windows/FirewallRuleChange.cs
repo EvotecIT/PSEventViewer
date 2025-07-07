@@ -13,10 +13,15 @@ public class FirewallRuleChange : EventRuleBase {
         // Simple rule - always handle if event ID and log name match
         return true;
     }
+    /// <summary>Computer where the rule was modified.</summary>
     public string Computer;
+    /// <summary>Description of the action.</summary>
     public string Action;
+    /// <summary>Name of the rule.</summary>
     public string RuleName;
+    /// <summary>Firewall profile that changed.</summary>
     public string ProfileChanged;
+    /// <summary>Time the event occurred.</summary>
     public DateTime When;
 
     public FirewallRuleChange(EventObject eventObject) : base(eventObject) {

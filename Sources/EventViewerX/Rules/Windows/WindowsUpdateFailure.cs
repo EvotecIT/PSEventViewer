@@ -13,9 +13,13 @@ public class WindowsUpdateFailure : EventRuleBase {
         // Simple rule - always handle if event ID and log name match
         return true;
     }
+    /// <summary>Computer where the update failed.</summary>
     public string Computer;
+    /// <summary>KB article number of the update.</summary>
     public string KB;
+    /// <summary>Reason of the failure.</summary>
     public string Reason;
+    /// <summary>Time the event occurred.</summary>
     public DateTime When;
 
     public WindowsUpdateFailure(EventObject eventObject) : base(eventObject) {

@@ -14,14 +14,23 @@ public class BitLockerKeyChange : EventRuleBase {
         // Simple rule - always handle if event ID and log name match
         return true;
     }
+    /// <summary>Computer where the key operation happened.</summary>
     public string Computer;
+    /// <summary>Description of the action.</summary>
     public string Action;
+    /// <summary>Volume type.</summary>
     public BitLockerVolumeType? Volume;
+    /// <summary>Protector type used.</summary>
     public BitLockerProtectorType? ProtectorType;
+    /// <summary>Master key identifier.</summary>
     public string MasterKeyId;
+    /// <summary>Recovery key identifier.</summary>
     public string RecoveryKeyId;
+    /// <summary>Server where recovery key was stored.</summary>
     public string RecoveryServer;
+    /// <summary>User responsible for the change.</summary>
     public string Who;
+    /// <summary>Time of the event.</summary>
     public DateTime When;
 
     public BitLockerKeyChange(EventObject eventObject) : base(eventObject) {

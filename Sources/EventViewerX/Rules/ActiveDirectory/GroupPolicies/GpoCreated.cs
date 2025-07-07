@@ -4,10 +4,15 @@
 /// Represents a newly created group policy object event.
 /// </summary>
 public class GpoCreated : EventRuleBase {
+    /// <summary>Computer on which the GPO was created.</summary>
     public string Computer;
+    /// <summary>Description of the action.</summary>
     public string Action;
+    /// <summary>Distinguished name of the new GPO.</summary>
     public string GpoName;
+    /// <summary>User that created the GPO.</summary>
     public string Who;
+    /// <summary>Time the GPO was created.</summary>
     public DateTime When;
     public override List<int> EventIds => new() { 5137 };
     public override string LogName => "Security";

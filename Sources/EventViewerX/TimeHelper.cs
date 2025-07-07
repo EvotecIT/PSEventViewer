@@ -1,6 +1,9 @@
 ﻿using System;
 
 namespace EventViewerX {
+    /// <summary>
+    /// Commonly used time ranges for event queries.
+    /// </summary>
     public enum TimePeriod {
         PastHour,
         CurrentHour,
@@ -33,6 +36,11 @@ namespace EventViewerX {
     }
 
     internal static class TimeHelper {
+        /// <summary>
+        /// Converts a <see cref="TimePeriod"/> to start and end timestamps.
+        /// </summary>
+        /// <param name="timePeriod">Time range to convert.</param>
+        /// <returns>Tuple describing the time range.</returns>
         internal static (DateTime? StartTime, DateTime? EndTime, TimeSpan? LastPeriod) GetTimePeriod(TimePeriod timePeriod) {
             DateTime now = DateTime.Now;
             DateTime? startTime = null;

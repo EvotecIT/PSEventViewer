@@ -14,12 +14,19 @@ public class OSTimeChange : EventRuleBase {
         // Simple rule - always handle if event ID and log name match
         return true;
     }
+    /// <summary>Computer where the time was changed.</summary>
     public string Computer;
+    /// <summary>Description of the event.</summary>
     public string Action;
+    /// <summary>Machine affected by the change.</summary>
     public string ObjectAffected;
+    /// <summary>Previous system time.</summary>
     public string PreviousTime;
+    /// <summary>New system time.</summary>
     public string NewTime;
+    /// <summary>User who changed the time.</summary>
     public string Who;
+    /// <summary>Timestamp of the event.</summary>
     public DateTime When;
 
     public OSTimeChange(EventObject eventObject) : base(eventObject) {
