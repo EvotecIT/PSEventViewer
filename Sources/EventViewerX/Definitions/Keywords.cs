@@ -1,4 +1,7 @@
 ﻿namespace EventViewerX;
+/// <summary>
+/// Well known keyword flags for event records.
+/// </summary>
 public enum Keywords : long {
     AuditFailure = (long)4503599627370496,
     AuditSuccess = (long)9007199254740992,

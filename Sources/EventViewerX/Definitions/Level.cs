@@ -1,5 +1,8 @@
 ﻿namespace EventViewerX;
 
+/// <summary>
+/// Common event severity levels.
+/// </summary>
 public enum Level {
     Verbose = 5,
     Informational = 4,
