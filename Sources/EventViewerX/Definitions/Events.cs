@@ -1,5 +1,8 @@
 namespace EventViewerX;
 
+/// <summary>
+/// Describes the impersonation level used during authentication.
+/// </summary>
 public enum ImpersonationLevel {
     Identification = 1832,
     Impersonation = 1833,
@@ -15,16 +18,25 @@ public enum ImpersonationLevel {
     Auto = 1849
 }
 
+/// <summary>
+/// Indicates whether a virtual account was used during logon.
+/// </summary>
 public enum VirtualAccount {
     Yes = 1843,
     No = 1844
 }
 
+/// <summary>
+/// Specifies if an elevated token was used for the logon.
+/// </summary>
 public enum ElevatedToken {
     Yes = 1842,
     No = 1843
 }
 
+/// <summary>
+/// Enumerates possible Windows logon types.
+/// </summary>
 public enum LogonType {
     Interactive = 2,
     Network = 3,
@@ -37,14 +49,23 @@ public enum LogonType {
     CachedInteractive = 11
 }
 
+/// <summary>
+/// Flags used to describe Kerberos ticket options.
+/// </summary>
 public enum TicketOptions {
     // Add appropriate values here
 }
 
+/// <summary>
+/// General status enumeration placeholder.
+/// </summary>
 public enum Status {
     // Add appropriate values here
 }
 
+/// <summary>
+/// Identifies encryption algorithms used for Kerberos tickets.
+/// </summary>
 public enum TicketEncryptionType {
     DES_CBC_CRC = 0x1,
     DES_CBC_MD5 = 0x3,
@@ -55,10 +76,16 @@ public enum TicketEncryptionType {
     AuditFailure = unchecked((int)0xFFFFFFFF)
 }
 
+/// <summary>
+/// Represents Kerberos pre-authentication types.
+/// </summary>
 public enum PreAuthType {
     // Add appropriate values here
 }
 
+/// <summary>
+/// Failure reasons returned for unsuccessful authentication attempts.
+/// </summary>
 public enum FailureReason {
     None = 0,
     // Common failure reasons (prefixed with %%)
@@ -70,6 +97,9 @@ public enum FailureReason {
     PasswordExpired = 2308
 }
 
+/// <summary>
+/// NTSTATUS codes returned for logon failures.
+/// </summary>
 public enum StatusCode : uint {
     None = 0x0,
     // NTSTATUS codes for logon failures
@@ -85,6 +115,9 @@ public enum StatusCode : uint {
     StatusNoTrust = 0xC000005E                 // No trust SAM account
 }
 
+/// <summary>
+/// Additional sub-status codes for failed authentication.
+/// </summary>
 public enum SubStatusCode : uint {
     None = 0x0,
     // Add any specific substatus codes as they are discovered
@@ -94,12 +127,18 @@ public enum SubStatusCode : uint {
     StatusAccountDisabled = 0xC0000072
 }
 
+/// <summary>
+/// Types of volumes protected by BitLocker.
+/// </summary>
 public enum BitLockerVolumeType {
     OperatingSystemVolume = 810,
     FixedDataVolume = 811,
     RemovableDataVolume = 812
 }
 
+/// <summary>
+/// Protector types available for BitLocker encryption.
+/// </summary>
 public enum BitLockerProtectorType {
     Tpm = 2200,
     ExternalKey = 2201,

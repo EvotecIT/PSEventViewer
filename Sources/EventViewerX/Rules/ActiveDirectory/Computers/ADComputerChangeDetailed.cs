@@ -1,19 +1,27 @@
 ﻿namespace EventViewerX.Rules.ActiveDirectory;
 
-/// Active Directory Computer Change Detailed
-/// 5136: A directory service object was modified
-/// 5137: A directory service object was created
-/// 5139: A directory service object was deleted
-/// 5141: A directory service object was moved
+/// <summary>
+/// Represents detailed Active Directory computer object changes.
+/// Handles events 5136, 5137, 5139 and 5141.
+/// </summary>
 public class ADComputerChangeDetailed : EventRuleBase {
+    /// <summary>Machine where the change occurred.</summary>
     public string Computer;
+    /// <summary>Short description of the change.</summary>
     public string Action;
+    /// <summary>LDAP object class.</summary>
     public string ObjectClass;
+    /// <summary>Translated operation type.</summary>
     public string OperationType;
+    /// <summary>User performing the change.</summary>
     public string Who;
+    /// <summary>Time of the change.</summary>
     public DateTime When;
+    /// <summary>Distinguished name of the computer object.</summary>
     public string ComputerObject; // 'Computer Object'
+    /// <summary>Attribute modified.</summary>
     public string FieldChanged;
+    /// <summary>Value after modification.</summary>
     public string FieldValue;
 
     //public string ClientDNSName;
