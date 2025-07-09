@@ -50,7 +50,7 @@
         <Delete Files="$(OutDir)System.Management.Automation.dll"
                 Condition="Exists('$(OutDir)System.Management.Automation.dll')" />
         <Delete Files="$(OutDir)System.Management.dll"
-                Condition="Exists('$(OutDir)System.Management.Automation.dll')" />
+                Condition="Exists('$(OutDir)System.Management.dll')" />
     </Target>
 
     <PropertyGroup>
@@ -72,5 +72,4 @@
             DestinationFiles="$(PublishDir)$(AssemblyName).dll-Help.xml"
             Condition="Exists('$(OutputPath)$(AssemblyName).dll-Help.xml')" />
     </Target>
-
 </Project>
