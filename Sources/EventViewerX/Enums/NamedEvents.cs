@@ -263,9 +263,29 @@
         OSBugCheck,
 
         /// <summary>
-        /// System start-up, shutdown or crash events
+        /// Operating system startup (System log)
         /// </summary>
-        OSStartupShutdownCrash,
+        OSStartup,
+
+        /// <summary>
+        /// Operating system shutdown
+        /// </summary>
+        OSShutdown,
+
+        /// <summary>
+        /// Operating system rebooted without clean shutdown
+        /// </summary>
+        OSUncleanShutdown,
+
+        /// <summary>
+        /// Operating system startup (Security log)
+        /// </summary>
+        OSStartupSecurity,
+
+        /// <summary>
+        /// Administrator recovered system from CrashOnAuditFail
+        /// </summary>
+        OSCrashOnAuditFailRecovery,
       
         /// <summary>
         /// System time changed
