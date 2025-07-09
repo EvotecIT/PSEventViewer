@@ -4,7 +4,6 @@ using EventViewerX.Rules.Kerberos;
 using EventViewerX.Rules.Logging;
 using EventViewerX.Rules.Windows;
 using EventViewerX.Rules.CertificateAuthority;
-using System.Runtime.Serialization;
 using EventViewerX.Rules.NPS;
 
 namespace EventViewerX;
@@ -106,7 +105,7 @@ public class EventObjectSlim {
         // For EventRuleBase classes, we get the NamedEvent from the rule itself
         if (ruleType.IsSubclassOf(typeof(EventRuleBase))) {
             try {
-                var instance = (EventRuleBase)FormatterServices.GetUninitializedObject(ruleType);
+                var instance = (EventRuleBase)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(ruleType);
                 _eventRuleTypes[instance.NamedEvent] = ruleType;
 
                 foreach (var eventId in instance.EventIds) {
@@ -187,7 +186,7 @@ public class EventObjectSlim {
     private static NamedEvents GetNamedEventForType(Type type) {
         if (type.IsSubclassOf(typeof(EventRuleBase))) {
             try {
-                var instance = (EventRuleBase)FormatterServices.GetUninitializedObject(type);
+                var instance = (EventRuleBase)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(type);
                 return instance.NamedEvent;
             } catch {
                 // Fall through to exception
@@ -219,7 +218,7 @@ public class EventObjectSlim {
             // Check if it's an EventRuleBase class
             if (ruleType.IsSubclassOf(typeof(EventRuleBase))) {
                 try {
-                    var instance = (EventRuleBase)FormatterServices.GetUninitializedObject(ruleType);
+                    var instance = (EventRuleBase)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(ruleType);
                     ruleEventIds = instance.EventIds;
                     ruleLogName = instance.LogName;
                 } catch {
