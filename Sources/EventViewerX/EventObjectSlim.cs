@@ -4,6 +4,7 @@ using EventViewerX.Rules.Kerberos;
 using EventViewerX.Rules.Logging;
 using EventViewerX.Rules.Windows;
 using EventViewerX.Rules.CertificateAuthority;
+using System.Runtime.Serialization;
 using EventViewerX.Rules.NPS;
 
 namespace EventViewerX;
@@ -105,15 +106,17 @@ public class EventObjectSlim {
         // For EventRuleBase classes, we get the NamedEvent from the rule itself
         if (ruleType.IsSubclassOf(typeof(EventRuleBase))) {
             try {
-                // Create a dummy EventObject to instantiate the rule and get its NamedEvent
-                var dummyEventObject = CreateDummyEventObject();
-                var constructor = ruleType.GetConstructor(new[] { typeof(EventObject) });
-                if (constructor != null) {
-                    var instance = (EventRuleBase)constructor.Invoke(new object[] { dummyEventObject });
-                    _eventRuleTypes[instance.NamedEvent] = ruleType;
+                var instance = (EventRuleBase)FormatterServices.GetUninitializedObject(ruleType);
+                _eventRuleTypes[instance.NamedEvent] = ruleType;
+
+                foreach (var eventId in instance.EventIds) {
+                    var key = (eventId, instance.LogName);
+                    if (!_eventHandlers.ContainsKey(key)) {
+                        _eventHandlers[key] = new List<Type>();
+                    }
+                    _eventHandlers[key].Add(ruleType);
                 }
             } catch {
-                // If we can't create instance, skip this type
                 return;
             }
         } else {
@@ -182,15 +185,10 @@ public class EventObjectSlim {
     }
 
     private static NamedEvents GetNamedEventForType(Type type) {
-        // For EventRuleBase classes, create instance and get NamedEvent
         if (type.IsSubclassOf(typeof(EventRuleBase))) {
             try {
-                var dummyEventObject = CreateDummyEventObject();
-                var constructor = type.GetConstructor(new[] { typeof(EventObject) });
-                if (constructor != null) {
-                    var instance = (EventRuleBase)constructor.Invoke(new object[] { dummyEventObject });
-                    return instance.NamedEvent;
-                }
+                var instance = (EventRuleBase)FormatterServices.GetUninitializedObject(type);
+                return instance.NamedEvent;
             } catch {
                 // Fall through to exception
             }
@@ -221,16 +219,10 @@ public class EventObjectSlim {
             // Check if it's an EventRuleBase class
             if (ruleType.IsSubclassOf(typeof(EventRuleBase))) {
                 try {
-                    // Create a dummy EventObject to instantiate the rule
-                    var dummyEventObject = CreateDummyEventObject();
-                    var constructor = ruleType.GetConstructor(new[] { typeof(EventObject) });
-                    if (constructor != null) {
-                        var instance = (EventRuleBase)constructor.Invoke(new object[] { dummyEventObject });
-                        ruleEventIds = instance.EventIds;
-                        ruleLogName = instance.LogName;
-                    }
+                    var instance = (EventRuleBase)FormatterServices.GetUninitializedObject(ruleType);
+                    ruleEventIds = instance.EventIds;
+                    ruleLogName = instance.LogName;
                 } catch {
-                    // If we can't create instance, skip
                     continue;
                 }
             } else {
@@ -257,20 +249,7 @@ public class EventObjectSlim {
         return eventInfoDict;
     }
 
-    /// <summary>
-    /// Creates a minimal dummy EventObject for getting rule metadata
-    /// </summary>
-    private static EventObject CreateDummyEventObject() {
-        // This is a hack - we need to create a minimal EventObject just to get metadata
-        // In a better design, the metadata would be static or available without instantiation
-        try {
-            // Try to create with minimal data
-            return new EventObject(null, "dummy");
-        } catch {
-            // If that fails, we'll need to handle this differently
-            throw new InvalidOperationException("Cannot create dummy EventObject for metadata extraction");
-        }
-    }
+
 
     private static readonly Dictionary<string, string> OperationTypeLookup = new()
     {
