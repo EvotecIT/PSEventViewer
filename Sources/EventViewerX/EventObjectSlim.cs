@@ -105,7 +105,7 @@ public class EventObjectSlim {
         // For EventRuleBase classes, we get the NamedEvent from the rule itself
         if (ruleType.IsSubclassOf(typeof(EventRuleBase))) {
             try {
-                var instance = (EventRuleBase)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(ruleType);
+                var instance = (EventRuleBase)System.Runtime.Serialization.FormatterServices.GetUninitializedObject(ruleType);
                 _eventRuleTypes[instance.NamedEvent] = ruleType;
 
                 foreach (var eventId in instance.EventIds) {
@@ -186,7 +186,7 @@ public class EventObjectSlim {
     private static NamedEvents GetNamedEventForType(Type type) {
         if (type.IsSubclassOf(typeof(EventRuleBase))) {
             try {
-                var instance = (EventRuleBase)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(type);
+                var instance = (EventRuleBase)System.Runtime.Serialization.FormatterServices.GetUninitializedObject(type);
                 return instance.NamedEvent;
             } catch {
                 // Fall through to exception
@@ -218,7 +218,7 @@ public class EventObjectSlim {
             // Check if it's an EventRuleBase class
             if (ruleType.IsSubclassOf(typeof(EventRuleBase))) {
                 try {
-                    var instance = (EventRuleBase)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(ruleType);
+                    var instance = (EventRuleBase)System.Runtime.Serialization.FormatterServices.GetUninitializedObject(ruleType);
                     ruleEventIds = instance.EventIds;
                     ruleLogName = instance.LogName;
                 } catch {
