@@ -167,7 +167,8 @@ namespace EventViewerX {
                 XNamespace ns = element.GetDefaultNamespace();
                 return element.Descendants(ns + "Data")
                     .FirstOrDefault(e => (string)e.Attribute("Name") == name)?.Value;
-            } catch {
+            } catch (Exception ex) {
+                Settings._logger.WriteWarning($"Failed extracting '{name}' data. Error: {ex.Message}");
                 return null;
             }
         }
