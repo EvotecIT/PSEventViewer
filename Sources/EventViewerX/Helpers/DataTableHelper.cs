@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.Data;
 using System.Linq;
 using System.Reflection;
@@ -9,6 +10,19 @@ namespace EventViewerX.Helpers {
     /// Helper methods for converting collections of events to <see cref="DataTable"/>.
     /// </summary>
     public static class DataTableHelper {
+        private sealed class MemberCache {
+            public List<PropertyInfo> Properties { get; }
+            public List<FieldInfo> Fields { get; }
+            public PropertyInfo? DataProperty { get; }
+
+            public MemberCache(List<PropertyInfo> properties, List<FieldInfo> fields, PropertyInfo? dataProperty) {
+                Properties = properties;
+                Fields = fields;
+                DataProperty = dataProperty;
+            }
+        }
+
+        private static readonly ConcurrentDictionary<Type, MemberCache> _cache = new();
         /// <summary>
         /// Converts a collection of <see cref="EventObject"/> instances to a <see cref="DataTable"/>.
         /// </summary>
@@ -33,10 +47,19 @@ namespace EventViewerX.Helpers {
             var dataTable = new DataTable(typeof(T).Name);
             if (!list.Any()) return dataTable;
 
-            var properties = typeof(T).GetProperties(BindingFlags.Instance | BindingFlags.Public)
-                .Where(p => IsSimpleType(p.PropertyType)).ToList();
-            var fields = typeof(T).GetFields(BindingFlags.Instance | BindingFlags.Public)
-                .Where(f => IsSimpleType(f.FieldType)).ToList();
+            var cache = _cache.GetOrAdd(
+                typeof(T),
+                static type => new MemberCache(
+                    type.GetProperties(BindingFlags.Instance | BindingFlags.Public)
+                        .Where(p => IsSimpleType(p.PropertyType)).ToList(),
+                    type.GetFields(BindingFlags.Instance | BindingFlags.Public)
+                        .Where(f => IsSimpleType(f.FieldType)).ToList(),
+                    type.GetProperty("Data", BindingFlags.Instance | BindingFlags.Public)
+                ));
+
+            var properties = cache.Properties;
+            var fields = cache.Fields;
+            var dataProperty = cache.DataProperty;
 
             foreach (var prop in properties) {
                 var type = Nullable.GetUnderlyingType(prop.PropertyType) ?? prop.PropertyType;
@@ -49,7 +72,6 @@ namespace EventViewerX.Helpers {
                 }
             }
 
-            PropertyInfo dataProperty = typeof(T).GetProperty("Data", BindingFlags.Instance | BindingFlags.Public);
             HashSet<string> dataKeys = new();
             if (dataProperty != null && dataProperty.PropertyType == typeof(Dictionary<string, string>)) {
                 foreach (var item in list) {
