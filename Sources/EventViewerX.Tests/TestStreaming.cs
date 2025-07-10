@@ -18,7 +18,9 @@ namespace EventViewerX.Tests {
         [Fact]
         public async Task NamedEventsStreamFirstEvent() {
             if (!OperatingSystem.IsWindows()) return;
-            await foreach (var _ in SearchEvents.FindEventsByNamedEvents([NamedEvents.OSCrash], new List<string> { Environment.MachineName }, maxEvents: 1)) {
+            await foreach (var _ in SearchEvents.FindEventsByNamedEvents([
+                NamedEvents.OSStartupSecurity
+            ], new List<string> { Environment.MachineName }, maxEvents: 1)) {
                 return;
             }
             Assert.Fail("No events were returned from FindEventsByNamedEvents.");
