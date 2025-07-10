@@ -315,7 +315,9 @@ namespace EventViewerX {
         /// <param name="xmlData">The XML data.</param>
         /// <returns></returns>
         private T ParseXML<T>(string xmlData) where T : IDictionary<string, string>, new() {
-            T data = new();
+            T data = typeof(T) == typeof(Dictionary<string, string>)
+                ? (T)(object)new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                : new();
 
             // Parse the XML data into an XElement
             XElement root;
