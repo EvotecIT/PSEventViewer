@@ -2,6 +2,8 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Reflection;
+using System.IO;
+using System.Linq;
 using Xunit;
 
 namespace EventViewerX.Tests {
@@ -46,6 +48,19 @@ namespace EventViewerX.Tests {
             var watcher = new WatchEvents();
             watcher.Watch(Environment.MachineName, "Application", new List<int> { 1 });
             Assert.Equal(0, WatchEvents.NumberOfEventsFound);
+        }
+
+        [Fact]
+        public void WatchedEventsAreKeyedByRecordId() {
+            if (!OperatingSystem.IsWindows()) return;
+            var path = Path.Combine("..", "..", "..", "..", "..", "Tests", "Logs", "Active Directory Web Services.evtx");
+            var firstEvent = SearchEvents.QueryLogFile(path, maxEvents: 1).First();
+            var watcher = new WatchEvents();
+            var field = typeof(WatchEvents).GetField("WatchedEvents", BindingFlags.NonPublic | BindingFlags.Instance);
+            Assert.NotNull(field);
+            var dict = (ConcurrentDictionary<long, EventObject>)field!.GetValue(watcher)!;
+            Assert.True(dict.TryAdd(firstEvent.RecordId ?? -1L, firstEvent));
+            Assert.False(dict.TryAdd(firstEvent.RecordId ?? -1L, firstEvent));
         }
     }
 }

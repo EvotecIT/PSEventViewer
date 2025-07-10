@@ -38,9 +38,9 @@ namespace EventViewerX {
         private Action<EventObject> _eventAction;
 
         /// <summary>
-        /// Events
+        /// Events keyed by record identifier
         /// </summary>
-        readonly ConcurrentDictionary<EventObject, byte> WatchedEvents = new ConcurrentDictionary<EventObject, byte>();
+        readonly ConcurrentDictionary<long, EventObject> WatchedEvents = new ConcurrentDictionary<long, EventObject>();
 
         private EventLogSession _eventLogSession;
         private EventLogWatcher _eventLogWatcher;
@@ -113,7 +113,7 @@ namespace EventViewerX {
                     _logger.WriteVerbose("Found event id {0} on {1}.", Event.Id, Event.MachineName);
 
                     var eventObject = new EventObject(Event, _machineName);
-                    WatchedEvents.TryAdd(eventObject, 0);
+                    WatchedEvents.TryAdd(eventObject.RecordId ?? -1L, eventObject);
                     _eventAction?.Invoke(eventObject);
                 }
             } else {
