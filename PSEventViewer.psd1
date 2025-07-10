@@ -1,7 +1,7 @@
 ﻿@{
-    AliasesToExport      = @('Get-EventViewerXEvent', 'Find-WinEvent', 'Get-Events', 'Get-EventViewerXFilter', 'Get-WinEventFilter', 'Get-EventsFilter', 'Get-EventViewerXInfo', 'Get-EventsSettings', 'Get-EventsInformation', 'Restore-EVXPowerShellScript', 'Get-PowerShellScriptExecution', 'Restore-PowerShellScript', 'Get-EventViewerXProviderList', 'Remove-EventViewerXSource', 'Remove-WinEventSource', 'Set-EventViewerXInfo', 'Set-EventsInformation', 'Set-EventsSettings', 'Start-EventViewerXWatcher', 'Start-EventWatching', 'Stop-EventViewerXWatcher', 'Get-EventViewerXWatcher', 'Write-EventViewerXEntry', 'Write-WinEvent', 'New-EventViewerXLog', 'New-WinEventLog', 'Get-EventViewerXLog', 'Get-WinEventLog', 'Remove-EventViewerXLog', 'Remove-WinEventLog', 'Limit-EventViewerXLog', 'Limit-WinEventLog', 'Limit-EVXLog')
+    AliasesToExport      = @('Get-EventViewerXEvent', 'Find-WinEvent', 'Get-Events', 'Get-EventViewerXFilter', 'Get-WinEventFilter', 'Get-EventsFilter', 'Get-EventViewerXInfo', 'Get-EventsSettings', 'Get-EventsInformation', 'Get-EventViewerXLog', 'Get-WinEventLog', 'Restore-EVXPowerShellScript', 'Get-PowerShellScriptExecution', 'Restore-PowerShellScript', 'Get-EventViewerXProviderList', 'Get-EventViewerXWatcher', 'Limit-EventViewerXLog', 'Limit-WinEventLog', 'Limit-EVXLog', 'New-EventViewerXLog', 'New-WinEventLog', 'Remove-EventViewerXLog', 'Remove-WinEventLog', 'Remove-EventViewerXSource', 'Remove-WinEventSource', 'Set-EventViewerXInfo', 'Set-EventsInformation', 'Set-EventsSettings', 'Start-EventViewerXWatcher', 'Start-EventWatching', 'Stop-EventViewerXWatcher', 'Write-EventViewerXEntry', 'Write-WinEvent')
     Author               = 'Przemyslaw Klys'
-    CmdletsToExport      = @('Get-EVXEvent', 'Get-EVXFilter', 'Get-EVXInfo', 'Get-EVXPowerShellScript', 'Get-EVXProviderList', 'Remove-EVXSource', 'Set-EVXInfo', 'Start-EVXWatcher', 'Stop-EVXWatcher', 'Get-EVXWatcher', 'Write-EVXEntry', 'New-EVXLog', 'Get-EVXLog', 'Remove-EVXLog', 'Limit-EVXLog')
+    CmdletsToExport      = @('Get-EVXEvent', 'Get-EVXFilter', 'Get-EVXInfo', 'Get-EVXLog', 'Get-EVXPowerShellScript', 'Get-EVXProviderList', 'Get-EVXWatcher', 'Set-EVXLogLimit', 'New-EVXLog', 'Remove-EVXLog', 'Remove-EVXSource', 'Set-EVXInfo', 'Start-EVXWatcher', 'Stop-EVXWatcher', 'Write-EVXEntry')
     CompanyName          = 'Evotec'
     CompatiblePSEditions = @('Desktop', 'Core')
     Copyright            = '(c) 2011 - 2025 Przemyslaw Klys @ Evotec. All rights reserved.'
@@ -21,7 +21,7 @@
     RequiredModules      = @(@{
             Guid          = 'ee272aa8-baaa-4edf-9f45-b6d6f7d844fe'
             ModuleName    = 'PSSharedGoods'
-            ModuleVersion = '0.0.309'
+            ModuleVersion = '0.0.310'
         }, 'Microsoft.PowerShell.Utility', 'Microsoft.PowerShell.Management', 'Microsoft.PowerShell.Diagnostics')
     RootModule           = 'PSEventViewer.psm1'
 }
