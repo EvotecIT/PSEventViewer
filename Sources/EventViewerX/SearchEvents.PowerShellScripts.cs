@@ -168,7 +168,7 @@ namespace EventViewerX {
                 return element.Descendants(ns + "Data")
                     .FirstOrDefault(e => (string)e.Attribute("Name") == name)?.Value;
             } catch (Exception ex) {
-                Settings._logger.WriteWarning($"Failed extracting '{name}' data. Error: {ex.Message}");
+                Settings._logger.WriteWarning($"Failed extracting '{name}' data. Exception: {ex}");
                 return null;
             }
         }
