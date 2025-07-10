@@ -22,7 +22,7 @@ Describe 'Limit-EVXLog cmdlet' {
         Limit-EVXLog -LogName $script:log -MaximumKilobytes 2048 -OverflowAction OverwriteOlder -RetentionDays 2 | Should -Be $true
         $eventLog = New-Object System.Diagnostics.EventLog $script:log
         $eventLog.MaximumKilobytes | Should -Be 2048
-        $eventLog.OverflowAction | Should -Be [System.Diagnostics.OverflowAction]::OverwriteOlder
+        $eventLog.OverflowAction | Should -Be 'OverwriteOlder'
         $eventLog.MinimumRetentionDays | Should -Be 2
     }
     It 'supports overwrite as needed' {
