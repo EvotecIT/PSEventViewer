@@ -45,6 +45,9 @@ public partial class SearchEvents : Settings {
         }
     }
 
+    /// <summary>
+    /// Queries events from a Windows event log file (.evtx) with optional filtering criteria.
+    /// </summary>
     /// <param name="filePath">The file path to the Windows event log file (.evtx) to query.</param>
     /// <param name="eventIds">Optional list of specific event IDs to filter for.</param>
     /// <param name="providerName">Optional name of the event provider to filter by.</param>
