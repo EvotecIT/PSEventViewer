@@ -29,7 +29,7 @@ namespace EventViewerX {
 
             var semaphore = new SemaphoreSlim(maxThreads);
             var results = new BlockingCollection<EventObjectSlim>();
-            var tasks = new ConcurrentBag<Task>();
+            var tasks = new List<Task>();
 
             foreach (var kvp in eventInfoDict) {
                 var logName = kvp.Key;
@@ -50,20 +50,19 @@ namespace EventViewerX {
                 }, cancellationToken));
             }
 
-            var completionTask = Task.Run(async () => {
-                try {
-                    await Task.WhenAll(tasks);
-                } finally {
-                    results.CompleteAdding();
-                }
-            }, cancellationToken);
+            var whenAllTask = Task.WhenAll(tasks);
+            _ = whenAllTask.ContinueWith(
+                _ => results.CompleteAdding(),
+                cancellationToken,
+                TaskContinuationOptions.ExecuteSynchronously,
+                TaskScheduler.Default);
 
             foreach (var result in results.GetConsumingEnumerable(cancellationToken)) {
                 yield return result;
                 await Task.Yield();
             }
 
-            await completionTask;
+            await whenAllTask;
         }
     }
 }

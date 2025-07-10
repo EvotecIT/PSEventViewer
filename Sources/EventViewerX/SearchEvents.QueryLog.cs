@@ -364,7 +364,7 @@ public partial class SearchEvents : Settings {
         var semaphore = new SemaphoreSlim(maxThreads);
         var results = new BlockingCollection<EventObject>();
 
-        var tasks = new ConcurrentBag<Task>();
+        var tasks = new List<Task>();
         foreach (var machineName in machineNames) {
             if (eventIds != null && eventIds.Any()) {
                 var eventIdsChunks = eventIds.Select((x, i) => new { Index = i, Value = x })
@@ -390,20 +390,19 @@ public partial class SearchEvents : Settings {
             }
         }
 
-        var completionTask = Task.Run(async () => {
-            try {
-                await Task.WhenAll(tasks);
-            } finally {
-                results.CompleteAdding();
-            }
-        }, cancellationToken);
+        var whenAllTask = Task.WhenAll(tasks);
+        _ = whenAllTask.ContinueWith(
+            _ => results.CompleteAdding(),
+            cancellationToken,
+            TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default);
 
         foreach (var result in results.GetConsumingEnumerable(cancellationToken)) {
             yield return result;
             await Task.Yield();
         }
 
-        await completionTask;
+        await whenAllTask;
     }
 
     public static async Task<IEnumerable<EventObject>> QueryLogsParallelAsync(string logName, List<int> eventIds = null, List<string> machineNames = null, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null, int maxEvents = 0, int maxThreads = 8, List<long> eventRecordId = null, TimePeriod? timePeriod = null, CancellationToken cancellationToken = default) {
