@@ -47,7 +47,7 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
     /// Specific event record identifiers to retrieve.
     /// </summary>
     [Alias("RecordId")]
-    [Parameter(Mandatory = false, Position = 1, ParameterSetName = "RecordId")]
+    [Parameter(Mandatory = false, ParameterSetName = "RecordId")]
     public List<long> EventRecordId = null;
 
     /// <summary>
