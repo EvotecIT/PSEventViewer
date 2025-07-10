@@ -184,7 +184,8 @@ namespace EventViewerX {
                         result[key] = data.Value;
                     }
                 }
-            } catch {
+            } catch (Exception ex) {
+                Settings._logger.WriteWarning($"Failed parsing event data. Error: {ex.Message}");
             }
             return result;
         }
