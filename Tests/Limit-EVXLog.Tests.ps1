@@ -29,6 +29,6 @@ Describe 'Limit-EVXLog cmdlet' {
         Limit-EVXLog -LogName $script:log -MaximumKilobytes 4096 -OverflowAction OverwriteAsNeeded | Should -Be $true
         $eventLog = New-Object System.Diagnostics.EventLog $script:log
         $eventLog.MaximumKilobytes | Should -Be 4096
-        $eventLog.OverflowAction | Should -Be [System.Diagnostics.OverflowAction]::OverwriteAsNeeded
+        $eventLog.OverflowAction | Should -Be 'OverwriteAsNeeded'
     }
 }
