@@ -26,21 +26,22 @@ public partial class SearchEvents : Settings {
     /// <param name="machineName">Name of the machine.</param>
     /// <returns>Initialized <see cref="EventLogReader"/> or null when failed.</returns>
     private static EventLogReader CreateEventLogReader(EventLogQuery query, string machineName) {
+        string targetMachine = string.IsNullOrEmpty(machineName) ? GetFQDN() : machineName;
         if (query == null) {
-            _logger.WriteWarning($"An error occurred on {machineName} while creating the event log reader: Query cannot be null.");
+            _logger.WriteWarning($"An error occurred on {targetMachine} while creating the event log reader: Query cannot be null.");
             return null;
         }
 
         try {
             return new EventLogReader(query);
         } catch (EventLogException ex) {
-            _logger.WriteWarning($"An error occurred on {machineName} while creating the event log reader: {ex.Message}");
+            _logger.WriteWarning($"An error occurred on {targetMachine} while creating the event log reader: {ex.Message}");
             return null;
         } catch (UnauthorizedAccessException ex) {
-            _logger.WriteWarning($"Insufficient permissions to read the event log on {machineName}: {ex.Message}");
+            _logger.WriteWarning($"Insufficient permissions to read the event log on {targetMachine}: {ex.Message}");
             return null;
         } catch (Exception ex) {
-            _logger.WriteWarning($"An error occurred on {machineName} while creating the event log reader: {ex.Message}");
+            _logger.WriteWarning($"An error occurred on {targetMachine} while creating the event log reader: {ex.Message}");
             return null;
         }
     }
@@ -171,11 +172,11 @@ public partial class SearchEvents : Settings {
         _logger.WriteVerbose($"Querying log '{logName}' on '{machineName} with query: {queryString}");
 
         EventLogQuery query = new EventLogQuery(logName, PathType.LogName, queryString);
-        if (machineName != null) {
+        if (!string.IsNullOrEmpty(machineName)) {
             query.Session = new EventLogSession(machineName);
         }
 
-        var queriedMachine = machineName ?? GetFQDN();
+        var queriedMachine = string.IsNullOrEmpty(machineName) ? GetFQDN() : machineName;
 
         EventRecord record;
         using (EventLogReader reader = CreateEventLogReader(query, machineName)) {
