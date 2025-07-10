@@ -45,22 +45,6 @@ public partial class SearchEvents : Settings {
         }
     }
 
-    /// <summary>
-    /// Get the fully qualified domain name of the machine
-    /// </summary>
-    /// <returns>Machine FQDN.</returns>
-    private static string GetFQDN() {
-        try {
-            return Dns.GetHostEntry("").HostName;
-        } catch (Exception ex) {
-            _logger.WriteVerbose($"Failed to resolve FQDN via DNS: {ex.Message}. Falling back to machine name.");
-            return Environment.MachineName;
-        }
-    }
-
-    /// <summary>
-    /// Queries events from a Windows event log file (.evtx) with optional filtering criteria.
-    /// </summary>
     /// <param name="filePath">The file path to the Windows event log file (.evtx) to query.</param>
     /// <param name="eventIds">Optional list of specific event IDs to filter for.</param>
     /// <param name="providerName">Optional name of the event provider to filter by.</param>
