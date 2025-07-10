@@ -288,7 +288,8 @@ public partial class SearchEvents : Settings {
 
         // Add provider name to the query
         if (!string.IsNullOrEmpty(providerName)) {
-            AddCondition(queryString, $"Provider[@Name='{providerName}']");
+            var escaped = EscapeXPathValue(providerName);
+            AddCondition(queryString, $"Provider[@Name='{escaped}']");
         }
 
         // Add keywords to the query
