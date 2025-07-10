@@ -55,18 +55,34 @@ namespace EventViewerX {
             }
         }
 
+        /// <summary>
+        /// Invokes the user provided callback when a matching event is detected.
+        /// </summary>
+        /// <param name="obj">Event object passed to the callback.</param>
         private void OnEvent(EventObject obj) {
+            Exception? exCaught = null;
             try {
                 Action?.Invoke(obj);
-            } catch {
-                // ignore user errors
+            } catch (Exception ex) {
+                exCaught = ex;
+                Settings._logger.WriteWarning("OnEvent callback threw: {0}", ex.Message.Trim());
             }
+
             if (StopOnMatch) {
                 Stop();
             } else if (StopAfter > 0 && Watcher.EventsFound >= StopAfter) {
                 Stop();
             }
+
+            if (exCaught != null) {
+                ActionException?.Invoke(this, exCaught);
+            }
         }
+
+        /// <summary>
+        /// Occurs when the callback passed to <see cref="StartWatcher"/> throws an exception.
+        /// </summary>
+        public event EventHandler<Exception>? ActionException;
 
         public void Stop() {
             Cancellation.Cancel();
