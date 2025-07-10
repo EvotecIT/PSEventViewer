@@ -90,8 +90,14 @@ namespace EventViewerX.Helpers {
         }
 
         private static bool IsSimpleType(Type type) {
-            type = Nullable.GetUnderlyingType(type) ?? type;
-            return type.IsPrimitive || type.IsEnum || type == typeof(string) || type == typeof(DateTime) || type == typeof(decimal) || type == typeof(Guid);
+            var targetType = Nullable.GetUnderlyingType(type) ?? type;
+
+            return targetType.IsPrimitive
+                || targetType.IsEnum
+                || targetType == typeof(string)
+                || targetType == typeof(DateTime)
+                || targetType == typeof(decimal)
+                || targetType == typeof(Guid);
         }
     }
 }
