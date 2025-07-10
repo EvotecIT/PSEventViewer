@@ -273,7 +273,7 @@ public partial class SearchEvents : Settings {
             startTime = times.StartTime;
             endTime = times.EndTime;
             lastPeriod = times.LastPeriod;
-            _logger.WriteVerbose("Time period: " + timePeriod + ", time start: " + startTime + ", time end: " + endTime, " lastPeriod: " + lastPeriod);
+            _logger.WriteVerbose($"Time period: {timePeriod}, time start: {startTime}, time end: {endTime}, lastPeriod: {lastPeriod}");
         }
 
         StringBuilder queryString = new StringBuilder($"<QueryList><Query Id='0' Path='{logName}'><Select Path='{logName}'>*[System[");
@@ -288,7 +288,8 @@ public partial class SearchEvents : Settings {
 
         // Add provider name to the query
         if (!string.IsNullOrEmpty(providerName)) {
-            AddCondition(queryString, $"Provider[@Name='{providerName}']");
+            var escaped = EscapeXPathValue(providerName);
+            AddCondition(queryString, $"Provider[@Name='{escaped}']");
         }
 
         // Add keywords to the query
@@ -359,7 +360,7 @@ public partial class SearchEvents : Settings {
             machineNames = new List<string> { null };
             _logger.WriteVerbose("No machine names provided, querying the local machine.");
         } else {
-            _logger.WriteVerbose("Machine names provided. Creating tasks for each machine on the list: " + string.Join(", ", machineNames));
+            _logger.WriteVerbose($"Machine names provided. Creating tasks for each machine on the list: {string.Join(", ", machineNames)}");
         }
         var semaphore = new SemaphoreSlim(maxThreads);
         var results = new BlockingCollection<EventObject>();
@@ -425,12 +426,12 @@ public partial class SearchEvents : Settings {
         return Task.Run(async () => {
             await semaphore.WaitAsync(cancellationToken);
             try {
-                _logger.WriteVerbose($"Querying log on machine: {machineName}, logName: {logName}, event ids: " + string.Join(", ", eventIds ?? new List<int>()));
+                _logger.WriteVerbose($"Querying log on machine: {machineName}, logName: {logName}, event ids: {string.Join(", ", eventIds ?? new List<int>())}");
                 foreach (var result in QueryLogEnumerable(logName, eventIds, machineName, providerName, keywords, level, startTime, endTime, userId, maxEvents, eventRecordId, timePeriod, cancellationToken)) {
                     if (cancellationToken.IsCancellationRequested) break;
                     results.Add(result, cancellationToken);
                 }
-                _logger.WriteVerbose("Querying log on machine: " + machineName + " completed.");
+                _logger.WriteVerbose($"Querying log on machine: {machineName} completed.");
             } finally {
                 semaphore.Release();
             }
@@ -450,13 +451,13 @@ public partial class SearchEvents : Settings {
             try {
                 Parallel.ForEach(machineNames, options, machineName => {
                     try {
-                        _logger.WriteVerbose("Starting task for machine: " + machineName);
+                        _logger.WriteVerbose($"Starting task for machine: {machineName}");
                         var queryResults = QueryLog(logName, eventIds, machineName, providerName, keywords, level, startTime, endTime, userId, maxEvents, eventRecordId, cancellationToken: cancellationToken);
                         foreach (var result in queryResults) {
                             if (cancellationToken.IsCancellationRequested) break;
                             results.Add(result, cancellationToken);
                         }
-                        _logger.WriteVerbose("Finished task for machine: " + machineName);
+                        _logger.WriteVerbose($"Finished task for machine: {machineName}");
                     } catch (Exception ex) {
                         exceptions.Enqueue(ex);
                     }
