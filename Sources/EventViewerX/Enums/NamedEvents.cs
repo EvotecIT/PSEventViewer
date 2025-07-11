@@ -371,5 +371,15 @@
         /// Azure AD Connect run profile completed
         /// </summary>
         AADConnectRunProfile,
+
+        /// <summary>
+        /// Network monitor driver loaded (events 6, 7035, 7045)
+        /// </summary>
+        NetworkMonitorDriverLoaded,
+
+        /// <summary>
+        /// Network adapter entered promiscuous mode (events 10400, 10401)
+        /// </summary>
+        NetworkPromiscuousMode,
     }
 }
