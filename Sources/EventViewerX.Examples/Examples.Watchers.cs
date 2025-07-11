@@ -74,5 +74,34 @@ namespace EventViewerX.Examples {
             Thread.Sleep(TimeSpan.FromSeconds(15));
             Console.WriteLine($"Ended at {watcher.EndTime}");
         }
+
+        public static void WatchDuplicateName() {
+            var first = WatcherManager.StartWatcher(
+                "duplicate",
+                Environment.MachineName,
+                "Application",
+                new List<int> { 1 },
+                new List<NamedEvents>(),
+                _ => { },
+                1,
+                false,
+                false,
+                0,
+                null);
+            var second = WatcherManager.StartWatcher(
+                "duplicate",
+                Environment.MachineName,
+                "Application",
+                new List<int> { 1 },
+                new List<NamedEvents>(),
+                _ => { },
+                1,
+                false,
+                false,
+                0,
+                null);
+            Console.WriteLine(first == second ? "Same watcher" : "Different watcher");
+            WatcherManager.StopAll();
+        }
     }
 }
