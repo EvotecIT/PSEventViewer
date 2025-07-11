@@ -1,5 +1,6 @@
 using System.Reflection;
 using System.Collections.Generic;
+using System.Diagnostics.Eventing.Reader;
 using System.Xml.Linq;
 using Xunit;
 
@@ -7,7 +8,12 @@ namespace EventViewerX.Tests {
     public class TestPowerShellScripts {
         [Fact]
         public void ExtractDataLogsWarning() {
-            var method = typeof(SearchEvents).GetMethod("ExtractData", BindingFlags.NonPublic | BindingFlags.Static);
+            var method = typeof(SearchEvents).GetMethod(
+                "ExtractData",
+                BindingFlags.NonPublic | BindingFlags.Static,
+                null,
+                new[] { typeof(EventRecord), typeof(string) },
+                null);
             Assert.NotNull(method);
             string? message = null;
             EventHandler<LogEventArgs> handler = (_, e) => message = e.FullMessage;
@@ -23,7 +29,12 @@ namespace EventViewerX.Tests {
 
         [Fact]
         public void GetAllDataLogsWarning() {
-            var method = typeof(SearchEvents).GetMethod("GetAllData", BindingFlags.NonPublic | BindingFlags.Static);
+            var method = typeof(SearchEvents).GetMethod(
+                "GetAllData",
+                BindingFlags.NonPublic | BindingFlags.Static,
+                null,
+                new[] { typeof(EventRecord) },
+                null);
             Assert.NotNull(method);
             string? message = null;
             EventHandler<LogEventArgs> handler = (_, e) => message = e.FullMessage;
