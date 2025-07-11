@@ -20,8 +20,9 @@ public class TestDataTableHelper {
         var cacheField = helperType.GetField("_cache", BindingFlags.NonPublic | BindingFlags.Static);
         Assert.NotNull(cacheField);
 
-        dynamic cache = cacheField!.GetValue(null)!;
-        cache.Clear();
+        object cache = cacheField!.GetValue(null)!;
+        MethodInfo clearMethod = cacheField.FieldType.GetMethod("Clear")!;
+        clearMethod.Invoke(cache, null);
 
         var method = helperType.GetMethod("ToDataTableInternal", BindingFlags.NonPublic | BindingFlags.Static);
         Assert.NotNull(method);
@@ -33,13 +34,15 @@ public class TestDataTableHelper {
 
         generic.Invoke(null, new object[] { items });
 
-        Assert.Equal(1, (int)cache.Count);
-        var first = cache[typeof(SimpleEvent)];
+        PropertyInfo countProperty = cacheField.FieldType.GetProperty("Count")!;
+        Assert.Equal(1, (int)countProperty.GetValue(cache)!);
+        PropertyInfo indexer = cacheField.FieldType.GetProperty("Item")!;
+        var first = indexer.GetValue(cache, new object[] { typeof(SimpleEvent) });
 
         generic.Invoke(null, new object[] { items });
 
-        Assert.Equal(1, (int)cache.Count);
-        var second = cache[typeof(SimpleEvent)];
+        Assert.Equal(1, (int)countProperty.GetValue(cache)!);
+        var second = indexer.GetValue(cache, new object[] { typeof(SimpleEvent) });
 
         Assert.Same(first, second);
     }
