@@ -1,3 +1,5 @@
+using EventViewerX.Rules.Windows;
+
 namespace EventViewerX.Examples {
     internal partial class Examples {
         public static async Task FindNetworkMonitorEvents() {
@@ -5,7 +7,13 @@ namespace EventViewerX.Examples {
                 NamedEvents.NetworkMonitorDriverLoaded,
                 NamedEvents.NetworkPromiscuousMode
             ])) {
-                Console.WriteLine($"Event: {evt.Type} {evt.EventID} on {evt.ComputerName}");
+                var computer = evt switch {
+                    NetworkMonitorDriverLoaded driver => driver.Computer,
+                    NetworkPromiscuousMode promiscuous => promiscuous.Computer,
+                    _ => evt.GatheredFrom
+                };
+
+                Console.WriteLine($"Event: {evt.Type} {evt.EventID} on {computer}");
             }
         }
     }
