@@ -105,3 +105,10 @@ The `TimePeriod` enumeration simplifies building date ranges. Each option sets t
 | TillLastSaturday | Since last Saturday |
 | TillLastSunday | Since last Sunday |
 
+### Example scripts
+
+See the `Examples` folder for more scenarios.
+
+- `Example.NamedDataFilterAdvanced.ps1` shows how to combine include and exclude named data filters.
+- `Example.WatchAdvanced.ps1` demonstrates a watcher using staging mode with `-StopOnMatch`.
+

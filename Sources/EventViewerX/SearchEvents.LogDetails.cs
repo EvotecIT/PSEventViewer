@@ -10,7 +10,7 @@ public partial class SearchEvents : Settings {
 
     public static IEnumerable<EventLogDetails> DisplayEventLogs(string[] listLog = null, string machineName = null) {
         EventLogSession session;
-        if (machineName != null) {
+        if (!string.IsNullOrEmpty(machineName)) {
             session = new EventLogSession(machineName);
         } else {
             session = new EventLogSession();

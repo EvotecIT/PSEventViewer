@@ -72,7 +72,7 @@ namespace EventViewerX {
             _eventsFound = 0;
             Dispose();
             StartTime = DateTime.UtcNow;
-            _machineName = machineName;
+            _machineName = string.IsNullOrEmpty(machineName) ? Environment.MachineName : machineName;
             if (staging && !eventId.Contains(350)) {
                 eventId.Add(350);
                 StagingEnabled = true;
@@ -84,10 +84,14 @@ namespace EventViewerX {
             _watchEventId = new ConcurrentBag<int>(eventId);
             _eventAction = eventAction;
             try {
-                _eventLogSession = new EventLogSession(machineName);
-                _eventLogWatcher = new EventLogWatcher(new EventLogQuery(logName, PathType.LogName) {
-                    Session = _eventLogSession
-                });
+                if (!string.IsNullOrEmpty(machineName)) {
+                    _eventLogSession = new EventLogSession(machineName);
+                }
+                EventLogQuery query = new EventLogQuery(logName, PathType.LogName);
+                if (_eventLogSession != null) {
+                    query.Session = _eventLogSession;
+                }
+                _eventLogWatcher = new EventLogWatcher(query);
                 _eventLogWatcher.EventRecordWritten += DetectEventsLogCallback;
                 _eventLogWatcher.Enabled = true;
                 cancellationToken.Register(() => Dispose());
