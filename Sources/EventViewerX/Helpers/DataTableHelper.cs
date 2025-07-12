@@ -109,6 +109,7 @@ public static class DataTableHelper {
             dataTable.Rows.Add(row);
         }
 
+        return dataTable;
     }
   
     private static bool IsSimpleType(Type type) {
