@@ -7,7 +7,7 @@ using Xunit;
 
 namespace EventViewerX.Tests;
 
-public class TestDataTableHelper {
+public partial class TestDataTableHelper {
     private class SimpleEvent {
         public int Id { get; set; }
         public string Name { get; set; }
@@ -46,9 +46,9 @@ public class TestDataTableHelper {
 
         Assert.Same(first, second);
     }
+}
 
-    [Fact]
-    public class TestDataTableHelper {
+public partial class TestDataTableHelper {
         private class Dummy {
             public int? IntValue { get; set; }
             public DateTime? DateValue { get; set; }
@@ -85,4 +85,3 @@ public class TestDataTableHelper {
             Assert.Equal(DBNull.Value, table.Rows[1]["DoubleValue"]);
         }
     }
-}
