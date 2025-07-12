@@ -70,8 +70,8 @@ namespace EventViewerX {
         public void Watch(string machineName, string logName, List<int> eventId, Action<EventObject> eventAction = null, CancellationToken cancellationToken = default, bool staging = false, string enabledBy = null) {
             NumberOfEventsFound = 0;
             _eventsFound = 0;
-            StartTime = DateTime.UtcNow;
             Dispose();
+            StartTime = DateTime.UtcNow;
             _machineName = string.IsNullOrEmpty(machineName) ? Environment.MachineName : machineName;
             if (staging && !eventId.Contains(350)) {
                 eventId.Add(350);
