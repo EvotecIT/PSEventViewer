@@ -31,6 +31,9 @@ namespace PSEventViewer {
         [Parameter(Mandatory = true, Position = 2, ParameterSetName = "EventId")]
         public int[] EventId { get; set; }
 
+        /// <summary>
+        /// Array of predefined event groups to monitor.
+        /// </summary>
         [Parameter(Mandatory = true, Position = 2, ParameterSetName = "NamedEvent")]
         public NamedEvents[] NamedEvent { get; set; }
 
@@ -46,15 +49,27 @@ namespace PSEventViewer {
         [Parameter(Mandatory = true, Position = 3)]
         public ScriptBlock Action { get; set; }
 
+        /// <summary>
+        /// Optional name for the watcher instance.
+        /// </summary>
         [Parameter]
         public string Name { get; set; }
 
+        /// <summary>
+        /// Duration after which the watcher stops automatically.
+        /// </summary>
         [Parameter]
         public TimeSpan? TimeOut { get; set; }
 
+        /// <summary>
+        /// When set, the watcher stops after the first matching event.
+        /// </summary>
         [Parameter]
         public SwitchParameter StopOnMatch { get; set; }
 
+        /// <summary>
+        /// Stops watching after processing the specified number of events.
+        /// </summary>
         [Parameter]
         public int StopAfter { get; set; }
 
@@ -65,6 +80,9 @@ namespace PSEventViewer {
         [ValidateRange(1, 1024)]
         public int NumberOfThreads { get; set; } = 8;
 
+        /// <summary>
+        /// Starts the watcher based on provided filters and returns its information.
+        /// </summary>
         protected override Task ProcessRecordAsync() {
             var ids = new System.Collections.Generic.List<int>();
             if (ParameterSetName == "EventId" && EventId != null) {

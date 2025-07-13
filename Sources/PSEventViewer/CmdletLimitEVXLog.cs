@@ -16,7 +16,7 @@ namespace PSEventViewer;
 /// functionality but this implementation relies solely on .NET APIs.
 /// </para>
 /// <para>
-/// <paramref name="OverflowAction"/> determines how old events are handled:
+/// <see cref="OverflowAction"/> determines how old events are handled:
 /// <list type="bullet">
 ///   <item>
 ///     <term>OverwriteAsNeeded</term>

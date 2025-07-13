@@ -441,6 +441,9 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
         return MessageRegex.IsMatch(message);
     }
 
+    /// <summary>
+    /// Saves the highest processed record ID to <see cref="RecordIdFile"/> when processing completes.
+    /// </summary>
     protected override Task EndProcessingAsync() {
         if (!string.IsNullOrEmpty(RecordIdFile) && _highestRecordId.HasValue) {
             _recordMap[_recordIdKey] = _highestRecordId.Value;
