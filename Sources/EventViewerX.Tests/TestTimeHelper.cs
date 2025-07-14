@@ -1,7 +1,12 @@
 using System;
 using Xunit;
 
-namespace EventViewerX.Tests {
+namespace EventViewerX.Tests
+{
+
+    /// <summary>
+    /// Unit tests for time conversion helpers.
+    /// </summary>
     public class TestTimeHelper {
         [Fact]
         public void PastHourRangeIsLocal() {

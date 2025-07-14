@@ -3,7 +3,12 @@ using System.IO;
 using System.Linq;
 using Xunit;
 
-namespace EventViewerX.Tests {
+namespace EventViewerX.Tests
+{
+
+    /// <summary>
+    /// Unit tests for reading events from log files.
+    /// </summary>
     public class TestQueryLogFile {
         [Fact]
         public void QueryLogFileSanitizesPath() {

@@ -4,7 +4,12 @@ using System.IO;
 using System.Linq;
 using Xunit;
 
-namespace EventViewerX.Tests {
+namespace EventViewerX.Tests
+{
+
+    /// <summary>
+    /// Unit tests for WinEventInformation retrieval.
+    /// </summary>
     public class TestEventInformation {
         [Fact]
         public void QueryLocalLogInformation() {

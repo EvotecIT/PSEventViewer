@@ -2,7 +2,12 @@ using System;
 using System.Reflection;
 using Xunit;
 
-namespace EventViewerX.Tests {
+namespace EventViewerX.Tests
+{
+
+    /// <summary>
+    /// Unit tests for FQDN cache logic.
+    /// </summary>
     public class TestFqdnCache {
         [Fact]
         public void GetFqdnCachesResult() {

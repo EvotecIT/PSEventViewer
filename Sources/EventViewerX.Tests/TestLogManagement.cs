@@ -3,6 +3,10 @@ using Xunit;
 
 namespace EventViewerX.Tests;
 
+    /// <summary>
+    /// Unit tests for event log management.
+    /// </summary>
+
 public class TestLogManagement {
     [Fact]
     public void CreateAndRemoveLog() {

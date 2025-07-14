@@ -7,6 +7,10 @@ using Xunit;
 
 namespace EventViewerX.Tests;
 
+    /// <summary>
+    /// Unit tests for DataTable helper.
+    /// </summary>
+
 public partial class TestDataTableHelper {
     private class SimpleEvent {
         public int Id { get; set; }
@@ -48,6 +52,9 @@ public partial class TestDataTableHelper {
     }
 }
 
+    /// <summary>
+    /// Additional tests for DataTable helper functionality.
+    /// </summary>
 public partial class TestDataTableHelper {
         private class Dummy {
             public int? IntValue { get; set; }

@@ -5,6 +5,10 @@ using Xunit;
 
 namespace EventViewerX.Tests;
 
+    /// <summary>
+    /// Unit tests for GroupPolicyHelpers.
+    /// </summary>
+
 public class TestGroupPolicyHelpers {
     [Fact]
     public void QueryByDistinguishedNameReturnsNullOnInvalid() {

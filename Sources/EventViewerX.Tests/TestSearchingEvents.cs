@@ -1,7 +1,12 @@
 using Xunit;
 using EventViewerX;
 
-namespace EventViewerX.Tests {
+namespace EventViewerX.Tests
+{
+
+    /// <summary>
+    /// Unit tests for SearchEvents.
+    /// </summary>
     public class TestSearchingEvents {
         [Fact]
         public void QuerySecurityEvents4932and4933() {

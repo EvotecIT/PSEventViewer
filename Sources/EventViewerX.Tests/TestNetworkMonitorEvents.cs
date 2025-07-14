@@ -1,7 +1,12 @@
 using System.Collections.Generic;
 using Xunit;
 
-namespace EventViewerX.Tests {
+namespace EventViewerX.Tests
+{
+
+    /// <summary>
+    /// Unit tests for network monitor event rules.
+    /// </summary>
     public class TestNetworkMonitorEvents {
         [Fact]
         public void EventInfoContainsNetworkMonitorEvents() {

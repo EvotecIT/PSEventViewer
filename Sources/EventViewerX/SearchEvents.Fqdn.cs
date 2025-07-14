@@ -1,5 +1,8 @@
 namespace EventViewerX;
 
+/// <summary>
+/// Helper methods for retrieving the fully qualified domain name.
+/// </summary>
 public partial class SearchEvents : Settings {
     private static string _fqdn;
 

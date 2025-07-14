@@ -4,7 +4,12 @@ using System.Reflection;
 using System.Runtime.Serialization;
 using Xunit;
 
-namespace EventViewerX.Tests {
+namespace EventViewerX.Tests
+{
+
+    /// <summary>
+    /// Unit tests for XML parsing helpers.
+    /// </summary>
     public class TestParseXml {
         [Fact]
         public void DataDictionaryIsCaseInsensitive() {

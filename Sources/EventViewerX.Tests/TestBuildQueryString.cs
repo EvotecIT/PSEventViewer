@@ -3,7 +3,12 @@ using System.Reflection;
 using System.Linq;
 using Xunit;
 
-namespace EventViewerX.Tests {
+namespace EventViewerX.Tests
+{
+
+    /// <summary>
+    /// Unit tests covering query string generation helpers.
+    /// </summary>
     public class TestBuildQueryString {
         [Fact]
         public void ProviderNameEscapesSpecialCharacters() {

@@ -4,7 +4,12 @@ using System.Diagnostics.Eventing.Reader;
 using System.Xml.Linq;
 using Xunit;
 
-namespace EventViewerX.Tests {
+namespace EventViewerX.Tests
+{
+
+    /// <summary>
+    /// Unit tests for PowerShell script event queries.
+    /// </summary>
     public class TestPowerShellScripts {
         [Fact]
         public void ExtractDataLogsWarning() {

@@ -8,6 +8,9 @@ using System.Threading.Tasks;
 
 namespace EventViewerX;
 
+/// <summary>
+/// Provides methods for constructing and executing event log queries.
+/// </summary>
 public partial class SearchEvents : Settings {
     /// <summary>
     /// Initialize the EventSearching class with an internal logger

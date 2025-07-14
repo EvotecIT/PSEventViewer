@@ -2,7 +2,12 @@ using System;
 using System.Collections.Generic;
 using Xunit;
 
-namespace EventViewerX.Tests {
+namespace EventViewerX.Tests
+{
+
+    /// <summary>
+    /// Unit tests for machine name edge cases.
+    /// </summary>
     public class TestMachineNameEdgeCases {
         [Fact]
         public void QueryLogHandlesEmptyMachineName() {

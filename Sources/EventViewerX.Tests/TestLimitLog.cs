@@ -3,6 +3,10 @@ using Xunit;
 
 namespace EventViewerX.Tests;
 
+    /// <summary>
+    /// Unit tests for log size limiting.
+    /// </summary>
+
 public class TestLimitLog {
     [Fact]
     public void LimitExistingLog() {

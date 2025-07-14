@@ -1,7 +1,12 @@
 using System.Collections.Generic;
 using Xunit;
 
-namespace EventViewerX.Tests {
+namespace EventViewerX.Tests
+{
+
+    /// <summary>
+    /// Unit tests for OS event queries.
+    /// </summary>
     public class TestOsEvents {
         [Fact]
         public void EventInfoContainsOsEvents() {

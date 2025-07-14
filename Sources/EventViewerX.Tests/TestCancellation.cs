@@ -2,7 +2,12 @@ using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
 
-namespace EventViewerX.Tests {
+namespace EventViewerX.Tests
+{
+
+    /// <summary>
+    /// Unit tests verifying cancellation support.
+    /// </summary>
     public class TestCancellation {
         [Fact]
         public async Task QueryLogsParallelAsyncHonorsCancellation() {

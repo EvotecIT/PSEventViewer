@@ -5,7 +5,12 @@ using System.Collections.Concurrent;
 using System.Runtime.Serialization;
 using Xunit;
 
-namespace EventViewerX.Tests {
+namespace EventViewerX.Tests
+{
+
+    /// <summary>
+    /// Unit tests for WatcherManager.
+    /// </summary>
     public class TestWatcherManager {
         [Fact]
         public void StartWatcherReturnsExistingInstance() {

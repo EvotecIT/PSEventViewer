@@ -2,7 +2,12 @@ using System;
 using System.Collections;
 using Xunit;
 
-namespace EventViewerX.Tests {
+namespace EventViewerX.Tests
+{
+
+    /// <summary>
+    /// Unit tests for WinEventFilter logic.
+    /// </summary>
     public class TestWinEventFilter {
         [Fact]
         public void NamedDataFilterSingleValue() {

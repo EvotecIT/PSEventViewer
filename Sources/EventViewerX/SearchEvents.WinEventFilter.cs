@@ -1,5 +1,8 @@
 namespace EventViewerX;
 
+/// <summary>
+/// Utility helpers for building XPath filters for event queries.
+/// </summary>
 public partial class SearchEvents {
     private static string EscapeXPathValue(string value) {
         return System.Security.SecurityElement.Escape(value);

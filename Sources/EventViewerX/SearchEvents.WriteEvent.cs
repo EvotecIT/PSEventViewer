@@ -1,4 +1,7 @@
 ﻿namespace EventViewerX;
+/// <summary>
+/// Methods for writing custom events to Windows Event Logs.
+/// </summary>
 
 public partial class SearchEvents : Settings {
 

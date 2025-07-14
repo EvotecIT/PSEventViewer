@@ -3,7 +3,12 @@ using System.Linq;
 using System.Reflection;
 using Xunit;
 
-namespace EventViewerX.Tests {
+namespace EventViewerX.Tests
+{
+
+    /// <summary>
+    /// Unit tests for BinaryWrappers helpers.
+    /// </summary>
     public class TestBinaryWrappers {
         [Fact]
         public void LogNamesEmptyWhenChannelReferencesMissing() {

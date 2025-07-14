@@ -8,6 +8,9 @@ using System.Collections.Generic;
 using System.Reflection;
 
 namespace EventViewerX {
+    /// <summary>
+    /// Utilities for mapping events to strongly typed rule classes.
+    /// </summary>
     public partial class SearchEvents : Settings {
         /// <summary>
         /// Builds the appropriate event object based on the NamedEvents value
