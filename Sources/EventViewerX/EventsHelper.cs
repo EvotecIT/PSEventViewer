@@ -146,6 +146,36 @@ internal static class EventsHelper {
     }
 
     /// <summary>
+    /// Translates a string value to a NasPortType enum.
+    /// </summary>
+    /// <param name="value">The value to translate.</param>
+    /// <returns>The translated NasPortType enum.</returns>
+    public static NasPortType? GetNasPortType(string value) {
+        if (string.IsNullOrEmpty(value)) {
+            return null;
+        }
+
+        if (value.StartsWith("%%")) {
+            value = value.Trim('%');
+        }
+
+        if (int.TryParse(value, out var number)
+            && Enum.IsDefined(typeof(NasPortType), number)) {
+            return (NasPortType)number;
+        }
+
+        var normalized = value.Replace("-", string.Empty)
+            .Replace(" ", string.Empty)
+            .Replace(".", string.Empty);
+
+        if (Enum.TryParse(normalized, true, out NasPortType result)) {
+            return result;
+        }
+
+        return null;
+    }
+
+    /// <summary>
     /// Translates device class name into a simplified device type.
     /// </summary>
     /// <param name="className">Device class name.</param>
