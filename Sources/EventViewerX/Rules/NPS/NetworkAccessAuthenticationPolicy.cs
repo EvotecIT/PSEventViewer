@@ -65,9 +65,9 @@ public class NetworkAccessAuthenticationPolicy : EventRuleBase {
     public string NASIdentifier;
 
     /// <summary>
-    /// Type of the NAS port.
+    /// Type of the network access server port.
     /// </summary>
-    public string NASPortType;
+    public NasPortType? NASPortType;
 
     /// <summary>
     /// NAS port number.
@@ -156,7 +156,8 @@ public class NetworkAccessAuthenticationPolicy : EventRuleBase {
 
         NASIdentifier = _eventObject.GetValueFromDataDictionary("NASIdentifier");
         NASPort = _eventObject.GetValueFromDataDictionary("NASPort");
-        NASPortType = _eventObject.GetValueFromDataDictionary("NASPortType");
+        NASPortType = EventsHelper.GetNasPortType(
+            _eventObject.GetValueFromDataDictionary("NASPortType"));
 
 
         AuthenticationProvider = _eventObject.GetValueFromDataDictionary("AuthenticationProvider");

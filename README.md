@@ -106,6 +106,16 @@ The `TimePeriod` enumeration simplifies building date ranges. Each option sets t
 | TillLastSaturday | Since last Saturday |
 | TillLastSunday | Since last Sunday |
 
+### NasPortType values
+
+The `NasPortType` enumeration maps common RADIUS NAS-Port-Type values.
+
+| Value | Description |
+|-------|-------------|
+| Ethernet | IEEE 802.3 Ethernet |
+| WirelessIEEE80211 | Wireless IEEE 802.11 |
+| Virtual | Virtual port |
+
 ### Example scripts
 
 See the `Examples` folder for more scenarios.
