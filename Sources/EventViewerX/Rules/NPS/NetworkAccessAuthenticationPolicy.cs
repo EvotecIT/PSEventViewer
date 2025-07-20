@@ -107,7 +107,11 @@ public class NetworkAccessAuthenticationPolicy : EventRuleBase {
     /// <summary>
     /// Authentication type selected.
     /// </summary>
-    public string AuthenticationType;
+    public AuthenticationType AuthenticationType;
+
+    internal static AuthenticationType ParseAuthenticationType(string value) {
+        return Enum.TryParse<AuthenticationType>(value, true, out var parsed) ? parsed : AuthenticationType.Unknown;
+    }
 
     /// <summary>
     /// EAP type value if applicable.
@@ -157,7 +161,8 @@ public class NetworkAccessAuthenticationPolicy : EventRuleBase {
 
         AuthenticationProvider = _eventObject.GetValueFromDataDictionary("AuthenticationProvider");
         AuthenticationServer = _eventObject.GetValueFromDataDictionary("AuthenticationServer");
-        AuthenticationType = _eventObject.GetValueFromDataDictionary("AuthenticationType");
+        var authType = _eventObject.GetValueFromDataDictionary("AuthenticationType");
+        AuthenticationType = ParseAuthenticationType(authType);
 
         EAPType = _eventObject.GetValueFromDataDictionary("EAPType");
 
