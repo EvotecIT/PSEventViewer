@@ -60,7 +60,7 @@ namespace EventViewerX.Rules.ActiveDirectory {
         //        }
         public string Computer;
         public string Action;
-        public string OperationType;
+        public OperationType OperationType;
         public string Who;
         public DateTime When;
         public string OrganizationalUnit; // 'User Object'
@@ -95,17 +95,6 @@ namespace EventViewerX.Rules.ActiveDirectory {
             OrganizationalUnit = OverwriteByField(Action, "A directory service object was moved.", OrganizationalUnit, _eventObject.GetValueFromDataDictionary("OldObjectDN"));
             FieldValue = OverwriteByField(Action, "A directory service object was moved.", FieldValue, _eventObject.GetValueFromDataDictionary("NewObjectDN"));
 
-            //OperationType = OverwriteByField(Action, "A directory service object was created.", OperationType, "Organizational Unit Created");
-            //OperationType = OverwriteByField(Action, "A directory service object was deleted.", OperationType, "Organizational Unit Deleted");
-            //OperationType = OverwriteByField(Action, "A directory service object was moved.", OperationType, "Organizational Unit Moved");
-
-            if (Action == "A directory service object was created.") {
-                OperationType = "Organizational Unit Created";
-            } else if (Action == "A directory service object was deleted.") {
-                OperationType = "Organizational Unit Deleted";
-            } else if (Action == "A directory service object was moved.") {
-                OperationType = "Organizational Unit Moved";
-            }
         }
     }
 }

@@ -12,7 +12,7 @@ public class ADComputerChangeDetailed : EventRuleBase {
     /// <summary>LDAP object class.</summary>
     public string ObjectClass;
     /// <summary>Translated operation type.</summary>
-    public string OperationType;
+    public OperationType OperationType;
     /// <summary>User performing the change.</summary>
     public string Who;
     /// <summary>Time of the change.</summary>

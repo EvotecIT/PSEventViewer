@@ -11,7 +11,7 @@ public class ADGroupPolicyChanges : EventRuleBase {
     /// <summary>Class of the object modified.</summary>
     public string ObjectClass;
     /// <summary>Operation type value.</summary>
-    public string OperationType;
+    public OperationType OperationType;
     /// <summary>User performing the action.</summary>
     public string Who;
     /// <summary>Timestamp of the event.</summary>

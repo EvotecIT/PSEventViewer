@@ -13,7 +13,7 @@ public class ADGroupPolicyEdits : EventRuleBase {
     /// <summary>Class of the object modified.</summary>
     public string ObjectClass;
     /// <summary>Operation type value.</summary>
-    public string OperationType;
+    public OperationType OperationType;
     /// <summary>User performing the edit.</summary>
     public string Who;
     /// <summary>Time the edit occurred.</summary>

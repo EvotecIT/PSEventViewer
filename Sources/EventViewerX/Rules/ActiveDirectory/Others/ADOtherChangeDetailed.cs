@@ -14,7 +14,7 @@ namespace EventViewerX.Rules.ActiveDirectory {
         public string Computer;
         public string Action;
         public string ObjectClass;
-        public string OperationType;
+        public OperationType OperationType;
         public string Who;
         public DateTime When;
         public string User; // 'User Object'

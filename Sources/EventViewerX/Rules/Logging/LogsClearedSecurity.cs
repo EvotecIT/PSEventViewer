@@ -18,7 +18,7 @@ public class LogsClearedSecurity : EventRuleBase {
     public string Computer;
     public string Action;
     public string BackupPath;
-    public string LogType;
+    public OperationType LogType;
     public string Who;
     public DateTime When;
 

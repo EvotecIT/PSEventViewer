@@ -26,7 +26,7 @@ public class ADUserChangeDetailed : EventRuleBase {
     /// <summary>
     /// Operation type description.
     /// </summary>
-    public string OperationType;
+    public OperationType OperationType;
 
     /// <summary>
     /// User performing the change.

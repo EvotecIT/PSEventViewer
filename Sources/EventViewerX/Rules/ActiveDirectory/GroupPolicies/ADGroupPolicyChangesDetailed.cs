@@ -7,7 +7,7 @@ public class ADGroupPolicyChangesDetailed : EventRuleBase {
     public string Computer;
     public string Action;
     public string ObjectClass;
-    public string OperationType;
+    public OperationType OperationType;
     public string Who;
     public DateTime When;
     public string GpoName;

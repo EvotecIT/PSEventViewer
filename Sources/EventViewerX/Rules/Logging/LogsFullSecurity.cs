@@ -15,7 +15,7 @@ public class LogsFullSecurity : EventRuleBase {
     }
     public string Computer;
     public string Action;
-    public string LogType;
+    public OperationType LogType;
     public string Who;
     public DateTime When;
 

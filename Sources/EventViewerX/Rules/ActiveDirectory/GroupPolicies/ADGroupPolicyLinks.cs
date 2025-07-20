@@ -54,7 +54,7 @@ public class ADGroupPolicyLinks : EventRuleBase {
     /// <summary>Description of the operation.</summary>
     public string Action;
     /// <summary>Type of operation.</summary>
-    public string OperationType;
+    public OperationType OperationType;
     /// <summary>User performing the change.</summary>
     public string Who;
     /// <summary>Event timestamp.</summary>
@@ -101,11 +101,11 @@ public class ADGroupPolicyLinks : EventRuleBase {
         // AttributeLDAPDisplayName = _eventObject.GetValueFromDataDictionary("AttributeLDAPDisplayName");
         var attributeValue = _eventObject.GetValueFromDataDictionary("AttributeValue");
         var gpoLinks = ExtractGpoLinks(attributeValue);
-        if (OperationType.Contains("Value Added")) {
+        if (OperationType == OperationType.ValueAdded) {
             Action = "Group Policies were linked";
             GroupPolicyLink = gpoLinks;
             GroupPolicyNames = gpoLinks.Select(x => x.DisplayName).ToList();
-        } else if (OperationType.Contains("Value Deleted")) {
+        } else if (OperationType == OperationType.ValueDeleted) {
             Action = "Group Policies were unlinked";
             GroupPolicyUnlink = gpoLinks;
             GroupPolicyNames = gpoLinks.Select(x => x.DisplayName).ToList();

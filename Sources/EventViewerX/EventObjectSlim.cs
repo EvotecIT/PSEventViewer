@@ -250,12 +250,16 @@ public class EventObjectSlim {
 
 
 
-    private static readonly Dictionary<string, string> OperationTypeLookup = new()
+    private static OperationType ParseOperationType(string code)
     {
-        {"%%14674", "Value Added"},
-        {"%%14675", "Value Deleted"},
-        {"%%14676", "Unknown"}
-    };
+        return code switch
+        {
+            "%%14674" => OperationType.ValueAdded,
+            "%%14675" => OperationType.ValueDeleted,
+            "%%14676" => OperationType.Unknown,
+            _ => OperationType.Unknown
+        };
+    }
 
 
     public EventObjectSlim(EventObject eventObject) {
@@ -283,12 +287,9 @@ public class EventObjectSlim {
             ? samAccountName
             : string.Empty;
     }
-    internal string ConvertFromOperationType(string s) {
-        if (OperationTypeLookup.ContainsKey(s)) {
-            return OperationTypeLookup[s];
-        }
-
-        return "Unknown Operation";
+    internal OperationType ConvertFromOperationType(string code)
+    {
+        return ParseOperationType(code);
     }
     internal static string OverwriteByField(string findField, string expectedValue, string currentValue, string insertValue) {
         //OverwriteByField = [ordered] @{
