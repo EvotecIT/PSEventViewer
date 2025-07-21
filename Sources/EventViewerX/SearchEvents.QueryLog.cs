@@ -45,116 +45,8 @@ public partial class SearchEvents : Settings {
             return null;
         }
     }
+    // QueryLogFile moved to SearchEvents.QueryLogFile.cs
 
-    /// <summary>
-    /// Queries events from a Windows event log file (.evtx) with optional filtering criteria.
-    /// </summary>
-    /// <param name="filePath">The file path to the Windows event log file (.evtx) to query.</param>
-    /// <param name="eventIds">Optional list of specific event IDs to filter for.</param>
-    /// <param name="providerName">Optional name of the event provider to filter by.</param>
-    /// <param name="keywords">Optional keywords to filter events by.</param>
-    /// <param name="level">Optional event level to filter by (e.g., Error, Warning, Information).</param>
-    /// <param name="startTime">Optional start time to filter events from.</param>
-    /// <param name="endTime">Optional end time to filter events until.</param>
-    /// <param name="userId">Optional user ID to filter events by.</param>
-    /// <param name="maxEvents">Maximum number of events to return. 0 means no limit.</param>
-    /// <param name="eventRecordId">Optional list of specific event record IDs to retrieve.</param>
-    /// <param name="timePeriod">Optional predefined time period to filter events by.</param>
-    /// <param name="oldest">If true, returns events in chronological order (oldest first). If false, returns newest first.</param>
-    /// <param name="namedDataFilter">Optional hashtable containing named data filters to include events.</param>
-    /// <param name="namedDataExcludeFilter">Optional hashtable containing named data filters to exclude events.</param>
-    /// <returns>An enumerable collection of EventObject instances representing the filtered events from the log file.</returns>
-    public static IEnumerable<EventObject> QueryLogFile(string filePath, List<int> eventIds = null, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null, int maxEvents = 0, List<long> eventRecordId = null, TimePeriod? timePeriod = null, bool oldest = false, System.Collections.Hashtable namedDataFilter = null, System.Collections.Hashtable namedDataExcludeFilter = null, CancellationToken cancellationToken = default) {
-
-        // Sanitize the provided path in case it contains wrapping quotes or extra spaces
-        string sanitizedPath = filePath.Trim().Trim('"', '\'');
-
-        string absolutePath = Path.GetFullPath(sanitizedPath);
-
-        if (!File.Exists(absolutePath)) {
-            throw new FileNotFoundException($"The log file '{absolutePath}' does not exist.", absolutePath);
-        }
-
-        if (eventIds != null && eventIds.Any(id => id <= 0)) {
-            throw new ArgumentException("Event IDs must be positive.", nameof(eventIds));
-        }
-
-        if (eventRecordId != null && eventRecordId.Any(id => id <= 0)) {
-            throw new ArgumentException("Event record IDs must be positive.", nameof(eventRecordId));
-        }
-
-        // Check if we have any filters that require an XML query
-        bool hasFilters = namedDataFilter != null || namedDataExcludeFilter != null || eventIds != null ||
-                         providerName != null || keywords != null || level != null || startTime != null ||
-                         endTime != null || userId != null || eventRecordId != null;
-
-        EventLogQuery query;
-
-        if (hasFilters) {
-            // Build complex XML query with filters
-            var namedDataFilterArray = namedDataFilter != null ? new[] { namedDataFilter } : null;
-            var namedDataExcludeFilterArray = namedDataExcludeFilter != null ? new[] { namedDataExcludeFilter } : null;
-            var idArray = eventIds?.Select(i => i.ToString()).ToArray();
-            var eventRecordIdArray = eventRecordId?.Select(i => i.ToString()).ToArray();
-            var providerNameArray = !string.IsNullOrEmpty(providerName) ? new[] { providerName } : null;
-            var keywordsArray = keywords != null ? new[] { (long)keywords.Value } : null;
-            var levelArray = level != null ? new[] { level.ToString() } : null;
-            var userIdArray = !string.IsNullOrEmpty(userId) ? new[] { userId } : null;
-
-            string queryString = BuildWinEventFilter(
-                id: idArray,
-                eventRecordId: eventRecordIdArray,
-                startTime: startTime,
-                endTime: endTime,
-                providerName: providerNameArray,
-                keywords: keywordsArray,
-                level: levelArray,
-                userId: userIdArray,
-                namedDataFilter: namedDataFilterArray,
-                namedDataExcludeFilter: namedDataExcludeFilterArray,
-                path: absolutePath,
-                xpathOnly: false
-            );
-
-            _logger.WriteVerbose($"Querying file '{filePath}' with complex query: {queryString}");
-
-            // Complex query with filters - use XML with null path
-            query = new EventLogQuery(null, PathType.LogName, queryString) {
-                ReverseDirection = !oldest
-            };
-        } else {
-            // Simple query without filters - use XML with wildcard filter
-            string queryString = BuildWinEventFilter(
-                path: absolutePath,
-                xpathOnly: false
-            );
-
-            _logger.WriteVerbose($"Querying file '{filePath}' with simple query: {queryString}");
-
-            query = new EventLogQuery(null, PathType.LogName, queryString) {
-                ReverseDirection = !oldest
-            };
-        }
-
-        // We need to keep record not disposed to be able to access it after the using block
-        // Maybe there's a better way to do this
-        EventRecord record;
-        using (EventLogReader reader = CreateEventLogReader(query, filePath)) {
-            if (reader != null) {
-                int eventCount = 0;
-                while (!cancellationToken.IsCancellationRequested && (record = reader.ReadEvent()) != null) {
-                    // using (record) {
-                    EventObject eventObject = new EventObject(record, filePath);
-                    yield return eventObject;
-                    eventCount++;
-                    if (maxEvents > 0 && eventCount >= maxEvents) {
-                        break;
-                    }
-                    // }
-                }
-            }
-        }
-    }
 
     private static IEnumerable<EventObject> QueryLogEnumerable(string logName, List<int> eventIds = null, string machineName = null, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null, int maxEvents = 0, List<long> eventRecordId = null, TimePeriod? timePeriod = null, CancellationToken cancellationToken = default) {
         if (eventIds != null && eventIds.Any(id => id <= 0)) {
@@ -228,7 +120,6 @@ public partial class SearchEvents : Settings {
     /// <param name="eventRecordIds">Event record identifiers.</param>
     /// <returns>XML query string.</returns>
     // BuildQueryString methods moved to SearchEvents.QueryLog.BuildQueryString.cs
-    }
 
     private static void AddCondition(StringBuilder queryString, string condition) {
         if (!queryString.ToString().EndsWith("[System[")) {

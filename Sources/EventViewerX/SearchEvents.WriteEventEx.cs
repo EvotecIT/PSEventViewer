@@ -66,11 +66,6 @@ namespace EventViewerX {
         }
 
         // WriteEventEx method moved to SearchEvents.WriteEventEx.Core.cs
-                pinnedArray.Free();
-            }
-
-            EventUnregister(registrationHandle);
-        }
 
 
         //public static void WriteEventEx(string log, string serviceName, string message) {
