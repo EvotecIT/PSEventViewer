@@ -1,4 +1,5 @@
 Describe 'Set-EVXInfo cmdlet' {
+    if (-not $IsWindows) { return }
     BeforeAll {
         $script:log = 'EVXInfoTestLog'
         $script:provider = 'EVXInfoTestSource'

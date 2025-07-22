@@ -27,21 +27,18 @@ public sealed class CmdletSetEVXInfo : AsyncPSCmdlet {
     /// Maximum size of the log in megabytes.
     /// </summary>
     [Parameter]
-    [AllowNull]
     public int? MaximumSizeMB { get; set; }
 
     /// <summary>
     /// Maximum size of the log in bytes.
     /// </summary>
     [Parameter]
-    [AllowNull]
     public long? MaximumSizeInBytes { get; set; }
 
     /// <summary>
     /// Action to take when the log reaches its maximum size.
     /// </summary>
     [Parameter]
-    [AllowNull]
     [ValidateSet(
         "OverwriteEventsAsNeededOldestFirst",
         "ArchiveTheLogWhenFullDoNotOverwrite",
