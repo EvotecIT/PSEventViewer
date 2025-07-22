@@ -101,22 +101,26 @@ namespace EventViewerX {
     /// </summary>
     public static class WatcherManager {
         private static readonly ConcurrentDictionary<Guid, WatcherInfo> _watchers = new();
+        private static readonly object _syncRoot = new();
 
         public static WatcherInfo StartWatcher(string? name, string machineName, string logName, List<int> eventIds, List<NamedEvents> namedEvents, Action<EventObject> action, int numberOfThreads, bool staging, bool stopOnMatch, int stopAfter, TimeSpan? timeout) {
-            if (!string.IsNullOrEmpty(name)) {
-                var matches = GetWatchers(name).ToList();
-                if (matches.Count > 0) {
-                    if (matches.Count == 1) {
-                        return matches[0];
+            WatcherInfo info;
+            lock (_syncRoot) {
+                if (!string.IsNullOrEmpty(name)) {
+                    var matches = GetWatchers(name).ToList();
+                    if (matches.Count > 0) {
+                        if (matches.Count == 1) {
+                            return matches[0];
+                        }
+                        throw new InvalidOperationException($"Multiple watchers with name '{name}' already exist.");
                     }
-                    throw new InvalidOperationException($"Multiple watchers with name '{name}' already exist.");
                 }
+
+                info = new WatcherInfo(name ?? string.Empty, machineName, logName, eventIds, namedEvents, action, numberOfThreads, staging, stopOnMatch, stopAfter, timeout);
+                _watchers.TryAdd(info.Id, info);
             }
 
-            var info = new WatcherInfo(name ?? string.Empty, machineName, logName, eventIds, namedEvents, action, numberOfThreads, staging, stopOnMatch, stopAfter, timeout);
-            if (_watchers.TryAdd(info.Id, info)) {
-                info.Start();
-            }
+            info.Start();
             return info;
         }
 

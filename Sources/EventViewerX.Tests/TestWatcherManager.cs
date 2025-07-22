@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Collections.Concurrent;
+using System.Threading.Tasks;
 using System.Runtime.Serialization;
 using Xunit;
 
@@ -58,6 +59,22 @@ namespace EventViewerX.Tests {
             } finally {
                 Settings._logger.OnWarningMessage -= handler;
             }
+        }
+
+        [Fact]
+        public void StartWatcherIsThreadSafe() {
+            var tasks = new List<Task<WatcherInfo>>();
+            for (int i = 0; i < 5; i++) {
+                tasks.Add(Task.Run(() => WatcherManager.StartWatcher(
+                    "sync", Environment.MachineName, "Application", new List<int>(),
+                    new List<NamedEvents>(), _ => { }, 1, false, false, 0, null)));
+            }
+            Task.WaitAll(tasks.ToArray());
+            var first = tasks[0].Result;
+            foreach (var t in tasks) {
+                Assert.Same(first, t.Result);
+            }
+            WatcherManager.StopAll();
         }
     }
 }
