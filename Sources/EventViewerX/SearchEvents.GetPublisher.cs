@@ -17,17 +17,25 @@ namespace EventViewerX {
         private static readonly ConcurrentDictionary<string, Metadata> _providerMetadataCache = new(StringComparer.OrdinalIgnoreCase);
 
         /// <summary>
+        /// Normalizes provider name for consistent cache keys.
+        /// </summary>
+        private static string NormalizeProviderName(string providerName) {
+            return providerName?.Trim() ?? string.Empty;
+        }
+
+        /// <summary>
         /// Retrieves available event providers on the local machine.
         /// </summary>
         /// <returns>Enumeration of provider metadata.</returns>
         public static IEnumerable<Metadata> GetProviders() {
             using EventLogSession session = new();
             foreach (string providerName in session.GetProviderNames()) {
-                if (!_providerMetadataCache.TryGetValue(providerName, out var metadata)) {
+                string normalizedName = NormalizeProviderName(providerName);
+                if (!_providerMetadataCache.TryGetValue(normalizedName, out var metadata)) {
                     try {
                         using ProviderMetadata providerMetadata = new(providerName, session, CultureInfo.CurrentCulture);
                         metadata = new Metadata(providerName, providerMetadata);
-                        _providerMetadataCache[providerName] = metadata;
+                        _providerMetadataCache[normalizedName] = metadata;
                     } catch (EventLogInvalidDataException ex) {
                         _logger.WriteWarning($"Error reading data for provider {providerName}: {ex.Message}");
                     } catch (EventLogException ex) {
