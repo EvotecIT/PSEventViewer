@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Collections.Concurrent;
 using System.Diagnostics.Eventing.Reader;
+using System.Globalization;
 using System.Linq;
 
 namespace EventViewerX {
@@ -24,7 +25,7 @@ namespace EventViewerX {
             foreach (string providerName in session.GetProviderNames()) {
                 if (!_providerMetadataCache.TryGetValue(providerName, out var metadata)) {
                     try {
-                        using ProviderMetadata providerMetadata = new(providerName, session);
+                        using ProviderMetadata providerMetadata = new(providerName, session, CultureInfo.CurrentCulture);
                         metadata = new Metadata(providerName, providerMetadata);
                         _providerMetadataCache[providerName] = metadata;
                     } catch (EventLogInvalidDataException ex) {
