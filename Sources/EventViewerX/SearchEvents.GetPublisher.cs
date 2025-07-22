@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Collections.Concurrent;
 using System.Diagnostics.Eventing.Reader;
+using System.Globalization;
 using System.Linq;
 
 namespace EventViewerX {
@@ -20,11 +21,11 @@ namespace EventViewerX {
         /// </summary>
         /// <returns>Enumeration of provider metadata.</returns>
         public static IEnumerable<Metadata> GetProviders() {
-            EventLogSession session = new EventLogSession();
+            using EventLogSession session = new();
             foreach (string providerName in session.GetProviderNames()) {
                 if (!_providerMetadataCache.TryGetValue(providerName, out var metadata)) {
                     try {
-                        using ProviderMetadata providerMetadata = new ProviderMetadata(providerName);
+                        using ProviderMetadata providerMetadata = new(providerName, session, CultureInfo.CurrentCulture);
                         metadata = new Metadata(providerName, providerMetadata);
                         _providerMetadataCache[providerName] = metadata;
                     } catch (EventLogInvalidDataException ex) {
@@ -83,16 +84,16 @@ namespace EventViewerX {
             ProviderName = providerName;
             Id = providerMetadata.Id;
             MessageFilePath = providerMetadata.MessageFilePath;
-            Keywords = providerMetadata.Keywords;
+            Keywords = providerMetadata.Keywords?.ToList();
 
             TrySetMetadata(() => DisplayName = providerMetadata.DisplayName, "display name", providerName);
-            TrySetMetadata(() => LogLinks = providerMetadata.LogLinks, "log links", providerName);
-            TrySetMetadata(() => LogNames = providerMetadata.LogLinks.Select(link => link.LogName).ToList(), "log names", providerName);
+            TrySetMetadata(() => LogLinks = providerMetadata.LogLinks?.ToList(), "log links", providerName);
+            TrySetMetadata(() => LogNames = providerMetadata.LogLinks?.Select(link => link.LogName).ToList() ?? new List<string>(), "log names", providerName);
             TrySetMetadata(() => ParameterFilePath = providerMetadata.ParameterFilePath, "parameter file path", providerName);
             TrySetMetadata(() => ResourceFilePath = providerMetadata.ResourceFilePath, "resource file path", providerName);
-            TrySetMetadata(() => Opcodes = providerMetadata.Opcodes, "opcodes", providerName);
-            TrySetMetadata(() => Tasks = providerMetadata.Tasks, "tasks", providerName);
-            TrySetMetadata(() => Events = providerMetadata.Events, "events", providerName);
+            TrySetMetadata(() => Opcodes = providerMetadata.Opcodes?.ToList(), "opcodes", providerName);
+            TrySetMetadata(() => Tasks = providerMetadata.Tasks?.ToList(), "tasks", providerName);
+            TrySetMetadata(() => Events = providerMetadata.Events?.ToList(), "events", providerName);
         }
 
         private void TrySetMetadata(Action setAction, string metadataType, string providerName) {
