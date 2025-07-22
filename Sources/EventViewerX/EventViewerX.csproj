@@ -17,6 +17,7 @@
 
   <ItemGroup>
         <PackageReference Include="DnsClientX" Version="0.4.0" />
+        <PackageReference Include="System.Linq.Dynamic.Core" Version="1.2.22" />
   </ItemGroup>
   <ItemGroup>
         <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">

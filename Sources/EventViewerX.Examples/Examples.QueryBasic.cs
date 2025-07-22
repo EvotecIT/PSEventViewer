@@ -34,5 +34,10 @@
                 }
             }
         }
+
+        public static void QueryDynamicFilter() {
+            var events = SearchEvents.QueryLog("Application", [1000, 1001], linqExpression: "Id == 1000");
+            Console.WriteLine($"Filtered events: {events.Count()}");
+        }
     }
 }
