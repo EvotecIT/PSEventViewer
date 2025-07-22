@@ -169,9 +169,10 @@ public partial class SearchEvents : Settings {
 
         // Add event IDs to the query
         if (eventIds != null) {
-            var validIds = eventIds.Where(id => id > 0).ToList();
+            var validIds = eventIds.Where(id => id > 0).Distinct().ToList();
             if (validIds.Any()) {
-                AddCondition(queryString, "(" + string.Join(" or ", validIds.Select(id => $"EventID={id}")) + ")");
+                var idConditions = validIds.Select(id => $"(EventID={id})");
+                AddCondition(queryString, $"({string.Join(" or ", idConditions)})");
             }
         }
 
