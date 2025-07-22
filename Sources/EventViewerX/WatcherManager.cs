@@ -46,9 +46,10 @@ namespace EventViewerX {
         public void Start() {
             Watcher.Watch(MachineName, LogName, EventIds, OnEvent, Cancellation.Token, _staging, Environment.UserName);
             if (Timeout.HasValue) {
+                var delayMs = (int)Timeout.Value.TotalMilliseconds;
                 TimeoutTask = Task.Run(async () => {
                     try {
-                        await Task.Delay(Timeout.Value, Cancellation.Token);
+                        await Task.Delay(delayMs, Cancellation.Token);
                         Stop();
                     } catch (TaskCanceledException) { }
                 });
