@@ -45,6 +45,10 @@ public partial class SearchEvents : Settings {
                 _logger.WriteWarning("Couldn't get log information for " + logName + ". Error: " + ex.Message);
             }
 
+            if (logInfoObj == null) {
+                _logger.WriteVerbose("Log information is not available for " + logName);
+            }
+
             if (logConfig == null) {
                 _logger.WriteWarning("LogConfig is null for " + logName);
                 continue;
