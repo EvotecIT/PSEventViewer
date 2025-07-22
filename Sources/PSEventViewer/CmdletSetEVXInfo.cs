@@ -27,23 +27,26 @@ public sealed class CmdletSetEVXInfo : AsyncPSCmdlet {
     /// Maximum size of the log in megabytes.
     /// </summary>
     [Parameter]
-    public int MaximumSizeMB { get; set; }
+    [AllowNull]
+    public int? MaximumSizeMB { get; set; }
 
     /// <summary>
     /// Maximum size of the log in bytes.
     /// </summary>
     [Parameter]
-    public long MaximumSizeInBytes { get; set; }
+    [AllowNull]
+    public long? MaximumSizeInBytes { get; set; }
 
     /// <summary>
     /// Action to take when the log reaches its maximum size.
     /// </summary>
     [Parameter]
+    [AllowNull]
     [ValidateSet(
         "OverwriteEventsAsNeededOldestFirst",
         "ArchiveTheLogWhenFullDoNotOverwrite",
         "DoNotOverwriteEventsClearLogManually")]
-    public string EventAction { get; set; }
+    public string? EventAction { get; set; }
 
     /// <summary>
     /// Log mode to apply to the specified log.
@@ -77,7 +80,7 @@ public sealed class CmdletSetEVXInfo : AsyncPSCmdlet {
             return Task.CompletedTask;
         }
 
-        if (MyInvocation.BoundParameters.ContainsKey(nameof(EventAction))) {
+        if (MyInvocation.BoundParameters.ContainsKey(nameof(EventAction)) && !string.IsNullOrEmpty(EventAction)) {
             _log.LogMode = EventAction switch {
                 "OverwriteEventsAsNeededOldestFirst" => EventLogMode.Circular,
                 "ArchiveTheLogWhenFullDoNotOverwrite" => EventLogMode.AutoBackup,
@@ -90,12 +93,12 @@ public sealed class CmdletSetEVXInfo : AsyncPSCmdlet {
             _log.LogMode = Mode.Value;
         }
 
-        if (MyInvocation.BoundParameters.ContainsKey(nameof(MaximumSizeMB))) {
-            _log.MaximumSizeInBytes = (long)MaximumSizeMB * 1024 * 1024;
+        if (MyInvocation.BoundParameters.ContainsKey(nameof(MaximumSizeMB)) && MaximumSizeMB.HasValue) {
+            _log.MaximumSizeInBytes = (long)MaximumSizeMB.Value * 1024 * 1024;
         }
 
-        if (MyInvocation.BoundParameters.ContainsKey(nameof(MaximumSizeInBytes))) {
-            _log.MaximumSizeInBytes = MaximumSizeInBytes;
+        if (MyInvocation.BoundParameters.ContainsKey(nameof(MaximumSizeInBytes)) && MaximumSizeInBytes.HasValue) {
+            _log.MaximumSizeInBytes = MaximumSizeInBytes.Value;
         }
 
         if (ShouldProcess(LogName, "Saving event log settings")) {
