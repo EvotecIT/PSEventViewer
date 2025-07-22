@@ -22,7 +22,7 @@ namespace EventViewerX.Tests {
                 TimeSpan.FromMilliseconds(100)
             );
 
-            Thread.Sleep(300);
+            watcher.TimeoutTask?.Wait(1000);
             Assert.NotNull(watcher.EndTime);
             WatcherManager.StopAll();
         }
