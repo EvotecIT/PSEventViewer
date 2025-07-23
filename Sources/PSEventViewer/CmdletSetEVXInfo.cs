@@ -37,13 +37,15 @@ public sealed class CmdletSetEVXInfo : AsyncPSCmdlet {
 
     /// <summary>
     /// Action to take when the log reaches its maximum size.
+    /// Supported values:
+    /// <list type="bullet">
+    /// <item>OverwriteEventsAsNeededOldestFirst</item>
+    /// <item>ArchiveTheLogWhenFullDoNotOverwrite</item>
+    /// <item>DoNotOverwriteEventsClearLogManually</item>
+    /// </list>
     /// </summary>
     [Parameter]
     [AllowNull]
-    [ValidateSet(
-        "OverwriteEventsAsNeededOldestFirst",
-        "ArchiveTheLogWhenFullDoNotOverwrite",
-        "DoNotOverwriteEventsClearLogManually")]
     public string? EventAction { get; set; }
 
     /// <summary>
