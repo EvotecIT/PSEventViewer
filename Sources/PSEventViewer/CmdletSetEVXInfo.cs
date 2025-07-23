@@ -20,7 +20,7 @@ public sealed class CmdletSetEVXInfo : AsyncPSCmdlet {
     /// Target computer on which to modify the log.
     /// </summary>
     [Parameter]
-    [Alias("ComputerName", "ServerName")]
+    [Alias("ServerName")]
     public string ComputerName { get; set; }
 
     /// <summary>
