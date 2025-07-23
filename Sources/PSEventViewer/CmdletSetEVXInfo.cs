@@ -39,6 +39,7 @@ public sealed class CmdletSetEVXInfo : AsyncPSCmdlet {
     /// Action to take when the log reaches its maximum size.
     /// </summary>
     [Parameter]
+    [AllowNull]
     [ValidateSet(
         "OverwriteEventsAsNeededOldestFirst",
         "ArchiveTheLogWhenFullDoNotOverwrite",
