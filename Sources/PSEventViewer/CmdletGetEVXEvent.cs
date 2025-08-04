@@ -1,4 +1,5 @@
 ﻿using System.Collections;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
@@ -21,7 +22,7 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
     private long? _resumeRecordId;
     private long? _highestRecordId;
     private string _recordIdKey = string.Empty;
-    private Dictionary<string, long> _recordMap = new();
+    private ConcurrentDictionary<string, long> _recordMap = new();
     /// <summary>
     /// Name of the log to query.
     /// </summary>
@@ -233,9 +234,9 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
         if (!string.IsNullOrEmpty(RecordIdFile) && File.Exists(RecordIdFile)) {
             try {
                 var json = File.ReadAllText(RecordIdFile);
-                _recordMap = JsonSerializer.Deserialize<Dictionary<string, long>>(json) ?? new();
+                _recordMap = JsonSerializer.Deserialize<ConcurrentDictionary<string, long>>(json) ?? new();
             } catch {
-                _recordMap = new Dictionary<string, long>();
+                _recordMap = new ConcurrentDictionary<string, long>();
             }
         }
         _recordIdKey = !string.IsNullOrEmpty(RecordIdKey)
