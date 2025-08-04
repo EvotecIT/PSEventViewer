@@ -28,6 +28,9 @@ namespace PSEventViewer {
         /// </summary>
         protected override void ProcessRecord() {
             var watchers = WatcherManager.GetWatchers(Name);
+            if (watchers == null) {
+                return;
+            }
             if (Id != null && Id.Length > 0) {
                 watchers = watchers.Where(w => Id.Contains(w.Id)).ToList();
             }
