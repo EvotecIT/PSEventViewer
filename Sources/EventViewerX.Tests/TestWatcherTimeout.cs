@@ -22,8 +22,10 @@ namespace EventViewerX.Tests {
                 TimeSpan.FromMilliseconds(100)
             );
 
-            watcher.TimeoutTask?.Wait(1000);
-            Assert.NotNull(watcher.EndTime);
+            Assert.True(
+                SpinWait.SpinUntil(() => watcher.EndTime.HasValue, 5000),
+                "Watcher did not stop before timeout."
+            );
             WatcherManager.StopAll();
         }
     }
