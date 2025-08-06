@@ -19,24 +19,24 @@
 
 Describe "Get-EVXFilter using Path and NamendDataFilter" {
     It "basic syntax check for queries of eventlogs" {
-        $XML = Get-EVXFilter -logname System -Id 7040 -NamedDataExcludeFilter @{ param4 = 'BITS' }
+        $XML = Get-EVXFilter -LogName System -EventId 7040 -NamedDataExcludeFilter @{ param4 = 'BITS' }
         $XML | Should -BeLike '*Query Id="0" Path="system"*'    -Because 'We wanted to query a filepath'
         $XML | Should -BeLike '*Select Path="system"*'          -Because 'Queries using eventfiles do not have a Channel'
     }
     It "basic syntax check for queries of saved eventlog files" {
         $FilePath = [System.IO.Path]::Combine($PSScriptRoot, 'Logs', 'NamedFilterExamples.evtx')
-        $XML = Get-EVXFilter -Path $FilePath -Id 7040 -NamedDataExcludeFilter @{ param4 = 'BITS' }
+        $XML = Get-EVXFilter -Path $FilePath -EventId 7040 -NamedDataExcludeFilter @{ param4 = 'BITS' }
         $XML | Should -BeLike '*Query Id="0" Path="file://*'    -Because 'We wanted to query a filepath'
         $XML | Should -Not -Belike '*Select Path*'              -Because 'Queries using eventfiles do not have a Channel'
     }
 }
 Describe 'Additional Get-WinEventFilter cases' {
-    It '-ID multiple values produce "or" xpath filter' {
-        $XPath = Get-EVXFilter -ID 1,2 -LogName 'xx' -XPathOnly
+    It '-EventId multiple values produce "or" xpath filter' {
+        $XPath = Get-EVXFilter -EventId 1,2 -LogName 'xx' -XPathOnly
         $XPath | Should -Be '*[System[(EventID=1) or (EventID=2)]]'
     }
-    It '-ExcludeID uses inequality syntax' {
-        $XPath = Get-EVXFilter -ExcludeID 1,2 -LogName 'xx' -XPathOnly
+    It '-ExcludeId uses inequality syntax' {
+        $XPath = Get-EVXFilter -ExcludeId 1,2 -LogName 'xx' -XPathOnly
         $XPath | Should -Be '*[System[(EventID!=1) or (EventID!=2)]]'
     }
 
@@ -48,5 +48,22 @@ Describe 'Additional Get-WinEventFilter cases' {
     It '-Keywords multiple values should OR them in band filter' {
         $XPath = Get-EVXFilter -Keywords 1125899906842624,281474976710656 -LogName 'xx' -XPathOnly
         $XPath | Should -Be '*[System[band(Keywords,1407374883553280)]]'
+    }
+}
+
+Describe 'Get-EVXFilter parameter binding' {
+    It 'binds EventId by new name' {
+        $XPath = Get-EVXFilter -EventId 1 -LogName 'xx' -XPathOnly
+        $XPath | Should -Be '*[System[(EventID=1)]]'
+    }
+    It 'binds EventId via ID alias' {
+        $XPath = Get-EVXFilter -Id 1 -LogName 'xx' -XPathOnly
+        $XPath | Should -Be '*[System[(EventID=1)]]'
+    }
+    It 'binds EventRecordId and RecordId alias' {
+        $Name = Get-EVXFilter -EventRecordId 10 -LogName 'xx' -XPathOnly
+        $Alias = Get-EVXFilter -RecordId 10 -LogName 'xx' -XPathOnly
+        $Name | Should -Be '*[System[(EventRecordID=10)]]'
+        $Alias | Should -Be $Name
     }
 }
