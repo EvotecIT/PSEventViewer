@@ -50,8 +50,12 @@ namespace EventViewerX {
                 TimeoutTask = Task.Run(async () => {
                     try {
                         await Task.Delay(delayMs, Cancellation.Token);
-                        Stop();
-                    } catch (TaskCanceledException) { }
+                    } catch (TaskCanceledException) {
+                    } finally {
+                        if (EndTime == null) {
+                            Stop();
+                        }
+                    }
                 });
             }
         }
