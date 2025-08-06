@@ -40,6 +40,13 @@ public abstract class AsyncPSCmdlet : PSCmdlet, IDisposable {
     /// </summary>
     protected internal CancellationToken CancelToken { get => _cancelSource.Token; }
 
+#if NET8_0_OR_GREATER
+    /// <summary>
+    /// Exposes a stopping token compatible with newer PowerShell versions.
+    /// </summary>
+    protected CancellationToken StoppingToken => CancelToken;
+#endif
+
     /// <summary>
     /// Begins processing the cmdlet asynchronously.
     /// </summary>

@@ -59,32 +59,38 @@ public partial class SearchEvents : Settings {
         }
     }
 
-    public static IEnumerable<EventLogDetails> DisplayEventLogsParallel(string[] listLog = null, List<string> machineNames = null, int maxDegreeOfParallelism = 8) {
+    public static IEnumerable<EventLogDetails> DisplayEventLogsParallel(string[] listLog = null, List<string> machineNames = null, int maxDegreeOfParallelism = 8, CancellationToken cancellationToken = default) {
         if (machineNames == null || !machineNames.Any()) {
             machineNames = new List<string> { null };
         }
 
-        BlockingCollection<EventLogDetails> logDetailsCollection = new BlockingCollection<EventLogDetails>();
+        using BlockingCollection<EventLogDetails> logDetailsCollection = new();
 
         Task.Factory.StartNew(() => {
-            Parallel.ForEach(machineNames, new ParallelOptions { MaxDegreeOfParallelism = maxDegreeOfParallelism }, machineName => {
+            Parallel.ForEach(machineNames, new ParallelOptions { MaxDegreeOfParallelism = maxDegreeOfParallelism, CancellationToken = cancellationToken }, machineName => {
                 try {
+                    cancellationToken.ThrowIfCancellationRequested();
                     _logger.WriteVerbose("Querying event log settings on " + machineName);
-                    foreach (var logDetails in DisplayEventLogs(listLog, machineName)) {
-                        logDetailsCollection.Add(logDetails);
+                    foreach (EventLogDetails logDetails in DisplayEventLogs(listLog, machineName)) {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        logDetailsCollection.Add(logDetails, cancellationToken);
                     }
+                } catch (OperationCanceledException) {
                 } catch (Exception ex) {
                     _logger.WriteWarning("Error querying event log settings on " + machineName + ". Error: " + ex.Message);
                 }
             });
             logDetailsCollection.CompleteAdding();
-        });
+        }, cancellationToken);
 
         while (!logDetailsCollection.IsCompleted) {
+            cancellationToken.ThrowIfCancellationRequested();
             EventLogDetails logDetails;
             while (logDetailsCollection.TryTake(out logDetails)) {
                 yield return logDetails;
             }
         }
+
+        cancellationToken.ThrowIfCancellationRequested();
     }
 }

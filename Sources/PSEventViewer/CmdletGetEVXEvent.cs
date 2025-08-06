@@ -250,12 +250,20 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
     /// Executes the event query based on provided parameters.
     /// </summary>
     protected override async Task ProcessRecordAsync() {
-        var results = AsArray ? new List<object>() : null;
+        CancellationToken token;
+#if NET8_0_OR_GREATER
+        using CancellationTokenSource linkedCts = CancellationTokenSource.CreateLinkedTokenSource(StoppingToken, CancelToken);
+        token = linkedCts.Token;
+#else
+        token = CancelToken;
+#endif
+        List<object> results = AsArray ? new List<object>() : null;
 
         if (ParameterSetName == "ListLog") {
-            foreach (var log in SearchEvents.DisplayEventLogsParallel(ListLog, MachineName, NumberOfThreads)) {
+            foreach (EventLogDetails log in SearchEvents.DisplayEventLogsParallel(ListLog, MachineName, NumberOfThreads, token)) {
+                token.ThrowIfCancellationRequested();
                 if (AsArray) {
-                    results.Add(log);
+                    results!.Add(log);
                 } else {
                     WriteObject(log);
                 }
@@ -263,23 +271,25 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
         } else if (ParameterSetName == "PathEvents") {
             // Handle file path queries
             if (Expand == false) {
-                foreach (var eventObject in SearchEvents.QueryLogFile(Path, EventId, ProviderName, Keywords, Level, StartTime, EndTime, UserId, MaxEvents, null, TimePeriod, Oldest, NamedDataFilter, NamedDataExcludeFilter, CancelToken)) {
+                foreach (EventObject eventObject in SearchEvents.QueryLogFile(Path, EventId, ProviderName, Keywords, Level, StartTime, EndTime, UserId, MaxEvents, null, TimePeriod, Oldest, NamedDataFilter, NamedDataExcludeFilter, token)) {
+                    token.ThrowIfCancellationRequested();
                     if (!MessageMatches(eventObject) || !ShouldOutput(eventObject)) {
                         continue;
                     }
                     if (AsArray) {
-                        results.Add(eventObject);
+                        results!.Add(eventObject);
                     } else {
                         WriteObject(eventObject);
                     }
                 }
             } else {
-                foreach (var eventObject in SearchEvents.QueryLogFile(Path, EventId, ProviderName, Keywords, Level, StartTime, EndTime, UserId, MaxEvents, null, TimePeriod, Oldest, NamedDataFilter, NamedDataExcludeFilter, CancelToken)) {
+                foreach (EventObject eventObject in SearchEvents.QueryLogFile(Path, EventId, ProviderName, Keywords, Level, StartTime, EndTime, UserId, MaxEvents, null, TimePeriod, Oldest, NamedDataFilter, NamedDataExcludeFilter, token)) {
+                    token.ThrowIfCancellationRequested();
                     if (!MessageMatches(eventObject) || !ShouldOutput(eventObject)) {
                         continue;
                     }
                     if (AsArray) {
-                        results.Add(GetExpandedObject(eventObject));
+                        results!.Add(GetExpandedObject(eventObject));
                     } else {
                         ReturnExpandedObject(eventObject);
                     }
@@ -289,12 +299,13 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
             if (Type != null) {
                 // let's find the events prepared for search
                 List<NamedEvents> typeList = Type.ToList();
-                await foreach (var eventObject in SearchEvents.FindEventsByNamedEvents(typeList, MachineName, StartTime, EndTime, TimePeriod, maxThreads: NumberOfThreads, maxEvents: MaxEvents, cancellationToken: CancelToken)) {
+                await foreach (EventObjectSlim eventObject in SearchEvents.FindEventsByNamedEvents(typeList, MachineName, StartTime, EndTime, TimePeriod, maxThreads: NumberOfThreads, maxEvents: MaxEvents, cancellationToken: token)) {
+                    token.ThrowIfCancellationRequested();
                     if (!MessageMatches(eventObject._eventObject) || !ShouldOutput(eventObject._eventObject)) {
                         continue;
                     }
                     if (AsArray) {
-                        results.Add(eventObject);
+                        results!.Add(eventObject);
                     } else {
                         WriteObject(eventObject);
                     }
@@ -304,24 +315,27 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
                     // Let's find the events by generic log name, event id, machine name, provider name, keywords, level, start time, end time, user id, and max events.
                     if (ParallelOption == ParallelOption.Disabled) {
                         if (MachineName == null) {
-                            foreach (var eventObject in SearchEvents.QueryLog(LogName, EventId, null, ProviderName, Keywords, Level, StartTime, EndTime, UserId, MaxEvents, EventRecordId, TimePeriod, CancelToken)) {
+                            foreach (EventObject eventObject in SearchEvents.QueryLog(LogName, EventId, null, ProviderName, Keywords, Level, StartTime, EndTime, UserId, MaxEvents, EventRecordId, TimePeriod, token)) {
+                                token.ThrowIfCancellationRequested();
                                 if (!MessageMatches(eventObject) || !ShouldOutput(eventObject)) {
                                     continue;
                                 }
                                 if (AsArray) {
-                                    results.Add(eventObject);
+                                    results!.Add(eventObject);
                                 } else {
                                     WriteObject(eventObject);
                                 }
                             }
                         } else {
-                            foreach (var machine in MachineName) {
-                                foreach (var eventObject in SearchEvents.QueryLog(LogName, EventId, machine, ProviderName, Keywords, Level, StartTime, EndTime, UserId, MaxEvents, EventRecordId, TimePeriod, CancelToken)) {
+                            foreach (string machine in MachineName) {
+                                token.ThrowIfCancellationRequested();
+                                foreach (EventObject eventObject in SearchEvents.QueryLog(LogName, EventId, machine, ProviderName, Keywords, Level, StartTime, EndTime, UserId, MaxEvents, EventRecordId, TimePeriod, token)) {
+                                    token.ThrowIfCancellationRequested();
                                     if (!MessageMatches(eventObject)) {
                                         continue;
                                     }
                                     if (AsArray) {
-                                        results.Add(eventObject);
+                                        results!.Add(eventObject);
                                     } else {
                                         WriteObject(eventObject);
                                     }
@@ -329,12 +343,13 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
                             }
                         }
                     } else if (ParallelOption == ParallelOption.Parallel) {
-                        await foreach (var eventObject in SearchEvents.QueryLogsParallel(LogName, EventId, MachineName, ProviderName, Keywords, Level, StartTime, EndTime, UserId, MaxEvents, NumberOfThreads, EventRecordId, TimePeriod, CancelToken)) {
+                        await foreach (EventObject eventObject in SearchEvents.QueryLogsParallel(LogName, EventId, MachineName, ProviderName, Keywords, Level, StartTime, EndTime, UserId, MaxEvents, NumberOfThreads, EventRecordId, TimePeriod, token)) {
+                            token.ThrowIfCancellationRequested();
                             if (!MessageMatches(eventObject) || !ShouldOutput(eventObject)) {
                                 continue;
                             }
                             if (AsArray) {
-                                results.Add(eventObject);
+                                results!.Add(eventObject);
                             } else {
                                 WriteObject(eventObject);
                             }
@@ -344,24 +359,27 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
                     // Let's find objects, but we will expand the properties of the object from Data to the PSObject.
                     if (ParallelOption == ParallelOption.Disabled) {
                         if (MachineName == null) {
-                            foreach (var eventObject in SearchEvents.QueryLog(LogName, EventId, null, ProviderName, Keywords, Level, StartTime, EndTime, UserId, MaxEvents, EventRecordId, TimePeriod, CancelToken)) {
+                            foreach (EventObject eventObject in SearchEvents.QueryLog(LogName, EventId, null, ProviderName, Keywords, Level, StartTime, EndTime, UserId, MaxEvents, EventRecordId, TimePeriod, token)) {
+                                token.ThrowIfCancellationRequested();
                                 if (!MessageMatches(eventObject) || !ShouldOutput(eventObject)) {
                                     continue;
                                 }
                                 if (AsArray) {
-                                    results.Add(GetExpandedObject(eventObject));
+                                    results!.Add(GetExpandedObject(eventObject));
                                 } else {
                                     ReturnExpandedObject(eventObject);
                                 }
                             }
                         } else {
-                            foreach (var machine in MachineName) {
-                                foreach (var eventObject in SearchEvents.QueryLog(LogName, EventId, machine, ProviderName, Keywords, Level, StartTime, EndTime, UserId, MaxEvents, EventRecordId, TimePeriod, CancelToken)) {
+                            foreach (string machine in MachineName) {
+                                token.ThrowIfCancellationRequested();
+                                foreach (EventObject eventObject in SearchEvents.QueryLog(LogName, EventId, machine, ProviderName, Keywords, Level, StartTime, EndTime, UserId, MaxEvents, EventRecordId, TimePeriod, token)) {
+                                    token.ThrowIfCancellationRequested();
                                     if (!MessageMatches(eventObject) || !ShouldOutput(eventObject)) {
                                         continue;
                                     }
                                     if (AsArray) {
-                                        results.Add(GetExpandedObject(eventObject));
+                                        results!.Add(GetExpandedObject(eventObject));
                                     } else {
                                         ReturnExpandedObject(eventObject);
                                     }
@@ -369,12 +387,13 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
                             }
                         }
                     } else if (ParallelOption == ParallelOption.Parallel) {
-                        await foreach (var eventObject in SearchEvents.QueryLogsParallel(LogName, EventId, MachineName, ProviderName, Keywords, Level, StartTime, EndTime, UserId, MaxEvents, NumberOfThreads, EventRecordId, TimePeriod, CancelToken)) {
+                        await foreach (EventObject eventObject in SearchEvents.QueryLogsParallel(LogName, EventId, MachineName, ProviderName, Keywords, Level, StartTime, EndTime, UserId, MaxEvents, NumberOfThreads, EventRecordId, TimePeriod, token)) {
+                            token.ThrowIfCancellationRequested();
                             if (!MessageMatches(eventObject) || !ShouldOutput(eventObject)) {
                                 continue;
                             }
                             if (AsArray) {
-                                results.Add(GetExpandedObject(eventObject));
+                                results!.Add(GetExpandedObject(eventObject));
                             } else {
                                 ReturnExpandedObject(eventObject);
                             }
