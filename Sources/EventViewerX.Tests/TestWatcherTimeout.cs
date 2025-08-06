@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using Xunit;
 
 namespace EventViewerX.Tests {
@@ -21,7 +22,9 @@ namespace EventViewerX.Tests {
                 TimeSpan.FromMilliseconds(100)
             );
 
-            watcher.TimeoutTask?.Wait(TimeSpan.FromSeconds(5));
+            Assert.NotNull(watcher.TimeoutTask);
+            watcher.TimeoutTask!.Wait(TimeSpan.FromSeconds(5));
+            SpinWait.SpinUntil(() => watcher.EndTime.HasValue, TimeSpan.FromSeconds(5));
             Assert.NotNull(watcher.EndTime);
             WatcherManager.StopAll();
         }
