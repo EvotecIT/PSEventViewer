@@ -3,6 +3,7 @@ using System.Reflection;
 using Xunit;
 
 namespace EventViewerX.Tests {
+    [Collection("FqdnCache")]
     public class TestFqdnCache {
         [Fact]
         public void GetFqdnCachesResult() {
