@@ -82,14 +82,24 @@ public sealed class CmdletWriteEVXEntry : AsyncPSCmdlet {
         var internalLogger = new InternalLogger();
         var internalLoggerPowerShell = new InternalLoggerPowerShell(internalLogger, this.WriteVerbose, this.WriteWarning, this.WriteDebug, this.WriteError, this.WriteProgress, this.WriteInformation);
         LoggingMessages.Logger = internalLogger;
-        var searchEvents = new SearchEvents(internalLogger);
         return Task.CompletedTask;
     }
+
     /// <summary>
     /// Writes the event using <see cref="SearchEvents"/>.
     /// </summary>
     protected override Task ProcessRecordAsync() {
-        SearchEvents.WriteEvent(ProviderName, LogName, Message, EventLogEntryType, Category, EventId, MachineName, AdditionalFields);
+        try {
+            SearchEvents.WriteEvent(ProviderName, LogName, Message, EventLogEntryType, Category, EventId, MachineName, AdditionalFields);
+        } catch (Exception ex) {
+            if (errorAction == ActionPreference.Stop) {
+                var errorRecord = new ErrorRecord(ex, "WriteEventFailed", ErrorCategory.WriteError, this);
+                ThrowTerminatingError(errorRecord);
+            } else {
+                WriteWarning($"Failed to write event: {ex.Message}");
+            }
+        }
+
         return Task.CompletedTask;
     }
 }
