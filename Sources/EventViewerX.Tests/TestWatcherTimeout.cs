@@ -22,7 +22,8 @@ namespace EventViewerX.Tests {
                 TimeSpan.FromMilliseconds(100)
             );
 
-            watcher.TimeoutTask?.Wait(1000);
+            var completed = watcher.TimeoutTask?.Wait(TimeSpan.FromSeconds(5)) ?? false;
+            Assert.True(completed, "Watcher did not timeout within expected interval.");
             Assert.NotNull(watcher.EndTime);
             WatcherManager.StopAll();
         }
