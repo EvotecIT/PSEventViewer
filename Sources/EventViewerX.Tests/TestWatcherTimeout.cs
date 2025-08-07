@@ -25,6 +25,10 @@ namespace EventViewerX.Tests {
             var completed = watcher.TimeoutTask?.Wait(TimeSpan.FromSeconds(5)) ?? false;
             Assert.True(completed, "Watcher did not timeout within expected interval.");
             Assert.NotNull(watcher.EndTime);
+            Assert.True(
+                SpinWait.SpinUntil(() => watcher.EndTime.HasValue, 5000),
+                "Watcher did not stop before timeout."
+            );
             WatcherManager.StopAll();
         }
     }
