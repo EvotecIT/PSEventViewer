@@ -27,7 +27,7 @@ public partial class SearchEvents : Settings {
 
         // Check if we have any filters that require an XML query
         bool hasFilters = namedDataFilter != null || namedDataExcludeFilter != null || eventIds != null ||
-                         providerName != null || keywords != null || level != null || startTime != null ||
+                         !string.IsNullOrEmpty(providerName) || keywords != null || level != null || startTime != null ||
                          endTime != null || userId != null || eventRecordId != null;
 
         EventLogQuery query;
