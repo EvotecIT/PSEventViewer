@@ -32,24 +32,3 @@ public abstract class ClientGroupPoliciesBase : EventRuleBase {
     }
 }
 
-/// <summary>
-/// Client side group policy processing events from the Application log.
-/// </summary>
-public class ClientGroupPoliciesApplication : ClientGroupPoliciesBase {
-    public override List<int> EventIds => new() { 4098 };
-    public override string LogName => "Application";
-    public override NamedEvents NamedEvent => NamedEvents.ClientGroupPoliciesApplication;
-
-    public ClientGroupPoliciesApplication(EventObject eventObject) : base(eventObject) { }
-}
-
-/// <summary>
-/// Client side group policy processing events from the System log.
-/// </summary>
-public class ClientGroupPoliciesSystem : ClientGroupPoliciesBase {
-    public override List<int> EventIds => new() { 1085 };
-    public override string LogName => "System";
-    public override NamedEvents NamedEvent => NamedEvents.ClientGroupPoliciesSystem;
-
-    public ClientGroupPoliciesSystem(EventObject eventObject) : base(eventObject) { }
-}
