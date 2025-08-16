@@ -13,7 +13,7 @@ public partial class SearchEvents : Settings {
     /// <param name="eventId">The event identifier.</param>
     /// <param name="machineName">Name of the machine.</param>
     /// <param name="replacementStrings">The replacement strings.</param>
-    public static void WriteEvent(string source, string log, string message, EventLogEntryType type, int category, int eventId, string machineName, params string[] replacementStrings) {
+    public static void WriteEvent(string source, string log, string message, EventLogEntryType type, int category, int eventId, string? machineName, params string[]? replacementStrings) {
         WriteEvent(source, log, message, type, category, eventId, machineName, null, replacementStrings);
     }
 
@@ -27,7 +27,7 @@ public partial class SearchEvents : Settings {
     /// <param name="eventId"></param>
     /// <param name="machineName"></param>
     /// <param name="replacementStrings"></param>
-    public static void WriteEvent(string source, string log, string message, EventLogEntryType type, int eventId, string machineName, params string[] replacementStrings) {
+    public static void WriteEvent(string source, string log, string message, EventLogEntryType type, int eventId, string? machineName, params string[]? replacementStrings) {
         WriteEvent(source, log, message, type, 0, eventId, machineName, null, replacementStrings);
     }
 
@@ -52,7 +52,7 @@ public partial class SearchEvents : Settings {
     /// <param name="log">The log.</param>
     /// <param name="machineName">Name of the machine.</param>
     /// <returns><c>true</c> when source exists or is created.</returns>
-    public static bool CreateLogSource(string source, string log, string machineName = null) {
+    public static bool CreateLogSource(string source, string log, string? machineName = null) {
         try {
             if (string.IsNullOrEmpty(machineName)) {
                 if (!EventLog.SourceExists(source)) {

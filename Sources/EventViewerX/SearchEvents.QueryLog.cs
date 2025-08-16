@@ -13,7 +13,7 @@ public partial class SearchEvents : Settings {
     /// Initialize the EventSearching class with an internal logger
     /// </summary>
     /// <param name="internalLogger">The internal logger.</param>
-    public SearchEvents(InternalLogger internalLogger = null) {
+    public SearchEvents(InternalLogger? internalLogger = null) {
         if (internalLogger != null) {
             _logger = internalLogger;
         }
@@ -25,24 +25,24 @@ public partial class SearchEvents : Settings {
     /// <param name="query">The query.</param>
     /// <param name="machineName">Name of the machine.</param>
     /// <returns>Initialized <see cref="EventLogReader"/> or null when failed.</returns>
-    private static EventLogReader CreateEventLogReader(EventLogQuery query, string machineName) {
+    private static EventLogReader CreateEventLogReader(EventLogQuery query, string? machineName) {
         string targetMachine = string.IsNullOrEmpty(machineName) ? GetFQDN() : machineName;
         if (query == null) {
             _logger.WriteWarning($"An error occurred on {targetMachine} while creating the event log reader: Query cannot be null.");
-            return null;
+            return null!;
         }
 
         try {
             return new EventLogReader(query);
         } catch (EventLogException ex) {
             _logger.WriteWarning($"An error occurred on {targetMachine} while creating the event log reader: {ex.Message}");
-            return null;
+            return null!;
         } catch (UnauthorizedAccessException ex) {
             _logger.WriteWarning($"Insufficient permissions to read the event log on {targetMachine}: {ex.Message}");
-            return null;
+            return null!;
         } catch (Exception ex) {
             _logger.WriteWarning($"An error occurred on {targetMachine} while creating the event log reader: {ex.Message}");
-            return null;
+            return null!;
         }
     }
 
@@ -57,7 +57,7 @@ public partial class SearchEvents : Settings {
     /// <param name="startTime">Optional start time to filter events from.</param>
     /// <param name="endTime">Optional end time to filter events until.</param>
     /// <param name="userId">Optional user ID to filter events by.</param>
-    private static IEnumerable<EventObject> QueryLogEnumerable(string logName, List<int> eventIds = null, string machineName = null, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null, int maxEvents = 0, List<long> eventRecordId = null, TimePeriod? timePeriod = null, CancellationToken cancellationToken = default) {
+    private static IEnumerable<EventObject> QueryLogEnumerable(string logName, List<int>? eventIds = null, string? machineName = null, string? providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string? userId = null, int maxEvents = 0, List<long>? eventRecordId = null, TimePeriod? timePeriod = null, CancellationToken cancellationToken = default) {
         if (eventIds != null && eventIds.Any(id => id <= 0)) {
             throw new ArgumentException("Event IDs must be positive.", nameof(eventIds));
         }
@@ -68,7 +68,7 @@ public partial class SearchEvents : Settings {
 
         string queryString = eventRecordId != null
             ? BuildQueryString(eventRecordId)
-            : BuildQueryString(logName, eventIds, providerName, keywords, level, startTime, endTime, userId, timePeriod: timePeriod);
+            : BuildQueryString(logName, eventIds, providerName, keywords, level, startTime, endTime, userId ?? string.Empty, timePeriod: timePeriod);
 
         _logger.WriteVerbose($"Querying log '{logName}' on '{machineName} with query: {queryString}");
 
@@ -111,11 +111,11 @@ public partial class SearchEvents : Settings {
     /// <param name="eventRecordId">The event record identifier.</param>
     /// <param name="timePeriod">The time period.</param>
     /// <returns>Enumerable collection of matching events.</returns>
-    public static IEnumerable<EventObject> QueryLog(string logName, List<int> eventIds = null, string machineName = null, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null, int maxEvents = 0, List<long> eventRecordId = null, TimePeriod? timePeriod = null, CancellationToken cancellationToken = default) {
+    public static IEnumerable<EventObject> QueryLog(string logName, List<int>? eventIds = null, string? machineName = null, string? providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string? userId = null, int maxEvents = 0, List<long>? eventRecordId = null, TimePeriod? timePeriod = null, CancellationToken cancellationToken = default) {
         return QueryLogEnumerable(logName, eventIds, machineName, providerName, keywords, level, startTime, endTime, userId, maxEvents, eventRecordId, timePeriod, cancellationToken);
     }
 
-    public static IEnumerable<EventObject> QueryLog(KnownLog logName, List<int> eventIds = null, string machineName = null, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null, int maxEvents = 0, List<long> eventRecordId = null, TimePeriod? timePeriod = null, CancellationToken cancellationToken = default) {
+    public static IEnumerable<EventObject> QueryLog(KnownLog logName, List<int>? eventIds = null, string? machineName = null, string? providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string? userId = null, int maxEvents = 0, List<long>? eventRecordId = null, TimePeriod? timePeriod = null, CancellationToken cancellationToken = default) {
         return QueryLog(LogNameToString(logName), eventIds, machineName, providerName, keywords, level, startTime, endTime, userId, maxEvents, eventRecordId, timePeriod, cancellationToken);
     }
 
@@ -155,7 +155,7 @@ public partial class SearchEvents : Settings {
     /// <param name="opcodes">The opcodes.</param>
     /// <param name="timePeriod">The time period.</param>
     /// <returns>XML query string.</returns>
-    private static string BuildQueryString(string logName, List<int> eventIds = null, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null, List<int> tasks = null, List<int> opcodes = null, TimePeriod? timePeriod = null) {
+    private static string BuildQueryString(string logName, List<int>? eventIds = null, string? providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string? userId = null, List<int>? tasks = null, List<int>? opcodes = null, TimePeriod? timePeriod = null) {
         TimeSpan? lastPeriod = null;
         if (timePeriod.HasValue) {
             var times = TimeHelper.GetTimePeriod(timePeriod.Value);

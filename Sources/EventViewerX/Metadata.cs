@@ -8,27 +8,27 @@ namespace EventViewerX {
     /// Lightweight provider metadata container.
     /// </summary>
     public class Metadata {
-        public string ProviderName;
-        public string DisplayName;
-        public List<string> LogNames;
-        public Guid Id;
+        public string ProviderName { get; }
+        public string? DisplayName { get; private set; }
+        public List<string> LogNames { get; private set; } = new();
+        public Guid Id { get; }
 
-        public IList<EventLogLink> LogLinks { get; set; }
-        public IEnumerable<EventMetadata> Events { get; set; }
+        public IList<EventLogLink>? LogLinks { get; private set; }
+        public IEnumerable<EventMetadata>? Events { get; private set; }
 
-        public IList<EventKeyword> Keywords { get; set; }
+        public IList<EventKeyword>? Keywords { get; private set; }
 
-        public IList<EventOpcode> Opcodes { get; set; }
+        public IList<EventOpcode>? Opcodes { get; private set; }
 
-        public string MessageFilePath { get; set; }
+        public string MessageFilePath { get; private set; } = string.Empty;
 
-        public string ResourceFilePath { get; set; }
+        public string ResourceFilePath { get; private set; } = string.Empty;
 
-        public string ParameterFilePath { get; set; }
+        public string ParameterFilePath { get; private set; } = string.Empty;
 
-        public IList<EventTask> Tasks { get; set; }
+        public IList<EventTask>? Tasks { get; private set; }
 
-        public List<string> Errors = new List<string>();
+        public List<string> Errors { get; } = new();
 
         public Metadata(string providerName, ProviderMetadata providerMetadata) {
             ProviderName = providerName;

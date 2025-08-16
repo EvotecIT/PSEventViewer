@@ -88,8 +88,8 @@ public partial class SearchEvents {
             foreach (Hashtable table in namedDataFilter) {
                 var keyFilters = new List<string>();
                 foreach (var key in table.Keys) {
-                    var keyName = EscapeXPathValue(key.ToString());
-                    var values = AsEnumerable(table[key]);
+                    var keyName = EscapeXPathValue(key?.ToString() ?? string.Empty);
+                    var values = AsEnumerable(table[key!]);
                     if (values.Any()) {
                         keyFilters.Add(InitializeXPathFilter(values, $"Data[@Name='{keyName}'] = '{{0}}'", "{0}", "or", true));
                     } else {
@@ -105,8 +105,8 @@ public partial class SearchEvents {
             foreach (Hashtable table in namedDataExcludeFilter) {
                 var keyFilters = new List<string>();
                 foreach (var key in table.Keys) {
-                    var keyName = EscapeXPathValue(key.ToString());
-                    var values = AsEnumerable(table[key]);
+                    var keyName = EscapeXPathValue(key?.ToString() ?? string.Empty);
+                    var values = AsEnumerable(table[key!]);
                     if (values.Any()) {
                         keyFilters.Add(InitializeXPathFilter(values, $"Data[@Name='{keyName}'] != '{{0}}'", "{0}", "and", true));
                     } else {

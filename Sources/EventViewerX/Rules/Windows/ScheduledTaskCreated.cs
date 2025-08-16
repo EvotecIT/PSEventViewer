@@ -14,11 +14,11 @@ public class ScheduledTaskCreated : EventRuleBase {
         return true;
     }
     /// <summary>Computer where the task was created.</summary>
-    public string Computer;
+    public string Computer = string.Empty;
     /// <summary>Name of the created task.</summary>
-    public string TaskName;
+    public string TaskName = string.Empty;
     /// <summary>Author of the task definition.</summary>
-    public string Author;
+    public string Author = string.Empty;
     /// <summary>Creation timestamp read from the task XML.</summary>
     public DateTime? Created;
     /// <summary>Time the event occurred.</summary>
