@@ -18,7 +18,7 @@
         <PackageReference Include="PowerShellStandard.Library" Version="5.1.1" PrivateAssets="all" />
     </ItemGroup>
   <ItemGroup>
-      <ProjectReference Include="..\EventViewerX\EventViewerX.csproj" />
+      <ProjectReference Include="..\\EventViewerX\\EventViewerX.csproj" />
   </ItemGroup>
 
   <ItemGroup Condition=" '$(TargetFramework)' == 'net472' or '$(TargetFramework)' == 'netstandard2.0' ">
@@ -29,22 +29,6 @@
     <PropertyGroup>
         <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
     </PropertyGroup>
-
-    <ItemGroup>
-        <Using Include="System.Collections" />
-        <Using Include="System.Management.Automation" />
-        <Using Include="System.Threading.Tasks" />
-        <Using Include="System.Collections.Concurrent" />
-        <Using Include="System.Threading" />
-        <Using Include="System" />
-        <Using Include="System.Collections.Generic" />
-        <Using Include="System.Linq" />
-        <Using Include="System.Text" />
-        <Using Include="System.IO" />
-        <Using Include="System.Net" />
-        <Using Include="System.Diagnostics" />
-        <Using Include="EventViewerX" />
-    </ItemGroup>
 
     <!-- We need to remove PowerShell conflicting libraries as it will break output -->
     <Target Name="RemoveFilesAfterBuild" AfterTargets="Build">

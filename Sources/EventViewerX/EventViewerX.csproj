@@ -44,23 +44,4 @@
         <PackageReference Include="System.DirectoryServices" Version="9.0.6" />
         <PackageReference Include="System.Diagnostics.EventLog" Version="9.0.6" />
     </ItemGroup>
-
-    <ItemGroup>
-        <Using Include="System.Collections" />
-        <Using Include="System.Threading.Tasks" />
-        <Using Include="System.Collections.Concurrent" />
-        <Using Include="System.Threading" />
-        <Using Include="System" />
-        <Using Include="System.Collections.Generic" />
-        <Using Include="System.Linq" />
-        <Using Include="System.Text" />
-        <Using Include="System.IO" />
-        <Using Include="System.Net" />
-        <Using Include="System.Diagnostics" />
-        <Using Include="System.Runtime.Versioning" />
-    </ItemGroup>
-    <ItemGroup>
-        <Folder Include="Properties\" />
-        <Folder Include="Rules\CertificateAuthority\" />
-    </ItemGroup>
 </Project>
