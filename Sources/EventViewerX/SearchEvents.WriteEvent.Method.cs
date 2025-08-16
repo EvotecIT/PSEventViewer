@@ -4,7 +4,7 @@ using System.Linq;
 namespace EventViewerX;
 
 public partial class SearchEvents : Settings {
-    public static void WriteEvent(string source, string log, string message, EventLogEntryType type, int category, int eventId, string machineName, byte[] rawData, params string[] replacementStrings) {
+    public static void WriteEvent(string source, string log, string message, EventLogEntryType type, int category, int eventId, string? machineName, byte[]? rawData, params string[]? replacementStrings) {
         if (category is < short.MinValue or > short.MaxValue) {
             throw new ArgumentOutOfRangeException(nameof(category), category, $"Category must fit into Int16 range ({short.MinValue} - {short.MaxValue}).");
         }

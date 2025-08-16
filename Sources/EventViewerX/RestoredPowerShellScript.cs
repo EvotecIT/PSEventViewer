@@ -9,27 +9,27 @@ public class RestoredPowerShellScript {
     /// <summary>
     /// Identifier of the script block.
     /// </summary>
-    public string ScriptBlockId { get; set; }
+    public string ScriptBlockId { get; set; } = string.Empty;
 
     /// <summary>
     /// Full script text reconstructed from events.
     /// </summary>
-    public string Script { get; set; }
+    public string Script { get; set; } = string.Empty;
 
     /// <summary>
     /// Event records that compose the script.
     /// </summary>
-    public IReadOnlyList<EventRecord> Events { get; set; }
+    public IReadOnlyList<EventRecord> Events { get; set; } = Array.Empty<EventRecord>();
 
     /// <summary>
     /// Primary event record for convenience access.
     /// </summary>
-    public EventRecord EventRecord => Events?[0];
+    public EventRecord? EventRecord => Events.Count > 0 ? Events[0] : null;
 
     /// <summary>
     /// Parsed data dictionary from the event.
     /// </summary>
-    public IDictionary<string, string?> Data { get; set; }
+    public IDictionary<string, string?> Data { get; set; } = new Dictionary<string, string?>();
 
     /// <summary>
     /// Saves the script to the specified directory.

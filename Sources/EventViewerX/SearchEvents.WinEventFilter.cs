@@ -13,25 +13,28 @@ public partial class SearchEvents {
         return newFilter;
     }
 
-    private static string InitializeXPathFilter(IEnumerable<object> items, string forEachFormatString, string finalizeFormatString, string logic = "or", bool noParenthesis = false, bool escapeItems = true) {
+    private static string InitializeXPathFilter(IEnumerable<object?> items, string forEachFormatString, string finalizeFormatString, string logic = "or", bool noParenthesis = false, bool escapeItems = true) {
         var filter = string.Empty;
         foreach (var item in items) {
-            var value = escapeItems ? EscapeXPathValue(item.ToString()) : item.ToString();
+            if (item == null) {
+                continue;
+            }
+            var value = escapeItems ? EscapeXPathValue(item.ToString()!) : item.ToString();
             var formatted = forEachFormatString.Replace("{0}", $"{value}");
             filter = JoinXPathFilter(formatted, filter, logic, noParenthesis);
         }
         return finalizeFormatString.Replace("{0}", $"{filter}");
     }
 
-    private static IEnumerable<string> AsEnumerable(object obj) {
+    private static IEnumerable<string> AsEnumerable(object? obj) {
         if (obj is IEnumerable enumerable and not string) {
             foreach (var o in enumerable) {
                 if (o != null) {
-                    yield return o.ToString();
+                    yield return o.ToString()!;
                 }
             }
         } else if (obj != null) {
-            yield return obj.ToString();
+            yield return obj.ToString()!;
         }
     }
 

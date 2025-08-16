@@ -24,7 +24,7 @@ namespace EventViewerX {
         /// <param name="maxEvents">Maximum events to return.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
         /// <returns>Asynchronous sequence of simplified events.</returns>
-        public static async IAsyncEnumerable<EventObjectSlim> FindEventsByNamedEvents(List<NamedEvents> typeEventsList, List<string> machineNames = null, DateTime? startTime = null, DateTime? endTime = null, TimePeriod? timePeriod = null, int maxThreads = 8, int maxEvents = 0, [EnumeratorCancellation] CancellationToken cancellationToken = default) {
+        public static async IAsyncEnumerable<EventObjectSlim> FindEventsByNamedEvents(List<NamedEvents> typeEventsList, List<string?>? machineNames = null, DateTime? startTime = null, DateTime? endTime = null, TimePeriod? timePeriod = null, int maxThreads = 8, int maxEvents = 0, [EnumeratorCancellation] CancellationToken cancellationToken = default) {
             var eventInfoDict = EventObjectSlim.GetEventInfoForNamedEvents(typeEventsList);
 
             var semaphore = new SemaphoreSlim(maxThreads);
