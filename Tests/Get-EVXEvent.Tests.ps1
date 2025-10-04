@@ -169,3 +169,11 @@ Describe 'Get-EVXEvent - Parameter validation' {
         { Get-EVXEvent -LogName 'Application' -NumberOfThreads 0 } | Should -Throw
     }
 }
+
+Describe 'Get-EVXEvent - Positional EventId' {
+    It 'Allows positional EventId without ambiguity' {
+        $events = Get-EVXEvent 'Application' 5617 -MaxEvents 1 -AsArray
+        $events | Should -HaveCount 1
+        $events[0].ID | Should -Be 5617
+    }
+}

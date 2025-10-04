@@ -14,13 +14,13 @@ public class KerberosServiceTicket : EventRuleBase
         // Simple rule - always handle if event ID and log name match
         return true;
     }
-    public string Computer;
-    public string Action;
-    public string AccountName;
-    public string ServiceName;
-    public string IpAddress;
-    public string IpPort;
-    public string TicketOptions;
+    public string Computer = string.Empty;
+    public string Action = string.Empty;
+    public string AccountName = string.Empty;
+    public string ServiceName = string.Empty;
+    public string IpAddress = string.Empty;
+    public string IpPort = string.Empty;
+    public string TicketOptions = string.Empty;
     public TicketEncryptionType? EncryptionType;
     public bool WeakEncryptionAlgorithm;
     public bool UnusualTicketOptions;

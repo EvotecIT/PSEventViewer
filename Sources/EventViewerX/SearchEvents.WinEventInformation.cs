@@ -12,7 +12,7 @@ namespace EventViewerX {
     public partial class SearchEvents : Settings {
         public static IEnumerable<WinEventInformation> GetWinEventInformation(string[]? logNames, List<string>? machines, List<string>? filePaths, int maxDegreeOfParallelism = 50) {
             if (machines == null || machines.Count == 0) {
-                machines = new List<string> { null };
+                machines = new List<string> { null! };
             }
 
             if (logNames != null && logNames.Length > 0) {
@@ -30,24 +30,24 @@ namespace EventViewerX {
 
         private static WinEventInformation ConvertLogDetails(EventLogDetails details) {
             var info = new WinEventInformation {
-                MachineName = details.MachineName,
-                LogName = details.LogName,
-                LogType = details.LogType,
+                MachineName = details.MachineName ?? string.Empty,
+                LogName = details.LogName ?? string.Empty,
+                LogType = details.LogType ?? string.Empty,
                 LogIsolation = details.LogIsolation,
                 IsEnabled = details.IsEnabled,
                 IsLogFull = details.IsLogFull,
                 MaximumSizeInBytes = details.MaximumSizeInBytes,
-                LogFilePath = details.LogFilePath,
-                LogMode = details.LogMode,
-                OwningProviderName = details.OwningProviderName,
-                ProviderNames = details.ProviderNames,
-                ProviderLevel = details.ProviderLevel,
-                ProviderKeywords = details.ProviderKeywords,
+                LogFilePath = details.LogFilePath ?? string.Empty,
+                LogMode = details.LogMode ?? string.Empty,
+                OwningProviderName = details.OwningProviderName ?? string.Empty,
+                ProviderNames = details.ProviderNames ?? new List<string>(),
+                ProviderLevel = details.ProviderLevel ?? string.Empty,
+                ProviderKeywords = details.ProviderKeywords ?? string.Empty,
                 ProviderBufferSize = details.ProviderBufferSize,
                 ProviderMinimumNumberOfBuffers = details.ProviderMinimumNumberOfBuffers,
                 ProviderMaximumNumberOfBuffers = details.ProviderMaximumNumberOfBuffers,
                 ProviderLatency = details.ProviderLatency,
-                ProviderControlGuid = details.ProviderControlGuid,
+                ProviderControlGuid = details.ProviderControlGuid ?? string.Empty,
                 CreationTime = details.CreationTime,
                 LastAccessTime = details.LastAccessTime,
                 LastWriteTime = details.LastWriteTime,
@@ -57,9 +57,9 @@ namespace EventViewerX {
                 FileSizeMaximumMB = details.FileSizeMaximumMB,
                 RecordCount = details.RecordCount,
                 OldestRecordNumber = details.OldestRecordNumber,
-                SecurityDescriptor = details.SecurityDescriptor,
+                SecurityDescriptor = details.SecurityDescriptor ?? string.Empty,
                 IsClassicLog = details.IsClassicLog,
-                Source = details.MachineName
+                Source = details.MachineName ?? string.Empty
             };
 
             // Map LogMode to human-readable EventAction
@@ -74,19 +74,19 @@ namespace EventViewerX {
             info.FileSizeMB = details.FileSizeCurrentMB;
             info.MaximumSizeMB = details.FileSizeMaximumMB;
 
-            info.ProviderNamesExpanded = string.Join(", ", details.ProviderNames);
+            info.ProviderNamesExpanded = string.Join(", ", details.ProviderNames ?? new List<string>());
             if (!string.IsNullOrEmpty(details.SecurityDescriptor)) {
                 try {
                     var sd = new CommonSecurityDescriptor(false, false, details.SecurityDescriptor);
-                    info.SecurityDescriptorOwner = sd.Owner?.ToString();
-                    info.SecurityDescriptorGroup = sd.Group?.ToString();
-                    info.SecurityDescriptorDiscretionaryAcl = sd.DiscretionaryAcl?.ToString();
-                    info.SecurityDescriptorSystemAcl = sd.SystemAcl?.ToString();
+                    info.SecurityDescriptorOwner = sd.Owner?.ToString() ?? string.Empty;
+                    info.SecurityDescriptorGroup = sd.Group?.ToString() ?? string.Empty;
+                    info.SecurityDescriptorDiscretionaryAcl = sd.DiscretionaryAcl?.ToString() ?? string.Empty;
+                    info.SecurityDescriptorSystemAcl = sd.SystemAcl?.ToString() ?? string.Empty;
                 } catch {
                 }
             }
-            info.EventOldest = GetEventTime(details.LogName, details.MachineName, false);
-            info.EventNewest = GetEventTime(details.LogName, details.MachineName, true);
+            info.EventOldest = GetEventTime(details.LogName ?? string.Empty, details.MachineName ?? string.Empty, false);
+            info.EventNewest = GetEventTime(details.LogName ?? string.Empty, details.MachineName ?? string.Empty, true);
             return info;
         }
 
@@ -160,7 +160,7 @@ namespace EventViewerX {
                 ProviderNames = new List<string>(),
                 ProviderNamesExpanded = string.Empty,
                 RecordCount = recordCount,
-                SecurityDescriptor = null,
+                SecurityDescriptor = string.Empty,
                 Source = "File"
             };
 

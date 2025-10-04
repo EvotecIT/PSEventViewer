@@ -10,6 +10,7 @@
         <Company>Evotec</Company>
         <Authors>Przemyslaw Klys</Authors>
         <LangVersion>latest</LangVersion>
+        <Nullable>enable</Nullable>
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
         <IsWindows>true</IsWindows>
         <SupportedOSPlatform>windows</SupportedOSPlatform>

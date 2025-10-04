@@ -17,6 +17,7 @@
   <a href="https://twitter.com/PrzemyslawKlys"><img src="https://img.shields.io/twitter/follow/PrzemyslawKlys.svg?label=Twitter%20%40PrzemyslawKlys&style=social"></a>
   <a href="https://evotec.xyz/hub"><img src="https://img.shields.io/badge/Blog-evotec.xyz-2A6496.svg"></a>
   <a href="https://www.linkedin.com/in/pklys"><img src="https://img.shields.io/badge/LinkedIn-pklys-0077B5.svg?logo=LinkedIn"></a>
+  <a href="https://evo.yt/discord"><img src="https://img.shields.io/discord/508328927853281280?style=flat-square&label=discord%20chat"></a>
 </p>
 
 # PSEventViewer - PowerShell Module
@@ -104,4 +105,21 @@ The `TimePeriod` enumeration simplifies building date ranges. Each option sets t
 | TillLastFriday | Since last Friday |
 | TillLastSaturday | Since last Saturday |
 | TillLastSunday | Since last Sunday |
+
+### NasPortType values
+
+The `NasPortType` enumeration maps common RADIUS NAS-Port-Type values.
+
+| Value | Description |
+|-------|-------------|
+| Ethernet | IEEE 802.3 Ethernet |
+| WirelessIEEE80211 | Wireless IEEE 802.11 |
+| Virtual | Virtual port |
+
+### Example scripts
+
+See the `Examples` folder for more scenarios.
+
+- `Example.NamedDataFilterAdvanced.ps1` shows how to combine include and exclude named data filters.
+- `Example.WatchAdvanced.ps1` demonstrates a watcher using staging mode with `-StopOnMatch`.
 

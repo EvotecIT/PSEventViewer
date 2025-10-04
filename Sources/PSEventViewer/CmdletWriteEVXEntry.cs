@@ -13,53 +13,53 @@ public sealed class CmdletWriteEVXEntry : AsyncPSCmdlet {
     /// </summary>
     [Alias("ComputerName", "ServerName")]
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
-    public string MachineName;
+    public string MachineName { get; set; }
 
     /// <summary>
     /// Name of the event log where the entry will be written.
     /// </summary>
     [Parameter(Mandatory = true, Position = 0, ParameterSetName = "RecordId")]
     [Parameter(Mandatory = true, Position = 0, ParameterSetName = "GenericEvents")]
-    public string LogName;
+    public string LogName { get; set; }
 
     /// <summary>
     /// Name of the provider that writes the entry.
     /// </summary>
     [Alias("Source", "Provider")]
     [Parameter(Mandatory = true, ParameterSetName = "GenericEvents")]
-    public string ProviderName;
+    public string ProviderName { get; set; }
 
     /// <summary>
     /// Category for the event entry.
     /// </summary>
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
-    public int Category;
+    public int Category { get; set; }
 
     /// <summary>
     /// Type of the event log entry.
     /// </summary>
     [Alias("EntryType")]
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
-    public System.Diagnostics.EventLogEntryType EventLogEntryType = System.Diagnostics.EventLogEntryType.Information;
+    public System.Diagnostics.EventLogEntryType EventLogEntryType { get; set; } = System.Diagnostics.EventLogEntryType.Information;
 
     /// <summary>
     /// Identifier for the event entry.
     /// </summary>
     [Alias("Id")]
     [Parameter(Mandatory = true, ParameterSetName = "GenericEvents")]
-    public int EventId;
+    public int EventId { get; set; }
 
     /// <summary>
     /// Message for the event entry.
     /// </summary>
     [Parameter(Mandatory = true, ParameterSetName = "GenericEvents")]
-    public string Message;
+    public string Message { get; set; }
 
     /// <summary>
     /// Additional custom fields to include with the event.
     /// </summary>
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
-    public string[] AdditionalFields;
+    public string[] AdditionalFields { get; set; }
 
     private ActionPreference errorAction;
 
@@ -82,14 +82,24 @@ public sealed class CmdletWriteEVXEntry : AsyncPSCmdlet {
         var internalLogger = new InternalLogger();
         var internalLoggerPowerShell = new InternalLoggerPowerShell(internalLogger, this.WriteVerbose, this.WriteWarning, this.WriteDebug, this.WriteError, this.WriteProgress, this.WriteInformation);
         LoggingMessages.Logger = internalLogger;
-        var searchEvents = new SearchEvents(internalLogger);
         return Task.CompletedTask;
     }
+
     /// <summary>
     /// Writes the event using <see cref="SearchEvents"/>.
     /// </summary>
     protected override Task ProcessRecordAsync() {
-        SearchEvents.WriteEvent(ProviderName, LogName, Message, EventLogEntryType, Category, EventId, MachineName, AdditionalFields);
+        try {
+            SearchEvents.WriteEvent(ProviderName, LogName, Message, EventLogEntryType, Category, EventId, MachineName, AdditionalFields);
+        } catch (Exception ex) {
+            if (errorAction == ActionPreference.Stop) {
+                var errorRecord = new ErrorRecord(ex, "WriteEventFailed", ErrorCategory.WriteError, this);
+                ThrowTerminatingError(errorRecord);
+            } else {
+                WriteWarning($"Failed to write event: {ex.Message}");
+            }
+        }
+
         return Task.CompletedTask;
     }
 }

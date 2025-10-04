@@ -30,28 +30,28 @@ namespace EventViewerX {
         /// <summary>
         /// Username of the account that enabled staging.
         /// </summary>
-        public string StagingEnabledBy { get; private set; }
+        public string? StagingEnabledBy { get; private set; }
 
         /// <summary>
         /// Action executed when an event matching the filter is detected.
         /// </summary>
-        private Action<EventObject> _eventAction;
+        private Action<EventObject>? _eventAction;
 
         /// <summary>
-        /// Events
+        /// Events keyed by record identifier
         /// </summary>
-        readonly ConcurrentDictionary<EventObject, byte> WatchedEvents = new ConcurrentDictionary<EventObject, byte>();
+        readonly ConcurrentDictionary<long, EventObject> WatchedEvents = new ConcurrentDictionary<long, EventObject>();
 
-        private EventLogSession _eventLogSession;
-        private EventLogWatcher _eventLogWatcher;
+        private EventLogSession? _eventLogSession;
+        private EventLogWatcher? _eventLogWatcher;
 
-        private string _machineName;
+        private string? _machineName;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="WatchEvents"/> class.
         /// </summary>
         /// <param name="internalLogger">Optional logger for verbose output.</param>
-        public WatchEvents(InternalLogger internalLogger = null) {
+        public WatchEvents(InternalLogger? internalLogger = null) {
             if (internalLogger != null) {
                 _logger = internalLogger;
             }
@@ -67,12 +67,12 @@ namespace EventViewerX {
         /// <param name="cancellationToken">Cancellation token to stop watching.</param>
         /// <param name="staging">Whether to use staging mode.</param>
         /// <param name="enabledBy">Account that enabled staging.</param>
-        public void Watch(string machineName, string logName, List<int> eventId, Action<EventObject> eventAction = null, CancellationToken cancellationToken = default, bool staging = false, string enabledBy = null) {
+        public void Watch(string? machineName, string logName, List<int> eventId, Action<EventObject>? eventAction = null, CancellationToken cancellationToken = default, bool staging = false, string? enabledBy = null) {
             NumberOfEventsFound = 0;
             _eventsFound = 0;
-            StartTime = DateTime.UtcNow;
             Dispose();
-            _machineName = machineName;
+            StartTime = DateTime.UtcNow;
+            _machineName = string.IsNullOrEmpty(machineName) ? Environment.MachineName : machineName;
             if (staging && !eventId.Contains(350)) {
                 eventId.Add(350);
                 StagingEnabled = true;
@@ -84,10 +84,14 @@ namespace EventViewerX {
             _watchEventId = new ConcurrentBag<int>(eventId);
             _eventAction = eventAction;
             try {
-                _eventLogSession = new EventLogSession(machineName);
-                _eventLogWatcher = new EventLogWatcher(new EventLogQuery(logName, PathType.LogName) {
-                    Session = _eventLogSession
-                });
+                if (!string.IsNullOrEmpty(machineName)) {
+                    _eventLogSession = new EventLogSession(machineName);
+                }
+                EventLogQuery query = new EventLogQuery(logName, PathType.LogName);
+                if (_eventLogSession != null) {
+                    query.Session = _eventLogSession;
+                }
+                _eventLogWatcher = new EventLogWatcher(query);
                 _eventLogWatcher.EventRecordWritten += DetectEventsLogCallback;
                 _eventLogWatcher.Enabled = true;
                 cancellationToken.Register(() => Dispose());
@@ -96,24 +100,24 @@ namespace EventViewerX {
                 _logger.WriteWarning("Failed to create event log subscription to Target Machine {0}. Verify network connectivity, firewall settings, permissions, etc. Continuing on to next DC if applicable...  ({1})", machineName, ex.Message.Trim());
             }
         }
-        private void DetectEventsLogCallback(object Object, EventRecordWrittenEventArgs Args) {
+        private void DetectEventsLogCallback(object? sender, EventRecordWrittenEventArgs args) {
             try {
-                if (Args.EventRecord == null) {
+                if (args.EventRecord == null) {
                     _logger.WriteWarning("Event log subscription callback was given invalid data. This shouldn't happen.");
                 }
             } catch (Exception ex) {
                 _logger.WriteWarning("Event log subscription callback threw: ({0})", ex.Message.Trim());
                 return;
             }
-            if (Args.EventRecord != null) {
-                var Event = Args.EventRecord;
+            if (args.EventRecord != null) {
+                var Event = args.EventRecord;
                 if (_watchEventId.Contains(Event.Id)) {
                     Interlocked.Increment(ref NumberOfEventsFound);
                     Interlocked.Increment(ref _eventsFound);
                     _logger.WriteVerbose("Found event id {0} on {1}.", Event.Id, Event.MachineName);
 
                     var eventObject = new EventObject(Event, _machineName);
-                    WatchedEvents.TryAdd(eventObject, 0);
+                    WatchedEvents.TryAdd(eventObject.RecordId ?? -1L, eventObject);
                     _eventAction?.Invoke(eventObject);
                 }
             } else {

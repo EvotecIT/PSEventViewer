@@ -46,27 +46,48 @@ namespace EventViewerX {
         public void Start() {
             Watcher.Watch(MachineName, LogName, EventIds, OnEvent, Cancellation.Token, _staging, Environment.UserName);
             if (Timeout.HasValue) {
+                var delayMs = (int)Timeout.Value.TotalMilliseconds;
                 TimeoutTask = Task.Run(async () => {
                     try {
-                        await Task.Delay(Timeout.Value, Cancellation.Token);
-                        Stop();
-                    } catch (TaskCanceledException) { }
+                        await Task.Delay(delayMs, Cancellation.Token);
+                    } catch (TaskCanceledException) {
+                    } finally {
+                        if (EndTime == null) {
+                            Stop();
+                        }
+                    }
                 });
             }
         }
 
+        /// <summary>
+        /// Invokes the user provided callback when a matching event is detected.
+        /// </summary>
+        /// <param name="obj">Event object passed to the callback.</param>
         private void OnEvent(EventObject obj) {
+            Exception? exCaught = null;
             try {
                 Action?.Invoke(obj);
-            } catch {
-                // ignore user errors
+            } catch (Exception ex) {
+                exCaught = ex;
+                Settings._logger.WriteWarning("OnEvent callback threw: {0}", ex.Message.Trim());
             }
+
             if (StopOnMatch) {
                 Stop();
             } else if (StopAfter > 0 && Watcher.EventsFound >= StopAfter) {
                 Stop();
             }
+
+            if (exCaught != null) {
+                ActionException?.Invoke(this, exCaught);
+            }
         }
+
+        /// <summary>
+        /// Occurs when the callback passed to <see cref="StartWatcher"/> throws an exception.
+        /// </summary>
+        public event EventHandler<Exception>? ActionException;
 
         public void Stop() {
             Cancellation.Cancel();
@@ -85,12 +106,26 @@ namespace EventViewerX {
     /// </summary>
     public static class WatcherManager {
         private static readonly ConcurrentDictionary<Guid, WatcherInfo> _watchers = new();
+        private static readonly object _syncRoot = new();
 
         public static WatcherInfo StartWatcher(string? name, string machineName, string logName, List<int> eventIds, List<NamedEvents> namedEvents, Action<EventObject> action, int numberOfThreads, bool staging, bool stopOnMatch, int stopAfter, TimeSpan? timeout) {
-            var info = new WatcherInfo(name ?? string.Empty, machineName, logName, eventIds, namedEvents, action, numberOfThreads, staging, stopOnMatch, stopAfter, timeout);
-            if (_watchers.TryAdd(info.Id, info)) {
-                info.Start();
+            WatcherInfo info;
+            lock (_syncRoot) {
+                if (!string.IsNullOrEmpty(name)) {
+                    var matches = GetWatchers(name).ToList();
+                    if (matches.Count > 0) {
+                        if (matches.Count == 1) {
+                            return matches[0];
+                        }
+                        throw new InvalidOperationException($"Multiple watchers with name '{name}' already exist.");
+                    }
+                }
+
+                info = new WatcherInfo(name ?? string.Empty, machineName, logName, eventIds, namedEvents, action, numberOfThreads, staging, stopOnMatch, stopAfter, timeout);
+                _watchers.TryAdd(info.Id, info);
             }
+
+            info.Start();
             return info;
         }
 

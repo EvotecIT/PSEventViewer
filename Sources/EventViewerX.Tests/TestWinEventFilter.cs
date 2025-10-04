@@ -90,5 +90,11 @@ namespace EventViewerX.Tests {
             var result = SearchEvents.BuildWinEventFilter(endTime: end, logName: "x", xpathOnly: true);
             Assert.Contains("timediff(@SystemTime) &gt;= 0", result);
         }
+
+        [Fact]
+        public void ProviderNameEscapesSpecialCharactersWinFilter() {
+            var result = SearchEvents.BuildWinEventFilter(providerName: ["O'Reilly & Co"], logName: "x", xpathOnly: true);
+            Assert.Equal("*[System[Provider[@Name='O&apos;Reilly &amp; Co']]]", result);
+        }
     }
 }

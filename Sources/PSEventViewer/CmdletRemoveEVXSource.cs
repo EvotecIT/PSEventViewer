@@ -35,6 +35,9 @@ public sealed class CmdletRemoveEVXSource : AsyncPSCmdlet {
                 if (EventLog.SourceExists(SourceName)) {
                     if (ShouldProcess(SourceName, "Delete event source")) {
                         EventLog.DeleteEventSource(SourceName);
+                    } else {
+                        WriteObject(false);
+                        return Task.CompletedTask;
                     }
                 } else {
                     WriteWarning($"Remove-EVXSource - Source {SourceName} was not found.");
@@ -45,6 +48,9 @@ public sealed class CmdletRemoveEVXSource : AsyncPSCmdlet {
                 if (EventLog.SourceExists(SourceName, MachineName)) {
                     if (ShouldProcess($"{SourceName} on {MachineName}", "Delete event source")) {
                         EventLog.DeleteEventSource(SourceName, MachineName);
+                    } else {
+                        WriteObject(false);
+                        return Task.CompletedTask;
                     }
                 } else {
                     WriteWarning($"Remove-EVXSource - Source {SourceName} was not found on {MachineName}.");

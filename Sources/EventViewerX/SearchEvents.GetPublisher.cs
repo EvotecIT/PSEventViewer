@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Collections.Concurrent;
 using System.Diagnostics.Eventing.Reader;
+using System.Globalization;
 using System.Linq;
 
 namespace EventViewerX {
@@ -16,17 +17,25 @@ namespace EventViewerX {
         private static readonly ConcurrentDictionary<string, Metadata> _providerMetadataCache = new(StringComparer.OrdinalIgnoreCase);
 
         /// <summary>
+        /// Normalizes provider name for consistent cache keys.
+        /// </summary>
+        private static string NormalizeProviderName(string providerName) {
+            return providerName?.Trim() ?? string.Empty;
+        }
+
+        /// <summary>
         /// Retrieves available event providers on the local machine.
         /// </summary>
         /// <returns>Enumeration of provider metadata.</returns>
         public static IEnumerable<Metadata> GetProviders() {
-            EventLogSession session = new EventLogSession();
+            using EventLogSession session = new();
             foreach (string providerName in session.GetProviderNames()) {
-                if (!_providerMetadataCache.TryGetValue(providerName, out var metadata)) {
+                string normalizedName = NormalizeProviderName(providerName);
+                if (!_providerMetadataCache.TryGetValue(normalizedName, out var metadata)) {
                     try {
-                        using ProviderMetadata providerMetadata = new ProviderMetadata(providerName);
+                        using ProviderMetadata providerMetadata = new(providerName, session, CultureInfo.CurrentCulture);
                         metadata = new Metadata(providerName, providerMetadata);
-                        _providerMetadataCache[providerName] = metadata;
+                        _providerMetadataCache[normalizedName] = metadata;
                     } catch (EventLogInvalidDataException ex) {
                         _logger.WriteWarning($"Error reading data for provider {providerName}: {ex.Message}");
                     } catch (EventLogException ex) {
@@ -51,56 +60,5 @@ namespace EventViewerX {
             return GetProviders().ToList();
         }
 
-    }
-
-    /// <summary>
-    /// Lightweight provider metadata container.
-    /// </summary>
-    public class Metadata {
-        public string ProviderName;
-        public string DisplayName;
-        public List<string> LogNames;
-        public Guid Id;
-
-        public IList<EventLogLink> LogLinks { get; set; }
-        public IEnumerable<EventMetadata> Events { get; set; }
-
-        public IList<EventKeyword> Keywords { get; set; }
-
-        public IList<EventOpcode> Opcodes { get; set; }
-
-        public string MessageFilePath { get; set; }
-
-        public string ResourceFilePath { get; set; }
-
-        public string ParameterFilePath { get; set; }
-
-        public IList<EventTask> Tasks { get; set; }
-
-        public List<string> Errors = new List<string>();
-
-        public Metadata(string providerName, ProviderMetadata providerMetadata) {
-            ProviderName = providerName;
-            Id = providerMetadata.Id;
-            MessageFilePath = providerMetadata.MessageFilePath;
-            Keywords = providerMetadata.Keywords;
-
-            TrySetMetadata(() => DisplayName = providerMetadata.DisplayName, "display name", providerName);
-            TrySetMetadata(() => LogLinks = providerMetadata.LogLinks, "log links", providerName);
-            TrySetMetadata(() => LogNames = providerMetadata.LogLinks.Select(link => link.LogName).ToList(), "log names", providerName);
-            TrySetMetadata(() => ParameterFilePath = providerMetadata.ParameterFilePath, "parameter file path", providerName);
-            TrySetMetadata(() => ResourceFilePath = providerMetadata.ResourceFilePath, "resource file path", providerName);
-            TrySetMetadata(() => Opcodes = providerMetadata.Opcodes, "opcodes", providerName);
-            TrySetMetadata(() => Tasks = providerMetadata.Tasks, "tasks", providerName);
-            TrySetMetadata(() => Events = providerMetadata.Events, "events", providerName);
-        }
-
-        private void TrySetMetadata(Action setAction, string metadataType, string providerName) {
-            try {
-                setAction();
-            } catch (Exception ex) {
-                Errors.Add($"Error reading {metadataType} for provider {providerName}. Details: {ex.Message}");
-            }
-        }
     }
 }

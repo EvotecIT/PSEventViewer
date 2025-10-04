@@ -5,9 +5,9 @@
 /// </summary>
 public class GroupPolicy {
     /// <summary>Name of the Group Policy Object.</summary>
-    public string GpoName { get; set; }
+    public string GpoName { get; set; } = string.Empty;
     /// <summary>Identifier of the Group Policy Object.</summary>
-    public string GpoId { get; set; }
+    public string GpoId { get; set; } = string.Empty;
     /// <summary>Domain hosting the Group Policy Object.</summary>
-    public string GpoDomain { get; set; }
+    public string GpoDomain { get; set; } = string.Empty;
 }

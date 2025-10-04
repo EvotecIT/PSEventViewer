@@ -12,6 +12,9 @@ namespace PSEventViewer;
 [OutputType(typeof(string))]
 public sealed class CmdletGetEVXProviderList : AsyncPSCmdlet
 {
+    /// <summary>
+    /// Retrieves available event log providers from the local system.
+    /// </summary>
     protected override Task ProcessRecordAsync()
     {
         using EventLogSession session = new();

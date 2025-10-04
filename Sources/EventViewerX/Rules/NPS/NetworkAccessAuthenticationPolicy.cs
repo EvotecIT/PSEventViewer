@@ -65,9 +65,9 @@ public class NetworkAccessAuthenticationPolicy : EventRuleBase {
     public string NASIdentifier;
 
     /// <summary>
-    /// Type of the NAS port.
+    /// Type of the network access server port.
     /// </summary>
-    public string NASPortType;
+    public NasPortType? NASPortType;
 
     /// <summary>
     /// NAS port number.
@@ -107,7 +107,11 @@ public class NetworkAccessAuthenticationPolicy : EventRuleBase {
     /// <summary>
     /// Authentication type selected.
     /// </summary>
-    public string AuthenticationType;
+    public AuthenticationType AuthenticationType;
+
+    internal static AuthenticationType ParseAuthenticationType(string value) {
+        return Enum.TryParse<AuthenticationType>(value, true, out var parsed) ? parsed : AuthenticationType.Unknown;
+    }
 
     /// <summary>
     /// EAP type value if applicable.
@@ -152,12 +156,14 @@ public class NetworkAccessAuthenticationPolicy : EventRuleBase {
 
         NASIdentifier = _eventObject.GetValueFromDataDictionary("NASIdentifier");
         NASPort = _eventObject.GetValueFromDataDictionary("NASPort");
-        NASPortType = _eventObject.GetValueFromDataDictionary("NASPortType");
+        NASPortType = EventsHelper.GetNasPortType(
+            _eventObject.GetValueFromDataDictionary("NASPortType"));
 
 
         AuthenticationProvider = _eventObject.GetValueFromDataDictionary("AuthenticationProvider");
         AuthenticationServer = _eventObject.GetValueFromDataDictionary("AuthenticationServer");
-        AuthenticationType = _eventObject.GetValueFromDataDictionary("AuthenticationType");
+        var authType = _eventObject.GetValueFromDataDictionary("AuthenticationType");
+        AuthenticationType = ParseAuthenticationType(authType);
 
         EAPType = _eventObject.GetValueFromDataDictionary("EAPType");
 

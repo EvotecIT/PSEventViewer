@@ -131,11 +131,11 @@ public class EventLogDetails {
     /// <param name="precision">Number of decimal places.</param>
     /// <returns>Converted value.</returns>
     private static double ConvertSize(double? value, string fromUnit, string toUnit, int precision) {
-        if (!value.HasValue) {
+        if (!value.HasValue || value.Value <= 0) {
             return 0;
         }
 
-        double size = (double)value.Value;
+        double size = value.Value;
 
         switch (fromUnit.ToUpper()) {
             case "B":
