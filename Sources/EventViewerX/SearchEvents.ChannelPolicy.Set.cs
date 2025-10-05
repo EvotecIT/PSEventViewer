@@ -72,6 +72,7 @@ public partial class SearchEvents : Settings {
                         result.Errors.Add($"SaveChanges failed: {ex.Message}");
                     }
                 }
+                // Success implies: no errors, and no attempt to set Isolation (considered unsupported here)
                 result.Success = result.Errors.Count == 0 && (policy.Isolation == null);
                 result.PartialSuccess = result.Errors.Count > 0 || result.SkippedOrUnsupported.Count > 0 || (changed && !result.Success);
                 return result;

@@ -93,8 +93,14 @@ public partial class SearchEvents : Settings {
 
             if (parallel) {
                 int dop = Math.Max(1, degreeOfParallelism ?? Environment.ProcessorCount);
-                foreach (var pol in filtered.AsParallel().WithDegreeOfParallelism(dop).Select(n => GetChannelPolicy(n, machineName)).Where(p => p != null)!) {
-                    yield return pol!;
+                var query = filtered
+                    .AsParallel()
+                    .WithDegreeOfParallelism(dop)
+                    .Select(n => GetChannelPolicy(n, machineName))
+                    .Where(p => p != null)
+                    .Cast<ChannelPolicy>();
+                foreach (var pol in query) {
+                    yield return pol;
                 }
             } else {
                 foreach (var name in filtered) {
