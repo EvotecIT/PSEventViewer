@@ -64,7 +64,7 @@ public partial class SearchEvents : Settings {
                           ?? subKey.GetValue("SubscriptionXml") as string
                           ?? subKey.GetValue("Configuration") as string
                           ?? subKey.GetValue("Config") as string;
-                if (!string.IsNullOrWhiteSpace(xml) && xml!.Contains("<Subscription", StringComparison.OrdinalIgnoreCase)) {
+                if (!string.IsNullOrWhiteSpace(xml) && xml!.IndexOf("<Subscription", StringComparison.OrdinalIgnoreCase) >= 0) {
                     info.RawXml = xml;
 
                     try {

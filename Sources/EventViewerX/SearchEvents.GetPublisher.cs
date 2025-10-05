@@ -28,10 +28,9 @@ namespace EventViewerX {
         /// </summary>
         /// <returns>Enumeration of provider metadata.</returns>
         public static IEnumerable<Metadata> GetProviders() {
-            EventLogSession? session = null;
             List<string> providerNames = new();
             try {
-                session = new EventLogSession();
+                using EventLogSession session = new();
                 providerNames = session.GetProviderNames()?.ToList() ?? new List<string>();
             } catch (Exception ex) {
                 _logger.WriteWarning($"Failed to enumerate provider names: {ex.Message}");
@@ -48,9 +47,7 @@ namespace EventViewerX {
                 string normalizedName = NormalizeProviderName(providerName);
                 if (!_providerMetadataCache.TryGetValue(normalizedName, out var metadata)) {
                     try {
-                        using ProviderMetadata providerMetadata = session != null
-                            ? new ProviderMetadata(providerName, session, CultureInfo.CurrentCulture)
-                            : new ProviderMetadata(providerName);
+                        using ProviderMetadata providerMetadata = new(providerName);
                         metadata = new Metadata(providerName, providerMetadata);
                         _providerMetadataCache[normalizedName] = metadata;
                     } catch (EventLogInvalidDataException ex) {
@@ -80,8 +77,6 @@ namespace EventViewerX {
                     yield return metadata;
                 }
             }
-
-            session?.Dispose();
         }
 
         /// <summary>
