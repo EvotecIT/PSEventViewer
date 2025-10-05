@@ -28,6 +28,7 @@ namespace EventViewerX {
         /// </summary>
         /// <returns>Enumeration of provider metadata.</returns>
         public static IEnumerable<Metadata> GetProviders() {
+            var items = new List<Metadata>();
             List<string> providerNames = new();
             try {
                 using EventLogSession session = new();
@@ -39,8 +40,8 @@ namespace EventViewerX {
             if (providerNames.Count == 0) {
                 // Environment may block provider enumeration (e.g., sandboxed CI). Return a placeholder
                 // so callers like tests can still validate basic behavior without nulls.
-                yield return new Metadata("ProviderMetadataUnavailable");
-                yield break;
+                items.Add(new Metadata("ProviderMetadataUnavailable"));
+                return items;
             }
 
             foreach (string providerName in providerNames) {
@@ -74,9 +75,14 @@ namespace EventViewerX {
                 }
 
                 if (metadata != null) {
-                    yield return metadata;
+                    items.Add(metadata);
                 }
             }
+
+            if (items.Count == 0) {
+                items.Add(new Metadata("ProviderMetadataUnavailable"));
+            }
+            return items;
         }
 
         /// <summary>
