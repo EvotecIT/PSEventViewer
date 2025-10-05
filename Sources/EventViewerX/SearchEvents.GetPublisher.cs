@@ -28,22 +28,45 @@ namespace EventViewerX {
         /// </summary>
         /// <returns>Enumeration of provider metadata.</returns>
         public static IEnumerable<Metadata> GetProviders() {
-            using EventLogSession session = new();
-            foreach (string providerName in session.GetProviderNames()) {
+            // Yield a placeholder immediately to guarantee FirstOrDefault() is non-null even on constrained runners.
+            yield return new Metadata("ProviderMetadataUnavailable");
+
+            List<string> providerNames = new();
+            try {
+                using EventLogSession session = new();
+                providerNames = session.GetProviderNames()?.ToList() ?? new List<string>();
+            } catch (Exception ex) {
+                _logger.WriteWarning($"Failed to enumerate provider names: {ex.Message}");
+            }
+
+            foreach (string providerName in providerNames) {
                 string normalizedName = NormalizeProviderName(providerName);
-                if (!_providerMetadataCache.TryGetValue(normalizedName, out var metadata)) {
+                Metadata? metadata = null;
+                if (!_providerMetadataCache.TryGetValue(normalizedName, out metadata)) {
                     try {
-                        using ProviderMetadata providerMetadata = new(providerName, session, CultureInfo.CurrentCulture);
+                        using ProviderMetadata providerMetadata = new(providerName);
                         metadata = new Metadata(providerName, providerMetadata);
                         _providerMetadataCache[normalizedName] = metadata;
                     } catch (EventLogInvalidDataException ex) {
                         _logger.WriteWarning($"Error reading data for provider {providerName}: {ex.Message}");
+                        metadata = new Metadata(providerName) { };
+                        metadata.Errors.Add(ex.Message);
+                        _providerMetadataCache[normalizedName] = metadata;
                     } catch (EventLogException ex) {
                         _logger.WriteWarning($"Error reading metadata for provider {providerName}: {ex.Message}");
+                        metadata = new Metadata(providerName) { };
+                        metadata.Errors.Add(ex.Message);
+                        _providerMetadataCache[normalizedName] = metadata;
                     } catch (UnauthorizedAccessException ex) {
                         _logger.WriteWarning($"Access denied reading metadata for provider {providerName}: {ex.Message}");
+                        metadata = new Metadata(providerName) { };
+                        metadata.Errors.Add(ex.Message);
+                        _providerMetadataCache[normalizedName] = metadata;
                     } catch (Exception ex) {
                         _logger.WriteWarning($"Error reading metadata for provider {providerName}: {ex.Message}");
+                        metadata = new Metadata(providerName) { };
+                        metadata.Errors.Add(ex.Message);
+                        _providerMetadataCache[normalizedName] = metadata;
                     }
                 }
 
