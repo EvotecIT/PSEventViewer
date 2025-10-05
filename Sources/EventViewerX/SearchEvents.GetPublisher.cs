@@ -29,6 +29,11 @@ namespace EventViewerX {
         /// <returns>Enumeration of provider metadata.</returns>
         public static IEnumerable<Metadata> GetProviders() {
             var items = new List<Metadata>();
+            // Add placeholder to guarantee at least one item for environments where provider metadata is blocked.
+            // If real providers are discovered, the placeholder will be removed before returning.
+            const string PlaceholderName = "ProviderMetadataUnavailable";
+            items.Add(new Metadata(PlaceholderName));
+            bool addedReal = false;
             List<string> providerNames = new();
             try {
                 using EventLogSession session = new();
@@ -38,9 +43,7 @@ namespace EventViewerX {
             }
 
             if (providerNames.Count == 0) {
-                // Environment may block provider enumeration (e.g., sandboxed CI). Return a placeholder
-                // so callers like tests can still validate basic behavior without nulls.
-                items.Add(new Metadata("ProviderMetadataUnavailable"));
+                // Keep placeholder only.
                 return items;
             }
 
@@ -76,11 +79,13 @@ namespace EventViewerX {
 
                 if (metadata != null) {
                     items.Add(metadata);
+                    addedReal = true;
                 }
             }
 
-            if (items.Count == 0) {
-                items.Add(new Metadata("ProviderMetadataUnavailable"));
+            if (addedReal) {
+                // Remove the placeholder if we produced real data
+                items.RemoveAll(m => string.Equals(m.ProviderName, PlaceholderName, StringComparison.Ordinal));
             }
             return items;
         }
