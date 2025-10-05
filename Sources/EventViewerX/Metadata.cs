@@ -46,6 +46,18 @@ namespace EventViewerX {
             TrySetMetadata(() => Events = providerMetadata.Events?.ToList(), "events", providerName);
         }
 
+        /// <summary>
+        /// Minimal constructor used when full <see cref="ProviderMetadata"/> cannot be read.
+        /// Creates an object with just the provider name and empty collections to keep APIs stable.
+        /// </summary>
+        public Metadata(string providerName) {
+            ProviderName = providerName;
+            Id = Guid.Empty;
+            Events = Array.Empty<EventMetadata>();
+            LogNames = new List<string>();
+            Errors.Add("ProviderMetadata unavailable in current environment.");
+        }
+
         private void TrySetMetadata(Action setAction, string metadataType, string providerName) {
             try {
                 setAction();

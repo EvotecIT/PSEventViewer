@@ -7,6 +7,7 @@ namespace EventViewerX;
 /// WEC subscriptions (readers).
 /// </summary>
 public partial class SearchEvents : Settings {
+    // Windows Event Collector (WEC) subscriptions registry path
     private const string SubscriptionsKey = @"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\EventCollector\\Subscriptions";
 
     /// <summary>
@@ -14,14 +15,13 @@ public partial class SearchEvents : Settings {
     /// </summary>
     /// <param name="machineName">Remote computer or null for local.</param>
     public static IEnumerable<SubscriptionInfo> GetCollectorSubscriptions(string? machineName = null) {
-        foreach (var sub in GetCollectorSubscriptionsInternal(machineName, RegistryView.Registry64)) {
-            yield return sub;
-        }
+        // First try 64-bit view (typical). If anything found, short-circuit for efficiency.
+        var first = GetCollectorSubscriptionsInternal(machineName, RegistryView.Registry64).ToList();
+        foreach (var sub in first) yield return sub;
+        if (first.Count > 0) yield break;
 
-        // On some systems the data may live under 32-bit view (rare); try as best-effort
-        foreach (var sub in GetCollectorSubscriptionsInternal(machineName, RegistryView.Registry32)) {
-            yield return sub;
-        }
+        // Fallback to 32-bit view if 64-bit view had no data.
+        foreach (var sub in GetCollectorSubscriptionsInternal(machineName, RegistryView.Registry32)) yield return sub;
     }
 
     private static IEnumerable<SubscriptionInfo> GetCollectorSubscriptionsInternal(string? machineName, RegistryView view) {
@@ -33,7 +33,10 @@ public partial class SearchEvents : Settings {
                 ? RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, view)
                 : RegistryKey.OpenRemoteBaseKey(RegistryHive.LocalMachine, machineName!, view);
             subsKey = hklm.OpenSubKey(SubscriptionsKey, writable: false);
-            if (subsKey == null) return results;
+            if (subsKey == null) {
+                _logger.WriteVerbose($"WEC subscriptions key not found or inaccessible on '{machineName ?? GetFQDN()}' (view={view}).");
+                return results;
+            }
 
             foreach (var name in subsKey.GetSubKeyNames()) {
                 using var subKey = subsKey.OpenSubKey(name, false);
@@ -83,6 +86,12 @@ public partial class SearchEvents : Settings {
 
                 results.Add(info);
             }
+        } catch (UnauthorizedAccessException ex) {
+            _logger.WriteWarning($"Access denied when enumerating WEC subscriptions on '{machineName ?? GetFQDN()}' (view={view}). Ensure Remote Registry permissions and firewall allow access. Details: {ex.Message}");
+        } catch (System.Security.SecurityException ex) {
+            _logger.WriteWarning($"Security exception when accessing registry for WEC subscriptions on '{machineName ?? GetFQDN()}' (view={view}). Details: {ex.Message}");
+        } catch (System.IO.IOException ex) {
+            _logger.WriteWarning($"I/O error when accessing registry for WEC subscriptions on '{machineName ?? GetFQDN()}' (view={view}). Possibly Remote Registry service disabled or network issue. Details: {ex.Message}");
         } catch (Exception ex) {
             _logger.WriteWarning($"Failed to enumerate WEC subscriptions on '{machineName ?? GetFQDN()}' (view={view}): {ex.Message}");
         } finally {

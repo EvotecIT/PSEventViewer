@@ -1,4 +1,6 @@
 using Microsoft.Win32;
+using System.Xml;
+using System.Xml.Linq;
 
 namespace EventViewerX;
 
@@ -10,12 +12,18 @@ public partial class SearchEvents : Settings {
     /// Enables or disables a subscription by flipping the 'Enabled' value.
     /// </summary>
     public static bool SetCollectorSubscriptionEnabled(string name, bool enabled, string? machineName = null) {
-        return WithSubscriptionKey(name, machineName, writable: true, (key, _) => {
+        return WithSubscriptionKey(name, machineName, writable: true, (key, host) => {
             try {
                 key.SetValue("Enabled", enabled ? 1 : 0, RegistryValueKind.DWord);
                 return true;
+            } catch (UnauthorizedAccessException ex) {
+                _logger.WriteWarning($"Access denied setting 'Enabled' for subscription '{name}' on '{host}'. Ensure permissions to HKLM are granted. Details: {ex.Message}");
+                return false;
+            } catch (System.Security.SecurityException ex) {
+                _logger.WriteWarning($"Security exception setting 'Enabled' for subscription '{name}' on '{host}': {ex.Message}");
+                return false;
             } catch (Exception ex) {
-                _logger.WriteWarning($"Failed to set Enabled for subscription '{name}' on '{_}': {ex.Message}");
+                _logger.WriteWarning($"Failed to set Enabled for subscription '{name}' on '{host}': {ex.Message}");
                 return false;
             }
         });
@@ -25,16 +33,38 @@ public partial class SearchEvents : Settings {
     /// Replaces the subscription XML payload. The caller should ensure XML correctness.
     /// </summary>
     public static bool SetCollectorSubscriptionXml(string name, string xml, string? machineName = null) {
-        if (string.IsNullOrWhiteSpace(xml) || xml.IndexOf("<Subscription", StringComparison.OrdinalIgnoreCase) < 0) {
-            throw new ArgumentException("Provided XML does not look like a WEC Subscription.", nameof(xml));
+        if (string.IsNullOrWhiteSpace(xml)) {
+            throw new ArgumentException("XML cannot be null or empty.", nameof(xml));
         }
-        return WithSubscriptionKey(name, machineName, writable: true, (key, _) => {
+
+        // Basic XML validation with DTD prohibited to limit XML injection/XXE risk
+        try {
+            var settings = new XmlReaderSettings {
+                DtdProcessing = DtdProcessing.Prohibit,
+                XmlResolver = null
+            };
+            using var reader = XmlReader.Create(new System.IO.StringReader(xml), settings);
+            var xdoc = XDocument.Load(reader, LoadOptions.None);
+            var root = xdoc.Root;
+            if (root == null || !root.Name.LocalName.Equals("Subscription", StringComparison.OrdinalIgnoreCase)) {
+                throw new ArgumentException("Root element must be <Subscription>.", nameof(xml));
+            }
+        } catch (XmlException xex) {
+            throw new ArgumentException($"Invalid XML content: {xex.Message}", nameof(xml));
+        }
+
+        return WithSubscriptionKey(name, machineName, writable: true, (key, host) => {
             try {
-                // Use a common value name (Subscription); if not present, create it.
                 key.SetValue("Subscription", xml, RegistryValueKind.String);
                 return true;
+            } catch (UnauthorizedAccessException ex) {
+                _logger.WriteWarning($"Access denied writing XML for subscription '{name}' on '{host}'. Ensure permissions to HKLM are granted. Details: {ex.Message}");
+                return false;
+            } catch (System.Security.SecurityException ex) {
+                _logger.WriteWarning($"Security exception writing XML for subscription '{name}' on '{host}': {ex.Message}");
+                return false;
             } catch (Exception ex) {
-                _logger.WriteWarning($"Failed to write XML for subscription '{name}' on '{_}': {ex.Message}");
+                _logger.WriteWarning($"Failed to write XML for subscription '{name}' on '{host}': {ex.Message}");
                 return false;
             }
         });
@@ -53,6 +83,12 @@ public partial class SearchEvents : Settings {
                 subKey = subsKey.OpenSubKey(name, writable) ?? (writable ? subsKey.CreateSubKey(name) : null);
                 if (subKey == null) continue;
                 return action(subKey, machineName ?? GetFQDN());
+            } catch (UnauthorizedAccessException ex) {
+                _logger.WriteWarning($"Access denied accessing subscription '{name}' on '{machineName ?? GetFQDN()}' (view={view}). Details: {ex.Message}");
+            } catch (System.Security.SecurityException ex) {
+                _logger.WriteWarning($"Security exception accessing subscription '{name}' on '{machineName ?? GetFQDN()}' (view={view}). Details: {ex.Message}");
+            } catch (System.IO.IOException ex) {
+                _logger.WriteWarning($"I/O error accessing subscription '{name}' on '{machineName ?? GetFQDN()}' (view={view}). Possibly Remote Registry service disabled or network issue. Details: {ex.Message}");
             } catch (Exception ex) {
                 _logger.WriteWarning($"Failed to access subscription '{name}' on '{machineName ?? GetFQDN()}' (view={view}): {ex.Message}");
             } finally {

@@ -38,12 +38,24 @@ namespace EventViewerX {
                         _providerMetadataCache[normalizedName] = metadata;
                     } catch (EventLogInvalidDataException ex) {
                         _logger.WriteWarning($"Error reading data for provider {providerName}: {ex.Message}");
+                        metadata = new Metadata(providerName) { };
+                        metadata.Errors.Add(ex.Message);
+                        _providerMetadataCache[normalizedName] = metadata;
                     } catch (EventLogException ex) {
                         _logger.WriteWarning($"Error reading metadata for provider {providerName}: {ex.Message}");
+                        metadata = new Metadata(providerName) { };
+                        metadata.Errors.Add(ex.Message);
+                        _providerMetadataCache[normalizedName] = metadata;
                     } catch (UnauthorizedAccessException ex) {
                         _logger.WriteWarning($"Access denied reading metadata for provider {providerName}: {ex.Message}");
+                        metadata = new Metadata(providerName) { };
+                        metadata.Errors.Add(ex.Message);
+                        _providerMetadataCache[normalizedName] = metadata;
                     } catch (Exception ex) {
                         _logger.WriteWarning($"Error reading metadata for provider {providerName}: {ex.Message}");
+                        metadata = new Metadata(providerName) { };
+                        metadata.Errors.Add(ex.Message);
+                        _providerMetadataCache[normalizedName] = metadata;
                     }
                 }
 
