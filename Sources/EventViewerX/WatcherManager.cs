@@ -106,23 +106,42 @@ namespace EventViewerX {
     /// </summary>
     public static class WatcherManager {
         private static readonly ConcurrentDictionary<Guid, WatcherInfo> _watchers = new();
+        private static readonly ConcurrentDictionary<string, WatcherInfo> _watchersByName = new(StringComparer.OrdinalIgnoreCase);
         private static readonly object _syncRoot = new();
 
         public static WatcherInfo StartWatcher(string? name, string machineName, string logName, List<int> eventIds, List<NamedEvents> namedEvents, Action<EventObject> action, int numberOfThreads, bool staging, bool stopOnMatch, int stopAfter, TimeSpan? timeout) {
             WatcherInfo info;
             lock (_syncRoot) {
                 if (!string.IsNullOrEmpty(name)) {
-                    var matches = GetWatchers(name).ToList();
-                    if (matches.Count > 0) {
-                        if (matches.Count == 1) {
-                            return matches[0];
+                    // Fast path: direct name lookup; drop stale (ended) instances
+                    if (_watchersByName.TryGetValue(name!, out var existing)) {
+                        if (existing != null && existing.EndTime == null) {
+                            return existing;
                         }
+                        // Stale entry: remove and fall through to create a fresh one
+                        _watchersByName.TryRemove(name!, out _);
+                        var stale = _watchers.Values.Where(w => string.Equals(w.Name, name, StringComparison.OrdinalIgnoreCase)).ToList();
+                        foreach (var s in stale) {
+                            _watchers.TryRemove(s.Id, out _);
+                        }
+                    }
+
+                    // Defensive: verify dictionary consistency and duplicate detection
+                    var matches = _watchers.Values.Where(w => string.Equals(w.Name, name, StringComparison.OrdinalIgnoreCase) && w.EndTime == null).ToList();
+                    if (matches.Count == 1) {
+                        _watchersByName[name!] = matches[0];
+                        return matches[0];
+                    }
+                    if (matches.Count > 1) {
                         throw new InvalidOperationException($"Multiple watchers with name '{name}' already exist.");
                     }
                 }
 
                 info = new WatcherInfo(name ?? string.Empty, machineName, logName, eventIds, namedEvents, action, numberOfThreads, staging, stopOnMatch, stopAfter, timeout);
                 _watchers.TryAdd(info.Id, info);
+                if (!string.IsNullOrEmpty(name)) {
+                    _watchersByName[name!] = info;
+                }
             }
 
             info.Start();
@@ -139,6 +158,13 @@ namespace EventViewerX {
         public static bool StopWatcher(Guid id) {
             if (_watchers.TryRemove(id, out var info)) {
                 info.Dispose();
+                // Remove name mapping if it points to this instance or if no watcher with that name exists
+                if (!string.IsNullOrEmpty(info.Name)) {
+                    _watchersByName.TryGetValue(info.Name, out var mapped);
+                    if (mapped == null || ReferenceEquals(mapped, info)) {
+                        _watchersByName.TryRemove(info.Name, out _);
+                    }
+                }
                 return true;
             }
             return false;
@@ -148,12 +174,14 @@ namespace EventViewerX {
             foreach (var w in GetWatchers(name)) {
                 StopWatcher(w.Id);
             }
+            _watchersByName.TryRemove(name, out _);
         }
 
         public static void StopAll() {
             foreach (var id in _watchers.Keys.ToList()) {
                 StopWatcher(id);
             }
+            _watchersByName.Clear();
         }
     }
 }

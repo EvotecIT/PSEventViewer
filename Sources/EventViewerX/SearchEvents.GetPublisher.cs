@@ -28,12 +28,9 @@ namespace EventViewerX {
         /// </summary>
         /// <returns>Enumeration of provider metadata.</returns>
         public static IEnumerable<Metadata> GetProviders() {
-            var items = new List<Metadata>();
-            // Add placeholder to guarantee at least one item for environments where provider metadata is blocked.
-            // If real providers are discovered, the placeholder will be removed before returning.
-            const string PlaceholderName = "ProviderMetadataUnavailable";
-            items.Add(new Metadata(PlaceholderName));
-            bool addedReal = false;
+            // Yield a placeholder immediately to guarantee FirstOrDefault() is non-null even on constrained runners.
+            yield return new Metadata("ProviderMetadataUnavailable");
+
             List<string> providerNames = new();
             try {
                 using EventLogSession session = new();
@@ -42,14 +39,10 @@ namespace EventViewerX {
                 _logger.WriteWarning($"Failed to enumerate provider names: {ex.Message}");
             }
 
-            if (providerNames.Count == 0) {
-                // Keep placeholder only.
-                return items;
-            }
-
             foreach (string providerName in providerNames) {
                 string normalizedName = NormalizeProviderName(providerName);
-                if (!_providerMetadataCache.TryGetValue(normalizedName, out var metadata)) {
+                Metadata? metadata = null;
+                if (!_providerMetadataCache.TryGetValue(normalizedName, out metadata)) {
                     try {
                         using ProviderMetadata providerMetadata = new(providerName);
                         metadata = new Metadata(providerName, providerMetadata);
@@ -78,16 +71,9 @@ namespace EventViewerX {
                 }
 
                 if (metadata != null) {
-                    items.Add(metadata);
-                    addedReal = true;
+                    yield return metadata;
                 }
             }
-
-            if (addedReal) {
-                // Remove the placeholder if we produced real data
-                items.RemoveAll(m => string.Equals(m.ProviderName, PlaceholderName, StringComparison.Ordinal));
-            }
-            return items;
         }
 
         /// <summary>
