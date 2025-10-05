@@ -17,7 +17,7 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="DnsClientX" Version="1.0.2" />
+        <PackageReference Include="DnsClientX" Version="1.0.4" />
     </ItemGroup>
     <ItemGroup>
         <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
