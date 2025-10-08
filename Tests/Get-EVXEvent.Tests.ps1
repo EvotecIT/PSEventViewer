@@ -11,6 +11,10 @@ Describe 'Get-EVXEvent - Basic Test' {
     $Date1 = $script:DateTo
 
     BeforeAll {
+        if (-not $script:TestLogName) { $script:TestLogName = 'Application' }
+        if (-not $script:TestEventId) { $script:TestEventId = 5617 }
+        if (-not $Date) { $script:DateFrom = (Get-Date).AddDays(-60); $Date = $script:DateFrom }
+        if (-not $Date1) { $script:DateTo = Get-Date; $Date1 = $script:DateTo }
         # Ensure at least two matching events exist
         try {
             $existing = Get-EVXEvent -LogName $script:TestLogName -Id $script:TestEventId -DateFrom $script:DateFrom -DateTo $script:DateTo -MaxEvents 2 -AsArray -ParallelOption Disabled -ErrorAction SilentlyContinue
@@ -25,7 +29,7 @@ Describe 'Get-EVXEvent - Basic Test' {
     }
 
     $PSDefaultParameterValues = @{
-        "It:TestCases" = @{ Date = $Date; Date1 = $Date1; Events = $Events }
+        'It:TestCases' = @{ Date = $Date; Date1 = $Date1; Events = $script:Events }
     }
 
     It 'Should have GatheredLogName, GatheredFrom fields properly filled in' {
@@ -53,6 +57,10 @@ Describe 'Get-EVXEvent - MaxEvents Test' {
     $Date1 = $script:DateTo
 
     BeforeAll {
+        if (-not $script:TestLogName) { $script:TestLogName = 'Application' }
+        if (-not $script:TestEventId) { $script:TestEventId = 5617 }
+        if (-not $Date) { $script:DateFrom = (Get-Date).AddDays(-60); $Date = $script:DateFrom }
+        if (-not $Date1) { $script:DateTo = Get-Date; $Date1 = $script:DateTo }
         # Ensure at least one matching event exists
         try {
             $existing = Get-EVXEvent -LogName $script:TestLogName -Id $script:TestEventId -DateFrom $script:DateFrom -DateTo $script:DateTo -MaxEvents 1 -AsArray -ParallelOption Disabled -ErrorAction SilentlyContinue
@@ -65,7 +73,7 @@ Describe 'Get-EVXEvent - MaxEvents Test' {
     }
 
     $PSDefaultParameterValues = @{
-        "It:TestCases" = @{ Date = $Date; Date1 = $Date1; Events = $Events }
+        'It:TestCases' = @{ Date = $Date; Date1 = $Date1; Events = $script:Events1 }
     }
 
     It 'Should have GatheredLogName, GatheredFrom fields properly filled in' {
@@ -94,6 +102,10 @@ Describe 'Get-EVXEvent - MaxEvents on 3 servers' {
     $Date1 = $script:DateTo
 
     BeforeAll {
+        if (-not $script:TestLogName) { $script:TestLogName = 'Application' }
+        if (-not $script:TestEventId) { $script:TestEventId = 5617 }
+        if (-not $Date) { $script:DateFrom = (Get-Date).AddDays(-60); $Date = $script:DateFrom }
+        if (-not $Date1) { $script:DateTo = Get-Date; $Date1 = $script:DateTo }
         # Ensure at least one matching event exists per machine (same machine used thrice)
         try {
             $existing = Get-EVXEvent -LogName $script:TestLogName -Id $script:TestEventId -DateFrom $script:DateFrom -DateTo $script:DateTo -MaxEvents 1 -AsArray -ParallelOption Disabled -ErrorAction SilentlyContinue
@@ -211,6 +223,10 @@ Describe 'Get-EVXEvent - Parameter validation' {
 }
 
 Describe 'Get-EVXEvent - Positional EventId' {
+    BeforeAll {
+        if (-not $script:TestLogName) { $script:TestLogName = 'Application' }
+        if (-not $script:TestEventId) { $script:TestEventId = 5617 }
+    }
     It 'Allows positional EventId without ambiguity' {
         $events = Get-EVXEvent $script:TestLogName $script:TestEventId -MaxEvents 1 -AsArray
         $events | Should -HaveCount 1
