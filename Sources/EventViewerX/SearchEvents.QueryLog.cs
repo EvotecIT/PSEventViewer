@@ -12,16 +12,11 @@ public partial class SearchEvents : Settings {
     private static bool IsLocalMachine(string? name) {
         if (string.IsNullOrEmpty(name)) return true;
         var cmp = StringComparison.OrdinalIgnoreCase;
-        try {
-            if (name.Equals("localhost", cmp) || name.Equals(".", cmp)) return true;
-        } catch { }
-        try {
-            if (name.Equals(Environment.MachineName, cmp)) return true;
-        } catch { }
-        try {
-            var fqdn = GetFQDN();
-            if (!string.IsNullOrEmpty(fqdn) && name.Equals(fqdn, cmp)) return true;
-        } catch { }
+        var n = name ?? string.Empty;
+        if (string.Equals(n, "localhost", cmp) || string.Equals(n, ".", cmp)) return true;
+        if (string.Equals(n, Environment.MachineName ?? string.Empty, cmp)) return true;
+        var fqdn = GetFQDN();
+        if (!string.IsNullOrEmpty(fqdn) && string.Equals(n, fqdn, cmp)) return true;
         return false;
     }
     /// <summary>
@@ -88,22 +83,39 @@ public partial class SearchEvents : Settings {
         _logger.WriteVerbose($"Querying log '{logName}' on '{machineName} with query: {queryString}");
 
         EventLogQuery query = new EventLogQuery(logName, PathType.LogName, queryString);
-        if (!IsLocalMachine(machineName)) {
+        if (!string.IsNullOrEmpty(machineName)) {
             query.Session = new EventLogSession(machineName);
         }
 
         string queriedMachine = string.IsNullOrEmpty(machineName) ? GetFQDN() : machineName!;
 
+        int eventCount = 0;
         EventRecord record;
         using (EventLogReader? reader = CreateEventLogReader(query, machineName)) {
             if (reader != null) {
-                int eventCount = 0;
                 while (!cancellationToken.IsCancellationRequested && (record = reader.ReadEvent()) != null) {
                     EventObject eventObject = new EventObject(record, queriedMachine);
                     yield return eventObject;
                     eventCount++;
                     if (maxEvents > 0 && eventCount >= maxEvents) {
                         break;
+                    }
+                }
+            }
+        }
+
+        // Fallback: if 0 events and querying local machine by name, try again as true local (no session)
+        if (eventCount == 0 && !string.IsNullOrEmpty(machineName) && IsLocalMachine(machineName)) {
+            var localQuery = new EventLogQuery(logName, PathType.LogName, queryString);
+            using (EventLogReader? reader2 = CreateEventLogReader(localQuery, null)) {
+                if (reader2 != null) {
+                    while (!cancellationToken.IsCancellationRequested && (record = reader2.ReadEvent()) != null) {
+                        EventObject eventObject = new EventObject(record, queriedMachine);
+                        yield return eventObject;
+                        eventCount++;
+                        if (maxEvents > 0 && eventCount >= maxEvents) {
+                            break;
+                        }
                     }
                 }
             }

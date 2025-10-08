@@ -48,16 +48,17 @@ namespace EventViewerX {
 
         private static Dictionary<string, string?> GetAllData(EventRecord record) {
             var result = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+            if (record == null) {
+                Settings._logger.WriteWarning("Failed parsing event data. Error: record is null.");
+                return result;
+            }
             try {
-                if (record == null) {
-                    throw new ArgumentNullException(nameof(record));
-                }
                 var element = XElement.Parse(record.ToXml());
                 return GetAllData(element);
             } catch (Exception ex) {
                 Settings._logger.WriteWarning($"Failed parsing event data. Error: {ex.Message}");
+                return result;
             }
-            return result;
         }
 
         private static Dictionary<string, string?> GetAllData(XElement element) {
