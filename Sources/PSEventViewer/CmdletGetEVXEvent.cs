@@ -381,9 +381,9 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
                                         continue;
                                     }
                                     if (AsArray) {
-                                        results!.Add(GetExpandedObject(eventObject));
+                                        results!.Add(eventObject);
                                     } else {
-                                        ReturnExpandedObject(eventObject);
+                                        WriteObject(eventObject);
                                     }
                                 }
                             }
@@ -395,9 +395,9 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
                                 continue;
                             }
                             if (AsArray) {
-                                results!.Add(GetExpandedObject(eventObject));
+                                results!.Add(eventObject);
                             } else {
-                                ReturnExpandedObject(eventObject);
+                                WriteObject(eventObject);
                             }
                         }
                     }

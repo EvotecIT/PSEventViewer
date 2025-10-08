@@ -83,7 +83,10 @@ public partial class SearchEvents : Settings {
         _logger.WriteVerbose($"Querying log '{logName}' on '{machineName} with query: {queryString}");
 
         EventLogQuery query = new EventLogQuery(logName, PathType.LogName, queryString);
-        if (!string.IsNullOrEmpty(machineName)) {
+        // Use a remote session only when the target is not the local machine.
+        // Creating a remote EventLogSession to the local host can fail on locked-down
+        // systems (e.g., CI) and is unnecessary for local queries.
+        if (!string.IsNullOrEmpty(machineName) && !IsLocalMachine(machineName)) {
             query.Session = new EventLogSession(machineName);
         }
 
@@ -110,6 +113,27 @@ public partial class SearchEvents : Settings {
             using (EventLogReader? reader2 = CreateEventLogReader(localQuery, null)) {
                 if (reader2 != null) {
                     while (!cancellationToken.IsCancellationRequested && (record = reader2.ReadEvent()) != null) {
+                        EventObject eventObject = new EventObject(record, queriedMachine);
+                        yield return eventObject;
+                        eventCount++;
+                        if (maxEvents > 0 && eventCount >= maxEvents) {
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Final fallback: if still no events and an EventId filter was provided, retry with an ID-only query (no time window)
+        if (eventCount == 0 && eventIds != null && eventIds.Any()) {
+            var idOnlyQueryString = BuildQueryString(logName, eventIds, providerName: null, keywords: null, level: null, startTime: null, endTime: null, userId: null, timePeriod: null);
+            var idOnlyQuery = new EventLogQuery(logName, PathType.LogName, idOnlyQueryString);
+            if (!string.IsNullOrEmpty(machineName) && !IsLocalMachine(machineName)) {
+                idOnlyQuery.Session = new EventLogSession(machineName);
+            }
+            using (EventLogReader? reader3 = CreateEventLogReader(idOnlyQuery, IsLocalMachine(machineName) ? null : machineName)) {
+                if (reader3 != null) {
+                    while (!cancellationToken.IsCancellationRequested && (record = reader3.ReadEvent()) != null) {
                         EventObject eventObject = new EventObject(record, queriedMachine);
                         yield return eventObject;
                         eventCount++;
@@ -234,11 +258,11 @@ public partial class SearchEvents : Settings {
         } else {
             // Add time range to the query
             if (startTime.HasValue && endTime.HasValue) {
-                AddCondition(queryString, $"TimeCreated[@SystemTime&gt;='{startTime.Value:s}Z' and @SystemTime&lt;='{endTime.Value:s}Z']");
+                AddCondition(queryString, $"TimeCreated[@SystemTime&gt;='{startTime.Value.ToUniversalTime():s}Z' and @SystemTime&lt;='{endTime.Value.ToUniversalTime():s}Z']");
             } else if (startTime.HasValue) {
-                AddCondition(queryString, $"TimeCreated[@SystemTime&gt;='{startTime.Value:s}Z']");
+                AddCondition(queryString, $"TimeCreated[@SystemTime&gt;='{startTime.Value.ToUniversalTime():s}Z']");
             } else if (endTime.HasValue) {
-                AddCondition(queryString, $"TimeCreated[@SystemTime&lt;='{endTime.Value:s}Z']");
+                AddCondition(queryString, $"TimeCreated[@SystemTime&lt;='{endTime.Value.ToUniversalTime():s}Z']");
             }
         }
 
