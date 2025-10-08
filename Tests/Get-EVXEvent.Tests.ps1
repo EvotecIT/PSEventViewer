@@ -1,81 +1,91 @@
-﻿BeforeAll {
+﻿BeforeDiscovery {
+    # Only set constant values during discovery to avoid invoking cmdlets
     $script:TestEventId = 5617
     $script:TestLogName = 'Application'
     $script:DateFrom = (Get-Date).AddDays(-60)
     $script:DateTo = Get-Date
-
-    # Ensure at least one matching event exists on the local machine so tests are deterministic
-    try {
-        $existing = Get-EVXEvent -LogName $script:TestLogName -Id $script:TestEventId -DateFrom $script:DateFrom -DateTo $script:DateTo -MaxEvents 1 -AsArray -ParallelOption Disabled -ErrorAction SilentlyContinue
-    } catch {
-        $existing = @()
-    }
-    $needed = 2
-    $have = if ($existing) { [int]$existing.Count } else { 0 }
-    for ($i = $have; $i -lt $needed; $i++) {
-        Write-EVXEntry -LogName $script:TestLogName -ProviderName 'PSEventViewer.Tests' -EventId $script:TestEventId -Message "PSEventViewer test event #$($i+1) (ensures deterministic tests)" -EventLogEntryType Information -Category 0 -ErrorAction SilentlyContinue | Out-Null
-        Start-Sleep -Milliseconds 500
-    }
 }
 
 Describe 'Get-EVXEvent - Basic Test' {
     $Date = $script:DateFrom
     $Date1 = $script:DateTo
 
-    $Events = Get-EVXEvent -Machine $Env:COMPUTERNAME -DateFrom $Date -DateTo $Date1 -ID $script:TestEventId -LogName $script:TestLogName # -Verbose
+    BeforeAll {
+        # Ensure at least two matching events exist
+        try {
+            $existing = Get-EVXEvent -LogName $script:TestLogName -Id $script:TestEventId -DateFrom $script:DateFrom -DateTo $script:DateTo -MaxEvents 2 -AsArray -ParallelOption Disabled -ErrorAction SilentlyContinue
+        } catch { $existing = @() }
+        $needed = 2
+        $have = if ($existing) { [int]$existing.Count } else { 0 }
+        for ($i = $have; $i -lt $needed; $i++) {
+            Write-EVXEntry -LogName $script:TestLogName -ProviderName 'PSEventViewer.Tests' -EventId $script:TestEventId -Message "PSEventViewer test event #$($i+1) (ensures deterministic tests)" -EventLogEntryType Information -Category 0 -ErrorAction SilentlyContinue | Out-Null
+            Start-Sleep -Milliseconds 250
+        }
+        $script:Events = Get-EVXEvent -Machine $Env:COMPUTERNAME -DateFrom $Date -DateTo $Date1 -ID $script:TestEventId -LogName $script:TestLogName -AsArray # -Verbose
+    }
 
     $PSDefaultParameterValues = @{
         "It:TestCases" = @{ Date = $Date; Date1 = $Date1; Events = $Events }
     }
 
     It 'Should have GatheredLogName, GatheredFrom fields properly filled in' {
-        $Events[0].GatheredFrom | Should -Be $Env:COMPUTERNAME
-        $Events[0].GatheredLogName | Should -Be $script:TestLogName
+        $script:Events[0].GatheredFrom | Should -Be $Env:COMPUTERNAME
+        $script:Events[0].GatheredLogName | Should -Be $script:TestLogName
     }
     It 'Should have more then 1 event' {
-        $Events.Count | Should -BeGreaterOrEqual 1
+        $script:Events.Count | Should -BeGreaterOrEqual 1
     }
     It 'Should return an Array' {
-        $Events -is [Array] | Should -Be $true
+        $script:Events -is [Array] | Should -Be $true
     }
     It 'Should return proper Level' {
-        $Events[0].LevelDisplayName | Should -Be 'Information'
+        $script:Events[0].LevelDisplayName | Should -Be 'Information'
     }
     It 'Should return proper LogName' {
-        $Events[0].LogName | Should -Be $script:TestLogName
+        $script:Events[0].LogName | Should -Be $script:TestLogName
     }
     It 'Should return proper ID (EventID)' {
-        $Events[0].ID | Should -Be $script:TestEventId
+        $script:Events[0].ID | Should -Be $script:TestEventId
     }
 }
 Describe 'Get-EVXEvent - MaxEvents Test' {
     $Date = $script:DateFrom
     $Date1 = $script:DateTo
 
-    $Events = Get-EVXEvent -Machine $Env:COMPUTERNAME -DateFrom $Date -DateTo $Date1 -ID $script:TestEventId -LogName $script:TestLogName -MaxEvents 1 -AsArray
+    BeforeAll {
+        # Ensure at least one matching event exists
+        try {
+            $existing = Get-EVXEvent -LogName $script:TestLogName -Id $script:TestEventId -DateFrom $script:DateFrom -DateTo $script:DateTo -MaxEvents 1 -AsArray -ParallelOption Disabled -ErrorAction SilentlyContinue
+        } catch { $existing = @() }
+        if (-not $existing -or $existing.Count -lt 1) {
+            Write-EVXEntry -LogName $script:TestLogName -ProviderName 'PSEventViewer.Tests' -EventId $script:TestEventId -Message "PSEventViewer test event (ensures deterministic tests)" -EventLogEntryType Information -Category 0 -ErrorAction SilentlyContinue | Out-Null
+            Start-Sleep -Milliseconds 250
+        }
+        $script:Events1 = Get-EVXEvent -Machine $Env:COMPUTERNAME -DateFrom $Date -DateTo $Date1 -ID $script:TestEventId -LogName $script:TestLogName -MaxEvents 1 -AsArray
+    }
 
     $PSDefaultParameterValues = @{
         "It:TestCases" = @{ Date = $Date; Date1 = $Date1; Events = $Events }
     }
 
     It 'Should have GatheredLogName, GatheredFrom fields properly filled in' {
-        $Events[0].GatheredFrom | Should -Be $Env:COMPUTERNAME
-        $Events[0].GatheredLogName | Should -Be $script:TestLogName
+        $script:Events1[0].GatheredFrom | Should -Be $Env:COMPUTERNAME
+        $script:Events1[0].GatheredLogName | Should -Be $script:TestLogName
     }
     It 'Should have exactly 1 event' {
-        $Events.Count | Should -BeExactly 1
+        $script:Events1.Count | Should -BeExactly 1
     }
     It 'Should return an Array' {
-        $Events -is [Array] | Should -Be $true
+        $script:Events1 -is [Array] | Should -Be $true
     }
     It 'Should return proper Level' {
-        $Events[0].LevelDisplayName | Should -Be 'Information'
+        $script:Events1[0].LevelDisplayName | Should -Be 'Information'
     }
     It 'Should return proper LogName' {
-        $Events[0].LogName | Should -Be $script:TestLogName
+        $script:Events1[0].LogName | Should -Be $script:TestLogName
     }
     It 'Should return proper ID (EventID)' {
-        $Events[0].ID | Should -Be $script:TestEventId
+        $script:Events1[0].ID | Should -Be $script:TestEventId
     }
 }
 
@@ -83,40 +93,50 @@ Describe 'Get-EVXEvent - MaxEvents on 3 servers' {
     $Date = $script:DateFrom
     $Date1 = $script:DateTo
 
-    $Events = Get-EVXEvent -Machine $Env:COMPUTERNAME, $Env:COMPUTERNAME, $Env:COMPUTERNAME -DateFrom $Date -DateTo $Date1 -ID $script:TestEventId -LogName $script:TestLogName -MaxEvents 1 -AsArray
+    BeforeAll {
+        # Ensure at least one matching event exists per machine (same machine used thrice)
+        try {
+            $existing = Get-EVXEvent -LogName $script:TestLogName -Id $script:TestEventId -DateFrom $script:DateFrom -DateTo $script:DateTo -MaxEvents 1 -AsArray -ParallelOption Disabled -ErrorAction SilentlyContinue
+        } catch { $existing = @() }
+        if (-not $existing -or $existing.Count -lt 1) {
+            Write-EVXEntry -LogName $script:TestLogName -ProviderName 'PSEventViewer.Tests' -EventId $script:TestEventId -Message "PSEventViewer test event (ensures deterministic tests)" -EventLogEntryType Information -Category 0 -ErrorAction SilentlyContinue | Out-Null
+            Start-Sleep -Milliseconds 250
+        }
+        $script:Events3 = Get-EVXEvent -Machine $Env:COMPUTERNAME, $Env:COMPUTERNAME, $Env:COMPUTERNAME -DateFrom $Date -DateTo $Date1 -ID $script:TestEventId -LogName $script:TestLogName -MaxEvents 1 -AsArray
+    }
 
     $PSDefaultParameterValues = @{
         "It:TestCases" = @{ Date = $Date; Date1 = $Date1; Events = $Events }
     }
 
     It 'Should have GatheredLogName, GatheredFrom fields properly filled in' {
-        $Events[0].GatheredFrom | Should -Be $Env:COMPUTERNAME
-        $Events[0].GatheredLogName | Should -Be $script:TestLogName
-        $Events[1].GatheredFrom | Should -Be $Env:COMPUTERNAME
-        $Events[1].GatheredLogName | Should -Be $script:TestLogName
-        $Events[2].GatheredFrom | Should -Be $Env:COMPUTERNAME
-        $Events[2].GatheredLogName | Should -Be $script:TestLogName
+        $script:Events3[0].GatheredFrom | Should -Be $Env:COMPUTERNAME
+        $script:Events3[0].GatheredLogName | Should -Be $script:TestLogName
+        $script:Events3[1].GatheredFrom | Should -Be $Env:COMPUTERNAME
+        $script:Events3[1].GatheredLogName | Should -Be $script:TestLogName
+        $script:Events3[2].GatheredFrom | Should -Be $Env:COMPUTERNAME
+        $script:Events3[2].GatheredLogName | Should -Be $script:TestLogName
     }
     It 'Should have exactly 1 event' {
-        $Events.Count | Should -BeExactly 3
+        $script:Events3.Count | Should -BeExactly 3
     }
     It 'Should return an Array' {
-        $Events -is [Array] | Should -Be $true
+        $script:Events3 -is [Array] | Should -Be $true
     }
     It 'Should return proper Level' {
-        $Events[0].LevelDisplayName | Should -Be 'Information'
-        $Events[1].LevelDisplayName | Should -Be 'Information'
-        $Events[2].LevelDisplayName | Should -Be 'Information'
+        $script:Events3[0].LevelDisplayName | Should -Be 'Information'
+        $script:Events3[1].LevelDisplayName | Should -Be 'Information'
+        $script:Events3[2].LevelDisplayName | Should -Be 'Information'
     }
     It 'Should return proper LogName' {
-        $Events[0].LogName | Should -Be $script:TestLogName
-        $Events[1].LogName | Should -Be $script:TestLogName
-        $Events[2].LogName | Should -Be $script:TestLogName
+        $script:Events3[0].LogName | Should -Be $script:TestLogName
+        $script:Events3[1].LogName | Should -Be $script:TestLogName
+        $script:Events3[2].LogName | Should -Be $script:TestLogName
     }
     It 'Should return proper ID (EventID)' {
-        $Events[0].ID | Should -Be $script:TestEventId
-        $Events[1].ID | Should -Be $script:TestEventId
-        $Events[2].ID | Should -Be $script:TestEventId
+        $script:Events3[0].ID | Should -Be $script:TestEventId
+        $script:Events3[1].ID | Should -Be $script:TestEventId
+        $script:Events3[2].ID | Should -Be $script:TestEventId
     }
 }
 
