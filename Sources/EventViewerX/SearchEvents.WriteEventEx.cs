@@ -21,7 +21,7 @@ namespace EventViewerX {
         [DllImport("advapi32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
         private static extern uint EventRegister(
             ref Guid ProviderId,
-            EtwEnableCallback EnableCallback,
+            EtwEnableCallback? EnableCallback,
             IntPtr CallbackContext,
             out IntPtr RegHandle);
 

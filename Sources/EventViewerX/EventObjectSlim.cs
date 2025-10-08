@@ -40,7 +40,7 @@ public class EventObjectSlim {
     /// <summary>
     /// Name of the rule type handling the event.
     /// </summary>
-    public string Type;
+    public string Type = string.Empty;
 
     private static readonly Dictionary<NamedEvents, Type> _eventRuleTypes = new();
     private static readonly Dictionary<(int EventId, string LogName), List<Type>> _eventHandlers = new();
@@ -146,14 +146,14 @@ public class EventObjectSlim {
     /// <summary>
     /// Gets the event rule type for a named event
     /// </summary>
-    public static Type GetEventRuleType(NamedEvents namedEvent) {
+    public static Type? GetEventRuleType(NamedEvents namedEvent) {
         return _eventRuleTypes.TryGetValue(namedEvent, out var type) ? type : null;
     }
 
     /// <summary>
     /// Creates an event rule instance from an EventObject
     /// </summary>
-    public static EventObjectSlim CreateEventRule(EventObject eventObject, List<NamedEvents> targetNamedEvents) {
+    public static EventObjectSlim? CreateEventRule(EventObject eventObject, List<NamedEvents> targetNamedEvents) {
         // Try each target named event to find a matching rule
         foreach (var namedEvent in targetNamedEvents) {
             var ruleType = GetEventRuleType(namedEvent);
@@ -212,8 +212,8 @@ public class EventObjectSlim {
             var ruleType = GetEventRuleType(namedEvent);
             if (ruleType == null) continue;
 
-            List<int> ruleEventIds = null;
-            string ruleLogName = null;
+            List<int>? ruleEventIds = null;
+            string? ruleLogName = null;
 
             // Check if it's an EventRuleBase class
             if (ruleType.IsSubclassOf(typeof(EventRuleBase))) {

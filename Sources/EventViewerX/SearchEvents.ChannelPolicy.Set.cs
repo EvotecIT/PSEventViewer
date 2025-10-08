@@ -131,14 +131,5 @@ public partial class SearchEvents : Settings {
         } finally {
             session?.Dispose();
         }
-        // Should not reach, but ensure deterministic value
-        // (dispose in finally already executed)
-        // If we do get here, consider it a failure
-        // with no partial success.
-        // Returning a new object maintains non-null contract.
-        // (Defensive programming – not expected path.)
-        //
-        // Note: callers should inspect Errors for details.
-        return result;
     }
 }

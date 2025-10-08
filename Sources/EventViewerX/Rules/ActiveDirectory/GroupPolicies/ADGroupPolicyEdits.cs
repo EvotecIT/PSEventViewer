@@ -7,23 +7,23 @@ namespace EventViewerX.Rules.ActiveDirectory;
 /// </summary>
 public class ADGroupPolicyEdits : EventRuleBase {
     /// <summary>Computer where the edit occurred.</summary>
-    public string Computer;
+    public string Computer = string.Empty;
     /// <summary>Description of the action.</summary>
-    public string Action;
+    public string Action = string.Empty;
     /// <summary>Class of the object modified.</summary>
-    public string ObjectClass;
+    public string ObjectClass = string.Empty;
     /// <summary>Operation type value.</summary>
-    public string OperationType;
+    public string OperationType = string.Empty;
     /// <summary>User performing the edit.</summary>
-    public string Who;
+    public string Who = string.Empty;
     /// <summary>Time the edit occurred.</summary>
     public DateTime When;
     /// <summary>Display name of the GPO.</summary>
-    public string GroupPolicyDisplayName;
+    public string GroupPolicyDisplayName = string.Empty;
     /// <summary>LDAP display name of the attribute.</summary>
-    public string AttributeLDAPDisplayName;
+    public string AttributeLDAPDisplayName = string.Empty;
     //public string AttributeValue;
-    public GroupPolicy GroupPolicy { get; set; }
+    public GroupPolicy? GroupPolicy { get; set; }
     public override List<int> EventIds => new() { 5136, 5137, 5141 };
     public override string LogName => "Security";
     public override NamedEvents NamedEvent => NamedEvents.ADGroupPolicyEdits;

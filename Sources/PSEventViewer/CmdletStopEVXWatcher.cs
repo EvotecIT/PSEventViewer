@@ -14,13 +14,13 @@ namespace PSEventViewer {
         /// Identifiers of watchers to stop.
         /// </summary>
         [Parameter(Position = 0, ValueFromPipelineByPropertyName = true)]
-        public Guid[] Id { get; set; }
+        public Guid[]? Id { get; set; }
 
         /// <summary>
         /// Name of the watcher to stop.
         /// </summary>
         [Parameter]
-        public string Name { get; set; }
+        public string? Name { get; set; }
 
         /// <summary>
         /// When set, stops all running watchers.
@@ -38,7 +38,7 @@ namespace PSEventViewer {
             }
 
             if (!string.IsNullOrEmpty(Name)) {
-                WatcherManager.StopWatchersByName(Name);
+                WatcherManager.StopWatchersByName(Name!);
             }
 
             if (Id != null) {

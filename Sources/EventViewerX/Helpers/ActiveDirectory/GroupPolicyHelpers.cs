@@ -12,7 +12,7 @@ public class GroupPolicyHelpers {
     /// </summary>
     /// <param name="gpoDn"></param>
     /// <returns></returns>
-    public static GroupPolicy QueryGroupPolicyByDistinguishedName(string gpoDn) {
+    public static GroupPolicy? QueryGroupPolicyByDistinguishedName(string gpoDn) {
         try {
             Forest currentForest = Forest.GetCurrentForest();
             foreach (Domain domain in currentForest.Domains) {
@@ -33,7 +33,7 @@ public class GroupPolicyHelpers {
     /// <param name="domainName"></param>
     /// <param name="gpoDn"></param>
     /// <returns></returns>
-    private static GroupPolicy QueryGroupPolicyInDomainByDistinguishedName(string domainName, string gpoDn) {
+    private static GroupPolicy? QueryGroupPolicyInDomainByDistinguishedName(string domainName, string gpoDn) {
         try {
             using DirectoryEntry rootDSE = new DirectoryEntry($"LDAP://{domainName}/CN=Policies,CN=System,DC={domainName.Replace(".", ",DC=")}");
             using (DirectorySearcher searcher = new DirectorySearcher(rootDSE)) {
@@ -42,13 +42,13 @@ public class GroupPolicyHelpers {
                 searcher.PropertiesToLoad.Add("name");
                 searcher.PropertiesToLoad.Add("distinguishedName");
 
-                SearchResult result = searcher.FindOne();
+                SearchResult? result = searcher.FindOne();
                 if (result != null) {
                     string gpoName = result.Properties["displayName"].Count > 0
-                        ? result.Properties["displayName"][0].ToString()
+                        ? result.Properties["displayName"][0]?.ToString() ?? string.Empty
                         : string.Empty;
                     string gpoId = result.Properties["name"].Count > 0
-                        ? result.Properties["name"][0].ToString()
+                        ? result.Properties["name"][0]?.ToString() ?? string.Empty
                         : string.Empty;
                     return new GroupPolicy {
                         GpoName = gpoName,

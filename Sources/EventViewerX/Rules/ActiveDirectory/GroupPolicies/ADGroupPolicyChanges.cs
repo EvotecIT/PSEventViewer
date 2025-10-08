@@ -5,23 +5,23 @@
 /// </summary>
 public class ADGroupPolicyChanges : EventRuleBase {
     /// <summary>Computer where the change occurred.</summary>
-    public string Computer;
+    public string Computer = string.Empty;
     /// <summary>Description of the action.</summary>
-    public string Action;
+    public string Action = string.Empty;
     /// <summary>Class of the object modified.</summary>
-    public string ObjectClass;
+    public string ObjectClass = string.Empty;
     /// <summary>Operation type value.</summary>
-    public string OperationType;
+    public string OperationType = string.Empty;
     /// <summary>User performing the action.</summary>
-    public string Who;
+    public string Who = string.Empty;
     /// <summary>Timestamp of the event.</summary>
     public DateTime When;
     /// <summary>Distinguished name of the GPO.</summary>
-    public string GpoName;
+    public string GpoName = string.Empty;
     /// <summary>LDAP display name of the attribute.</summary>
-    public string AttributeLDAPDisplayName;
+    public string AttributeLDAPDisplayName = string.Empty;
     /// <summary>Value of the attribute.</summary>
-    public string AttributeValue;
+    public string AttributeValue = string.Empty;
     public override List<int> EventIds => new() { 5136, 5137, 5141 };
     public override string LogName => "Security";
     public override NamedEvents NamedEvent => NamedEvents.ADGroupPolicyChanges;

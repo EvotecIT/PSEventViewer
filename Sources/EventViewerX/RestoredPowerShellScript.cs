@@ -36,15 +36,16 @@ public class RestoredPowerShellScript {
     /// </summary>
     public string Save(string directory, bool addComment = true, bool unblock = false) {
         Directory.CreateDirectory(directory);
-        string fileName = $"{EventRecord.MachineName}_{ScriptBlockId}.ps1";
+        string machine = EventRecord?.MachineName ?? "Unknown";
+        string fileName = $"{machine}_{ScriptBlockId}.ps1";
         string filePath = Path.Combine(directory, fileName);
         if (addComment) {
             var header = string.Join(Environment.NewLine,
                 "<#",
-                $"RecordID = {EventRecord.RecordId}",
-                $"LogName = {EventRecord.LogName}",
-                $"MachineName = {EventRecord.MachineName}",
-                $"TimeCreated = {EventRecord.TimeCreated}",
+                $"RecordID = {EventRecord?.RecordId}",
+                $"LogName = {EventRecord?.LogName}",
+                $"MachineName = {EventRecord?.MachineName}",
+                $"TimeCreated = {EventRecord?.TimeCreated}",
                 "#>");
             File.WriteAllText(filePath, header + Environment.NewLine + Script);
         } else {

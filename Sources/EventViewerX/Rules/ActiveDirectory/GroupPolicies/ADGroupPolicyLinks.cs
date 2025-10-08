@@ -50,21 +50,21 @@ namespace EventViewerX.Rules.ActiveDirectory;
 /// </remarks>
 public class ADGroupPolicyLinks : EventRuleBase {
     /// <summary>Computer where the change occurred.</summary>
-    public string Computer;
+    public string Computer = string.Empty;
     /// <summary>Description of the operation.</summary>
-    public string Action;
+    public string Action = string.Empty;
     /// <summary>Type of operation.</summary>
-    public string OperationType;
+    public string OperationType = string.Empty;
     /// <summary>User performing the change.</summary>
-    public string Who;
+    public string Who = string.Empty;
     /// <summary>Event timestamp.</summary>
     public DateTime When;
     /// <summary>Domain affected.</summary>
-    public string DomainName;
+    public string DomainName = string.Empty;
     /// <summary>Type of object linked to.</summary>
-    public string LinkedToType;
+    public string LinkedToType = string.Empty;
     /// <summary>Distinguished name of the linked object.</summary>
-    public string LinkedTo;
+    public string LinkedTo = string.Empty;
     // public string AttributeLDAPDisplayName;
     // public string AttributeValue;
     public List<string> GroupPolicyNames { get; set; } = new();

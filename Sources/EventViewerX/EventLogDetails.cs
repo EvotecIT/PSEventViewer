@@ -29,9 +29,9 @@ public class EventLogDetails {
     /// <summary>List of providers registered for the log.</summary>
     public List<string> ProviderNames { get; set; }
     /// <summary>Provider level mask.</summary>
-    public string ProviderLevel { get; set; }
+    public string ProviderLevel { get; set; } = string.Empty;
     /// <summary>Provider keywords mask.</summary>
-    public string ProviderKeywords { get; set; }
+    public string ProviderKeywords { get; set; } = string.Empty;
     /// <summary>Buffer size used by the provider.</summary>
     public int ProviderBufferSize { get; set; }
     /// <summary>Minimum number of buffers for the provider.</summary>
@@ -41,7 +41,7 @@ public class EventLogDetails {
     /// <summary>Provider latency setting.</summary>
     public int ProviderLatency { get; set; }
     /// <summary>Control GUID for the provider.</summary>
-    public string ProviderControlGuid { get; set; }
+    public string ProviderControlGuid { get; set; } = string.Empty;
     /// <summary>Creation time of the log file.</summary>
     public DateTime? CreationTime { get; set; }
     /// <summary>Last access time of the log file.</summary>
@@ -79,15 +79,15 @@ public class EventLogDetails {
     /// <param name="machineName">Name of the computer hosting the log.</param>
     /// <param name="logConfig">Event log configuration.</param>
     /// <param name="logInfoObj">Optional log information object.</param>
-    public EventLogDetails(InternalLogger internalLogger, string machineName, EventLogConfiguration logConfig, EventLogInformation logInfoObj) {
-        LogName = logConfig.LogName;
+    public EventLogDetails(InternalLogger internalLogger, string machineName, EventLogConfiguration logConfig, EventLogInformation? logInfoObj) {
+        LogName = logConfig.LogName ?? string.Empty;
         LogType = logConfig.LogType.ToString();
         IsEnabled = logConfig.IsEnabled;
         MaximumSizeInBytes = logConfig.MaximumSizeInBytes;
-        LogFilePath = logConfig.LogFilePath;
+        LogFilePath = logConfig.LogFilePath ?? string.Empty;
         LogIsolation = logConfig.LogIsolation;
         LogMode = logConfig.LogMode.ToString();
-        OwningProviderName = logConfig.OwningProviderName;
+        OwningProviderName = logConfig.OwningProviderName ?? string.Empty;
         try {
             ProviderNames = new List<string>(logConfig.ProviderNames);
         } catch (Exception ex) {
@@ -98,10 +98,10 @@ public class EventLogDetails {
         ProviderMinimumNumberOfBuffers = logConfig.ProviderMinimumNumberOfBuffers.GetValueOrDefault();
         ProviderMaximumNumberOfBuffers = logConfig.ProviderMaximumNumberOfBuffers.GetValueOrDefault();
         ProviderLatency = logConfig.ProviderLatency.GetValueOrDefault();
-        ProviderControlGuid = logConfig.ProviderControlGuid.ToString();
+        ProviderControlGuid = logConfig.ProviderControlGuid?.ToString() ?? string.Empty;
         SecurityDescriptor = logConfig.SecurityDescriptor;
-        ProviderLevel = logConfig.ProviderLevel.ToString();
-        ProviderKeywords = logConfig.ProviderKeywords.ToString();
+        ProviderLevel = logConfig.ProviderLevel?.ToString() ?? string.Empty;
+        ProviderKeywords = logConfig.ProviderKeywords?.ToString() ?? string.Empty;
         IsClassicLog = logConfig.IsClassicLog;
 
         if (logInfoObj != null) {

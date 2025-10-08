@@ -75,8 +75,8 @@ public partial class SearchEvents : Settings {
                         // Queries: collect any <Query> text under <Select> or direct XPath
                         var queries = new List<string>();
                         foreach (var sel in xdoc.Descendants().Where(e => e.Name.LocalName.Equals("Select", StringComparison.OrdinalIgnoreCase))) {
-                            var q = sel.Value?.Trim();
-                            if (!string.IsNullOrEmpty(q)) queries.Add(q);
+                        var q = sel.Value?.Trim();
+                        if (!string.IsNullOrEmpty(q)) queries.Add(q!);
                         }
                         if (queries.Count > 0) info.Queries = queries;
                     } catch (Exception ex) {

@@ -8,7 +8,7 @@ namespace EventViewerX;
 /// </summary>
 public partial class SearchEvents : Settings {
 
-    public static IEnumerable<EventLogDetails> DisplayEventLogs(string[] listLog = null, string machineName = null) {
+    public static IEnumerable<EventLogDetails> DisplayEventLogs(string[]? listLog = null, string? machineName = null) {
         EventLogSession session;
         if (!string.IsNullOrEmpty(machineName)) {
             session = new EventLogSession(machineName);
@@ -29,7 +29,7 @@ public partial class SearchEvents : Settings {
                     continue;
                 }
             }
-            EventLogConfiguration logConfig;
+            EventLogConfiguration? logConfig;
             try {
                 logConfig = new EventLogConfiguration(logName, session);
                 // Rest of your code...
@@ -37,7 +37,7 @@ public partial class SearchEvents : Settings {
                 logConfig = null;
                 _logger.WriteWarning("Couldn't create EventLogConfiguration for " + logName + ". Error: " + ex.Message);
             }
-            EventLogInformation logInfoObj;
+            EventLogInformation? logInfoObj;
             try {
                 logInfoObj = session.GetLogInformation(logName, PathType.LogName);
             } catch (Exception ex) {
@@ -53,15 +53,15 @@ public partial class SearchEvents : Settings {
                 _logger.WriteWarning("LogConfig is null for " + logName);
                 continue;
             }
-            EventLogDetails logDetails = new EventLogDetails(_logger, machineName, logConfig, logInfoObj);
+            EventLogDetails logDetails = new EventLogDetails(_logger, machineName ?? GetFQDN(), logConfig, logInfoObj);
             yield return logDetails;
 
         }
     }
 
-    public static IEnumerable<EventLogDetails> DisplayEventLogsParallel(string[] listLog = null, List<string> machineNames = null, int maxDegreeOfParallelism = 8, CancellationToken cancellationToken = default) {
+    public static IEnumerable<EventLogDetails> DisplayEventLogsParallel(string[]? listLog = null, List<string?>? machineNames = null, int maxDegreeOfParallelism = 8, CancellationToken cancellationToken = default) {
         if (machineNames == null || !machineNames.Any()) {
-            machineNames = new List<string> { null };
+            machineNames = new List<string?> { null };
         }
 
         using BlockingCollection<EventLogDetails> logDetailsCollection = new();
@@ -85,9 +85,8 @@ public partial class SearchEvents : Settings {
 
         while (!logDetailsCollection.IsCompleted) {
             cancellationToken.ThrowIfCancellationRequested();
-            EventLogDetails logDetails;
-            while (logDetailsCollection.TryTake(out logDetails)) {
-                yield return logDetails;
+            while (logDetailsCollection.TryTake(out var item)) {
+                yield return item;
             }
         }
 

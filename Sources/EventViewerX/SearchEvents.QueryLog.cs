@@ -25,24 +25,24 @@ public partial class SearchEvents : Settings {
     /// <param name="query">The query.</param>
     /// <param name="machineName">Name of the machine.</param>
     /// <returns>Initialized <see cref="EventLogReader"/> or null when failed.</returns>
-    private static EventLogReader CreateEventLogReader(EventLogQuery query, string? machineName) {
-        string targetMachine = string.IsNullOrEmpty(machineName) ? GetFQDN() : machineName;
+    private static EventLogReader? CreateEventLogReader(EventLogQuery query, string? machineName) {
+        string targetMachine = string.IsNullOrEmpty(machineName) ? GetFQDN() : machineName!;
         if (query == null) {
             _logger.WriteWarning($"An error occurred on {targetMachine} while creating the event log reader: Query cannot be null.");
-            return null!;
+            return null;
         }
 
         try {
             return new EventLogReader(query);
         } catch (EventLogException ex) {
             _logger.WriteWarning($"An error occurred on {targetMachine} while creating the event log reader: {ex.Message}");
-            return null!;
+            return null;
         } catch (UnauthorizedAccessException ex) {
             _logger.WriteWarning($"Insufficient permissions to read the event log on {targetMachine}: {ex.Message}");
             return null!;
         } catch (Exception ex) {
             _logger.WriteWarning($"An error occurred on {targetMachine} while creating the event log reader: {ex.Message}");
-            return null!;
+            return null;
         }
     }
 
@@ -77,10 +77,10 @@ public partial class SearchEvents : Settings {
             query.Session = new EventLogSession(machineName);
         }
 
-        var queriedMachine = string.IsNullOrEmpty(machineName) ? GetFQDN() : machineName;
+        string queriedMachine = string.IsNullOrEmpty(machineName) ? GetFQDN() : machineName!;
 
         EventRecord record;
-        using (EventLogReader reader = CreateEventLogReader(query, machineName)) {
+        using (EventLogReader? reader = CreateEventLogReader(query, machineName)) {
             if (reader != null) {
                 int eventCount = 0;
                 while (!cancellationToken.IsCancellationRequested && (record = reader.ReadEvent()) != null) {
@@ -119,7 +119,7 @@ public partial class SearchEvents : Settings {
         return QueryLog(LogNameToString(logName), eventIds, machineName, providerName, keywords, level, startTime, endTime, userId, maxEvents, eventRecordId, timePeriod, cancellationToken);
     }
 
-    public static async Task<IEnumerable<EventObject>> QueryLogAsync(string logName, List<int> eventIds = null, string machineName = null, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null, int maxEvents = 0, List<long> eventRecordId = null, TimePeriod? timePeriod = null, CancellationToken cancellationToken = default) {
+    public static async Task<IEnumerable<EventObject>> QueryLogAsync(string logName, List<int>? eventIds = null, string? machineName = null, string? providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string? userId = null, int maxEvents = 0, List<long>? eventRecordId = null, TimePeriod? timePeriod = null, CancellationToken cancellationToken = default) {
         return await Task.Run(() => QueryLogEnumerable(logName, eventIds, machineName, providerName, keywords, level, startTime, endTime, userId, maxEvents, eventRecordId, timePeriod, cancellationToken).ToList().AsEnumerable(), cancellationToken);
     }
 
@@ -178,7 +178,7 @@ public partial class SearchEvents : Settings {
 
         // Add provider name to the query
         if (!string.IsNullOrEmpty(providerName)) {
-            var escaped = EscapeXPathValue(providerName);
+            var escaped = EscapeXPathValue(providerName!);
             AddCondition(queryString, $"Provider[@Name='{escaped}']");
         }
 

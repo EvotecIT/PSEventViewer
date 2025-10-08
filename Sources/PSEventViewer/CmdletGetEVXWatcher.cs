@@ -15,13 +15,13 @@ namespace PSEventViewer {
         /// Identifiers of watchers to retrieve.
         /// </summary>
         [Parameter(Position = 0, ValueFromPipelineByPropertyName = true)]
-        public Guid[] Id { get; set; }
+        public Guid[]? Id { get; set; }
 
         /// <summary>
         /// Name of the watcher to return.
         /// </summary>
         [Parameter]
-        public string Name { get; set; }
+        public string? Name { get; set; }
 
         /// <summary>
         /// Outputs watcher information matching the provided parameters.

@@ -17,7 +17,7 @@ public sealed class CmdletNewEVXLog : AsyncPSCmdlet
     /// Name of the log to create.
     /// </summary>
     [Parameter(Mandatory = true, Position = 0)]
-    public string LogName { get; set; }
+    public string LogName { get; set; } = string.Empty;
 
     /// <summary>
     /// Name of the provider associated with the log.
@@ -31,7 +31,7 @@ public sealed class CmdletNewEVXLog : AsyncPSCmdlet
     /// </summary>
     [Alias("ComputerName", "ServerName")]
     [Parameter]
-    public string MachineName { get; set; }
+    public string? MachineName { get; set; }
 
     /// <summary>
     /// Maximum log size in kilobytes.

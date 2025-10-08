@@ -26,7 +26,7 @@ namespace PSEventViewer {
         /// Paths to event log files to analyse.
         /// </summary>
         [Parameter(Mandatory = false)]
-        public List<string> FilePath { get; set; }
+        public List<string>? FilePath { get; set; }
 
         /// <summary>
         /// Names of logs to retrieve information about.
@@ -85,7 +85,7 @@ namespace PSEventViewer {
                 List<string> logsToProcess = logNameSpecified ? LogName : new List<string> { "Security" };
                 List<string> machinesToProcess = machineSpecified ? machines : new List<string> { Environment.MachineName };
 
-                foreach (var info in SearchEvents.GetWinEventInformation(logsToProcess?.ToArray(), machinesToProcess, FilePath, MaxRunspaces)) {
+                foreach (var info in SearchEvents.GetWinEventInformation(logsToProcess?.ToArray(), machinesToProcess?.Cast<string?>().ToList(), FilePath, MaxRunspaces)) {
                     WriteObject(info);
                 }
             }
