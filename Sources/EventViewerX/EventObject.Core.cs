@@ -11,7 +11,7 @@ namespace EventViewerX {
         /// <summary>
         /// Time and date when the event was created
         /// </summary>
-        public DateTime TimeCreated => _eventRecord.TimeCreated.Value;
+        public DateTime TimeCreated => _eventRecord.TimeCreated.GetValueOrDefault();
 
         /// <summary>
         /// Event ID
@@ -51,7 +51,7 @@ namespace EventViewerX {
         /// <summary>
         /// Additional event qualifiers if present.
         /// </summary>
-        public string Qualifiers => _eventRecord.Qualifiers?.ToString();
+        public string Qualifiers => _eventRecord.Qualifiers?.ToString() ?? string.Empty;
 
         /// <summary>
         /// Opcode of the event record.
@@ -161,7 +161,7 @@ namespace EventViewerX {
         /// <summary>
         /// First line of the formatted message.
         /// </summary>
-        public string MessageSubject;
+        public string MessageSubject = string.Empty;
 
         /// <summary>
         /// Attachments extracted from the event if present

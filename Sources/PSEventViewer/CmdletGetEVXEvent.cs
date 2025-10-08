@@ -27,13 +27,13 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
     /// </summary>
     [Parameter(Mandatory = true, Position = 0, ParameterSetName = "RecordId")]
     [Parameter(Mandatory = true, Position = 0, ParameterSetName = "GenericEvents")]
-    public string LogName { get; set; }
+    public string LogName { get; set; } = string.Empty;
 
     /// <summary>
     /// Path to an event log file for offline analysis.
     /// </summary>
     [Parameter(Mandatory = true, ParameterSetName = "PathEvents")]
-    public string Path { get; set; }
+    public string Path { get; set; } = string.Empty;
 
     /// <summary>
     /// Event identifiers used to filter results.
@@ -41,14 +41,14 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
     [Alias("Id")]
     [Parameter(Mandatory = false, Position = 1, ParameterSetName = "GenericEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
-    public List<int> EventId { get; set; }
+    public int[]? EventId { get; set; }
 
     /// <summary>
     /// Specific event record identifiers to retrieve.
     /// </summary>
     [Alias("RecordId")]
     [Parameter(Mandatory = false, ParameterSetName = "RecordId")]
-    public List<long> EventRecordId { get; set; }
+    public long[]? EventRecordId { get; set; }
 
     /// <summary>
     /// Path to a file storing last processed record ID.
@@ -57,7 +57,7 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
-    public string RecordIdFile { get; set; }
+    public string? RecordIdFile { get; set; }
 
     /// <summary>
     /// Identifier used when persisting record IDs to allow multiple jobs to share a file.
@@ -66,24 +66,24 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
-    public string RecordIdKey { get; set; }
+    public string? RecordIdKey { get; set; }
 
     /// <summary>
     /// Computer names against which to run the query.
     /// </summary>
-    [Alias("ComputerName", "ServerName")]
+    [Alias("ComputerName", "ServerName", "Machine")]
     [Parameter(Mandatory = false, ParameterSetName = "RecordId")]
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "ListLog")]
-    public List<string> MachineName { get; set; }
+    public string[]? MachineName { get; set; }
 
     /// <summary>
     /// Event provider name to filter results.
     /// </summary>
     [Alias("Source", "Provider")]
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
-    public string ProviderName { get; set; }
+    public string? ProviderName { get; set; }
 
     /// <summary>
     /// Keywords used to filter events.
@@ -126,7 +126,7 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
     /// User identifier used to filter events.
     /// </summary>
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
-    public string UserId { get; set; }
+    public string? UserId { get; set; }
 
     /// <summary>
     /// Filters events by matching their formatted message against the provided regular expression.
@@ -135,7 +135,7 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
-    public Regex MessageRegex { get; set; }
+    public Regex? MessageRegex { get; set; }
 
     /// <summary>
     /// Number of parallel threads used for queries.
@@ -183,13 +183,13 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
     /// Hashtable filter for named event data when querying files.
     /// </summary>
     [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
-    public Hashtable NamedDataFilter { get; set; }
+    public Hashtable? NamedDataFilter { get; set; }
 
     /// <summary>
     /// Hashtable filter to exclude named event data when querying files.
     /// </summary>
     [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
-    public Hashtable NamedDataExcludeFilter { get; set; }
+    public Hashtable? NamedDataExcludeFilter { get; set; }
 
     /// <summary>
     /// Disables parallel processing of file queries.
@@ -211,7 +211,7 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
     /// Predefined named events to query.
     /// </summary>
     [Parameter(Mandatory = true, ParameterSetName = "NamedEvents")]
-    public NamedEvents[] Type { get; set; }
+    public NamedEvents[] Type { get; set; } = Array.Empty<NamedEvents>();
 
     /// <summary>
     /// The list log parameter is used to list the logs on the machine.
@@ -238,9 +238,11 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
                 _recordMap = new Dictionary<string, long>();
             }
         }
-        _recordIdKey = !string.IsNullOrEmpty(RecordIdKey)
-            ? RecordIdKey
-            : $"{LogName ?? Path ?? "unknown"}|{string.Join(",", MachineName ?? new List<string>())}";
+        if (!string.IsNullOrEmpty(RecordIdKey)) {
+            _recordIdKey = RecordIdKey!;
+        } else {
+            _recordIdKey = $"{LogName ?? Path ?? "unknown"}|{string.Join(",", MachineName ?? Array.Empty<string>())}";
+        }
         if (_recordMap.TryGetValue(_recordIdKey, out var lastId)) {
             _resumeRecordId = lastId;
         }
@@ -257,10 +259,10 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
 #else
         token = CancelToken;
 #endif
-        List<object> results = AsArray ? new List<object>() : null;
+        List<object>? results = AsArray ? new List<object>() : null;
 
         if (ParameterSetName == "ListLog") {
-            foreach (EventLogDetails log in SearchEvents.DisplayEventLogsParallel(ListLog, MachineName, NumberOfThreads, token)) {
+            foreach (EventLogDetails log in SearchEvents.DisplayEventLogsParallel(ListLog, MachineName?.ToList<string?>(), NumberOfThreads, token)) {
                 token.ThrowIfCancellationRequested();
                 if (AsArray) {
                     results!.Add(log);
@@ -271,7 +273,7 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
         } else if (ParameterSetName == "PathEvents") {
             // Handle file path queries
             if (Expand == false) {
-                foreach (EventObject eventObject in SearchEvents.QueryLogFile(Path, EventId, ProviderName, Keywords, Level, StartTime, EndTime, UserId, MaxEvents, null, TimePeriod, Oldest, NamedDataFilter, NamedDataExcludeFilter, token)) {
+                foreach (EventObject eventObject in SearchEvents.QueryLogFile(Path, EventId?.ToList(), ProviderName, Keywords, Level, StartTime, EndTime, UserId, MaxEvents, null, TimePeriod, Oldest, NamedDataFilter, NamedDataExcludeFilter, token)) {
                     token.ThrowIfCancellationRequested();
                     if (!MessageMatches(eventObject) || !ShouldOutput(eventObject)) {
                         continue;
@@ -283,7 +285,7 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
                     }
                 }
             } else {
-                foreach (EventObject eventObject in SearchEvents.QueryLogFile(Path, EventId, ProviderName, Keywords, Level, StartTime, EndTime, UserId, MaxEvents, null, TimePeriod, Oldest, NamedDataFilter, NamedDataExcludeFilter, token)) {
+                foreach (EventObject eventObject in SearchEvents.QueryLogFile(Path, EventId?.ToList(), ProviderName, Keywords, Level, StartTime, EndTime, UserId, MaxEvents, null, TimePeriod, Oldest, NamedDataFilter, NamedDataExcludeFilter, token)) {
                     token.ThrowIfCancellationRequested();
                     if (!MessageMatches(eventObject) || !ShouldOutput(eventObject)) {
                         continue;
@@ -299,7 +301,7 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
             if (Type != null) {
                 // let's find the events prepared for search
                 List<NamedEvents> typeList = Type.ToList();
-                await foreach (EventObjectSlim eventObject in SearchEvents.FindEventsByNamedEvents(typeList, MachineName, StartTime, EndTime, TimePeriod, maxThreads: NumberOfThreads, maxEvents: MaxEvents, cancellationToken: token)) {
+                await foreach (EventObjectSlim eventObject in SearchEvents.FindEventsByNamedEvents(typeList, MachineName?.ToList<string?>(), StartTime, EndTime, TimePeriod, maxThreads: NumberOfThreads, maxEvents: MaxEvents, cancellationToken: token)) {
                     token.ThrowIfCancellationRequested();
                     if (!MessageMatches(eventObject._eventObject) || !ShouldOutput(eventObject._eventObject)) {
                         continue;
@@ -315,7 +317,7 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
                     // Let's find the events by generic log name, event id, machine name, provider name, keywords, level, start time, end time, user id, and max events.
                     if (ParallelOption == ParallelOption.Disabled) {
                         if (MachineName == null) {
-                            foreach (EventObject eventObject in SearchEvents.QueryLog(LogName, EventId, null, ProviderName, Keywords, Level, StartTime, EndTime, UserId, MaxEvents, EventRecordId, TimePeriod, token)) {
+                            foreach (EventObject eventObject in SearchEvents.QueryLog(LogName, EventId?.ToList(), null, ProviderName, Keywords, Level, StartTime, EndTime, UserId, MaxEvents, EventRecordId?.ToList(), TimePeriod, token)) {
                                 token.ThrowIfCancellationRequested();
                                 if (!MessageMatches(eventObject) || !ShouldOutput(eventObject)) {
                                     continue;
@@ -327,9 +329,9 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
                                 }
                             }
                         } else {
-                            foreach (string machine in MachineName) {
+                            foreach (string? machine in MachineName) {
                                 token.ThrowIfCancellationRequested();
-                                foreach (EventObject eventObject in SearchEvents.QueryLog(LogName, EventId, machine, ProviderName, Keywords, Level, StartTime, EndTime, UserId, MaxEvents, EventRecordId, TimePeriod, token)) {
+                                foreach (EventObject eventObject in SearchEvents.QueryLog(LogName, EventId?.ToList(), machine, ProviderName, Keywords, Level, StartTime, EndTime, UserId, MaxEvents, EventRecordId?.ToList(), TimePeriod, token)) {
                                     token.ThrowIfCancellationRequested();
                                     if (!MessageMatches(eventObject)) {
                                         continue;
@@ -343,7 +345,7 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
                             }
                         }
                     } else if (ParallelOption == ParallelOption.Parallel) {
-                        await foreach (EventObject eventObject in SearchEvents.QueryLogsParallel(LogName, EventId, MachineName, ProviderName, Keywords, Level, StartTime, EndTime, UserId, MaxEvents, NumberOfThreads, EventRecordId, TimePeriod, token)) {
+                        await foreach (EventObject eventObject in SearchEvents.QueryLogsParallel(LogName, EventId?.ToList(), MachineName?.ToList<string?>(), ProviderName, Keywords, Level, StartTime, EndTime, UserId, MaxEvents, NumberOfThreads, EventRecordId?.ToList(), TimePeriod, token)) {
                             token.ThrowIfCancellationRequested();
                             if (!MessageMatches(eventObject) || !ShouldOutput(eventObject)) {
                                 continue;
@@ -359,7 +361,7 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
                     // Let's find objects, but we will expand the properties of the object from Data to the PSObject.
                     if (ParallelOption == ParallelOption.Disabled) {
                         if (MachineName == null) {
-                            foreach (EventObject eventObject in SearchEvents.QueryLog(LogName, EventId, null, ProviderName, Keywords, Level, StartTime, EndTime, UserId, MaxEvents, EventRecordId, TimePeriod, token)) {
+                            foreach (EventObject eventObject in SearchEvents.QueryLog(LogName, EventId?.ToList(), null, ProviderName, Keywords, Level, StartTime, EndTime, UserId, MaxEvents, EventRecordId?.ToList(), TimePeriod, token)) {
                                 token.ThrowIfCancellationRequested();
                                 if (!MessageMatches(eventObject) || !ShouldOutput(eventObject)) {
                                     continue;
@@ -371,9 +373,9 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
                                 }
                             }
                         } else {
-                            foreach (string machine in MachineName) {
+                            foreach (string? machine in MachineName) {
                                 token.ThrowIfCancellationRequested();
-                                foreach (EventObject eventObject in SearchEvents.QueryLog(LogName, EventId, machine, ProviderName, Keywords, Level, StartTime, EndTime, UserId, MaxEvents, EventRecordId, TimePeriod, token)) {
+                                foreach (EventObject eventObject in SearchEvents.QueryLog(LogName, EventId?.ToList(), machine, ProviderName, Keywords, Level, StartTime, EndTime, UserId, MaxEvents, EventRecordId?.ToList(), TimePeriod, token)) {
                                     token.ThrowIfCancellationRequested();
                                     if (!MessageMatches(eventObject) || !ShouldOutput(eventObject)) {
                                         continue;
@@ -387,7 +389,7 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
                             }
                         }
                     } else if (ParallelOption == ParallelOption.Parallel) {
-                        await foreach (EventObject eventObject in SearchEvents.QueryLogsParallel(LogName, EventId, MachineName, ProviderName, Keywords, Level, StartTime, EndTime, UserId, MaxEvents, NumberOfThreads, EventRecordId, TimePeriod, token)) {
+                        await foreach (EventObject eventObject in SearchEvents.QueryLogsParallel(LogName, EventId?.ToList(), MachineName?.ToList<string?>(), ProviderName, Keywords, Level, StartTime, EndTime, UserId, MaxEvents, NumberOfThreads, EventRecordId?.ToList(), TimePeriod, token)) {
                             token.ThrowIfCancellationRequested();
                             if (!MessageMatches(eventObject) || !ShouldOutput(eventObject)) {
                                 continue;

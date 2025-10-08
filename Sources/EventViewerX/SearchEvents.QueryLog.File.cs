@@ -6,7 +6,7 @@ using System.Threading;
 namespace EventViewerX;
 
 public partial class SearchEvents : Settings {
-    public static IEnumerable<EventObject> QueryLogFile(string filePath, List<int> eventIds = null, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null, int maxEvents = 0, List<long> eventRecordId = null, TimePeriod? timePeriod = null, bool oldest = false, System.Collections.Hashtable namedDataFilter = null, System.Collections.Hashtable namedDataExcludeFilter = null, CancellationToken cancellationToken = default) {
+    public static IEnumerable<EventObject> QueryLogFile(string filePath, List<int>? eventIds = null, string? providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string? userId = null, int maxEvents = 0, List<long>? eventRecordId = null, TimePeriod? timePeriod = null, bool oldest = false, System.Collections.Hashtable? namedDataFilter = null, System.Collections.Hashtable? namedDataExcludeFilter = null, CancellationToken cancellationToken = default) {
 
         // Sanitize the provided path in case it contains wrapping quotes or extra spaces
         string sanitizedPath = filePath.Trim().Trim('"', '\'');
@@ -38,10 +38,10 @@ public partial class SearchEvents : Settings {
             var namedDataExcludeFilterArray = namedDataExcludeFilter != null ? new[] { namedDataExcludeFilter } : null;
             var idArray = eventIds?.Select(i => i.ToString()).ToArray();
             var eventRecordIdArray = eventRecordId?.Select(i => i.ToString()).ToArray();
-            var providerNameArray = !string.IsNullOrEmpty(providerName) ? new[] { providerName } : null;
+            string[]? providerNameArray = !string.IsNullOrEmpty(providerName) ? new string[] { providerName! } : null;
             var keywordsArray = keywords != null ? new[] { (long)keywords.Value } : null;
-            var levelArray = level != null ? new[] { level.ToString() } : null;
-            var userIdArray = !string.IsNullOrEmpty(userId) ? new[] { userId } : null;
+            string[]? levelArray = level.HasValue ? new string[] { level.Value.ToString() } : null;
+            string[]? userIdArray = !string.IsNullOrEmpty(userId) ? new string[] { userId! } : null;
 
             string queryString = BuildWinEventFilter(
                 id: idArray,
@@ -81,7 +81,7 @@ public partial class SearchEvents : Settings {
         // We need to keep record not disposed to be able to access it after the using block
         // Maybe there's a better way to do this
         EventRecord record;
-        using (EventLogReader reader = CreateEventLogReader(query, filePath)) {
+        using (EventLogReader? reader = CreateEventLogReader(query, filePath)) {
             if (reader != null) {
                 int eventCount = 0;
                 while (!cancellationToken.IsCancellationRequested && (record = reader.ReadEvent()) != null) {

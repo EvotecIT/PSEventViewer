@@ -10,9 +10,9 @@ namespace EventViewerX {
     /// Utility methods for retrieving basic Windows event log information.
     /// </summary>
     public partial class SearchEvents : Settings {
-        public static IEnumerable<WinEventInformation> GetWinEventInformation(string[]? logNames, List<string>? machines, List<string>? filePaths, int maxDegreeOfParallelism = 50) {
+        public static IEnumerable<WinEventInformation> GetWinEventInformation(string[]? logNames, List<string?>? machines, List<string>? filePaths, int maxDegreeOfParallelism = 50) {
             if (machines == null || machines.Count == 0) {
-                machines = new List<string> { null! };
+                machines = new List<string?> { null };
             }
 
             if (logNames != null && logNames.Length > 0) {
@@ -77,7 +77,7 @@ namespace EventViewerX {
             info.ProviderNamesExpanded = string.Join(", ", details.ProviderNames ?? new List<string>());
             if (!string.IsNullOrEmpty(details.SecurityDescriptor)) {
                 try {
-                    var sd = new CommonSecurityDescriptor(false, false, details.SecurityDescriptor);
+                    var sd = new CommonSecurityDescriptor(false, false, details.SecurityDescriptor ?? string.Empty);
                     info.SecurityDescriptorOwner = sd.Owner?.ToString() ?? string.Empty;
                     info.SecurityDescriptorGroup = sd.Group?.ToString() ?? string.Empty;
                     info.SecurityDescriptorDiscretionaryAcl = sd.DiscretionaryAcl?.ToString() ?? string.Empty;

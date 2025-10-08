@@ -7,7 +7,9 @@ using EventViewerX;
 namespace EventViewerX.Tests {
     public class TestNetworkAccessAuthenticationPolicy {
         private static Dictionary<string, string> Parse(string xml) {
+            #pragma warning disable SYSLIB0050 // Formatter-based serialization is obsolete; used only to create uninitialized instance for private method invocation in tests.
             var obj = (EventObject)System.Runtime.Serialization.FormatterServices.GetUninitializedObject(typeof(EventObject));
+            #pragma warning restore SYSLIB0050
             var method = typeof(EventObject).GetMethod("ParseXML", BindingFlags.NonPublic | BindingFlags.Instance)!
                 .MakeGenericMethod(typeof(Dictionary<string, string>));
             return (Dictionary<string, string>)method.Invoke(obj, new object[] { xml })!;

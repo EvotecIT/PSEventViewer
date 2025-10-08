@@ -1,7 +1,7 @@
 namespace EventViewerX;
 
 public partial class SearchEvents : Settings {
-    private static string _fqdn;
+    private static string _fqdn = string.Empty;
 
     /// <summary>
     /// Get the fully qualified domain name of the machine

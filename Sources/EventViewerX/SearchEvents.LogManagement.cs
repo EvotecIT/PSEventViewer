@@ -16,7 +16,7 @@ public partial class SearchEvents : Settings {
     /// <param name="overflowAction">Overflow policy.</param>
     /// <param name="retentionDays">Retention in days for OverwriteOlder policy.</param>
     /// <returns><c>true</c> if creation succeeded.</returns>
-    public static bool CreateLog(string logName, string sourceName = null, string machineName = null, int maximumKilobytes = 0, OverflowAction overflowAction = OverflowAction.OverwriteAsNeeded, int retentionDays = 7) {
+    public static bool CreateLog(string logName, string? sourceName = null, string? machineName = null, int maximumKilobytes = 0, OverflowAction overflowAction = OverflowAction.OverwriteAsNeeded, int retentionDays = 7) {
         if (string.IsNullOrEmpty(sourceName)) {
             sourceName = logName;
         }
@@ -58,7 +58,7 @@ public partial class SearchEvents : Settings {
     /// <param name="logName">Name of the log.</param>
     /// <param name="machineName">Target machine.</param>
     /// <returns><c>true</c> when log is removed.</returns>
-    public static bool RemoveLog(string logName, string machineName = null) {
+    public static bool RemoveLog(string logName, string? machineName = null) {
         try {
             bool exists = string.IsNullOrEmpty(machineName)
                 ? EventLog.Exists(logName)
@@ -85,7 +85,7 @@ public partial class SearchEvents : Settings {
     /// <param name="logName">The log name.</param>
     /// <param name="machineName">Target machine.</param>
     /// <returns><c>true</c> when log exists.</returns>
-    public static bool LogExists(string logName, string machineName = null) {
+    public static bool LogExists(string logName, string? machineName = null) {
         try {
             return string.IsNullOrEmpty(machineName)
                 ? EventLog.Exists(logName)
@@ -102,7 +102,7 @@ public partial class SearchEvents : Settings {
     /// <param name="machineName">Target machine.</param>
     /// <param name="retentionDays">Retention days when setting overwrite policy.</param>
     /// <returns><c>true</c> when clearing succeeds.</returns>
-    public static bool ClearLog(string logName, string machineName = null, int? retentionDays = null) {
+    public static bool ClearLog(string logName, string? machineName = null, int? retentionDays = null) {
         try {
             using EventLog log = string.IsNullOrEmpty(machineName)
                 ? new EventLog(logName)

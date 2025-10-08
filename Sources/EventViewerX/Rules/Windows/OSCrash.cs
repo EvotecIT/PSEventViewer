@@ -13,13 +13,13 @@ public class OSCrash : EventRuleBase {
         // Simple rule - always handle if event ID and log name match
         return true;
     }
-    public string Computer;
-    public string Action;
-    public string ObjectAffected;
-    public string ActionDetails;
-    public string ActionDetailsDate;
-    public string ActionDetailsTime;
-    public string Who;
+    public string Computer = string.Empty;
+    public string Action = string.Empty;
+    public string ObjectAffected = string.Empty;
+    public string ActionDetails = string.Empty;
+    public string ActionDetailsDate = string.Empty;
+    public string ActionDetailsTime = string.Empty;
+    public string Who = string.Empty;
     public DateTime When;
 
     public OSCrash(EventObject eventObject) : base(eventObject) {

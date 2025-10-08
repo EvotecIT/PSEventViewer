@@ -10,7 +10,7 @@ namespace EventViewerX {
         /// <param name="splitter">The splitter.</param>
         /// <param name="reverseOrder">if set to <c>true</c> [reverse order].</param>
         /// <returns></returns>
-        public string GetValueFromDataDictionary(string key1, string key2 = null, string splitter = "\\", bool reverseOrder = false) {
+        public string GetValueFromDataDictionary(string key1, string? key2 = null, string splitter = "\\", bool reverseOrder = false) {
             if (key1 != null && key2 != null && Data.ContainsKey(key1) && Data.ContainsKey(key2)) {
                 if (reverseOrder) {
                     return Data[key2] + splitter + Data[key1];

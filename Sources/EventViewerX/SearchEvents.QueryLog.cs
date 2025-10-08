@@ -9,6 +9,16 @@ using System.Threading.Tasks;
 namespace EventViewerX;
 
 public partial class SearchEvents : Settings {
+    private static bool IsLocalMachine(string? name) {
+        if (string.IsNullOrEmpty(name)) return true;
+        var cmp = StringComparison.OrdinalIgnoreCase;
+        var n = name ?? string.Empty;
+        if (string.Equals(n, "localhost", cmp) || string.Equals(n, ".", cmp)) return true;
+        if (string.Equals(n, Environment.MachineName ?? string.Empty, cmp)) return true;
+        var fqdn = GetFQDN();
+        if (!string.IsNullOrEmpty(fqdn) && string.Equals(n, fqdn, cmp)) return true;
+        return false;
+    }
     /// <summary>
     /// Initialize the EventSearching class with an internal logger
     /// </summary>
@@ -25,24 +35,24 @@ public partial class SearchEvents : Settings {
     /// <param name="query">The query.</param>
     /// <param name="machineName">Name of the machine.</param>
     /// <returns>Initialized <see cref="EventLogReader"/> or null when failed.</returns>
-    private static EventLogReader CreateEventLogReader(EventLogQuery query, string? machineName) {
-        string targetMachine = string.IsNullOrEmpty(machineName) ? GetFQDN() : machineName;
+    private static EventLogReader? CreateEventLogReader(EventLogQuery query, string? machineName) {
+        string targetMachine = string.IsNullOrEmpty(machineName) ? GetFQDN() : machineName!;
         if (query == null) {
             _logger.WriteWarning($"An error occurred on {targetMachine} while creating the event log reader: Query cannot be null.");
-            return null!;
+            return null;
         }
 
         try {
             return new EventLogReader(query);
         } catch (EventLogException ex) {
             _logger.WriteWarning($"An error occurred on {targetMachine} while creating the event log reader: {ex.Message}");
-            return null!;
+            return null;
         } catch (UnauthorizedAccessException ex) {
             _logger.WriteWarning($"Insufficient permissions to read the event log on {targetMachine}: {ex.Message}");
             return null!;
         } catch (Exception ex) {
             _logger.WriteWarning($"An error occurred on {targetMachine} while creating the event log reader: {ex.Message}");
-            return null!;
+            return null;
         }
     }
 
@@ -73,22 +83,62 @@ public partial class SearchEvents : Settings {
         _logger.WriteVerbose($"Querying log '{logName}' on '{machineName} with query: {queryString}");
 
         EventLogQuery query = new EventLogQuery(logName, PathType.LogName, queryString);
-        if (!string.IsNullOrEmpty(machineName)) {
+        // Use an explicit remote session only for non-local machines; for local targets
+        // relying on the default session is more reliable and avoids permission quirks.
+        if (!string.IsNullOrEmpty(machineName) && !IsLocalMachine(machineName)) {
             query.Session = new EventLogSession(machineName);
         }
 
-        var queriedMachine = string.IsNullOrEmpty(machineName) ? GetFQDN() : machineName;
+        string queriedMachine = string.IsNullOrEmpty(machineName) ? GetFQDN() : machineName!;
 
+        int eventCount = 0;
         EventRecord record;
-        using (EventLogReader reader = CreateEventLogReader(query, machineName)) {
+        using (EventLogReader? reader = CreateEventLogReader(query, machineName)) {
             if (reader != null) {
-                int eventCount = 0;
                 while (!cancellationToken.IsCancellationRequested && (record = reader.ReadEvent()) != null) {
                     EventObject eventObject = new EventObject(record, queriedMachine);
                     yield return eventObject;
                     eventCount++;
                     if (maxEvents > 0 && eventCount >= maxEvents) {
                         break;
+                    }
+                }
+            }
+        }
+
+        // Fallback: if 0 events and querying local machine by name, try again as true local (no session)
+        if (eventCount == 0 && !string.IsNullOrEmpty(machineName) && IsLocalMachine(machineName)) {
+            var localQuery = new EventLogQuery(logName, PathType.LogName, queryString);
+            using (EventLogReader? reader2 = CreateEventLogReader(localQuery, null)) {
+                if (reader2 != null) {
+                    while (!cancellationToken.IsCancellationRequested && (record = reader2.ReadEvent()) != null) {
+                        EventObject eventObject = new EventObject(record, queriedMachine);
+                        yield return eventObject;
+                        eventCount++;
+                        if (maxEvents > 0 && eventCount >= maxEvents) {
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Final fallback: if still no events and an EventId filter was provided, retry with an ID-only query (no time window)
+        if (eventCount == 0 && eventIds != null && eventIds.Any()) {
+            var idOnlyQueryString = BuildQueryString(logName, eventIds, providerName: null, keywords: null, level: null, startTime: null, endTime: null, userId: null, timePeriod: null);
+            var idOnlyQuery = new EventLogQuery(logName, PathType.LogName, idOnlyQueryString);
+            if (!string.IsNullOrEmpty(machineName) && !IsLocalMachine(machineName)) {
+                idOnlyQuery.Session = new EventLogSession(machineName);
+            }
+            using (EventLogReader? reader3 = CreateEventLogReader(idOnlyQuery, IsLocalMachine(machineName) ? null : machineName)) {
+                if (reader3 != null) {
+                    while (!cancellationToken.IsCancellationRequested && (record = reader3.ReadEvent()) != null) {
+                        EventObject eventObject = new EventObject(record, queriedMachine);
+                        yield return eventObject;
+                        eventCount++;
+                        if (maxEvents > 0 && eventCount >= maxEvents) {
+                            break;
+                        }
                     }
                 }
             }
@@ -119,7 +169,7 @@ public partial class SearchEvents : Settings {
         return QueryLog(LogNameToString(logName), eventIds, machineName, providerName, keywords, level, startTime, endTime, userId, maxEvents, eventRecordId, timePeriod, cancellationToken);
     }
 
-    public static async Task<IEnumerable<EventObject>> QueryLogAsync(string logName, List<int> eventIds = null, string machineName = null, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null, int maxEvents = 0, List<long> eventRecordId = null, TimePeriod? timePeriod = null, CancellationToken cancellationToken = default) {
+    public static async Task<IEnumerable<EventObject>> QueryLogAsync(string logName, List<int>? eventIds = null, string? machineName = null, string? providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string? userId = null, int maxEvents = 0, List<long>? eventRecordId = null, TimePeriod? timePeriod = null, CancellationToken cancellationToken = default) {
         return await Task.Run(() => QueryLogEnumerable(logName, eventIds, machineName, providerName, keywords, level, startTime, endTime, userId, maxEvents, eventRecordId, timePeriod, cancellationToken).ToList().AsEnumerable(), cancellationToken);
     }
 
@@ -178,7 +228,7 @@ public partial class SearchEvents : Settings {
 
         // Add provider name to the query
         if (!string.IsNullOrEmpty(providerName)) {
-            var escaped = EscapeXPathValue(providerName);
+            var escaped = EscapeXPathValue(providerName!);
             AddCondition(queryString, $"Provider[@Name='{escaped}']");
         }
 
@@ -207,11 +257,11 @@ public partial class SearchEvents : Settings {
         } else {
             // Add time range to the query
             if (startTime.HasValue && endTime.HasValue) {
-                AddCondition(queryString, $"TimeCreated[@SystemTime&gt;='{startTime.Value:s}Z' and @SystemTime&lt;='{endTime.Value:s}Z']");
+                AddCondition(queryString, $"TimeCreated[@SystemTime&gt;='{startTime.Value.ToUniversalTime():s}Z' and @SystemTime&lt;='{endTime.Value.ToUniversalTime():s}Z']");
             } else if (startTime.HasValue) {
-                AddCondition(queryString, $"TimeCreated[@SystemTime&gt;='{startTime.Value:s}Z']");
+                AddCondition(queryString, $"TimeCreated[@SystemTime&gt;='{startTime.Value.ToUniversalTime():s}Z']");
             } else if (endTime.HasValue) {
-                AddCondition(queryString, $"TimeCreated[@SystemTime&lt;='{endTime.Value:s}Z']");
+                AddCondition(queryString, $"TimeCreated[@SystemTime&lt;='{endTime.Value.ToUniversalTime():s}Z']");
             }
         }
 

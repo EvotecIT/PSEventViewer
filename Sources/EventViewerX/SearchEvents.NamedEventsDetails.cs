@@ -16,7 +16,7 @@ namespace EventViewerX {
         /// <param name="typeEventsList">List of target event types.</param>
         /// <returns>Concrete event rule instance or null.</returns>
         /// <exception cref="ArgumentException"></exception>
-        private static EventObjectSlim BuildTargetEvents(EventObject eventObject, List<NamedEvents> typeEventsList) {
+        private static EventObjectSlim? BuildTargetEvents(EventObject eventObject, List<NamedEvents> typeEventsList) {
             // Use the new reflection-based system - let each rule decide if it can handle the event
             return EventObjectSlim.CreateEventRule(eventObject, typeEventsList);
         }

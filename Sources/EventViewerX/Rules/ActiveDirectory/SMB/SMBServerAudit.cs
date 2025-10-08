@@ -16,9 +16,9 @@ namespace EventViewerX.Rules.ActiveDirectory;
 /// </summary>
 public class SMBServerAudit : EventRuleBase {
     // public EventObject EventObject { get; }
-    public string Computer;
-    public string Action;
-    public string ClientAddress;
+    public string Computer = string.Empty;
+    public string Action = string.Empty;
+    public string ClientAddress = string.Empty;
     public string ClientDNSName = string.Empty;
     public DateTime When;
     public override List<int> EventIds => new() { 3000 };
@@ -40,11 +40,11 @@ public class SMBServerAudit : EventRuleBase {
         Action = _eventObject.MessageSubject;
         ClientAddress = _eventObject.GetValueFromDataDictionary("ClientName");
         When = _eventObject.TimeCreated;
-        ClientDNSName = Task.Run(() => QueryDnsAsync(ClientAddress)).Result;
+        ClientDNSName = Task.Run(() => QueryDnsAsync(ClientAddress)).Result ?? string.Empty;
     }
 
 
-    private static async Task<string> QueryDnsAsync(string clientAddress) {
+    private static async Task<string?> QueryDnsAsync(string clientAddress) {
         if (string.IsNullOrEmpty(clientAddress)) {
             return null;
         }

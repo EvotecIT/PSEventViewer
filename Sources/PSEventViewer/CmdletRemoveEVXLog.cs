@@ -15,14 +15,14 @@ public sealed class CmdletRemoveEVXLog : AsyncPSCmdlet {
     /// Name of the log to remove.
     /// </summary>
     [Parameter(Mandatory = true, Position = 0)]
-    public string LogName { get; set; }
+    public string LogName { get; set; } = string.Empty;
 
     /// <summary>
     /// Target machine from which to remove the log.
     /// </summary>
     [Parameter]
     [Alias("ComputerName", "ServerName")]
-    public string MachineName { get; set; }
+    public string? MachineName { get; set; }
 
     /// <summary>
     /// Removes the specified log.

@@ -14,14 +14,14 @@ public sealed class CmdletSetEVXInfo : AsyncPSCmdlet {
     /// Name of the log whose settings will be modified.
     /// </summary>
     [Parameter(Mandatory = true)]
-    public string LogName { get; set; }
+    public string LogName { get; set; } = string.Empty;
 
     /// <summary>
     /// Target computer on which to modify the log.
     /// </summary>
     [Parameter]
     [Alias("ComputerName", "ServerName")]
-    public string ComputerName { get; set; }
+    public string? ComputerName { get; set; }
 
     /// <summary>
     /// Maximum size of the log in megabytes.
@@ -43,7 +43,7 @@ public sealed class CmdletSetEVXInfo : AsyncPSCmdlet {
         "OverwriteEventsAsNeededOldestFirst",
         "ArchiveTheLogWhenFullDoNotOverwrite",
         "DoNotOverwriteEventsClearLogManually")]
-    public string EventAction { get; set; }
+    public string? EventAction { get; set; }
 
     /// <summary>
     /// Log mode to apply to the specified log.
@@ -52,7 +52,7 @@ public sealed class CmdletSetEVXInfo : AsyncPSCmdlet {
     [Parameter]
     public EventLogMode? Mode { get; set; }
 
-    private EventLogConfiguration _log;
+    private EventLogConfiguration? _log;
 
     /// <summary>
     /// Initializes the event log configuration object.

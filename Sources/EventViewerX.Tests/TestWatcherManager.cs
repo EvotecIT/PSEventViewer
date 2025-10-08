@@ -36,13 +36,18 @@ namespace EventViewerX.Tests {
 
         [Fact]
         public void OnEventLogsWarningOnException() {
-            var info = (WatcherInfo)Activator.CreateInstance(typeof(WatcherInfo),
-                BindingFlags.Instance | BindingFlags.NonPublic, null,
-                new object[] {
-                    "test", Environment.MachineName, "Application", new List<int> { 1 },
-                    new List<NamedEvents>(), new Action<EventObject>(_ => throw new InvalidOperationException("fail")),
-                    1, false, false, 0, null
-                }, null)!;
+            TimeSpan? timeout = null;
+            object?[] args = {
+                "test", Environment.MachineName, "Application", new List<int> { 1 },
+                new List<NamedEvents>(), new Action<EventObject>(_ => throw new InvalidOperationException("fail")),
+                1, false, false, 0, timeout
+            };
+            var info = (WatcherInfo)Activator.CreateInstance(
+                typeof(WatcherInfo),
+                BindingFlags.Instance | BindingFlags.NonPublic,
+                binder: null,
+                args: args,
+                culture: null)!;
 
             Exception? captured = null;
             info.ActionException += (_, ex) => captured = ex;
@@ -50,7 +55,9 @@ namespace EventViewerX.Tests {
             EventHandler<LogEventArgs> handler = (_, e) => message = e.FullMessage;
             Settings._logger.OnWarningMessage += handler;
             try {
+                #pragma warning disable SYSLIB0050 // Formatter-based serialization is obsolete; used only to synthesize instance for private method invocation.
                 var dummy = (EventObject)FormatterServices.GetUninitializedObject(typeof(EventObject));
+                #pragma warning restore SYSLIB0050
                 var method = typeof(WatcherInfo).GetMethod("OnEvent", BindingFlags.Instance | BindingFlags.NonPublic)!;
                 method.Invoke(info, new object[] { dummy });
                 Assert.NotNull(captured);
@@ -62,17 +69,17 @@ namespace EventViewerX.Tests {
         }
 
         [Fact]
-        public void StartWatcherIsThreadSafe() {
+        public async Task StartWatcherIsThreadSafe() {
             var tasks = new List<Task<WatcherInfo>>();
             for (int i = 0; i < 5; i++) {
                 tasks.Add(Task.Run(() => WatcherManager.StartWatcher(
                     "sync", Environment.MachineName, "Application", new List<int>(),
                     new List<NamedEvents>(), _ => { }, 1, false, false, 0, null)));
             }
-            Task.WaitAll(tasks.ToArray());
-            var first = tasks[0].Result;
-            foreach (var t in tasks) {
-                Assert.Same(first, t.Result);
+            var results = await Task.WhenAll(tasks);
+            var first = results[0];
+            foreach (var r in results) {
+                Assert.Same(first, r);
             }
             WatcherManager.StopAll();
         }

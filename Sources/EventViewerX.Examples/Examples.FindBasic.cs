@@ -51,7 +51,7 @@ namespace EventViewerX.Examples {
         }
 
         public static async Task FindEventsTargetedPerType() {
-            List<string> MachineName = new List<string> { "AD1", "AD2", "AD0" };
+            List<string?> MachineName = new List<string?> { "AD1", "AD2", "AD0" };
 
             // Initialize the logger
             var internalLogger = new InternalLogger(true);

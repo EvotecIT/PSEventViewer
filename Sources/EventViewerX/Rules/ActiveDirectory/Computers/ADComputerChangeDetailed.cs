@@ -36,7 +36,7 @@ public class ADComputerChangeDetailed : EventRuleBase {
                objectClass == "computer";
     }
 
-    public static EventObjectSlim Create(EventObject eventObject) {
+    public static EventObjectSlim? Create(EventObject eventObject) {
         var rule = new ADComputerChangeDetailed(eventObject);
         return rule.CanHandle(eventObject) ? rule : null;
     }

@@ -53,12 +53,12 @@ namespace PSEventViewer;
 public sealed class CmdletLimitEVXLog : AsyncPSCmdlet {
     /// <summary>Log name to modify.</summary>
     [Parameter(Mandatory = true, Position = 0)]
-    public string LogName { get; set; }
+    public string LogName { get; set; } = string.Empty;
 
     /// <summary>Target machine.</summary>
     [Parameter]
     [Alias("ComputerName", "ServerName")]
-    public string MachineName { get; set; }
+    public string? MachineName { get; set; }
 
     /// <summary>Maximum size in KB.</summary>
     [Parameter]
