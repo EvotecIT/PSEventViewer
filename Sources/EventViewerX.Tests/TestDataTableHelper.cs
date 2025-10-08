@@ -10,7 +10,7 @@ namespace EventViewerX.Tests;
 public partial class TestDataTableHelper {
     private class SimpleEvent {
         public int Id { get; set; }
-        public string Name { get; set; }
+        public string Name { get; set; } = string.Empty;
         public Dictionary<string, string> Data { get; set; } = new();
     }
 
@@ -69,12 +69,15 @@ public partial class TestDataTableHelper {
             var method = typeof(DataTableHelper).GetMethod("ToDataTableInternal", BindingFlags.NonPublic | BindingFlags.Static);
             Assert.NotNull(method);
             var generic = method!.MakeGenericMethod(typeof(Dummy));
-            var table = (DataTable)generic.Invoke(null, new object[] { items });
+            var table = (DataTable?)generic.Invoke(null, new object[] { items }) ?? new DataTable();
 
             Assert.Equal(3, table.Columns.Count);
-            Assert.Equal(typeof(int), table.Columns["IntValue"].DataType);
-            Assert.Equal(typeof(DateTime), table.Columns["DateValue"].DataType);
-            Assert.Equal(typeof(double), table.Columns["DoubleValue"].DataType);
+            Assert.NotNull(table.Columns["IntValue"]);
+            Assert.NotNull(table.Columns["DateValue"]);
+            Assert.NotNull(table.Columns["DoubleValue"]);
+            Assert.Equal(typeof(int), table.Columns["IntValue"]!.DataType);
+            Assert.Equal(typeof(DateTime), table.Columns["DateValue"]!.DataType);
+            Assert.Equal(typeof(double), table.Columns["DoubleValue"]!.DataType);
 
             Assert.Equal(2, table.Rows.Count);
             Assert.Equal(5, table.Rows[0]["IntValue"]);

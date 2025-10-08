@@ -9,7 +9,9 @@ namespace EventViewerX.Tests {
         [Fact]
         public void DataDictionaryIsCaseInsensitive() {
             const string xml = "<Event><EventData><Data Name='Key'>Value</Data></EventData></Event>";
+            #pragma warning disable SYSLIB0050 // Formatter-based serialization is obsolete; used only for test of private method.
             var obj = (EventObject)FormatterServices.GetUninitializedObject(typeof(EventObject));
+            #pragma warning restore SYSLIB0050
             var method = typeof(EventObject).GetMethod("ParseXML", BindingFlags.NonPublic | BindingFlags.Instance)!
                 .MakeGenericMethod(typeof(Dictionary<string, string>));
             var result = (Dictionary<string, string>)method.Invoke(obj, new object[] { xml })!;

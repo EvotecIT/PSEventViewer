@@ -8,7 +8,7 @@ namespace EventViewerX.Tests {
         [Fact]
         public async Task QueryLogsParallelStreamsFirstEvent() {
             if (!OperatingSystem.IsWindows()) return;
-            await foreach (var _ in SearchEvents.QueryLogsParallel("System", maxEvents: 1, machineNames: new List<string> { Environment.MachineName })) {
+            await foreach (var _ in SearchEvents.QueryLogsParallel("System", maxEvents: 1, machineNames: new List<string?> { Environment.MachineName })) {
                 // Successfully retrieved first event, so streaming works
                 return;
             }
@@ -20,7 +20,7 @@ namespace EventViewerX.Tests {
             if (!OperatingSystem.IsWindows()) return;
             await foreach (var _ in SearchEvents.FindEventsByNamedEvents([
                 NamedEvents.OSStartupSecurity
-            ], new List<string> { Environment.MachineName }, maxEvents: 1)) {
+            ], new List<string?> { Environment.MachineName }, maxEvents: 1)) {
                 return;
             }
             Assert.Fail("No events were returned from FindEventsByNamedEvents.");

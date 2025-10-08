@@ -105,7 +105,9 @@ public class EventObjectSlim {
         // For EventRuleBase classes, we get the NamedEvent from the rule itself
         if (ruleType.IsSubclassOf(typeof(EventRuleBase))) {
             try {
+                #pragma warning disable SYSLIB0050 // Formatter-based serialization is obsolete; here used only to obtain constant metadata from rule types without running constructors.
                 var instance = (EventRuleBase)System.Runtime.Serialization.FormatterServices.GetUninitializedObject(ruleType);
+                #pragma warning restore SYSLIB0050
                 _eventRuleTypes[instance.NamedEvent] = ruleType;
 
                 foreach (var eventId in instance.EventIds) {
@@ -186,7 +188,9 @@ public class EventObjectSlim {
     private static NamedEvents GetNamedEventForType(Type type) {
         if (type.IsSubclassOf(typeof(EventRuleBase))) {
             try {
+                #pragma warning disable SYSLIB0050 // See note above.
                 var instance = (EventRuleBase)System.Runtime.Serialization.FormatterServices.GetUninitializedObject(type);
+                #pragma warning restore SYSLIB0050
                 return instance.NamedEvent;
             } catch {
                 // Fall through to exception
@@ -218,7 +222,9 @@ public class EventObjectSlim {
             // Check if it's an EventRuleBase class
             if (ruleType.IsSubclassOf(typeof(EventRuleBase))) {
                 try {
+                    #pragma warning disable SYSLIB0050 // See note above.
                     var instance = (EventRuleBase)System.Runtime.Serialization.FormatterServices.GetUninitializedObject(ruleType);
+                    #pragma warning restore SYSLIB0050
                     ruleEventIds = instance.EventIds;
                     ruleLogName = instance.LogName;
                 } catch {
