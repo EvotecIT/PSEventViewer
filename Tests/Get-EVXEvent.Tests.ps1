@@ -1,8 +1,28 @@
-﻿Describe 'Get-EVXEvent - Basic Test' {
-    $Date = (Get-Date).AddDays(-60)
-    $Date1 = Get-Date
+﻿BeforeAll {
+    $script:TestEventId = 5617
+    $script:TestLogName = 'Application'
+    $script:DateFrom = (Get-Date).AddDays(-60)
+    $script:DateTo = Get-Date
 
-    $Events = Get-EVXEvent -Machine $Env:COMPUTERNAME -DateFrom $Date -DateTo $Date1 -ID 5617 -LogName 'Application' # -Verbose
+    # Ensure at least one matching event exists on the local machine so tests are deterministic
+    try {
+        $existing = Get-EVXEvent -LogName $script:TestLogName -Id $script:TestEventId -DateFrom $script:DateFrom -DateTo $script:DateTo -MaxEvents 1 -AsArray -ParallelOption Disabled -ErrorAction SilentlyContinue
+    } catch {
+        $existing = @()
+    }
+    $needed = 2
+    $have = if ($existing) { [int]$existing.Count } else { 0 }
+    for ($i = $have; $i -lt $needed; $i++) {
+        Write-EVXEntry -LogName $script:TestLogName -ProviderName 'PSEventViewer.Tests' -EventId $script:TestEventId -Message "PSEventViewer test event #$($i+1) (ensures deterministic tests)" -EventLogEntryType Information -Category 0 -ErrorAction SilentlyContinue | Out-Null
+        Start-Sleep -Milliseconds 500
+    }
+}
+
+Describe 'Get-EVXEvent - Basic Test' {
+    $Date = $script:DateFrom
+    $Date1 = $script:DateTo
+
+    $Events = Get-EVXEvent -Machine $Env:COMPUTERNAME -DateFrom $Date -DateTo $Date1 -ID $script:TestEventId -LogName $script:TestLogName # -Verbose
 
     $PSDefaultParameterValues = @{
         "It:TestCases" = @{ Date = $Date; Date1 = $Date1; Events = $Events }
@@ -10,7 +30,7 @@
 
     It 'Should have GatheredLogName, GatheredFrom fields properly filled in' {
         $Events[0].GatheredFrom | Should -Be $Env:COMPUTERNAME
-        $Events[0].GatheredLogName | Should -Be 'Application'
+        $Events[0].GatheredLogName | Should -Be $script:TestLogName
     }
     It 'Should have more then 1 event' {
         $Events.Count | Should -BeGreaterOrEqual 1
@@ -22,17 +42,17 @@
         $Events[0].LevelDisplayName | Should -Be 'Information'
     }
     It 'Should return proper LogName' {
-        $Events[0].LogName | Should -Be 'Application'
+        $Events[0].LogName | Should -Be $script:TestLogName
     }
     It 'Should return proper ID (EventID)' {
-        $Events[0].ID | Should -Be 5617
+        $Events[0].ID | Should -Be $script:TestEventId
     }
 }
 Describe 'Get-EVXEvent - MaxEvents Test' {
-    $Date = (Get-Date).AddDays(-60)
-    $Date1 = Get-Date
+    $Date = $script:DateFrom
+    $Date1 = $script:DateTo
 
-    $Events = Get-EVXEvent -Machine $Env:COMPUTERNAME -DateFrom $Date -DateTo $Date1 -ID 5617 -LogName 'Application' -MaxEvents 1 -AsArray
+    $Events = Get-EVXEvent -Machine $Env:COMPUTERNAME -DateFrom $Date -DateTo $Date1 -ID $script:TestEventId -LogName $script:TestLogName -MaxEvents 1 -AsArray
 
     $PSDefaultParameterValues = @{
         "It:TestCases" = @{ Date = $Date; Date1 = $Date1; Events = $Events }
@@ -40,7 +60,7 @@ Describe 'Get-EVXEvent - MaxEvents Test' {
 
     It 'Should have GatheredLogName, GatheredFrom fields properly filled in' {
         $Events[0].GatheredFrom | Should -Be $Env:COMPUTERNAME
-        $Events[0].GatheredLogName | Should -Be 'Application'
+        $Events[0].GatheredLogName | Should -Be $script:TestLogName
     }
     It 'Should have exactly 1 event' {
         $Events.Count | Should -BeExactly 1
@@ -52,18 +72,18 @@ Describe 'Get-EVXEvent - MaxEvents Test' {
         $Events[0].LevelDisplayName | Should -Be 'Information'
     }
     It 'Should return proper LogName' {
-        $Events[0].LogName | Should -Be 'Application'
+        $Events[0].LogName | Should -Be $script:TestLogName
     }
     It 'Should return proper ID (EventID)' {
-        $Events[0].ID | Should -Be 5617
+        $Events[0].ID | Should -Be $script:TestEventId
     }
 }
 
 Describe 'Get-EVXEvent - MaxEvents on 3 servers' {
-    $Date = (Get-Date).AddDays(-60)
-    $Date1 = Get-Date
+    $Date = $script:DateFrom
+    $Date1 = $script:DateTo
 
-    $Events = Get-EVXEvent -Machine $Env:COMPUTERNAME, $Env:COMPUTERNAME, $Env:COMPUTERNAME -DateFrom $Date -DateTo $Date1 -ID 5617 -LogName 'Application' -MaxEvents 1 -AsArray
+    $Events = Get-EVXEvent -Machine $Env:COMPUTERNAME, $Env:COMPUTERNAME, $Env:COMPUTERNAME -DateFrom $Date -DateTo $Date1 -ID $script:TestEventId -LogName $script:TestLogName -MaxEvents 1 -AsArray
 
     $PSDefaultParameterValues = @{
         "It:TestCases" = @{ Date = $Date; Date1 = $Date1; Events = $Events }
@@ -71,11 +91,11 @@ Describe 'Get-EVXEvent - MaxEvents on 3 servers' {
 
     It 'Should have GatheredLogName, GatheredFrom fields properly filled in' {
         $Events[0].GatheredFrom | Should -Be $Env:COMPUTERNAME
-        $Events[0].GatheredLogName | Should -Be 'Application'
+        $Events[0].GatheredLogName | Should -Be $script:TestLogName
         $Events[1].GatheredFrom | Should -Be $Env:COMPUTERNAME
-        $Events[1].GatheredLogName | Should -Be 'Application'
+        $Events[1].GatheredLogName | Should -Be $script:TestLogName
         $Events[2].GatheredFrom | Should -Be $Env:COMPUTERNAME
-        $Events[2].GatheredLogName | Should -Be 'Application'
+        $Events[2].GatheredLogName | Should -Be $script:TestLogName
     }
     It 'Should have exactly 1 event' {
         $Events.Count | Should -BeExactly 3
@@ -89,14 +109,14 @@ Describe 'Get-EVXEvent - MaxEvents on 3 servers' {
         $Events[2].LevelDisplayName | Should -Be 'Information'
     }
     It 'Should return proper LogName' {
-        $Events[0].LogName | Should -Be 'Application'
-        $Events[1].LogName | Should -Be 'Application'
-        $Events[2].LogName | Should -Be 'Application'
+        $Events[0].LogName | Should -Be $script:TestLogName
+        $Events[1].LogName | Should -Be $script:TestLogName
+        $Events[2].LogName | Should -Be $script:TestLogName
     }
     It 'Should return proper ID (EventID)' {
-        $Events[0].ID | Should -Be 5617
-        $Events[1].ID | Should -Be 5617
-        $Events[2].ID | Should -Be 5617
+        $Events[0].ID | Should -Be $script:TestEventId
+        $Events[1].ID | Should -Be $script:TestEventId
+        $Events[2].ID | Should -Be $script:TestEventId
     }
 }
 
@@ -172,8 +192,8 @@ Describe 'Get-EVXEvent - Parameter validation' {
 
 Describe 'Get-EVXEvent - Positional EventId' {
     It 'Allows positional EventId without ambiguity' {
-        $events = Get-EVXEvent 'Application' 5617 -MaxEvents 1 -AsArray
+        $events = Get-EVXEvent $script:TestLogName $script:TestEventId -MaxEvents 1 -AsArray
         $events | Should -HaveCount 1
-        $events[0].ID | Should -Be 5617
+        $events[0].ID | Should -Be $script:TestEventId
     }
 }
