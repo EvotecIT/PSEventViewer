@@ -83,10 +83,10 @@ public partial class SearchEvents : Settings {
         _logger.WriteVerbose($"Querying log '{logName}' on '{machineName} with query: {queryString}");
 
         EventLogQuery query = new EventLogQuery(logName, PathType.LogName, queryString);
-        // Use a remote session only when the target is not the local machine.
-        // Creating a remote EventLogSession to the local host can fail on locked-down
-        // systems (e.g., CI) and is unnecessary for local queries.
-        if (!string.IsNullOrEmpty(machineName) && !IsLocalMachine(machineName)) {
+        // When a machine name is provided, use an explicit EventLogSession to match
+        // legacy behavior and environment expectations (including CI runners),
+        // then rely on fallbacks below if it yields no events.
+        if (!string.IsNullOrEmpty(machineName)) {
             query.Session = new EventLogSession(machineName);
         }
 
