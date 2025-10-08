@@ -9,6 +9,21 @@ using System.Threading.Tasks;
 namespace EventViewerX;
 
 public partial class SearchEvents : Settings {
+    private static bool IsLocalMachine(string? name) {
+        if (string.IsNullOrEmpty(name)) return true;
+        var cmp = StringComparison.OrdinalIgnoreCase;
+        try {
+            if (name.Equals("localhost", cmp) || name.Equals(".", cmp)) return true;
+        } catch { }
+        try {
+            if (name.Equals(Environment.MachineName, cmp)) return true;
+        } catch { }
+        try {
+            var fqdn = GetFQDN();
+            if (!string.IsNullOrEmpty(fqdn) && name.Equals(fqdn, cmp)) return true;
+        } catch { }
+        return false;
+    }
     /// <summary>
     /// Initialize the EventSearching class with an internal logger
     /// </summary>
@@ -73,7 +88,7 @@ public partial class SearchEvents : Settings {
         _logger.WriteVerbose($"Querying log '{logName}' on '{machineName} with query: {queryString}");
 
         EventLogQuery query = new EventLogQuery(logName, PathType.LogName, queryString);
-        if (!string.IsNullOrEmpty(machineName)) {
+        if (!IsLocalMachine(machineName)) {
             query.Session = new EventLogSession(machineName);
         }
 
