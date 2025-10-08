@@ -83,10 +83,9 @@ public partial class SearchEvents : Settings {
         _logger.WriteVerbose($"Querying log '{logName}' on '{machineName} with query: {queryString}");
 
         EventLogQuery query = new EventLogQuery(logName, PathType.LogName, queryString);
-        // When a machine name is provided, use an explicit EventLogSession to match
-        // legacy behavior and environment expectations (including CI runners),
-        // then rely on fallbacks below if it yields no events.
-        if (!string.IsNullOrEmpty(machineName)) {
+        // Use an explicit remote session only for non-local machines; for local targets
+        // relying on the default session is more reliable and avoids permission quirks.
+        if (!string.IsNullOrEmpty(machineName) && !IsLocalMachine(machineName)) {
             query.Session = new EventLogSession(machineName);
         }
 
