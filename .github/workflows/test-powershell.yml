@@ -11,6 +11,7 @@ on:
   pull_request:
     branches:
       - master
+  workflow_dispatch:  # 👈 enables manual triggering
 
 env:
   DOTNET_VERSION: '8.x'
