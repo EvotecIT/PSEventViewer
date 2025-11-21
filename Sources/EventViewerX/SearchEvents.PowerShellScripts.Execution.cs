@@ -42,6 +42,7 @@ namespace EventViewerX {
                     yield break;
                 }
 
+                // Reverse direction keeps newest script blocks first; each read is bounded to avoid hung remote logs.
                 while (true) {
                     EventRecord? record = null;
                     try {

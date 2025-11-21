@@ -54,6 +54,7 @@ public partial class SearchEvents : Settings {
         }
     }
 
+    // Lightweight metadata call mirroring -ListLog; helps “wake” RPC without touching Security channel payloads.
     private static void TryListLogWarmup(EventLogSession session, string? machineName, int budgetMs)
     {
         try
