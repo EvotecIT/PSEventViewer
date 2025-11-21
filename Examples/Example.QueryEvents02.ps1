@@ -2,7 +2,7 @@
 Import-Module $PSScriptRoot\..\PSEventViewer.psd1 -Force
 
 $Output = Find-WinEvent -LogName 'Security' -EventId 4627 -Verbose -MachineName 'AD1', 'AD2', 'AD0', "ADRODC.ad.evotec.pl" -ParallelOption Parallel | Select-Object -First 2
-#$Output
+$Output.Count
 #$Output[0] | Format-List
 #$Output[0].MessageData
 return
