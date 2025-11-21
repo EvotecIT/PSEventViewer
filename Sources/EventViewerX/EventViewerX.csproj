@@ -14,6 +14,9 @@
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
         <IsWindows>true</IsWindows>
         <SupportedOSPlatform>windows</SupportedOSPlatform>
+        <DisableImplicitNuGetFallbackFolder>true</DisableImplicitNuGetFallbackFolder>
+        <RestoreAdditionalProjectFallbackFoldersExcludes>$(RestoreAdditionalProjectFallbackFoldersExcludes);C:\Program Files (x86)\Microsoft Visual Studio\Shared\NuGetPackages</RestoreAdditionalProjectFallbackFoldersExcludes>
+        <RestoreFallbackFolders />
     </PropertyGroup>
 
     <ItemGroup>

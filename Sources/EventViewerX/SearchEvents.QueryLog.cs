@@ -9,6 +9,8 @@ using System.Threading.Tasks;
 namespace EventViewerX;
 
 public partial class SearchEvents : Settings {
+    // Query path budget: short enough to drop bad hosts, long enough to open Security on DCs.
+    private const int QuerySessionTimeoutMs = 15000;
     /// <summary>
     /// Initialize the EventSearching class with an internal logger
     /// </summary>
@@ -20,12 +22,12 @@ public partial class SearchEvents : Settings {
     }
 
     /// <summary>
-    /// Create an event log reader allowing for catching errors and logging them
+    /// Create an event log reader allowing for catching errors and logging them.
     /// </summary>
     /// <param name="query">The query.</param>
     /// <param name="machineName">Name of the machine.</param>
     /// <returns>Initialized <see cref="EventLogReader"/> or null when failed.</returns>
-    private static EventLogReader CreateEventLogReader(EventLogQuery query, string? machineName) {
+    private static EventLogReader CreateEventLogReader(EventLogQuery query, string? machineName, int constructorTimeoutMs = QuerySessionTimeoutMs) {
         string targetMachine = string.IsNullOrEmpty(machineName) ? GetFQDN() : machineName;
         if (query == null) {
             _logger.WriteWarning($"An error occurred on {targetMachine} while creating the event log reader: Query cannot be null.");
@@ -33,7 +35,13 @@ public partial class SearchEvents : Settings {
         }
 
         try {
-            return new EventLogReader(query);
+            var createTask = Task.Run(() => new EventLogReader(query));
+            var completed = Task.WhenAny(createTask, Task.Delay(constructorTimeoutMs)).GetAwaiter().GetResult();
+            if (completed != createTask) {
+                _logger.WriteWarning($"Reader create timed out on {targetMachine} after {constructorTimeoutMs} ms");
+                return null;
+            }
+            return createTask.GetAwaiter().GetResult();
         } catch (EventLogException ex) {
             _logger.WriteWarning($"An error occurred on {targetMachine} while creating the event log reader: {ex.Message}");
             return null!;
@@ -43,6 +51,23 @@ public partial class SearchEvents : Settings {
         } catch (Exception ex) {
             _logger.WriteWarning($"An error occurred on {targetMachine} while creating the event log reader: {ex.Message}");
             return null!;
+        }
+    }
+
+    private static void TryListLogWarmup(EventLogSession session, string? machineName, int budgetMs)
+    {
+        try
+        {
+            var namesTask = Task.Run(() => session.GetLogNames());
+            var done = Task.WhenAny(namesTask, Task.Delay(budgetMs)).GetAwaiter().GetResult();
+            if (done != namesTask)
+            {
+                _logger.WriteVerbose($"ListLog warm-up timed out on {machineName ?? GetFQDN()} after {budgetMs} ms");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.WriteVerbose($"ListLog warm-up failed on {machineName ?? GetFQDN()}: {ex.Message}");
         }
     }
 
@@ -57,7 +82,7 @@ public partial class SearchEvents : Settings {
     /// <param name="startTime">Optional start time to filter events from.</param>
     /// <param name="endTime">Optional end time to filter events until.</param>
     /// <param name="userId">Optional user ID to filter events by.</param>
-    private static IEnumerable<EventObject> QueryLogEnumerable(string logName, List<int>? eventIds = null, string? machineName = null, string? providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string? userId = null, int maxEvents = 0, List<long>? eventRecordId = null, TimePeriod? timePeriod = null, CancellationToken cancellationToken = default) {
+    private static IEnumerable<EventObject> QueryLogEnumerable(string logName, List<int>? eventIds = null, string? machineName = null, string? providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string? userId = null, int maxEvents = 0, List<long>? eventRecordId = null, TimePeriod? timePeriod = null, int sessionTimeoutMs = QuerySessionTimeoutMs, CancellationToken cancellationToken = default) {
         if (eventIds != null && eventIds.Any(id => id <= 0)) {
             throw new ArgumentException("Event IDs must be positive.", nameof(eventIds));
         }
@@ -72,26 +97,64 @@ public partial class SearchEvents : Settings {
 
         _logger.WriteVerbose($"Querying log '{logName}' on '{machineName} with query: {queryString}");
 
-        EventLogQuery query = new EventLogQuery(logName, PathType.LogName, queryString);
+        EventLogSession? session = null;
+        EventLogQuery query = new EventLogQuery(logName, PathType.LogName, queryString)
+        {
+            ReverseDirection = true,
+            TolerateQueryErrors = true
+        };
         if (!string.IsNullOrEmpty(machineName)) {
-            query.Session = new EventLogSession(machineName);
+            session = CreateSession(machineName, "QueryLog", logName, sessionTimeoutMs);
+            if (session == null) yield break;
+            query.Session = session;
+            // Fast, light-weight warm-up mirroring DisplayEventLogs
+            TryListLogWarmup(session, machineName, Math.Min(3000, sessionTimeoutMs / 2));
         }
 
         var queriedMachine = string.IsNullOrEmpty(machineName) ? GetFQDN() : machineName;
 
         EventRecord record;
-        using (EventLogReader reader = CreateEventLogReader(query, machineName)) {
-            if (reader != null) {
-                int eventCount = 0;
-                while (!cancellationToken.IsCancellationRequested && (record = reader.ReadEvent()) != null) {
-                    EventObject eventObject = new EventObject(record, queriedMachine);
-                    yield return eventObject;
-                    eventCount++;
-                    if (maxEvents > 0 && eventCount >= maxEvents) {
-                        break;
+        try
+        {
+            // Use the same short constructor budget as DisplayEventLogs preflight to fail fast on semi-dead hosts.
+            using (EventLogReader reader = CreateEventLogReader(query, machineName, sessionTimeoutMs)) {
+                if (reader != null) {
+                    int eventCount = 0;
+                    while (!cancellationToken.IsCancellationRequested) {
+                        EventRecord? next = null;
+                        try {
+                            // Bound each read so dead hosts don't hang forever
+                            var readTask = Task.Run(() => reader.ReadEvent(TimeSpan.FromMilliseconds(750)));
+                            var completed = Task.WhenAny(readTask, Task.Delay(sessionTimeoutMs, cancellationToken)).GetAwaiter().GetResult();
+                            if (completed != readTask) {
+                                _logger.WriteWarning($"Timed out reading events from {queriedMachine} after {sessionTimeoutMs} ms");
+                                break;
+                            }
+                            next = readTask.GetAwaiter().GetResult();
+                        } catch (OperationCanceledException) {
+                            break;
+                        } catch (Exception ex) when (ex is EventLogException or UnauthorizedAccessException) {
+                            _logger.WriteWarning($"An error occurred on {queriedMachine} while reading the event log: {ex.Message}");
+                            break;
+                        }
+
+                        if (next == null) {
+                            break;
+                        }
+
+                        EventObject eventObject = new EventObject(next, queriedMachine);
+                        yield return eventObject;
+                        eventCount++;
+                        if (maxEvents > 0 && eventCount >= maxEvents) {
+                            break;
+                        }
                     }
                 }
             }
+        }
+        finally
+        {
+            session?.Dispose();
         }
     }
 
@@ -112,7 +175,7 @@ public partial class SearchEvents : Settings {
     /// <param name="timePeriod">The time period.</param>
     /// <returns>Enumerable collection of matching events.</returns>
     public static IEnumerable<EventObject> QueryLog(string logName, List<int>? eventIds = null, string? machineName = null, string? providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string? userId = null, int maxEvents = 0, List<long>? eventRecordId = null, TimePeriod? timePeriod = null, CancellationToken cancellationToken = default) {
-        return QueryLogEnumerable(logName, eventIds, machineName, providerName, keywords, level, startTime, endTime, userId, maxEvents, eventRecordId, timePeriod, cancellationToken);
+        return QueryLogEnumerable(logName, eventIds, machineName, providerName, keywords, level, startTime, endTime, userId, maxEvents, eventRecordId, timePeriod, QuerySessionTimeoutMs, cancellationToken);
     }
 
     public static IEnumerable<EventObject> QueryLog(KnownLog logName, List<int>? eventIds = null, string? machineName = null, string? providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string? userId = null, int maxEvents = 0, List<long>? eventRecordId = null, TimePeriod? timePeriod = null, CancellationToken cancellationToken = default) {
@@ -120,7 +183,7 @@ public partial class SearchEvents : Settings {
     }
 
     public static async Task<IEnumerable<EventObject>> QueryLogAsync(string logName, List<int> eventIds = null, string machineName = null, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null, int maxEvents = 0, List<long> eventRecordId = null, TimePeriod? timePeriod = null, CancellationToken cancellationToken = default) {
-        return await Task.Run(() => QueryLogEnumerable(logName, eventIds, machineName, providerName, keywords, level, startTime, endTime, userId, maxEvents, eventRecordId, timePeriod, cancellationToken).ToList().AsEnumerable(), cancellationToken);
+        return await Task.Run(() => QueryLogEnumerable(logName, eventIds, machineName, providerName, keywords, level, startTime, endTime, userId, maxEvents, eventRecordId, timePeriod, QuerySessionTimeoutMs, cancellationToken).ToList().AsEnumerable(), cancellationToken);
     }
 
     /// <summary>

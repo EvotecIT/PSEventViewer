@@ -17,9 +17,8 @@ public partial class SearchEvents : Settings {
 
         EventLogSession? session = null;
         try {
-            session = string.IsNullOrEmpty(machineName)
-                ? new EventLogSession()
-                : new EventLogSession(machineName);
+            session = CreateSession(machineName, "ChannelPolicy.Get", logName, DefaultSessionTimeoutMs);
+            if (session == null) return null;
 
             try {
                 using var cfg = new EventLogConfiguration(logName, session);

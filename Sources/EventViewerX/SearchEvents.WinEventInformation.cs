@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics.Eventing.Reader;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Security.AccessControl;
 
 namespace EventViewerX {
@@ -175,16 +176,28 @@ namespace EventViewerX {
         }
 
         private static DateTime? GetEventTime(string logName, string machine, bool newest) {
+            EventLogSession? session = null;
             try {
                 var query = new EventLogQuery(logName, PathType.LogName) { ReverseDirection = newest };
                 if (!string.IsNullOrEmpty(machine)) {
-                    query.Session = new EventLogSession(machine);
+                    session = CreateSession(machine, "WinEventInformation", logName, DefaultSessionTimeoutMs);
+                    if (session == null) return null;
+                    query.Session = session;
                 }
+
                 using var reader = new EventLogReader(query);
-                var rec = reader.ReadEvent();
+                var readTask = Task.Run(() => reader.ReadEvent(TimeSpan.FromMilliseconds(750)));
+                var completed = Task.WhenAny(readTask, Task.Delay(DefaultSessionTimeoutMs)).GetAwaiter().GetResult();
+                if (completed != readTask) {
+                    return null;
+                }
+                var rec = readTask.GetAwaiter().GetResult();
                 return rec?.TimeCreated;
             } catch {
                 return null;
+            }
+            finally {
+                session?.Dispose();
             }
         }
 
