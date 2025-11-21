@@ -44,6 +44,7 @@ namespace EventViewerX {
 
         private EventLogSession? _eventLogSession;
         private EventLogWatcher? _eventLogWatcher;
+        private int _disposed;
 
         private string? _machineName;
 
@@ -129,6 +130,9 @@ namespace EventViewerX {
         /// Stops watching and cleans up resources.
         /// </summary>
         public void Dispose() {
+            if (Interlocked.Exchange(ref _disposed, 1) == 1) {
+                return;
+            }
             if (_eventLogWatcher != null) {
                 _eventLogWatcher.EventRecordWritten -= DetectEventsLogCallback;
                 _eventLogWatcher.Enabled = false;

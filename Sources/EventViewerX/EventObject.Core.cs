@@ -40,8 +40,9 @@ namespace EventViewerX {
 
         /// <summary>
         /// Human readable event level name.
+        /// Falls back to numeric level when the provider omits a display string (e.g., synthetic or test events).
         /// </summary>
-        public string LevelDisplayName => _eventRecord.LevelDisplayName;
+        public string LevelDisplayName => _eventRecord.LevelDisplayName ?? LevelToDisplayName(_eventRecord.Level);
 
         /// <summary>
         /// Provider that generated the event.
@@ -215,6 +216,18 @@ namespace EventViewerX {
             }
             NicIdentifiers = ExtractNicIdentifiers();
             Attachments = ExtractAttachments(XMLData);
+        }
+
+        private static string LevelToDisplayName(byte? level)
+        {
+            return level switch {
+                1 => "Critical",
+                2 => "Error",
+                3 => "Warning",
+                4 => "Information",
+                5 => "Verbose",
+                _ => level?.ToString() ?? string.Empty
+            };
         }
     }
 }
