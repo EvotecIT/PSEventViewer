@@ -11,8 +11,7 @@ namespace PSEventViewer;
 [Cmdlet(VerbsCommon.New, "EVXLog", SupportsShouldProcess = true)]
 [Alias("New-EventViewerXLog", "New-WinEventLog")]
 [OutputType(typeof(bool))]
-public sealed class CmdletNewEVXLog : AsyncPSCmdlet
-{
+public sealed class CmdletNewEVXLog : AsyncPSCmdlet {
     /// <summary>
     /// Name of the log to create.
     /// </summary>
@@ -25,6 +24,12 @@ public sealed class CmdletNewEVXLog : AsyncPSCmdlet
     [Alias("Source", "Provider")]
     [Parameter(Position = 1)]
     public string ProviderName { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Optional log name to scope source creation checks (defaults to the log being created when provided).
+    /// </summary>
+    [Parameter]
+    public string SourceLogName { get; set; }
 
     /// <summary>
     /// Target machine on which to create the log.
@@ -54,35 +59,25 @@ public sealed class CmdletNewEVXLog : AsyncPSCmdlet
     /// <summary>
     /// Creates the event log with the specified options.
     /// </summary>
-    protected override Task ProcessRecordAsync()
-    {
+    protected override Task ProcessRecordAsync() {
         var errorAction = GetErrorActionPreference();
-        if (string.IsNullOrEmpty(ProviderName))
-        {
+        if (string.IsNullOrEmpty(ProviderName)) {
             ProviderName = LogName;
         }
 
-        try
-        {
-            if (ShouldProcess($"{LogName} on {MachineName ?? "localhost"}", "Create event log"))
-            {
-                bool result = SearchEvents.CreateLog(LogName, ProviderName, MachineName, MaximumKilobytes, OverflowAction, RetentionDays);
+        try {
+            if (ShouldProcess($"{LogName} on {MachineName ?? "localhost"}", "Create event log")) {
+                var sourceLog = string.IsNullOrEmpty(SourceLogName) ? LogName : SourceLogName;
+                bool result = SearchEvents.CreateLog(LogName, ProviderName, MachineName, MaximumKilobytes, OverflowAction, RetentionDays, sourceLog);
                 WriteObject(result);
-            }
-            else
-            {
+            } else {
                 WriteObject(false);
             }
-        }
-        catch (Exception ex)
-        {
+        } catch (Exception ex) {
             WriteWarning($"New-EVXLog - Error creating log {LogName}: {ex.Message}");
-            if (errorAction == ActionPreference.Stop)
-            {
+            if (errorAction == ActionPreference.Stop) {
                 ThrowTerminatingError(new ErrorRecord(ex, "NewEVXLogFailed", ErrorCategory.InvalidOperation, LogName));
-            }
-            else
-            {
+            } else {
                 WriteObject(false);
             }
         }
