@@ -53,27 +53,52 @@ public partial class SearchEvents : Settings {
     /// <param name="machineName">Name of the machine.</param>
     /// <returns><c>true</c> when source exists or is created.</returns>
     public static bool CreateLogSource(string source, string log, string? machineName = null) {
+        if (string.IsNullOrWhiteSpace(source) || string.IsNullOrWhiteSpace(log)) {
+            return false;
+        }
+
+        string key = BuildSourceKey(source, log, machineName);
+
         try {
-            if (string.IsNullOrEmpty(machineName)) {
-                if (!EventLog.SourceExists(source)) {
-                    LoggingMessages.Logger.WriteVerbose($"Creating event source {source}.");
-                    EventLog.CreateEventSource(source, log);
+            bool exists = SourceExistsSafe(source, log, machineName);
+            if (!exists) {
+                if (string.IsNullOrEmpty(machineName) && !HasLocalAdmin()) {
+                    if (_sourceDenied.TryAdd(key, true)) {
+                        LoggingMessages.Logger.WriteWarning($"Insufficient privileges to create event source '{source}' for log '{log}'. Run as administrator to create it.");
+                    }
+                    return false;
                 }
-            } else {
-                if (!EventLog.SourceExists(source, machineName)) {
-                    LoggingMessages.Logger.WriteVerbose($"Creating event source {source} on machine {machineName}.");
-                    EventLog.CreateEventSource(new EventSourceCreationData(source, log) { MachineName = machineName });
+
+                LoggingMessages.Logger.WriteVerbose(string.IsNullOrEmpty(machineName)
+                    ? $"Creating event source {source} for log {log}."
+                    : $"Creating event source {source} for log {log} on machine {machineName}.");
+
+                var data = new EventSourceCreationData(source, log);
+                if (!string.IsNullOrEmpty(machineName)) {
+                    data.MachineName = machineName;
                 }
+
+                EventLog.CreateEventSource(data);
             }
+
+            _sourceCache[key] = true;
+            _sourceDenied.TryRemove(key, out _);
+            return true;
+        } catch (System.ComponentModel.Win32Exception ex) when (ex.NativeErrorCode == 183) {
+            _sourceCache[key] = true;
+            _sourceDenied.TryRemove(key, out _);
             return true;
         } catch (System.Security.SecurityException ex) {
-            // Handle the security exception
-            LoggingMessages.Logger.WriteWarning("Couldn't create event log. Error: " + ex.Message);
+            if (_sourceDenied.TryAdd(key, true)) {
+                LoggingMessages.Logger.WriteWarning($"Unable to create event source '{source}' for log '{log}': {ex.Message}");
+            }
+        } catch (UnauthorizedAccessException ex) {
+            if (_sourceDenied.TryAdd(key, true)) {
+                LoggingMessages.Logger.WriteWarning($"Unable to create event source '{source}' for log '{log}': {ex.Message}");
+            }
         } catch (System.ArgumentException ex) {
-            // Handle argument exception
             LoggingMessages.Logger.WriteWarning("Couldn't create event log. Error: " + ex.Message);
         } catch (Exception ex) {
-            // Handle any other type of exception
             LoggingMessages.Logger.WriteWarning("Couldn't create event log. Error: " + ex.Message);
         }
 

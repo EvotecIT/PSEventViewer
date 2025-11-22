@@ -3,6 +3,7 @@ namespace PSEventViewer;
 using System.Diagnostics;
 using System.Management.Automation;
 using System.Threading.Tasks;
+using EventViewerX;
 
 /// <summary>
 /// Removes an event source from Windows Event Log.
@@ -19,6 +20,12 @@ public sealed class CmdletRemoveEVXSource : AsyncPSCmdlet {
     public string SourceName { get; set; }
 
     /// <summary>
+    /// Optional log name to scope source checks (avoids probing Security/State). Defaults to Application when specified.
+    /// </summary>
+    [Parameter]
+    public string LogName { get; set; }
+
+    /// <summary>
     /// Target computer where the source resides.
     /// </summary>
     [Parameter]
@@ -31,34 +38,23 @@ public sealed class CmdletRemoveEVXSource : AsyncPSCmdlet {
     protected override Task ProcessRecordAsync() {
         var errorAction = GetErrorActionPreference();
         try {
-            if (string.IsNullOrEmpty(MachineName)) {
-                if (EventLog.SourceExists(SourceName)) {
-                    if (ShouldProcess(SourceName, "Delete event source")) {
-                        EventLog.DeleteEventSource(SourceName);
-                    } else {
-                        WriteObject(false);
-                        return Task.CompletedTask;
-                    }
-                } else {
-                    WriteWarning($"Remove-EVXSource - Source {SourceName} was not found.");
-                    WriteObject(false);
-                    return Task.CompletedTask;
-                }
-            } else {
-                if (EventLog.SourceExists(SourceName, MachineName)) {
-                    if (ShouldProcess($"{SourceName} on {MachineName}", "Delete event source")) {
-                        EventLog.DeleteEventSource(SourceName, MachineName);
-                    } else {
-                        WriteObject(false);
-                        return Task.CompletedTask;
-                    }
-                } else {
-                    WriteWarning($"Remove-EVXSource - Source {SourceName} was not found on {MachineName}.");
-                    WriteObject(false);
-                    return Task.CompletedTask;
-                }
+            string target = string.IsNullOrEmpty(MachineName)
+                ? SourceName
+                : $"{SourceName} on {MachineName}";
+
+            if (!ShouldProcess(target, "Delete event source")) {
+                WriteObject(false);
+                return Task.CompletedTask;
             }
-            WriteObject(true);
+
+            bool removed = SearchEvents.RemoveSource(SourceName, MachineName, LogName);
+            if (!removed) {
+                WriteWarning(string.IsNullOrEmpty(MachineName)
+                    ? $"Remove-EVXSource - Source {SourceName} was not found."
+                    : $"Remove-EVXSource - Source {SourceName} was not found on {MachineName}.");
+            }
+
+            WriteObject(removed);
         } catch (Exception ex) {
             WriteWarning($"Remove-EVXSource - Error removing source {SourceName}: {ex.Message}");
             if (errorAction == ActionPreference.Stop) {

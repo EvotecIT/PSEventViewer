@@ -10,8 +10,7 @@ namespace PSEventViewer;
 [Cmdlet(VerbsCommon.Clear, "EVXLog", SupportsShouldProcess = true)]
 [Alias("Clear-EventViewerXLog", "Clear-WinEventLog")]
 [OutputType(typeof(bool))]
-public sealed class CmdletClearEVXLog : AsyncPSCmdlet
-{
+public sealed class CmdletClearEVXLog : AsyncPSCmdlet {
     /// <summary>Log name to clear.</summary>
     [Parameter(Mandatory = true, Position = 0)]
     public string LogName { get; set; }
@@ -26,30 +25,20 @@ public sealed class CmdletClearEVXLog : AsyncPSCmdlet
     public int? RetentionDays { get; set; }
 
     /// <summary>Performs log clearing.</summary>
-    protected override Task ProcessRecordAsync()
-    {
+    protected override Task ProcessRecordAsync() {
         var errorAction = GetErrorActionPreference();
-        try
-        {
-            if (ShouldProcess($"{LogName} on {MachineName ?? "localhost"}", "Clear event log"))
-            {
+        try {
+            if (ShouldProcess($"{LogName} on {MachineName ?? "localhost"}", "Clear event log")) {
                 bool result = SearchEvents.ClearLog(LogName, MachineName, RetentionDays);
                 WriteObject(result);
-            }
-            else
-            {
+            } else {
                 WriteObject(false);
             }
-        }
-        catch (Exception ex)
-        {
+        } catch (Exception ex) {
             WriteWarning($"Clear-EVXLog - Error clearing log {LogName}: {ex.Message}");
-            if (errorAction == ActionPreference.Stop)
-            {
+            if (errorAction == ActionPreference.Stop) {
                 ThrowTerminatingError(new ErrorRecord(ex, "ClearEVXLogFailed", ErrorCategory.InvalidOperation, LogName));
-            }
-            else
-            {
+            } else {
                 WriteObject(false);
             }
         }
