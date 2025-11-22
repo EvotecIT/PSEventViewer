@@ -71,6 +71,28 @@ $BinaryDev = @(
     }
 )
 
+# if ($Development) {
+#     # Preload BCL helper assemblies to avoid version mismatches inside the VSCode PowerShell host (Desktop 5.1).
+#     $PreloadAssemblies = @(
+#         'Microsoft.Bcl.AsyncInterfaces.dll',
+#         'System.Threading.Tasks.Extensions.dll',
+#         'System.Memory.dll',
+#         'System.Buffers.dll',
+#         'System.Numerics.Vectors.dll',
+#         'System.Runtime.CompilerServices.Unsafe.dll'
+#     )
+#     foreach ($Preload in $PreloadAssemblies) {
+#         $PreloadPath = Join-Path $DevelopmentAssemblyFolder.Path $Preload
+#         if (Test-Path $PreloadPath) {
+#             try {
+#                 [System.Reflection.Assembly]::LoadFrom($PreloadPath) | Out-Null
+#             } catch {
+#                 Write-Verbose ("Failed to preload {0}: {1}" -f $PreloadPath, $_.Exception.Message)
+#             }
+#         }
+#     }
+# }
+
 if ($Development) {
     $Assembly = Get-ChildItem -Path "$($DevelopmentAssemblyFolder.Path)\*.dll" -ErrorAction SilentlyContinue -File
 } else {
