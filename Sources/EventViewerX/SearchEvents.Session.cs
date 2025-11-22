@@ -10,6 +10,7 @@ public partial class SearchEvents : Settings
 {
     private const int DefaultSessionTimeoutMs = 5000;
     private const int DefaultRpcProbeTimeoutMs = 2500;
+    private const int DefaultPingTimeoutMs = 1000;
     private const int NegativeCacheTtlSeconds = 15;
 
     private static readonly ConcurrentDictionary<string, DateTime> _unreachable = new(StringComparer.OrdinalIgnoreCase);
@@ -44,7 +45,7 @@ public partial class SearchEvents : Settings
         try
         {
             using var ping = new System.Net.NetworkInformation.Ping();
-            var reply = ping.Send(machineName, Math.Min(1000, budget));
+            var reply = ping.Send(machineName, Math.Min(DefaultPingTimeoutMs, budget));
             if (reply == null || reply.Status != System.Net.NetworkInformation.IPStatus.Success)
             {
                 _logger.WriteWarning($"{purpose ?? "Session"}: ping failed for '{machineName}' when opening '{logName}'. Skipping.");
@@ -52,7 +53,10 @@ public partial class SearchEvents : Settings
                 return null;
             }
         }
-        catch { /* ignore ping errors and continue to session attempt */ }
+        catch (Exception ex)
+        {
+            _logger.WriteVerbose($"{purpose ?? "Session"}: ping probe failed for '{machineName}' ({ex.Message}), continuing to session attempt.");
+        }
 
         // RPC (135) preflight to avoid EventLogSession hangs on dead/filtered hosts
         if (!RpcProbe(normalizedHost, Math.Min(DefaultRpcProbeTimeoutMs, budget)))
@@ -116,6 +120,7 @@ public partial class SearchEvents : Settings
 
     private static bool RpcProbe(string host, int timeoutMs)
     {
+        string lowerHost = host?.ToLowerInvariant() ?? string.Empty;
         try
         {
             using var tcp = new TcpClient();
@@ -127,8 +132,9 @@ public partial class SearchEvents : Settings
             }
             return true;
         }
-        catch
+        catch (Exception ex)
         {
+            _logger.WriteVerbose($"Session: RPC probe failed for '{host}': {ex.Message}");
             return false;
         }
     }
@@ -138,10 +144,11 @@ public partial class SearchEvents : Settings
         try
         {
             if (string.IsNullOrWhiteSpace(host)) return false;
-            if (_unreachable.TryGetValue(host.ToLowerInvariant(), out var until))
+            string lower = host.ToLowerInvariant();
+            if (_unreachable.TryGetValue(lower, out var until))
             {
                 if (until > DateTime.UtcNow) return true;
-                _unreachable.TryRemove(host.ToLowerInvariant(), out _);
+                _unreachable.TryRemove(lower, out _);
             }
             return false;
         }
@@ -153,7 +160,8 @@ public partial class SearchEvents : Settings
         try
         {
             if (string.IsNullOrWhiteSpace(host)) return;
-            _unreachable[host.ToLowerInvariant()] = DateTime.UtcNow.AddSeconds(NegativeCacheTtlSeconds);
+            string lower = host.ToLowerInvariant();
+            _unreachable[lower] = DateTime.UtcNow.AddSeconds(NegativeCacheTtlSeconds);
         }
         catch { }
     }
@@ -163,7 +171,8 @@ public partial class SearchEvents : Settings
         try
         {
             if (string.IsNullOrWhiteSpace(host)) return;
-            _unreachable.TryRemove(host.ToLowerInvariant(), out _);
+            string lower = host.ToLowerInvariant();
+            _unreachable.TryRemove(lower, out _);
         }
         catch { }
     }

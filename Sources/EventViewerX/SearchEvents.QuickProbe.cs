@@ -10,6 +10,9 @@ namespace EventViewerX;
 /// </summary>
 public partial class SearchEvents : Settings
 {
+    private const int QuickProbeReadTimeoutMs = 750;
+    private const int QuickProbeMinPerReadMs = 200;
+
     /// <summary>Status of a quick probe.</summary>
     public enum QuickProbeStatus
     {
@@ -86,19 +89,22 @@ public partial class SearchEvents : Settings
 
                 // Bound each ReadEvent call so RPC stalls can't exceed the overall budget
                 TimeSpan perReadBudget = timeout.Value - sw.Elapsed;
-                if (perReadBudget < TimeSpan.FromMilliseconds(200)) perReadBudget = TimeSpan.FromMilliseconds(200);
+                if (perReadBudget < TimeSpan.FromMilliseconds(QuickProbeMinPerReadMs)) perReadBudget = TimeSpan.FromMilliseconds(QuickProbeMinPerReadMs);
 
                 EventRecord? rec = null;
                 try
                 {
-                    var readTask = Task.Run(() => reader.ReadEvent(TimeSpan.FromMilliseconds(750)));
-                    var completed = Task.WhenAny(readTask, Task.Delay(perReadBudget)).GetAwaiter().GetResult();
-                    if (completed != readTask)
+                    // Synchronous bounded read avoids runaway Task.Run that could keep RPC handles alive.
+                    var readWindow = perReadBudget < TimeSpan.FromMilliseconds(QuickProbeReadTimeoutMs)
+                        ? perReadBudget
+                        : TimeSpan.FromMilliseconds(QuickProbeReadTimeoutMs);
+
+                    rec = reader.ReadEvent(readWindow);
+                    if (rec == null)
                     {
                         return new QuickProbeResult(logName, machineName ?? GetFQDN(), null, QuickProbeStatus.Timeout,
                             $"Timed out after {timeout.Value.TotalMilliseconds:F0} ms", scanned, null, sw.Elapsed);
                     }
-                    rec = readTask.GetAwaiter().GetResult();
                 }
                 catch (EventLogException ex)
                 {
@@ -169,19 +175,21 @@ public partial class SearchEvents : Settings
                 }
 
                 TimeSpan perReadBudget = timeout.Value - sw.Elapsed;
-                if (perReadBudget < TimeSpan.FromMilliseconds(200)) perReadBudget = TimeSpan.FromMilliseconds(200);
+                if (perReadBudget < TimeSpan.FromMilliseconds(QuickProbeMinPerReadMs)) perReadBudget = TimeSpan.FromMilliseconds(QuickProbeMinPerReadMs);
 
                 EventRecord? rec = null;
                 try
                 {
-                    var readTask = Task.Run(() => reader.ReadEvent(TimeSpan.FromMilliseconds(750)));
-                    var completed = Task.WhenAny(readTask, Task.Delay(perReadBudget)).GetAwaiter().GetResult();
-                    if (completed != readTask)
+                    var readWindow = perReadBudget < TimeSpan.FromMilliseconds(QuickProbeReadTimeoutMs)
+                        ? perReadBudget
+                        : TimeSpan.FromMilliseconds(QuickProbeReadTimeoutMs);
+
+                    rec = reader.ReadEvent(readWindow);
+                    if (rec == null)
                     {
                         return new QuickProbeResult(logName, machineName ?? GetFQDN(), null, QuickProbeStatus.Timeout,
                             $"Timed out after {timeout.Value.TotalMilliseconds:F0} ms", scanned, null, sw.Elapsed);
                     }
-                    rec = readTask.GetAwaiter().GetResult();
                 }
                 catch (EventLogException ex)
                 {

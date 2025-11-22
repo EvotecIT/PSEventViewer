@@ -192,9 +192,12 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
     public Hashtable NamedDataExcludeFilter { get; set; }
 
     /// <summary>
-    /// Disables parallel processing of file queries.
+    /// Disables parallel processing of queries.
     /// </summary>
     [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "RecordId")]
+    [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
     public SwitchParameter DisableParallel { get; set; }
 
     /// <summary>
@@ -258,6 +261,10 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
         token = CancelToken;
 #endif
         List<object> results = AsArray ? new List<object>() : null;
+
+        if (DisableParallel.IsPresent) {
+            ParallelOption = ParallelOption.Disabled;
+        }
 
         if (ParameterSetName == "ListLog") {
             foreach (EventLogDetails log in SearchEvents.DisplayEventLogsParallel(ListLog, MachineName, NumberOfThreads, token)) {

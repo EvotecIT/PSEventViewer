@@ -132,7 +132,8 @@ public partial class SearchEvents : Settings {
                 int eventCount = 0;
                 var overall = Stopwatch.StartNew();
                 int perReadMs = Math.Min(2000, Math.Max(750, sessionTimeoutMs / 3));
-                while (!cancellationToken.IsCancellationRequested) {
+                while (true) {
+                    cancellationToken.ThrowIfCancellationRequested();
                     EventRecord? next = null;
                     try {
                         // Bound each read so dead hosts don't hang forever, but keep overall budget.

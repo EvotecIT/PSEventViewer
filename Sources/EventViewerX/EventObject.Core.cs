@@ -42,7 +42,9 @@ namespace EventViewerX {
         /// Human readable event level name.
         /// Falls back to numeric level when the provider omits a display string (e.g., synthetic or test events).
         /// </summary>
-        public string LevelDisplayName => _eventRecord.LevelDisplayName ?? LevelToDisplayName(_eventRecord.Level);
+        private readonly string _levelDisplayName;
+
+        public string LevelDisplayName => _levelDisplayName;
 
         /// <summary>
         /// Provider that generated the event.
@@ -197,6 +199,20 @@ namespace EventViewerX {
         public EventObject(EventRecord eventRecord, string queriedMachine) {
             QueriedMachine = queriedMachine;
             _eventRecord = eventRecord;
+
+            try {
+                _levelDisplayName = eventRecord.LevelDisplayName;
+            } catch (EventLogNotFoundException) {
+                // Some offline .evtx files reference providers that are not installed on the host.
+                // When the metadata DLL is missing, EventLogReader throws while resolving the display name.
+                _levelDisplayName = null;
+            } catch (EventLogException) {
+                _levelDisplayName = null;
+            }
+
+            if (string.IsNullOrEmpty(_levelDisplayName)) {
+                _levelDisplayName = LevelToDisplayName(eventRecord.Level);
+            }
 
             ContainerLog = ((EventLogRecord)_eventRecord).ContainerLog;
 
