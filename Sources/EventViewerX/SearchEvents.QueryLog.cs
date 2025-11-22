@@ -146,10 +146,10 @@ public partial class SearchEvents : Settings {
                     } catch (OperationCanceledException) {
                         break;
                     } catch (InvalidOperationException ex) {
-                        if (eventCount > 0) {
-                            _logger.WriteVerbose($"Reader closed on {queriedMachine} after {eventCount} events: {ex.Message}");
-                        } else {
-                            _logger.WriteWarning($"An error occurred on {queriedMachine} while reading the event log: {ex.Message}");
+                        // Some remote hosts close the reader handle mid-stream (wevtsvc/rollover/throttle).
+                        // If we already returned events, treat it as EOF and stay quiet; otherwise warn once.
+                        if (eventCount == 0) {
+                            _logger.WriteWarning($"Reader became invalid on {queriedMachine} before any events: {ex.Message}");
                         }
                         break;
                     } catch (Exception ex) when (ex is EventLogException or UnauthorizedAccessException) {
