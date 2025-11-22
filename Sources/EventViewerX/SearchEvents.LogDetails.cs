@@ -113,6 +113,7 @@ public partial class SearchEvents : Settings {
         bool ownsSession = false;
         try {
             if (!string.IsNullOrEmpty(machineName)) {
+                ClearHostCache(machineName);
                 session = CreateSession(machineName, "DisplayEventLogs", "*", DefaultSessionTimeoutMs);
                 ownsSession = true;
             } else {
@@ -158,22 +159,22 @@ public partial class SearchEvents : Settings {
                 // Rest of your code...
             } catch (EventLogException ex) {
                 logConfig = null;
-                _logger.WriteWarning("Couldn't create EventLogConfiguration for " + logName + ". Error: " + ex.Message);
+                _logger.WriteWarning($"Couldn't create EventLogConfiguration for {logName} on {machineName}. Error: {ex.Message}");
             }
             EventLogInformation logInfoObj;
             try {
                 logInfoObj = session.GetLogInformation(logName, PathType.LogName);
             } catch (Exception ex) {
                 logInfoObj = null;
-                _logger.WriteWarning("Couldn't get log information for " + logName + ". Error: " + ex.Message);
+                _logger.WriteWarning($"Couldn't get log information for {logName} on {machineName}. Error: {ex.Message}");
             }
 
             if (logInfoObj == null) {
-                _logger.WriteVerbose("Log information is not available for " + logName);
+                _logger.WriteVerbose($"Log information is not available for {logName} on {machineName}");
             }
 
             if (logConfig == null) {
-                _logger.WriteWarning("LogConfig is null for " + logName);
+                _logger.WriteWarning($"LogConfig is null for {logName} on {machineName}");
                 continue;
             }
             EventLogDetails logDetails = new EventLogDetails(_logger, machineName, logConfig, logInfoObj);

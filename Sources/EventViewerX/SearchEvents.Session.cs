@@ -10,7 +10,7 @@ public partial class SearchEvents : Settings
 {
     private const int DefaultSessionTimeoutMs = 5000;
     private const int DefaultRpcProbeTimeoutMs = 2500;
-    private const int NegativeCacheTtlSeconds = 90;
+    private const int NegativeCacheTtlSeconds = 15;
 
     private static readonly ConcurrentDictionary<string, DateTime> _unreachable = new(StringComparer.OrdinalIgnoreCase);
 
@@ -96,6 +96,22 @@ public partial class SearchEvents : Settings
     public static EventLogSession? OpenSession(string? machineName, int? timeoutMs = null, string? purpose = null, string? logName = null)
     {
         return CreateSession(machineName, purpose, logName, timeoutMs);
+    }
+
+    /// <summary>
+    /// Clears any cached unreachable state for a specific host.
+    /// </summary>
+    public static void ClearHostCache(string host)
+    {
+        ClearNegativeCache(host);
+    }
+
+    /// <summary>
+    /// Clears all cached unreachable hosts.
+    /// </summary>
+    public static void ClearAllHostCache()
+    {
+        _unreachable.Clear();
     }
 
     private static bool RpcProbe(string host, int timeoutMs)

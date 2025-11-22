@@ -69,6 +69,7 @@ namespace EventViewerX {
         /// <param name="staging">Whether to use staging mode.</param>
         /// <param name="enabledBy">Account that enabled staging.</param>
         public void Watch(string? machineName, string logName, List<int> eventId, Action<EventObject>? eventAction = null, CancellationToken cancellationToken = default, bool staging = false, string? enabledBy = null) {
+            Interlocked.Exchange(ref _disposed, 0);
             NumberOfEventsFound = 0;
             _eventsFound = 0;
             Dispose();
@@ -130,15 +131,17 @@ namespace EventViewerX {
         /// Stops watching and cleans up resources.
         /// </summary>
         public void Dispose() {
-            if (Interlocked.Exchange(ref _disposed, 1) == 1) {
-                return;
+            bool firstDispose = Interlocked.Exchange(ref _disposed, 1) == 0;
+            if (firstDispose) {
+                if (_eventLogWatcher != null) {
+                    _eventLogWatcher.EventRecordWritten -= DetectEventsLogCallback;
+                    _eventLogWatcher.Enabled = false;
+                    _eventLogWatcher.Dispose();
+                    _eventLogWatcher = null;
+                }
             }
-            if (_eventLogWatcher != null) {
-                _eventLogWatcher.EventRecordWritten -= DetectEventsLogCallback;
-                _eventLogWatcher.Enabled = false;
-                _eventLogWatcher.Dispose();
-                _eventLogWatcher = null;
-            }
+            // Clear any existing IDs even if Dispose is called multiple times or concurrently.
+            while (_watchEventId.TryTake(out _)) { }
             _watchEventId = new ConcurrentBag<int>();
             StagingEnabled = false;
             StagingEnabledBy = null;

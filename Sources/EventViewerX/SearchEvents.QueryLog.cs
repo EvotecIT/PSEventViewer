@@ -1,4 +1,5 @@
-﻿using System.Diagnostics.Eventing.Reader;
+﻿using System.Diagnostics;
+using System.Diagnostics.Eventing.Reader;
 using System.IO;
 using System.Net;
 using System.Runtime.CompilerServices;
@@ -18,6 +19,25 @@ public partial class SearchEvents : Settings {
     public SearchEvents(InternalLogger? internalLogger = null) {
         if (internalLogger != null) {
             _logger = internalLogger;
+        }
+    }
+
+    /// <summary>
+    /// Lightweight list-log warm-up; returns false on timeout/failure.
+    /// </summary>
+    private static bool TryListLogWarmup(EventLogSession session, string machineName, int budgetMs) {
+        try {
+            var namesTask = Task.Run(() => session.GetLogNames());
+            var completed = Task.WhenAny(namesTask, Task.Delay(budgetMs)).GetAwaiter().GetResult();
+            if (completed != namesTask) {
+                _logger.WriteVerbose($"ListLog warm-up timed out on {machineName} after {budgetMs} ms");
+                return false;
+            }
+            _ = namesTask.GetAwaiter().GetResult();
+            return true;
+        } catch (Exception ex) {
+            _logger.WriteVerbose($"ListLog warm-up failed on {machineName}: {ex.Message}");
+            return false;
         }
     }
 
@@ -51,24 +71,6 @@ public partial class SearchEvents : Settings {
         } catch (Exception ex) {
             _logger.WriteWarning($"An error occurred on {targetMachine} while creating the event log reader: {ex.Message}");
             return null!;
-        }
-    }
-
-    // Lightweight metadata call mirroring -ListLog; helps “wake” RPC without touching Security channel payloads.
-    private static void TryListLogWarmup(EventLogSession session, string? machineName, int budgetMs)
-    {
-        try
-        {
-            var namesTask = Task.Run(() => session.GetLogNames());
-            var done = Task.WhenAny(namesTask, Task.Delay(budgetMs)).GetAwaiter().GetResult();
-            if (done != namesTask)
-            {
-                _logger.WriteVerbose($"ListLog warm-up timed out on {machineName ?? GetFQDN()} after {budgetMs} ms");
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.WriteVerbose($"ListLog warm-up failed on {machineName ?? GetFQDN()}: {ex.Message}");
         }
     }
 
@@ -109,7 +111,11 @@ public partial class SearchEvents : Settings {
             if (session == null) yield break;
             query.Session = session;
             // Fast, light-weight warm-up mirroring DisplayEventLogs
-            TryListLogWarmup(session, machineName, Math.Min(3000, sessionTimeoutMs / 2));
+            bool warmOk = TryListLogWarmup(session, machineName, Math.Min(3000, sessionTimeoutMs / 2));
+            if (!warmOk) {
+                _logger.WriteVerbose($"Skipping query on {machineName} because warm-up could not complete.");
+                yield break;
+            }
         }
 
         var queriedMachine = string.IsNullOrEmpty(machineName) ? GetFQDN() : machineName;
@@ -118,37 +124,55 @@ public partial class SearchEvents : Settings {
         try
         {
             // Use the same short constructor budget as DisplayEventLogs preflight to fail fast on semi-dead hosts.
-            using (EventLogReader reader = CreateEventLogReader(query, machineName, sessionTimeoutMs)) {
-                if (reader != null) {
-                    int eventCount = 0;
-                    while (!cancellationToken.IsCancellationRequested) {
-                        EventRecord? next = null;
-                        try {
-                            // Bound each read so dead hosts don't hang forever
-                            var readTask = Task.Run(() => reader.ReadEvent(TimeSpan.FromMilliseconds(750)));
-                            var completed = Task.WhenAny(readTask, Task.Delay(sessionTimeoutMs, cancellationToken)).GetAwaiter().GetResult();
-                            if (completed != readTask) {
-                                _logger.WriteWarning($"Timed out reading events from {queriedMachine} after {sessionTimeoutMs} ms");
-                                break;
-                            }
-                            next = readTask.GetAwaiter().GetResult();
-                        } catch (OperationCanceledException) {
+            var reader = CreateEventLogReader(query, machineName, sessionTimeoutMs);
+            if (reader == null) {
+                yield break;
+            }
+            using (reader) {
+                int eventCount = 0;
+                var overall = Stopwatch.StartNew();
+                int perReadMs = Math.Min(2000, Math.Max(750, sessionTimeoutMs / 3));
+                while (!cancellationToken.IsCancellationRequested) {
+                    EventRecord? next = null;
+                    try {
+                        // Bound each read so dead hosts don't hang forever, but keep overall budget.
+                        next = reader.ReadEvent(TimeSpan.FromMilliseconds(perReadMs));
+                    } catch (EventLogException ex) when (ex.Message.IndexOf("timeout", StringComparison.OrdinalIgnoreCase) >= 0) {
+                        if (overall.ElapsedMilliseconds >= sessionTimeoutMs) {
+                            _logger.WriteWarning($"Timed out reading events from {queriedMachine} after {sessionTimeoutMs} ms");
                             break;
-                        } catch (Exception ex) when (ex is EventLogException or UnauthorizedAccessException) {
+                        }
+                        continue;
+                    } catch (OperationCanceledException) {
+                        break;
+                    } catch (InvalidOperationException ex) {
+                        if (eventCount > 0) {
+                            _logger.WriteVerbose($"Reader closed on {queriedMachine} after {eventCount} events: {ex.Message}");
+                        } else {
                             _logger.WriteWarning($"An error occurred on {queriedMachine} while reading the event log: {ex.Message}");
-                            break;
                         }
+                        break;
+                    } catch (Exception ex) when (ex is EventLogException or UnauthorizedAccessException) {
+                        _logger.WriteWarning($"An error occurred on {queriedMachine} while reading the event log: {ex.Message}");
+                        break;
+                    } catch (Exception ex) {
+                        _logger.WriteWarning($"Unexpected error on {queriedMachine} while reading the event log: {ex.Message}");
+                        break;
+                    }
 
-                        if (next == null) {
+                    if (next == null) {
+                        if (overall.ElapsedMilliseconds >= sessionTimeoutMs) {
+                            _logger.WriteWarning($"Timed out reading events from {queriedMachine} after {sessionTimeoutMs} ms");
                             break;
                         }
+                        continue;
+                    }
 
-                        EventObject eventObject = new EventObject(next, queriedMachine);
-                        yield return eventObject;
-                        eventCount++;
-                        if (maxEvents > 0 && eventCount >= maxEvents) {
-                            break;
-                        }
+                    EventObject eventObject = new EventObject(next, queriedMachine);
+                    yield return eventObject;
+                    eventCount++;
+                    if (maxEvents > 0 && eventCount >= maxEvents) {
+                        break;
                     }
                 }
             }
