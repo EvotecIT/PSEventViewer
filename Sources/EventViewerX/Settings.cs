@@ -21,6 +21,9 @@ public class Settings {
     /// <summary>Timeout (ms) for ICMP ping reachability check.</summary>
     public static int PingTimeoutMs { get; set; } = 1000;
 
+    /// <summary>Warm-up budget (ms) for listing log names before queries.</summary>
+    public static int ListLogWarmupMs { get; set; } = 3000;
+
     /// <summary>When set, error messages are written to the console.</summary>
     public bool Error {
         get => _logger.IsError;

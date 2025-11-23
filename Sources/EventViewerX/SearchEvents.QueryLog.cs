@@ -111,7 +111,7 @@ public partial class SearchEvents : Settings {
             if (session == null) yield break;
             query.Session = session;
             // Fast, light-weight warm-up mirroring DisplayEventLogs
-            bool warmOk = TryListLogWarmup(session, machineName, Math.Min(3000, sessionTimeoutMs / 2));
+            bool warmOk = TryListLogWarmup(session, machineName, Math.Min(Settings.ListLogWarmupMs, sessionTimeoutMs / 2));
             if (!warmOk) {
                 _logger.WriteVerbose($"Skipping query on {machineName} because warm-up could not complete.");
                 yield break;

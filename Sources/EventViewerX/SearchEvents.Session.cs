@@ -37,7 +37,7 @@ public partial class SearchEvents : Settings
             }
         }
 
-        var normalizedHost = machineName.Trim();
+        var normalizedHost = machineName?.Trim() ?? string.Empty;
         if (IsHostNegativeCached(normalizedHost))
         {
             _logger.WriteVerbose($"{purpose ?? "Session"}: skipping {normalizedHost} (cached unreachable)");
@@ -166,7 +166,11 @@ public partial class SearchEvents : Settings
             }
             return false;
         }
-        catch { return false; }
+        catch (Exception ex)
+        {
+            _logger.WriteVerbose($"Negative cache check failed for '{host}': {ex.Message}");
+            return false;
+        }
     }
 
     private static void MarkHostUnreachable(string host)
@@ -177,7 +181,10 @@ public partial class SearchEvents : Settings
             string lower = host.ToLowerInvariant();
             _unreachable[lower] = DateTime.UtcNow.AddSeconds(NegativeCacheTtlSecondsValue);
         }
-        catch { }
+        catch (Exception ex)
+        {
+            _logger.WriteVerbose($"Failed to mark '{host}' unreachable: {ex.Message}");
+        }
     }
 
     private static void ClearNegativeCache(string host)
@@ -188,7 +195,10 @@ public partial class SearchEvents : Settings
             string lower = host.ToLowerInvariant();
             _unreachable.TryRemove(lower, out _);
         }
-        catch { }
+        catch (Exception ex)
+        {
+            _logger.WriteVerbose($"Failed clearing negative cache for '{host}': {ex.Message}");
+        }
     }
 
     private static bool IsLocalMachine(string? machineName)
