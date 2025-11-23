@@ -24,10 +24,14 @@ public class ADGroupPolicyEdits : EventRuleBase {
     public string AttributeLDAPDisplayName;
     //public string AttributeValue;
     public GroupPolicy GroupPolicy { get; set; }
+    /// <inheritdoc />
     public override List<int> EventIds => new() { 5136, 5137, 5141 };
+    /// <inheritdoc />
     public override string LogName => "Security";
+    /// <inheritdoc />
     public override NamedEvents NamedEvent => NamedEvents.ADGroupPolicyEdits;
 
+    /// <summary>Accepts versionNumber attribute edits on groupPolicyContainer objects.</summary>
     public override bool CanHandle(EventObject eventObject) {
         // Check if this is a group policy container with versionNumber attribute
         if (eventObject.Data.TryGetValue("ObjectClass", out var objectClass) && objectClass == "groupPolicyContainer") {
@@ -40,6 +44,7 @@ public class ADGroupPolicyEdits : EventRuleBase {
         return false;
     }
 
+    /// <summary>Initialises a GPO edit wrapper from an event record.</summary>
     public ADGroupPolicyEdits(EventObject eventObject) : base(eventObject) {
         _eventObject = eventObject;
         Type = "ADGroupPolicyEdits";

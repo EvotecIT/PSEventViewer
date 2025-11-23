@@ -65,15 +65,19 @@ public class ADUserLogon : EventRuleBase {
     /// </summary>
     public LogonType? LogonType;
 
+    /// <inheritdoc />
     public override List<int> EventIds => new() { 4624 };
+    /// <inheritdoc />
     public override string LogName => "Security";
+    /// <inheritdoc />
     public override NamedEvents NamedEvent => NamedEvents.ADUserLogon;
 
+    /// <summary>Accepts any 4624 events in the Security log.</summary>
     public override bool CanHandle(EventObject eventObject) {
-        // Simple rule - always handle if event ID and log name match
         return true;
     }
 
+    /// <summary>Initialises a successful logon wrapper from an event record.</summary>
     public ADUserLogon(EventObject eventObject) : base(eventObject) {
         _eventObject = eventObject;
         Type = "ADUserLogon";

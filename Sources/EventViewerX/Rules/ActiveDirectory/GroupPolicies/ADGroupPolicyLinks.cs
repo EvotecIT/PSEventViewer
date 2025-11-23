@@ -14,7 +14,7 @@ namespace EventViewerX.Rules.ActiveDirectory;
 ///     <!-- ...existing XML elements... -->
 ///     <EventID>5136</EventID>
 ///     <Version>0</Version>
-///     <Level>0</Version>
+///     <Level>0</Level>
 ///     <Task>14081</Task>
 ///     <Opcode>0</Opcode>
 ///     <Keywords>0x8020000000000000</Keywords>
@@ -74,8 +74,11 @@ public class ADGroupPolicyLinks : EventRuleBase {
     /// <summary>
     /// Initializes a new instance of the ADGroupPolicyLinks class using a specified event object.
     /// </summary>
+    /// <inheritdoc />
     public override List<int> EventIds => new() { 5136, 5137, 5141 };
+    /// <inheritdoc />
     public override string LogName => "Security";
+    /// <inheritdoc />
     public override NamedEvents NamedEvent => NamedEvents.ADGroupPolicyLinks;
 
     public override bool CanHandle(EventObject eventObject) {

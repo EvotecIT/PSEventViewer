@@ -25,12 +25,15 @@ namespace EventViewerX.Rules.ActiveDirectory;
 /// Event ID: 4625
 /// </summary>
 public class ADUserLogonFailed : EventRuleBase {
+    /// <inheritdoc />
     public override List<int> EventIds => new() { 4625 };
+    /// <inheritdoc />
     public override string LogName => "Security";
+    /// <inheritdoc />
     public override NamedEvents NamedEvent => NamedEvents.ADUserLogonFailed;
 
+    /// <summary>Accepts any 4625 logon failure events in the Security log.</summary>
     public override bool CanHandle(EventObject eventObject) {
-        // Simple rule - always handle if event ID and log name match
         return true;
     }
     /// <summary>
@@ -124,6 +127,7 @@ public class ADUserLogonFailed : EventRuleBase {
     public string TransmittedServices;
 
 
+    /// <summary>Initialises a failed logon wrapper from an event record.</summary>
     public ADUserLogonFailed(EventObject eventObject) : base(eventObject) {
         _eventObject = eventObject;
         Type = "ADUserLogonFailed";
