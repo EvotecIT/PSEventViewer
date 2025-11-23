@@ -7,23 +7,34 @@ namespace EventViewerX.Rules.CertificateAuthority;
 /// </summary>
 public class CertificateIssued : EventRuleBase
 {
+    /// <inheritdoc />
     public override List<int> EventIds => new() { 4886, 4887 };
+    /// <inheritdoc />
     public override string LogName => "Security";
+    /// <inheritdoc />
     public override NamedEvents NamedEvent => NamedEvents.CertificateIssued;
 
+    /// <summary>Accepts certificate request/issue events from the CA.</summary>
     public override bool CanHandle(EventObject eventObject)
     {
-        // Simple rule - always handle if event ID and log name match
         return true;
     }
+    /// <summary>Certificate Services host.</summary>
     public string Computer;
+    /// <summary>Action text (requested/issued).</summary>
     public string Action;
+    /// <summary>Certificate template involved.</summary>
     public string CertificateTemplate;
+    /// <summary>Requester (subject) of the certificate.</summary>
     public string Requester;
+    /// <summary>Issued certificate serial number.</summary>
     public string SerialNumber;
+    /// <summary>User account responsible for the operation.</summary>
     public string Who;
+    /// <summary>Event timestamp.</summary>
     public DateTime When;
 
+    /// <summary>Initialises a certificate issuance wrapper from an event record.</summary>
     public CertificateIssued(EventObject eventObject) : base(eventObject)
     {
         _eventObject = eventObject;
