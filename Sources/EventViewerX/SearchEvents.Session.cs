@@ -11,7 +11,8 @@ public partial class SearchEvents : Settings
     private const int DefaultSessionTimeoutMs = 5000;
     private const int DefaultRpcProbeTimeoutMs = 2500;
     private const int DefaultPingTimeoutMs = 1000;
-    private const int NegativeCacheTtlSeconds = 15;
+    /// <summary>How long to remember unreachable hosts to avoid repeated slow probes.</summary>
+    private static int NegativeCacheTtlSecondsValue => Settings.NegativeCacheTtlSeconds;
 
     private static readonly ConcurrentDictionary<string, DateTime> _unreachable = new(StringComparer.OrdinalIgnoreCase);
 
@@ -55,7 +56,8 @@ public partial class SearchEvents : Settings
         }
         catch (Exception ex)
         {
-            _logger.WriteVerbose($"{purpose ?? "Session"}: ping probe failed for '{machineName}' ({ex.Message}), continuing to session attempt.");
+            string reason = ex.InnerException?.Message ?? ex.Message;
+            _logger.WriteVerbose($"{purpose ?? "Session"}: ping probe failed for '{machineName}': {reason}. Continuing to session attempt.");
         }
 
         // RPC (135) preflight to avoid EventLogSession hangs on dead/filtered hosts
@@ -120,7 +122,6 @@ public partial class SearchEvents : Settings
 
     private static bool RpcProbe(string host, int timeoutMs)
     {
-        string lowerHost = host?.ToLowerInvariant() ?? string.Empty;
         try
         {
             using var tcp = new TcpClient();
@@ -161,7 +162,7 @@ public partial class SearchEvents : Settings
         {
             if (string.IsNullOrWhiteSpace(host)) return;
             string lower = host.ToLowerInvariant();
-            _unreachable[lower] = DateTime.UtcNow.AddSeconds(NegativeCacheTtlSeconds);
+            _unreachable[lower] = DateTime.UtcNow.AddSeconds(NegativeCacheTtlSecondsValue);
         }
         catch { }
     }

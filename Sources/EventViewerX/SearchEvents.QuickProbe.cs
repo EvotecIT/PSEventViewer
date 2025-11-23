@@ -10,7 +10,15 @@ namespace EventViewerX;
 /// </summary>
 public partial class SearchEvents : Settings
 {
+    /// <summary>
+    /// Maximum time (ms) to wait on a single EventLogReader.ReadEvent call to prevent long RPC stalls.
+    /// Tuned to keep overall probe time budgeted while still allowing slow-but-responding hosts.
+    /// </summary>
     private const int QuickProbeReadTimeoutMs = 750;
+
+    /// <summary>
+    /// Minimum per-read budget (ms) to avoid overly aggressive time slices that would thrash on busy hosts.
+    /// </summary>
     private const int QuickProbeMinPerReadMs = 200;
 
     /// <summary>Status of a quick probe.</summary>
@@ -111,12 +119,6 @@ public partial class SearchEvents : Settings
                     return new QuickProbeResult(logName, machineName ?? GetFQDN(), null, QuickProbeStatus.Error, ex.Message, scanned, null, sw.Elapsed);
                 }
 
-                if (rec == null)
-                {
-                    return new QuickProbeResult(logName, machineName ?? GetFQDN(), null, QuickProbeStatus.NoEvent,
-                        "No matching events returned.", scanned, null, sw.Elapsed);
-                }
-
                 scanned++;
                 DateTime? created = rec.TimeCreated?.ToUniversalTime();
                 rec.Dispose();
@@ -194,12 +196,6 @@ public partial class SearchEvents : Settings
                 catch (EventLogException ex)
                 {
                     return new QuickProbeResult(logName, machineName ?? GetFQDN(), null, QuickProbeStatus.Error, ex.Message, scanned, null, sw.Elapsed);
-                }
-
-                if (rec == null)
-                {
-                    return new QuickProbeResult(logName, machineName ?? GetFQDN(), null, QuickProbeStatus.NoEvent,
-                        "No matching events returned.", scanned, null, sw.Elapsed);
                 }
 
                 scanned++;
@@ -283,7 +279,10 @@ public partial class SearchEvents : Settings
                     return (QuickProbeStatus.Error, "Ping failed");
                 }
             }
-            catch { /* ignore ping errors */ }
+            catch (Exception ex)
+            {
+                Settings._logger.WriteVerbose($"Preflight: ping failed for '{host}': {ex.Message}");
+            }
 
             // RPC probe
             if (!RpcProbe(host, Math.Min(DefaultRpcProbeTimeoutMs, budgetMs)))

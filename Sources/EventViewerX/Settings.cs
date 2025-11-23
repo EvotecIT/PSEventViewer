@@ -6,6 +6,9 @@ namespace EventViewerX;
 public class Settings {
     public static InternalLogger _logger = new InternalLogger();
 
+    /// <summary>TTL (seconds) for negative host reachability cache; adjust for slower/faster networks.</summary>
+    public static int NegativeCacheTtlSeconds { get; set; } = 15;
+
     /// <summary>When set, error messages are written to the console.</summary>
     public bool Error {
         get => _logger.IsError;
