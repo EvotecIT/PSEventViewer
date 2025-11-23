@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Security.Principal;
 using System.Reflection;
 using System.Runtime.Serialization;
 using System.Diagnostics.Eventing.Reader;
@@ -32,7 +33,7 @@ public class TestRuleHelpers
     public void IsProvider_IsCaseInsensitive()
     {
         var eo = BuildEventObject(message: string.Empty, provider: "Microsoft-Windows-Eventlog", containerLog: "System");
-        Assert.True(Rules.RuleHelpers.IsProvider(eo, "eventlog"));
+        Assert.True(Rules.RuleHelpers.IsProvider(eo, "microsoft-windows-eventlog"));
         Assert.False(Rules.RuleHelpers.IsProvider(eo, "OtherProvider"));
     }
 
@@ -62,7 +63,10 @@ public class TestRuleHelpers
 
     private static EventObject BuildEventObject(string message, string provider, string containerLog, Dictionary<string, string>? data = null, string messageSubject = "")
     {
-        var record = new FakeEventRecord(provider, containerLog, message);
+        var record = (FakeEventRecord)FormatterServices.GetUninitializedObject(typeof(FakeEventRecord));
+        SetField(record, "_provider", provider);
+        SetField(record, "_log", containerLog);
+        SetField(record, "_message", message);
 
         // Bypass ctor to avoid EventLogRecord dependency
         var eo = (EventObject)FormatterServices.GetUninitializedObject(typeof(EventObject));

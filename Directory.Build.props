@@ -1,5 +1,6 @@
 ﻿<Project>
     <PropertyGroup>
-        <NoWarn>$(NoWarn);CA1416</NoWarn>
+    <NoWarn>$(NoWarn);CA1416</NoWarn>
+    <WarningsAsErrors>$(WarningsAsErrors);1591</WarningsAsErrors>
     </PropertyGroup>
 </Project>

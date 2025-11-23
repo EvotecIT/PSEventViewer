@@ -55,7 +55,10 @@ public class TestKerberosTgtRequest
 
     private static EventObject BuildEventObject(int id, string log, string provider, Dictionary<string, string> data)
     {
-        var record = new FakeEventRecord(id, log, provider);
+        var record = (FakeEventRecord)FormatterServices.GetUninitializedObject(typeof(FakeEventRecord));
+        SetField(record, "_provider", provider);
+        SetField(record, "_log", log);
+        SetField(record, "_id", id);
 
         var eo = (EventObject)FormatterServices.GetUninitializedObject(typeof(EventObject));
         SetField(eo, "_eventRecord", record);
