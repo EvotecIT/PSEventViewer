@@ -140,7 +140,11 @@ public partial class SearchEvents : Settings {
                         next = reader.ReadEvent(TimeSpan.FromMilliseconds(perReadMs));
                     } catch (EventLogException ex) when (ex.Message.IndexOf("timeout", StringComparison.OrdinalIgnoreCase) >= 0) {
                         if (overall.ElapsedMilliseconds >= sessionTimeoutMs) {
-                            _logger.WriteWarning($"Timed out reading events from {queriedMachine} after {sessionTimeoutMs} ms");
+                            if (eventCount == 0) {
+                                _logger.WriteWarning($"Timed out reading events from {queriedMachine} after {sessionTimeoutMs} ms");
+                            } else {
+                                _logger.WriteVerbose($"Timed out reading events from {queriedMachine} after {sessionTimeoutMs} ms with {eventCount} events already returned");
+                            }
                             break;
                         }
                         continue;
@@ -163,7 +167,11 @@ public partial class SearchEvents : Settings {
 
                     if (next == null) {
                         if (overall.ElapsedMilliseconds >= sessionTimeoutMs) {
-                            _logger.WriteWarning($"Timed out reading events from {queriedMachine} after {sessionTimeoutMs} ms");
+                            if (eventCount == 0) {
+                                _logger.WriteWarning($"Timed out reading events from {queriedMachine} after {sessionTimeoutMs} ms");
+                            } else {
+                                _logger.WriteVerbose($"Timed out reading events from {queriedMachine} after {sessionTimeoutMs} ms with {eventCount} events already returned");
+                            }
                             break;
                         }
                         continue;

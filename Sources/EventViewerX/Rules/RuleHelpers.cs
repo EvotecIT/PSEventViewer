@@ -115,6 +115,37 @@ internal static class RuleHelpers
     }
 
     /// <summary>
+    /// Normalizes IPv6-mapped and loopback addresses to friendlier IPv4/localhost strings.
+    /// </summary>
+    internal static string NormalizeIp(string? ip)
+    {
+        if (string.IsNullOrWhiteSpace(ip)) return string.Empty;
+        ip = ip.Trim();
+        if (ip.Equals("::1", StringComparison.OrdinalIgnoreCase)) return "127.0.0.1";
+        if (ip.StartsWith("::ffff:", StringComparison.OrdinalIgnoreCase)) return ip.Substring("::ffff:".Length);
+        return ip;
+    }
+
+    /// <summary>
+    /// Returns a comma-separated list of flagged enum names, falling back to the raw value when no flags are set.
+    /// </summary>
+    internal static string DescribeFlags<TEnum>(TEnum? value) where TEnum : struct, Enum
+    {
+        if (!value.HasValue) return string.Empty;
+        var v = value.Value;
+        var names = Enum.GetValues(typeof(TEnum))
+            .Cast<Enum>()
+            .Where(flag => v.HasFlag((Enum)(object)flag) && Convert.ToUInt64(flag) != 0)
+            .Select(flag => flag.ToString())
+            .ToList();
+        if (names.Count == 0)
+        {
+            return v.ToString();
+        }
+        return string.Join(", ", names);
+    }
+
+    /// <summary>
     /// Returns the best-available message text for an event, preferring the richest content among subject, rendered message,
     /// unlabeled data (<c>NoNameA0</c>), and <c>#text</c> payloads. Useful when remote queries omit the rendered message.
     /// </summary>

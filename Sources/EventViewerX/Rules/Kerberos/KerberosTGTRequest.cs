@@ -26,16 +26,41 @@ public class KerberosTGTRequest : EventRuleBase
     public string AccountName;
     /// <summary>Client IP address.</summary>
     public string IpAddress;
+    /// <summary>Client IP normalized (v4-mapped/loopback).</summary>
+    public string IpAddressNormalized;
     /// <summary>Client source port.</summary>
     public string IpPort;
     /// <summary>Ticket options bitmask parsed from the event.</summary>
     public TicketOptions? TicketOptions;
+    /// <summary>Human-friendly ticket options.</summary>
+    public string TicketOptionsText;
     /// <summary>Status code reported by the KDC.</summary>
     public StatusCode? Status;
+    /// <summary>Status with hex representation.</summary>
+    public string StatusText;
     /// <summary>Encryption type used for the ticket.</summary>
     public TicketEncryptionType? EncryptionType;
+    public string EncryptionTypeText;
     /// <summary>Pre-authentication type used by the client.</summary>
     public PreAuthType? PreAuthType;
+    public string PreAuthTypeText;
+    /// <summary>Session key encryption type (from SessionKeyEncryptionType).</summary>
+    public TicketEncryptionType? SessionKeyEncryptionType;
+    public string SessionKeyEncryptionTypeText;
+    /// <summary>Pre-auth encryption type (from PreAuthEncryptionType).</summary>
+    public TicketEncryptionType? PreAuthEncryptionType;
+    public string PreAuthEncryptionTypeText;
+    /// <summary>Client-advertised encryption types string.</summary>
+    public string ClientAdvertizedEncryptionTypes;
+    /// <summary>Supported/available encryption types reported by account/service/DC.</summary>
+    public string AccountSupportedEncryptionTypes;
+    public string AccountAvailableKeys;
+    public string ServiceSupportedEncryptionTypes;
+    public string ServiceAvailableKeys;
+    public string DCSupportedEncryptionTypes;
+    public string DCAvailableKeys;
+    /// <summary>Response ticket hash when present.</summary>
+    public string ResponseTicket;
     /// <summary>True when a weak encryption algorithm (e.g., RC4/DES) was used.</summary>
     public bool WeakEncryptionAlgorithm;
     /// <summary>Time the event was created.</summary>
@@ -50,11 +75,39 @@ public class KerberosTGTRequest : EventRuleBase
         Action = _eventObject.MessageSubject;
         AccountName = _eventObject.GetValueFromDataDictionary("TargetUserName", "TargetDomainName", "\\", reverseOrder: true);
         IpAddress = _eventObject.GetValueFromDataDictionary("IpAddress");
+        IpAddressNormalized = Rules.RuleHelpers.NormalizeIp(IpAddress);
         IpPort = _eventObject.GetValueFromDataDictionary("IpPort");
-        TicketOptions = EventsHelper.GetTicketOptions(_eventObject.GetValueFromDataDictionary("TicketOptions"));
-        Status = EventsHelper.GetStatusCode(_eventObject.GetValueFromDataDictionary("Status"));
-        EncryptionType = EventsHelper.GetTicketEncryptionType(_eventObject.GetValueFromDataDictionary("TicketEncryptionType"));
-        PreAuthType = EventsHelper.GetPreAuthType(_eventObject.GetValueFromDataDictionary("PreAuthType"));
+        var rawTicketOptions = _eventObject.GetValueFromDataDictionary("TicketOptions");
+        TicketOptions = EventsHelper.GetTicketOptions(rawTicketOptions);
+        TicketOptionsText = EventsHelper.DescribeTicketOptions(TicketOptions, rawTicketOptions);
+
+        var rawStatus = _eventObject.GetValueFromDataDictionary("Status");
+        Status = EventsHelper.GetStatusCode(rawStatus);
+        StatusText = EventsHelper.DescribeStatus(Status, rawStatus);
+
+        var rawTicketEtype = _eventObject.GetValueFromDataDictionary("TicketEncryptionType");
+        EncryptionType = EventsHelper.GetTicketEncryptionType(rawTicketEtype);
+        EncryptionTypeText = EventsHelper.DescribeEncryption(EncryptionType, rawTicketEtype);
+
+        var rawPreAuth = _eventObject.GetValueFromDataDictionary("PreAuthType");
+        PreAuthType = EventsHelper.GetPreAuthType(rawPreAuth);
+        PreAuthTypeText = EventsHelper.DescribePreAuthType(PreAuthType, rawPreAuth);
+
+        var rawSessionEtype = _eventObject.GetValueFromDataDictionary("SessionKeyEncryptionType");
+        SessionKeyEncryptionType = EventsHelper.GetTicketEncryptionType(rawSessionEtype);
+        SessionKeyEncryptionTypeText = EventsHelper.DescribeEncryption(SessionKeyEncryptionType, rawSessionEtype);
+
+        var rawPreAuthEtype = _eventObject.GetValueFromDataDictionary("PreAuthEncryptionType");
+        PreAuthEncryptionType = EventsHelper.GetTicketEncryptionType(rawPreAuthEtype);
+        PreAuthEncryptionTypeText = EventsHelper.DescribeEncryption(PreAuthEncryptionType, rawPreAuthEtype);
+        ClientAdvertizedEncryptionTypes = _eventObject.GetValueFromDataDictionary("ClientAdvertizedEncryptionTypes");
+        AccountSupportedEncryptionTypes = _eventObject.GetValueFromDataDictionary("AccountSupportedEncryptionTypes");
+        AccountAvailableKeys = _eventObject.GetValueFromDataDictionary("AccountAvailableKeys");
+        ServiceSupportedEncryptionTypes = _eventObject.GetValueFromDataDictionary("ServiceSupportedEncryptionTypes");
+        ServiceAvailableKeys = _eventObject.GetValueFromDataDictionary("ServiceAvailableKeys");
+        DCSupportedEncryptionTypes = _eventObject.GetValueFromDataDictionary("DCSupportedEncryptionTypes");
+        DCAvailableKeys = _eventObject.GetValueFromDataDictionary("DCAvailableKeys");
+        ResponseTicket = _eventObject.GetValueFromDataDictionary("ResponseTicket");
         When = _eventObject.TimeCreated;
 
         WeakEncryptionAlgorithm = EncryptionType is TicketEncryptionType.DES_CBC_CRC

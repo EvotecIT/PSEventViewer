@@ -3,6 +3,8 @@
 /// <summary>
 /// Event helper methods.
 /// </summary>
+using System.Globalization;
+
 internal static class EventsHelper {
     /// <summary>
     /// Translates a string value to an ImpersonationLevel enum.
@@ -59,9 +61,23 @@ internal static class EventsHelper {
     /// <param name="value">The value to translate.</param>
     /// <returns>The translated TicketOptions enum.</returns>
     public static TicketOptions? GetTicketOptions(string value) {
-        if (Enum.TryParse(value, out TicketOptions ticketOptions)) {
+        if (string.IsNullOrWhiteSpace(value)) {
+            return null;
+        }
+
+        var trimmed = value.Trim();
+        if (trimmed.StartsWith("0x", StringComparison.OrdinalIgnoreCase)) {
+            trimmed = trimmed.Substring(2);
+        }
+
+        if (uint.TryParse(trimmed, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var numeric)) {
+            return (TicketOptions)numeric;
+        }
+
+        if (Enum.TryParse(trimmed, true, out TicketOptions ticketOptions)) {
             return ticketOptions;
         }
+
         return null;
     }
 
@@ -77,7 +93,7 @@ internal static class EventsHelper {
             trimmed = trimmed.Substring(2);
         }
 
-        if (uint.TryParse(trimmed, System.Globalization.NumberStyles.HexNumber, null, out var code)) {
+        if (uint.TryParse(trimmed, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var code)) {
             return Enum.IsDefined(typeof(StatusCode), code) ? (StatusCode)code : null;
         }
 
@@ -95,9 +111,23 @@ internal static class EventsHelper {
     /// <param name="value">The value to translate.</param>
     /// <returns>The translated TicketEncryptionType enum.</returns>
     public static TicketEncryptionType? GetTicketEncryptionType(string value) {
-        if (Enum.TryParse(value, out TicketEncryptionType ticketEncryptionType)) {
+        if (string.IsNullOrWhiteSpace(value)) {
+            return null;
+        }
+
+        var trimmed = value.Trim();
+        if (trimmed.StartsWith("0x", StringComparison.OrdinalIgnoreCase)) {
+            trimmed = trimmed.Substring(2);
+        }
+
+        if (uint.TryParse(trimmed, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var numeric)) {
+            return (TicketEncryptionType)numeric;
+        }
+
+        if (Enum.TryParse(trimmed, true, out TicketEncryptionType ticketEncryptionType)) {
             return ticketEncryptionType;
         }
+
         return null;
     }
 
@@ -107,10 +137,73 @@ internal static class EventsHelper {
     /// <param name="value">The value to translate.</param>
     /// <returns>The translated PreAuthType enum.</returns>
     public static PreAuthType? GetPreAuthType(string value) {
-        if (Enum.TryParse(value, out PreAuthType preAuthType)) {
+        if (string.IsNullOrWhiteSpace(value)) {
+            return null;
+        }
+
+        var trimmed = value.Trim();
+        if (trimmed.StartsWith("0x", StringComparison.OrdinalIgnoreCase)) {
+            trimmed = trimmed.Substring(2);
+        }
+
+        if (int.TryParse(trimmed, NumberStyles.Integer, CultureInfo.InvariantCulture, out var numeric)
+            && Enum.IsDefined(typeof(PreAuthType), numeric)) {
+            return (PreAuthType)numeric;
+        }
+
+        if (Enum.TryParse(trimmed, true, out PreAuthType preAuthType)) {
             return preAuthType;
         }
+
         return null;
+    }
+
+    public static string DescribeTicketOptions(TicketOptions? options, string rawValue)
+    {
+        if (options.HasValue) {
+            var names = Rules.RuleHelpers.DescribeFlags(options);
+            var hex = $"0x{((uint)options.Value):X8}";
+            return string.IsNullOrWhiteSpace(names)
+                ? hex
+                : $"{names} ({hex})";
+        }
+        return rawValue ?? string.Empty;
+    }
+
+    public static string DescribeStatus(StatusCode? status, string rawValue)
+    {
+        if (status.HasValue) {
+            var hex = $"0x{((uint)status.Value):X8}";
+            return $"{status} ({hex})";
+        }
+        return rawValue ?? string.Empty;
+    }
+
+    public static string DescribePreAuthType(PreAuthType? preAuth, string rawValue)
+    {
+        if (preAuth.HasValue) {
+            var description = preAuth switch
+            {
+                PreAuthType.None => "None",
+                PreAuthType.EncTimestamp => "Password / ENC-TIMESTAMP",
+                PreAuthType.PublicKeyInitial => "Smartcard / PKINIT",
+                PreAuthType.PublicKeyResponse => "PKINIT Response",
+                PreAuthType.Fast => "FAST / Armoring",
+                PreAuthType.EncryptedChallenge => "Encrypted Challenge",
+                _ => preAuth.Value.ToString()
+            };
+            return $"{description} ({(int)preAuth.Value})";
+        }
+        return rawValue ?? string.Empty;
+    }
+
+    public static string DescribeEncryption(TicketEncryptionType? etype, string rawValue)
+    {
+        if (etype.HasValue) {
+            var hex = $"0x{((uint)etype.Value):X}";
+            return $"{etype} ({hex})";
+        }
+        return rawValue ?? string.Empty;
     }
 
     /// <summary>

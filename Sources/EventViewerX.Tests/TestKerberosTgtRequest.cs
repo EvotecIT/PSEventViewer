@@ -40,14 +40,17 @@ public class TestKerberosTgtRequest
 
         Assert.Equal("MSOL_6f0d1d4965ec", rule.AccountName.Split('\\')[1]);
         Assert.Equal("192.168.241.15", rule.IpAddressNormalized);
-        Assert.Equal( TicketEncryptionType.AES256, rule.EncryptionType );
-        Assert.Equal("0x0", rule.StatusText.Split(' ')[1]);
+        Assert.Equal(TicketEncryptionType.AES256, rule.EncryptionType);
+        Assert.Contains("0x00000000", rule.StatusText);
         Assert.Equal("AES-SHA1, RC4", rule.AccountAvailableKeys);
         Assert.Equal("AES256 AES128 RC4", rule.ClientAdvertizedEncryptionTypes);
         Assert.Equal("ABC==", rule.ResponseTicket);
         Assert.Equal(TicketEncryptionType.AES256, rule.SessionKeyEncryptionType);
         Assert.Equal(TicketEncryptionType.AES256, rule.PreAuthEncryptionType);
-        Assert.Equal("0x40810010", rule.TicketOptionsText.Contains("0x40810010") ? "0x40810010" : rule.TicketOptionsText);
+        Assert.Contains("Forwardable", rule.TicketOptionsText);
+        Assert.Contains("Renewable", rule.TicketOptionsText);
+        Assert.Contains("0x40810010", rule.TicketOptionsText);
+        Assert.Contains("Password", rule.PreAuthTypeText);
     }
 
     private static EventObject BuildEventObject(int id, string log, string provider, Dictionary<string, string> data)
