@@ -31,7 +31,7 @@ public class KerberosTGTRequest : EventRuleBase
     /// <summary>Ticket options bitmask parsed from the event.</summary>
     public TicketOptions? TicketOptions;
     /// <summary>Status code reported by the KDC.</summary>
-    public Status? Status;
+    public StatusCode? Status;
     /// <summary>Encryption type used for the ticket.</summary>
     public TicketEncryptionType? EncryptionType;
     /// <summary>Pre-authentication type used by the client.</summary>
@@ -52,7 +52,7 @@ public class KerberosTGTRequest : EventRuleBase
         IpAddress = _eventObject.GetValueFromDataDictionary("IpAddress");
         IpPort = _eventObject.GetValueFromDataDictionary("IpPort");
         TicketOptions = EventsHelper.GetTicketOptions(_eventObject.GetValueFromDataDictionary("TicketOptions"));
-        Status = EventsHelper.GetStatus(_eventObject.GetValueFromDataDictionary("Status"));
+        Status = EventsHelper.GetStatusCode(_eventObject.GetValueFromDataDictionary("Status"));
         EncryptionType = EventsHelper.GetTicketEncryptionType(_eventObject.GetValueFromDataDictionary("TicketEncryptionType"));
         PreAuthType = EventsHelper.GetPreAuthType(_eventObject.GetValueFromDataDictionary("PreAuthType"));
         When = _eventObject.TimeCreated;

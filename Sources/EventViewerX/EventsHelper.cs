@@ -66,14 +66,26 @@ internal static class EventsHelper {
     }
 
     /// <summary>
-    /// Translates a string value to a Status enum.
+    /// Translates a status string (often hex like 0x0) to a StatusCode enum.
     /// </summary>
-    /// <param name="value">The value to translate.</param>
-    /// <returns>The translated Status enum.</returns>
-    public static Status? GetStatus(string value) {
-        if (Enum.TryParse(value, out Status status)) {
-            return status;
+    public static StatusCode? GetStatusCode(string value) {
+        if (string.IsNullOrWhiteSpace(value)) return null;
+
+        // Normalize hex like "0xC000006D" or "c000006d"
+        var trimmed = value.Trim();
+        if (trimmed.StartsWith("0x", StringComparison.OrdinalIgnoreCase)) {
+            trimmed = trimmed.Substring(2);
         }
+
+        if (uint.TryParse(trimmed, System.Globalization.NumberStyles.HexNumber, null, out var code)) {
+            return Enum.IsDefined(typeof(StatusCode), code) ? (StatusCode)code : null;
+        }
+
+        // Fall back to name-based parsing (rare)
+        if (Enum.TryParse(trimmed, ignoreCase: true, out StatusCode parsed)) {
+            return parsed;
+        }
+
         return null;
     }
 

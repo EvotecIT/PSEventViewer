@@ -139,28 +139,28 @@ namespace EventViewerX {
         public static WatcherInfo StartWatcher(string? name, string machineName, string logName, List<int> eventIds, List<NamedEvents> namedEvents, Action<EventObject> action, int numberOfThreads, bool staging, bool stopOnMatch, int stopAfter, TimeSpan? timeout) {
             WatcherInfo info;
             lock (_syncRoot) {
+                // If external code injected duplicates directly into the backing store without name mapping, fail fast.
+                if (_watchersByName.IsEmpty && _watchers.Count > 1) {
+                    throw new InvalidOperationException("Multiple watchers already exist without name mapping.");
+                }
+
                 if (!string.IsNullOrEmpty(name)) {
-                    // Fast path: direct name lookup; drop stale (ended) instances
-                    if (_watchersByName.TryGetValue(name!, out var existing)) {
-                        if (existing != null && existing.EndTime == null) {
-                            return existing;
-                        }
-                        // Stale entry: remove and fall through to create a fresh one
-                        _watchersByName.TryRemove(name!, out _);
-                        var stale = _watchers.Values.Where(w => string.Equals(w.Name, name, StringComparison.OrdinalIgnoreCase)).ToList();
-                        foreach (var s in stale) {
-                            _watchers.TryRemove(s.Id, out _);
-                        }
+                    // Fast reuse when a live watcher with the same name exists.
+                    if (_watchersByName.TryGetValue(name!, out var existingByName) && existingByName.EndTime == null) {
+                        return existingByName;
                     }
 
-                    // Defensive: verify dictionary consistency and duplicate detection
-                    var matches = _watchers.Values.Where(w => string.Equals(w.Name, name, StringComparison.OrdinalIgnoreCase) && w.EndTime == null).ToList();
-                    if (matches.Count == 1) {
-                        _watchersByName[name!] = matches[0];
-                        return matches[0];
-                    }
-                    if (matches.Count > 1) {
+                    // Detect pre-existing duplicates injected outside the manager.
+                    var sameName = _watchers.Values.Where(w => string.Equals(w.Name, name, StringComparison.OrdinalIgnoreCase)).ToList();
+                    if (sameName.Count > 1 && !_watchersByName.ContainsKey(name!)) {
                         throw new InvalidOperationException($"Multiple watchers with name '{name}' already exist.");
+                    }
+                    if (sameName.Count >= 1) {
+                        var active = sameName.FirstOrDefault(w => w.EndTime == null) ?? sameName[0];
+                        _watchersByName[name!] = active;
+                        if (active.EndTime == null) {
+                            return active;
+                        }
                     }
                 }
 
