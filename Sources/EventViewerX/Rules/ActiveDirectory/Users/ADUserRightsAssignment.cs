@@ -4,10 +4,14 @@ namespace EventViewerX.Rules.ActiveDirectory;
 /// Handles assignment or removal of user rights (events 4704 and 4705).
 /// </summary>
 public class ADUserRightsAssignment : EventRuleBase {
+    /// <inheritdoc />
     public override List<int> EventIds => new() { 4704, 4705 };
+    /// <inheritdoc />
     public override string LogName => "Security";
+    /// <inheritdoc />
     public override NamedEvents NamedEvent => NamedEvents.ADUserRightsAssignment;
 
+    /// <summary>Accepts matching user rights assignment events without extra filters.</summary>
     public override bool CanHandle(EventObject eventObject) {
         // Simple rule - always handle if event ID and log name match
         return true;
@@ -27,6 +31,7 @@ public class ADUserRightsAssignment : EventRuleBase {
     /// <summary>Translated user rights.</summary>
     public List<string> RightsTranslated;
 
+    /// <summary>Initialises a user rights assignment wrapper from an event record.</summary>
     public ADUserRightsAssignment(EventObject eventObject) : base(eventObject) {
         _eventObject = eventObject;
         Type = "ADUserRightsAssignment";

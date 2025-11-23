@@ -52,10 +52,16 @@ public class ADUserChangeDetailed : EventRuleBase {
     /// New value of the changed field.
     /// </summary>
     public string FieldValue; // 'Field Value'
+    /// <inheritdoc />
     public override List<int> EventIds => new() { 5136, 5137, 5139, 5141 };
+
+    /// <inheritdoc />
     public override string LogName => "Security";
+
+    /// <inheritdoc />
     public override NamedEvents NamedEvent => NamedEvents.ADUserChangeDetailed;
 
+    /// <summary>Handles only directory events where the object class is <c>user</c>.</summary>
     public override bool CanHandle(EventObject eventObject) {
         // Check if this is a user object change
         return eventObject.Data.TryGetValue("ObjectClass", out var objectClass) &&
@@ -63,6 +69,7 @@ public class ADUserChangeDetailed : EventRuleBase {
     }
 
 
+    /// <summary>Initialises a detailed user change wrapper from an event record.</summary>
     public ADUserChangeDetailed(EventObject eventObject) : base(eventObject) {
         _eventObject = eventObject;
 

@@ -5,12 +5,15 @@ namespace EventViewerX.Rules.ActiveDirectory;
 /// 4672: Special privileges assigned to new logon
 /// </summary>
 public class ADUserPrivilegeUse : EventRuleBase {
+    /// <inheritdoc />
     public override List<int> EventIds => new() { 4672 };
+    /// <inheritdoc />
     public override string LogName => "Security";
+    /// <inheritdoc />
     public override NamedEvents NamedEvent => NamedEvents.ADUserPrivilegeUse;
 
+    /// <summary>Accepts special-privilege logon events (4672).</summary>
     public override bool CanHandle(EventObject eventObject) {
-        // Simple rule - always handle if event ID and log name match
         return true;
     }
     /// <summary>
@@ -43,6 +46,7 @@ public class ADUserPrivilegeUse : EventRuleBase {
     /// </summary>
     public List<string> PrivilegesTranslated;
 
+    /// <summary>Initialises a privilege-assignment wrapper from an event record.</summary>
     public ADUserPrivilegeUse(EventObject eventObject) : base(eventObject) {
         _eventObject = eventObject;
         Type = "ADUserPrivilegeUse";

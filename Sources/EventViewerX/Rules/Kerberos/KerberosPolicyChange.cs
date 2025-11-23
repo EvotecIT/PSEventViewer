@@ -5,25 +5,38 @@ namespace EventViewerX.Rules.Kerberos;
 /// </summary>
 public class KerberosPolicyChange : EventRuleBase
 {
+    /// <inheritdoc />
     public override List<int> EventIds => new() { 4713 };
+    /// <inheritdoc />
     public override string LogName => "Security";
+    /// <inheritdoc />
     public override NamedEvents NamedEvent => NamedEvents.KerberosPolicyChange;
 
+    /// <summary>Accepts Kerberos policy change events.</summary>
     public override bool CanHandle(EventObject eventObject)
     {
-        // Simple rule - always handle if event ID and log name match
         return true;
     }
+    /// <summary>Domain controller where the policy change occurred.</summary>
     public string Computer;
+    /// <summary>Account that modified the policy.</summary>
     public string Who;
+    /// <summary>Raw policy change string from the event.</summary>
     public string PolicyChanges;
+    /// <summary>Kerberos proxy lifetime in minutes.</summary>
     public double? KerProxyMinutes;
+    /// <summary>Kerberos max renewable lifetime in days.</summary>
     public double? KerMaxRDays;
+    /// <summary>Kerberos max ticket lifetime in hours.</summary>
     public double? KerMaxTHours;
+    /// <summary>Kerberos min ticket lifetime in minutes.</summary>
     public double? KerMinTMinutes;
+    /// <summary>Whether user logon restrictions are enforced.</summary>
     public bool? EnforceUserLogonRestrictions;
+    /// <summary>Event timestamp.</summary>
     public DateTime When;
 
+    /// <summary>Initialises a Kerberos policy change wrapper from an event record.</summary>
     public KerberosPolicyChange(EventObject eventObject) : base(eventObject)
     {
         _eventObject = eventObject;

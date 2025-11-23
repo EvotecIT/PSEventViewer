@@ -23,6 +23,7 @@ public class ADGroupPolicyEdits : EventRuleBase {
     /// <summary>LDAP display name of the attribute.</summary>
     public string AttributeLDAPDisplayName;
     //public string AttributeValue;
+    /// <summary>Resolved group policy information for the edited object (when available).</summary>
     public GroupPolicy GroupPolicy { get; set; }
     /// <inheritdoc />
     public override List<int> EventIds => new() { 5136, 5137, 5141 };

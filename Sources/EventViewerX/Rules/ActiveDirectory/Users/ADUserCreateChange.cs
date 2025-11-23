@@ -4,10 +4,16 @@ namespace EventViewerX.Rules.ActiveDirectory;
 /// Represents creation or modification of user accounts (events 4720 and 4738).
 /// </summary>
 public class ADUserCreateChange : EventRuleBase {
+    /// <inheritdoc />
     public override List<int> EventIds => new() { 4720, 4738 };
+
+    /// <inheritdoc />
     public override string LogName => "Security";
+
+    /// <inheritdoc />
     public override NamedEvents NamedEvent => NamedEvents.ADUserCreateChange;
 
+    /// <summary>Accepts matching create/change user events without extra filtering.</summary>
     public override bool CanHandle(EventObject eventObject) {
         // Simple rule - always handle if event ID and log name match
         return true;
@@ -59,6 +65,7 @@ public class ADUserCreateChange : EventRuleBase {
     /// <summary>Time of the change.</summary>
     public DateTime When;
 
+    /// <summary>Initialises a user creation/change wrapper from an event record.</summary>
     public ADUserCreateChange(EventObject eventObject) : base(eventObject) {
         // main object initialization
         _eventObject = eventObject;

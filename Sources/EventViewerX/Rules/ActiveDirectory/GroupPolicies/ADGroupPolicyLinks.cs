@@ -51,7 +51,7 @@ namespace EventViewerX.Rules.ActiveDirectory;
 public class ADGroupPolicyLinks : EventRuleBase {
     /// <summary>Computer where the change occurred.</summary>
     public string Computer;
-    /// <summary>Description of the operation.</summary>
+    /// <summary>Description of the operation (linked/unlinked).</summary>
     public string Action;
     /// <summary>Type of operation.</summary>
     public string OperationType;
@@ -67,8 +67,11 @@ public class ADGroupPolicyLinks : EventRuleBase {
     public string LinkedTo;
     // public string AttributeLDAPDisplayName;
     // public string AttributeValue;
+    /// <summary>Display names of the GPOs that were linked or unlinked.</summary>
     public List<string> GroupPolicyNames { get; set; } = new();
+    /// <summary>Parsed links added in the event.</summary>
     public List<GroupPolicyLinks> GroupPolicyLink { get; set; } = new();
+    /// <summary>Parsed links removed in the event.</summary>
     public List<GroupPolicyLinks> GroupPolicyUnlink { get; set; } = new();
 
     /// <summary>
@@ -81,6 +84,7 @@ public class ADGroupPolicyLinks : EventRuleBase {
     /// <inheritdoc />
     public override NamedEvents NamedEvent => NamedEvents.ADGroupPolicyLinks;
 
+    /// <summary>Handles gpLink attribute changes on domain/OU/site objects.</summary>
     public override bool CanHandle(EventObject eventObject) {
         // Check if this is a domain DNS, organizational unit, or site object with gpLink attribute
         if (eventObject.Data.TryGetValue("ObjectClass", out var objectClass)) {
@@ -90,6 +94,7 @@ public class ADGroupPolicyLinks : EventRuleBase {
         }
         return false;
     }
+    /// <summary>Initialises a GPO link/unlink wrapper from an event record.</summary>
     public ADGroupPolicyLinks(EventObject eventObject) : base(eventObject) {
         _eventObject = eventObject;
         Type = "ADGroupPolicyLinks";

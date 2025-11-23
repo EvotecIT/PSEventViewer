@@ -10,20 +10,40 @@ namespace EventViewerX.Rules.ActiveDirectory {
     /// 5141: A directory service object was moved
     /// </summary>
     public class ADOtherChangeDetailed : EventRuleBase {
-
+        /// <summary>Domain controller where the change was recorded.</summary>
         public string Computer;
+
+        /// <summary>Short description of the object change.</summary>
         public string Action;
+
+        /// <summary>LDAP object class for the changed object.</summary>
         public string ObjectClass;
+
+        /// <summary>Operation type translated to human-friendly text.</summary>
         public string OperationType;
+
+        /// <summary>Account that performed the change.</summary>
         public string Who;
+
+        /// <summary>Timestamp of the change.</summary>
         public DateTime When;
+
+        /// <summary>Distinguished name of the changed object.</summary>
         public string User; // 'User Object'
+
+        /// <summary>Attribute modified on the object.</summary>
         public string FieldChanged; // 'Field Changed'
+
+        /// <summary>Value written to the attribute.</summary>
         public string FieldValue; // 'Field Value'
+    /// <inheritdoc />
     public override List<int> EventIds => new() { 5136, 5137, 5139, 5141 };
+    /// <inheritdoc />
     public override string LogName => "Security";
+    /// <inheritdoc />
     public override NamedEvents NamedEvent => NamedEvents.ADOtherChangeDetailed;
 
+    /// <summary>Ignores user, computer, OU and group classes; captures all other object changes.</summary>
     public override bool CanHandle(EventObject eventObject) {
         // Only handle objects that are NOT user, computer, organizationalUnit, or group
         if (eventObject.Data.TryGetValue("ObjectClass", out var objectClass)) {
@@ -34,6 +54,7 @@ namespace EventViewerX.Rules.ActiveDirectory {
     }
 
 
+        /// <summary>Initialises a detailed wrapper for non-standard directory object changes.</summary>
         public ADOtherChangeDetailed(EventObject eventObject) : base(eventObject) {
             _eventObject = eventObject;
 

@@ -16,20 +16,28 @@ namespace EventViewerX.Rules.ActiveDirectory;
 /// </summary>
 public class SMBServerAudit : EventRuleBase {
     // public EventObject EventObject { get; }
+    /// <summary>Server that raised the SMB audit event.</summary>
     public string Computer;
+    /// <summary>Short description of the SMB audit action.</summary>
     public string Action;
+    /// <summary>Client IP or host that accessed SMB.</summary>
     public string ClientAddress;
+    /// <summary>Reverse DNS name for the client when resolved.</summary>
     public string ClientDNSName = string.Empty;
+    /// <summary>Timestamp of the SMB access.</summary>
     public DateTime When;
+    /// <inheritdoc />
     public override List<int> EventIds => new() { 3000 };
+    /// <inheritdoc />
     public override string LogName => "Microsoft-Windows-SMBServer/Audit";
+    /// <inheritdoc />
     public override NamedEvents NamedEvent => NamedEvents.ADSMBServerAuditV1;
 
     public override bool CanHandle(EventObject eventObject) {
         return RuleHelpers.IsProvider(eventObject, "Microsoft-Windows-SMBServer");
     }
 
-    // public ctor that performs partial initialization
+    /// <summary>Initialises an SMB audit wrapper from an event record.</summary>
     public SMBServerAudit(EventObject eventObject) : base(eventObject) {
         //EventObject = eventObject;
 

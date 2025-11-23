@@ -39,15 +39,20 @@ public class ADUserLogonNTLMv1 : EventRuleBase {
     /// <summary>Caller process name.</summary>
     public string ProcessName;
 
+    /// <inheritdoc />
     public override List<int> EventIds => new() { 4624 };
+    /// <inheritdoc />
     public override string LogName => "Security";
+    /// <inheritdoc />
     public override NamedEvents NamedEvent => NamedEvents.ADUserLogonNTLMv1;
 
+    /// <summary>Handles only logon events that include the NTLM V1 package.</summary>
     public override bool CanHandle(EventObject eventObject) {
         // Only handle NTLMv1 logons
         return eventObject.ValueMatches("LmPackageName", "NTLM V1");
     }
 
+    /// <summary>Initialises an NTLMv1 logon wrapper from an event record.</summary>
     public ADUserLogonNTLMv1(EventObject eventObject) : base(eventObject) {
         _eventObject = eventObject;
         Type = "ADUserLogonNTLMv1";

@@ -17,9 +17,13 @@ public class HyperVVirtualMachineStarted : EventRuleBase {
         return true;
     }
 
+    /// <summary>Hyper-V host that started the VM.</summary>
     public string Computer;
+    /// <summary>Name of the virtual machine.</summary>
     public string VirtualMachine;
+    /// <summary>Unique identifier of the virtual machine.</summary>
     public string VirtualMachineId;
+    /// <summary>Timestamp when the VM was started.</summary>
     public DateTime When;
 
     /// <summary>Initialises a Hyper-V VM start wrapper from an event record.</summary>

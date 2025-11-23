@@ -10,10 +10,14 @@ namespace EventViewerX.Rules.ActiveDirectory;
 /// 4726: A user account was deleted
 /// </summary>
 public class ADUserStatus : EventRuleBase {
+    /// <inheritdoc />
     public override List<int> EventIds => new() { 4722, 4725, 4723, 4724, 4726 };
+    /// <inheritdoc />
     public override string LogName => "Security";
+    /// <inheritdoc />
     public override NamedEvents NamedEvent => NamedEvents.ADUserStatus;
 
+    /// <summary>Accepts matching status change events without additional filtering.</summary>
     public override bool CanHandle(EventObject eventObject) {
         // Simple rule - always handle if event ID and log name match
         return true;
@@ -44,6 +48,7 @@ public class ADUserStatus : EventRuleBase {
     /// </summary>
     public string UserAffected;
 
+    /// <summary>Initialises a user status change wrapper from an event record.</summary>
     public ADUserStatus(EventObject eventObject) : base(eventObject) {
         _eventObject = eventObject;
         Type = "ADUsersStatus";
