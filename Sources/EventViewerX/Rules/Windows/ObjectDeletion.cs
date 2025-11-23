@@ -5,12 +5,15 @@ namespace EventViewerX.Rules.Windows;
 /// 4660: An object was deleted
 /// </summary>
 public class ObjectDeletion : EventRuleBase {
+    /// <inheritdoc />
     public override List<int> EventIds => new() { 4660 };
+    /// <inheritdoc />
     public override string LogName => "Security";
+    /// <inheritdoc />
     public override NamedEvents NamedEvent => NamedEvents.ObjectDeletion;
 
+    /// <summary>Accepts object deletion events (4660) in the Security log.</summary>
     public override bool CanHandle(EventObject eventObject) {
-        // Simple rule - always handle if event ID and log name match
         return true;
     }
     public string Computer;
@@ -18,6 +21,7 @@ public class ObjectDeletion : EventRuleBase {
     public string Who;
     public DateTime When;
 
+    /// <summary>Initialises an object deletion wrapper from an event record.</summary>
     public ObjectDeletion(EventObject eventObject) : base(eventObject) {
         _eventObject = eventObject;
         Type = "ObjectDeletion";

@@ -5,12 +5,15 @@ namespace EventViewerX.Rules.HyperV;
 /// 18560: The virtual machine was turned off
 /// </summary>
 public class VmShutdown : EventRuleBase {
+    /// <inheritdoc />
     public override List<int> EventIds => new() { 18560 };
+    /// <inheritdoc />
     public override string LogName => "Microsoft-Windows-Hyper-V-Worker/Operational";
+    /// <inheritdoc />
     public override NamedEvents NamedEvent => NamedEvents.HyperVVirtualMachineShutdown;
 
+    /// <summary>Accepts Hyper-V VM shutdown events.</summary>
     public override bool CanHandle(EventObject eventObject) {
-        // Simple rule - always handle if event ID and log name match
         return true;
     }
 
@@ -19,6 +22,7 @@ public class VmShutdown : EventRuleBase {
     public string User;
     public DateTime When;
 
+    /// <summary>Initialises a Hyper-V VM shutdown wrapper from an event record.</summary>
     public VmShutdown(EventObject eventObject) : base(eventObject) {
         _eventObject = eventObject;
         Type = "HyperVVirtualMachineShutdown";

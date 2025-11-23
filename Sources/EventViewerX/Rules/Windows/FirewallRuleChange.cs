@@ -5,10 +5,14 @@ namespace EventViewerX.Rules.Windows;
 /// 4947: A change has been made to Windows Firewall exception list. A rule was modified.
 /// </summary>
 public class FirewallRuleChange : EventRuleBase {
+    /// <inheritdoc />
     public override List<int> EventIds => new() { 4947 };
+    /// <inheritdoc />
     public override string LogName => "Security";
+    /// <inheritdoc />
     public override NamedEvents NamedEvent => NamedEvents.FirewallRuleChange;
 
+    /// <summary>Accepts firewall rule modification events from auditing or firewall providers.</summary>
     public override bool CanHandle(EventObject eventObject) {
         return RuleHelpers.IsProvider(eventObject, "Microsoft-Windows-Security-Auditing", "Microsoft-Windows-Windows Firewall With Advanced Security");
     }
@@ -23,6 +27,7 @@ public class FirewallRuleChange : EventRuleBase {
     /// <summary>Time the event occurred.</summary>
     public DateTime When;
 
+    /// <summary>Initialises a firewall rule change wrapper from an event record.</summary>
     public FirewallRuleChange(EventObject eventObject) : base(eventObject) {
         _eventObject = eventObject;
         Type = "FirewallRuleChange";

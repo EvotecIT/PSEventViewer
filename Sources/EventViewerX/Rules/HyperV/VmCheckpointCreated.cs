@@ -5,12 +5,15 @@ namespace EventViewerX.Rules.HyperV;
 /// 4096: Hyper-V checkpoint created
 /// </summary>
 public class VmCheckpointCreated : EventRuleBase {
+    /// <inheritdoc />
     public override List<int> EventIds => new() { 4096 };
+    /// <inheritdoc />
     public override string LogName => "Microsoft-Windows-Hyper-V-VMMS/Admin";
+    /// <inheritdoc />
     public override NamedEvents NamedEvent => NamedEvents.HyperVCheckpointCreated;
 
+    /// <summary>Accepts Hyper-V checkpoint creation events.</summary>
     public override bool CanHandle(EventObject eventObject) {
-        // Simple rule - always handle if event ID and log name match
         return true;
     }
 
@@ -20,6 +23,7 @@ public class VmCheckpointCreated : EventRuleBase {
     public string User;
     public DateTime When;
 
+    /// <summary>Initialises a Hyper-V checkpoint wrapper from an event record.</summary>
     public VmCheckpointCreated(EventObject eventObject) : base(eventObject) {
         _eventObject = eventObject;
         Type = "VmCheckpointCreated";

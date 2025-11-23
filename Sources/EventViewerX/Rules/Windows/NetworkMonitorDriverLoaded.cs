@@ -5,8 +5,11 @@ namespace EventViewerX.Rules.Windows;
 /// 6: Filter Manager driver loaded
 /// </summary>
 public class NetworkMonitorDriverLoaded : EventRuleBase {
+    /// <inheritdoc />
     public override List<int> EventIds => new() { 6, 7035, 7045 };
+    /// <inheritdoc />
     public override string LogName => "System";
+    /// <inheritdoc />
     public override NamedEvents NamedEvent => NamedEvents.NetworkMonitorDriverLoaded;
 
     private static readonly string[] _driverNames = ["npcap", "npf", "netmon"];
@@ -27,10 +30,14 @@ public class NetworkMonitorDriverLoaded : EventRuleBase {
         return false;
     }
 
+    /// <summary>Machine where the driver was loaded or service started.</summary>
     public string Computer;
+    /// <summary>Detected driver/service name (npcap/npf/netmon).</summary>
     public string DriverName;
+    /// <summary>Event timestamp.</summary>
     public DateTime When;
 
+    /// <summary>Initialises a network monitor driver detection wrapper from an event record.</summary>
     public NetworkMonitorDriverLoaded(EventObject eventObject) : base(eventObject) {
         _eventObject = eventObject;
         Type = "NetworkMonitorDriverLoaded";

@@ -6,12 +6,15 @@ namespace EventViewerX.Rules.Windows;
 /// 4692: Backup of data protection master key was attempted
 /// </summary>
 public class BitLockerKeyChange : EventRuleBase {
+    /// <inheritdoc />
     public override List<int> EventIds => new() { 4673, 4692 };
+    /// <inheritdoc />
     public override string LogName => "Security";
+    /// <inheritdoc />
     public override NamedEvents NamedEvent => NamedEvents.BitLockerKeyChange;
 
+    /// <summary>Accepts BitLocker key change/backup events in the Security log.</summary>
     public override bool CanHandle(EventObject eventObject) {
-        // Simple rule - always handle if event ID and log name match
         return true;
     }
     /// <summary>Computer where the key operation happened.</summary>
@@ -33,6 +36,7 @@ public class BitLockerKeyChange : EventRuleBase {
     /// <summary>Time of the event.</summary>
     public DateTime When;
 
+    /// <summary>Initialises a BitLocker key change wrapper from an event record.</summary>
     public BitLockerKeyChange(EventObject eventObject) : base(eventObject) {
         _eventObject = eventObject;
         Type = "BitLockerKeyChange";
