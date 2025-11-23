@@ -20,6 +20,7 @@ public partial class SearchEvents : Settings
     /// Minimum per-read budget (ms) to avoid overly aggressive time slices that would thrash on busy hosts.
     /// </summary>
     private const int QuickProbeMinPerReadMs = 200;
+    private static int QuickProbePingMaxMs => Settings.PingTimeoutMs;
 
     /// <summary>Status of a quick probe.</summary>
     public enum QuickProbeStatus
@@ -240,10 +241,20 @@ public partial class SearchEvents : Settings
 
         try
         {
-            var task = Task.Run(() => new EventLogSession(machineName));
-            var completed = Task.WhenAny(task, Task.Delay(budget)).GetAwaiter().GetResult();
+            using var cts = new System.Threading.CancellationTokenSource(budget);
+            var task = Task.Run(() => new EventLogSession(machineName), cts.Token);
+            var completed = Task.WhenAny(task, Task.Delay(budget, cts.Token)).GetAwaiter().GetResult();
             if (completed != task)
             {
+                // Ensure the eventual session is disposed when it completes to avoid lingering handles.
+                task.ContinueWith(t =>
+                {
+                    if (t.Status == TaskStatus.RanToCompletion && t.Result != null)
+                    {
+                        t.Result.Dispose();
+                    }
+                }, TaskContinuationOptions.OnlyOnRanToCompletion | TaskContinuationOptions.ExecuteSynchronously);
+
                 return (null, QuickProbeStatus.Timeout, $"Session open timed out after {budget.TotalMilliseconds:F0} ms");
             }
 
@@ -272,7 +283,8 @@ public partial class SearchEvents : Settings
             try
             {
                 using var ping = new System.Net.NetworkInformation.Ping();
-                var reply = ping.Send(host, Math.Min(1000, budgetMs / 2));
+                var pingTimeout = Math.Min(QuickProbePingMaxMs, budgetMs / 2);
+                var reply = ping.Send(host, pingTimeout);
                 if (reply == null || reply.Status != System.Net.NetworkInformation.IPStatus.Success)
                 {
                     MarkHostUnreachable(host);

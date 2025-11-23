@@ -3,14 +3,16 @@ using System.Diagnostics.Eventing.Reader;
 using System.Collections.Concurrent;
 using System.Net.Sockets;
 using System.Threading.Tasks;
+using System.Threading;
 
 namespace EventViewerX;
 
 public partial class SearchEvents : Settings
 {
-    private const int DefaultSessionTimeoutMs = 5000;
-    private const int DefaultRpcProbeTimeoutMs = 2500;
-    private const int DefaultPingTimeoutMs = 1000;
+    private static int DefaultSessionTimeoutMs => Settings.SessionTimeoutMs;
+    private static int DefaultRpcProbeTimeoutMs => Settings.RpcProbeTimeoutMs;
+    private static int DefaultPingTimeoutMs => Settings.PingTimeoutMs;
+
     /// <summary>How long to remember unreachable hosts to avoid repeated slow probes.</summary>
     private static int NegativeCacheTtlSecondsValue => Settings.NegativeCacheTtlSeconds;
 
@@ -70,12 +72,22 @@ public partial class SearchEvents : Settings
 
         try
         {
-            var task = Task.Run(() => new EventLogSession(machineName));
-            var completed = Task.WhenAny(task, Task.Delay(budget)).GetAwaiter().GetResult();
+            using var cts = new System.Threading.CancellationTokenSource(budget);
+            var task = Task.Run(() => new EventLogSession(machineName), cts.Token);
+            var completed = Task.WhenAny(task, Task.Delay(budget, cts.Token)).GetAwaiter().GetResult();
             if (completed != task)
             {
                 _logger.WriteWarning($"{purpose ?? "Session"}: timeout opening session to '{machineName}' for '{logName}' after {budget} ms");
                 MarkHostUnreachable(normalizedHost);
+
+                // Ensure the late session (if it eventually opens) gets disposed.
+                task.ContinueWith(t =>
+                {
+                    if (t.Status == TaskStatus.RanToCompletion && t.Result != null)
+                    {
+                        t.Result.Dispose();
+                    }
+                }, TaskContinuationOptions.OnlyOnRanToCompletion | TaskContinuationOptions.ExecuteSynchronously);
                 return null;
             }
             // Success: clear any stale negative entry
@@ -125,7 +137,7 @@ public partial class SearchEvents : Settings
         try
         {
             using var tcp = new TcpClient();
-            var connectTask = tcp.ConnectAsync(host, 135);
+            var connectTask = tcp.ConnectAsync(host, Settings.RpcProbePort);
             var finished = Task.WhenAny(connectTask, Task.Delay(timeoutMs)).GetAwaiter().GetResult();
             if (finished != connectTask || !tcp.Connected)
             {
@@ -149,6 +161,7 @@ public partial class SearchEvents : Settings
             if (_unreachable.TryGetValue(lower, out var until))
             {
                 if (until > DateTime.UtcNow) return true;
+                // Older frameworks don't expose TryRemove(KeyValuePair<,>), fall back to key+out.
                 _unreachable.TryRemove(lower, out _);
             }
             return false;
