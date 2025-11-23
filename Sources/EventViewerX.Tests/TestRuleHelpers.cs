@@ -114,21 +114,23 @@ public class TestRuleHelpers
         public override int? Task => null;
         public override long? Keywords => null;
         public override IEnumerable<string> KeywordsDisplayNames => Array.Empty<string>();
-        public override int? Opcode => null;
+        public override short? Opcode => 0;
         public override string OpcodeDisplayName => string.Empty;
-        public override int? TaskCategory => null;
         public override string TaskDisplayName => string.Empty;
         public override Guid? ProviderId => null;
         public override Guid? ActivityId => null;
         public override Guid? RelatedActivityId => null;
-        public override int ProcessId => 0;
-        public override int ThreadId => 0;
+        public override int? ProcessId => 0;
+        public override int? ThreadId => 0;
         public override string LevelDisplayName => "Information";
         public override string FormatDescription() => _message;
         public override string FormatDescription(IEnumerable<object> values) => _message;
         public override IList<EventProperty> Properties => Array.Empty<EventProperty>();
         public override DateTime? TimeCreated => DateTime.UtcNow;
         public override int? Qualifiers => null;
+        public override long? RecordId => 0;
+        public override byte? Version => 0;
+        public override SecurityIdentifier UserId => null;
         public override EventBookmark Bookmark => null;
         protected override void Dispose(bool disposing) { }
         public override string ToXml() => "<Event></Event>";
