@@ -82,4 +82,28 @@ internal static class RuleHelpers
         }
         return null;
     }
+
+    /// <summary>
+    /// Returns the best-available message text for an event, falling back to
+    /// the first unlabeled data field when the rendered message is missing
+    /// on remote queries.
+    /// </summary>
+    internal static string GetMessage(EventObject e)
+    {
+        if (e == null) return string.Empty;
+
+        var subject = e.MessageSubject;
+        var rendered = e.Message;
+        var data = e.GetValueFromDataDictionary("NoNameA0");
+        var text = e.GetValueFromDataDictionary("#text");
+
+        // Prefer the longest non-empty payload so we keep rich details when rendered message is truncated.
+        string best = string.Empty;
+        if (!string.IsNullOrWhiteSpace(subject)) best = subject;
+        if (!string.IsNullOrWhiteSpace(rendered) && rendered.Length > best.Length) best = rendered;
+        if (!string.IsNullOrWhiteSpace(data) && data.Length > best.Length) best = data;
+        if (!string.IsNullOrWhiteSpace(text) && text.Length > best.Length) best = text;
+
+        return best ?? string.Empty;
+    }
 }

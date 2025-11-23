@@ -10,7 +10,7 @@ public class OSCrash : EventRuleBase {
     public override NamedEvents NamedEvent => NamedEvents.OSCrash;
 
     public override bool CanHandle(EventObject eventObject) {
-        return RuleHelpers.IsProvider(eventObject, "EventLog");
+        return RuleHelpers.IsProvider(eventObject, "EventLog", "Microsoft-Windows-Eventlog");
     }
     public string Computer;
     public string Action;

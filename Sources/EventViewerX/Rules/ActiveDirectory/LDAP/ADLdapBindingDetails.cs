@@ -55,8 +55,8 @@ public class ADLdapBindingDetails : EventRuleBase {
             var idx = endpoint.LastIndexOf(':');
             if (idx > 0 && idx < endpoint.Length - 1)
             {
-                var ipPart = endpoint[..idx].Trim('[', ']');
-                var portPart = endpoint[(idx + 1)..];
+                var ipPart = endpoint.Substring(0, idx).Trim('[', ']');
+                var portPart = endpoint.Substring(idx + 1);
                 return (ipPart, int.TryParse(portPart, out var p) ? p : null);
             }
             return (endpoint.Trim('[', ']'), null);
