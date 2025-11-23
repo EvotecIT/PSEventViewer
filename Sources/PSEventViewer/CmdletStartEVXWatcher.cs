@@ -5,9 +5,29 @@ using System.Linq;
 
 namespace PSEventViewer {
     /// <summary>
-    /// Starts real-time monitoring of Windows Event Logs with customizable filters and actions.
-    /// Provides continuous event watching with scriptblock execution for matched events.
+    /// <para type="synopsis">Starts real-time monitoring of Windows Event Logs with customizable filters and actions.</para>
+    /// <para type="description">Supports explicit event IDs or NamedEvents, optional staging events, auto-stop conditions, multithreaded processing, and executes a script block for each match.</para>
     /// </summary>
+    /// <example>
+    ///   <summary>Watch security log for logon failures</summary>
+    ///   <code>Start-EVXWatcher -MachineName DC1 -LogName Security -EventId 4625 -Action { Write-Host "Failed logon:" $_.MessageSubject }</code>
+    ///   <para>Streams failed logons and prints a summary.</para>
+    /// </example>
+    /// <example>
+    ///   <summary>Use NamedEvents for AD lockouts</summary>
+    ///   <code>Start-EVXWatcher -MachineName DC1 -LogName Security -NamedEvent ADUserLockouts -Action { Send-MailMessage ... }</code>
+    ///   <para>Triggers an alert when any AD lockout occurs.</para>
+    /// </example>
+    /// <example>
+    ///   <summary>Stop after first hit</summary>
+    ///   <code>Start-EVXWatcher -MachineName SRV1 -LogName System -EventId 41 -StopOnMatch -Action { $_ | Out-File crash.txt }</code>
+    ///   <para>Captures the first critical kernel-power event then exits.</para>
+    /// </example>
+    /// <example>
+    ///   <summary>Limit runtime</summary>
+    ///   <code>Start-EVXWatcher -MachineName SRV1 -LogName Application -EventId 1000 -TimeOut (New-TimeSpan -Minutes 15) -Action { $_.WriteToHost() }</code>
+    ///   <para>Watches for 15 minutes and then stops automatically.</para>
+    /// </example>
     [Cmdlet(VerbsLifecycle.Start, "EVXWatcher", DefaultParameterSetName = "EventId")]
     [Alias("Start-EventViewerXWatcher", "Start-EventWatching")]
     [OutputType(typeof(WatcherInfo))]

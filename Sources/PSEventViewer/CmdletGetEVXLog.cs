@@ -5,8 +5,24 @@ using EventViewerX;
 namespace PSEventViewer;
 
 /// <summary>
-/// Retrieves event log details by name.
+/// <para type="synopsis">Retrieves event log details by name.</para>
+/// <para type="description">Lists log metadata (size, record count, status) on local or remote machines; supports wildcards.</para>
 /// </summary>
+/// <example>
+///   <summary>List security log</summary>
+///   <code>Get-EVXLog -LogName Security</code>
+///   <para>Shows details for the Security log on the local computer.</para>
+/// </example>
+/// <example>
+///   <summary>Query remote logs</summary>
+///   <code>Get-EVXLog -LogName Application,System -MachineName SRV01</code>
+///   <para>Retrieves Application and System log info from SRV01.</para>
+/// </example>
+/// <example>
+///   <summary>Use wildcards</summary>
+///   <code>Get-EVXLog -LogName "Microsoft-Windows-*"</code>
+///   <para>Lists all Microsoft-Windows prefixed logs.</para>
+/// </example>
 [Cmdlet(VerbsCommon.Get, "EVXLog")]
 [Alias("Get-EventViewerXLog", "Get-WinEventLog")]
 [OutputType(typeof(EventLogDetails))]

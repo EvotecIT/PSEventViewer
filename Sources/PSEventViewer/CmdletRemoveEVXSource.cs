@@ -6,8 +6,24 @@ using System.Threading.Tasks;
 using EventViewerX;
 
 /// <summary>
-/// Removes an event source from Windows Event Log.
+/// <para type="synopsis">Removes an event source from Windows Event Log.</para>
+/// <para type="description">Deletes the provider registration locally or on a remote machine with optional log scoping.</para>
 /// </summary>
+/// <example>
+///   <summary>Remove local source</summary>
+///   <code>Remove-EVXSource -SourceName MyApp</code>
+///   <para>Unregisters the MyApp event source on the local computer.</para>
+/// </example>
+/// <example>
+///   <summary>Remove source on remote server</summary>
+///   <code>Remove-EVXSource -SourceName MyApp -MachineName SRV01</code>
+///   <para>Targets the specified remote machine.</para>
+/// </example>
+/// <example>
+///   <summary>Specify log scope</summary>
+///   <code>Remove-EVXSource -SourceName MyApp -LogName Application</code>
+///   <para>Limits the lookup to the Application log when removing the source.</para>
+/// </example>
 [Cmdlet(VerbsCommon.Remove, "EVXSource", SupportsShouldProcess = true)]
 [Alias("Remove-EventViewerXSource", "Remove-WinEventSource")]
 [OutputType(typeof(bool))]
