@@ -373,6 +373,31 @@
         AADConnectRunProfile,
 
         /// <summary>
+        /// Azure AD Connect cycle stage (Directory Synchronization 904)
+        /// </summary>
+        AADSyncCycleStage,
+
+        /// <summary>
+        /// Azure AD Connect provision credentials ping (Directory Synchronization 653/654)
+        /// </summary>
+        AADSyncProvisionCredentialsPing,
+
+        /// <summary>
+        /// Password hash sync status heartbeat (Directory Synchronization 663)
+        /// </summary>
+        AADSyncPasswordHashSyncStatus,
+
+        /// <summary>
+        /// Azure AD Connect import/sync status (Directory Synchronization 105/132/133/134)
+        /// </summary>
+        AADSyncImportStatus,
+
+        /// <summary>
+        /// ADSync connector filter status (ADSync 6952)
+        /// </summary>
+        AADSyncFilterStatus,
+
+        /// <summary>
         /// Network monitor driver loaded (events 6, 7035, 7045)
         /// </summary>
         NetworkMonitorDriverLoaded,

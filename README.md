@@ -1,125 +1,185 @@
-<p align="center">
-  <a href="https://dev.azure.com/evotecpl/PSEventViewer/_build/latest?definitionId=3"><img src="https://dev.azure.com/evotecpl/PSEventViewer/_apis/build/status/EvotecIT.PSEventViewer"></a>
-  <a href="https://www.powershellgallery.com/packages/PSEventViewer"><img src="https://img.shields.io/powershellgallery/v/PSEventViewer.svg"></a>
-  <a href="https://www.powershellgallery.com/packages/PSEventViewer"><img src="https://img.shields.io/powershellgallery/vpre/PSEventViewer.svg?label=powershell%20gallery%20preview&colorB=yellow"></a>
-  <a href="https://github.com/EvotecIT/PSEventViewer"><img src="https://img.shields.io/github/license/EvotecIT/PSEventViewer.svg"></a>
-  <a href="https://codecov.io/gh/EvotecIT/PSEventViewer"><img src="https://codecov.io/gh/EvotecIT/PSEventViewer/branch/master/graph/badge.svg"></a>
-</p>
+# PSEventViewer - Modern Windows Event Log Toolkit for .NET and PowerShell
 
-<p align="center">
-  <a href="https://www.powershellgallery.com/packages/PSEventViewer"><img src="https://img.shields.io/powershellgallery/p/PSEventViewer.svg"></a>
-  <a href="https://github.com/EvotecIT/PSEventViewer"><img src="https://img.shields.io/github/languages/top/evotecit/PSEventViewer.svg"></a>
-  <a href="https://github.com/EvotecIT/PSEventViewer"><img src="https://img.shields.io/github/languages/code-size/evotecit/PSEventViewer.svg"></a>
-  <a href="https://www.powershellgallery.com/packages/PSEventViewer"><img src="https://img.shields.io/powershellgallery/dt/PSEventViewer.svg"></a>
-</p>
+PSEventViewer ships as a PowerShell module from the PowerShell Gallery and as the underlying **EventViewerX** .NET library. Use the module for day-to-day incident response and automation, or drop the library into services and tools that need the same high-performance event pipeline.
 
-<p align="center">
-  <a href="https://twitter.com/PrzemyslawKlys"><img src="https://img.shields.io/twitter/follow/PrzemyslawKlys.svg?label=Twitter%20%40PrzemyslawKlys&style=social"></a>
-  <a href="https://evotec.xyz/hub"><img src="https://img.shields.io/badge/Blog-evotec.xyz-2A6496.svg"></a>
-  <a href="https://www.linkedin.com/in/pklys"><img src="https://img.shields.io/badge/LinkedIn-pklys-0077B5.svg?logo=LinkedIn"></a>
-  <a href="https://evo.yt/discord"><img src="https://img.shields.io/discord/508328927853281280?style=flat-square&label=discord%20chat"></a>
-</p>
+PowerShell Gallery
 
-# PSEventViewer - PowerShell Module
+[![powershell gallery version](https://img.shields.io/powershellgallery/v/PSEventViewer.svg)](https://www.powershellgallery.com/packages/PSEventViewer)
+[![powershell gallery preview](https://img.shields.io/powershellgallery/vpre/PSEventViewer.svg?label=powershell%20gallery%20preview&colorB=yellow)](https://www.powershellgallery.com/packages/PSEventViewer)
+[![powershell gallery platforms](https://img.shields.io/powershellgallery/p/PSEventViewer.svg)](https://www.powershellgallery.com/packages/PSEventViewer)
+[![powershell gallery downloads](https://img.shields.io/powershellgallery/dt/PSEventViewer.svg)](https://www.powershellgallery.com/packages/PSEventViewer)
 
-## Description
+Project Information
 
-This module was built for a project of Events Reporting. As it was a bit inefficient, I've decided to rewrite it and split reading events to separate modules.
-While underneath it's just a wrapper over `Get-WinEvent`, it does add few tweaks here and there...
+[![Test .NET](https://github.com/EvotecIT/PSEventViewer/actions/workflows/test-dotnet.yml/badge.svg)](https://github.com/EvotecIT/PSEventViewer/actions/workflows/test-dotnet.yml)
+[![Test PowerShell](https://github.com/EvotecIT/PSEventViewer/actions/workflows/test-powershell.yml/badge.svg)](https://github.com/EvotecIT/PSEventViewer/actions/workflows/test-powershell.yml)
+[![Coverage](https://img.shields.io/codecov/c/github/EvotecIT/PSEventViewer?branch=master&logo=codecov&label=coverage)](https://codecov.io/gh/EvotecIT/PSEventViewer)
+[![license](https://img.shields.io/github/license/EvotecIT/PSEventViewer.svg)](https://github.com/EvotecIT/PSEventViewer)
+[![top language](https://img.shields.io/github/languages/top/evotecit/PSEventViewer.svg)](https://github.com/EvotecIT/PSEventViewer)
 
-The project was split into 2 parts:
+Author & Social
 
-- `PSEventViewer` - this module.
-- [PSWinReporting](https://github.com/EvotecIT/PSWinReporting) - reporting on Active Directory Events, Windows Events...
+[![Twitter follow](https://img.shields.io/twitter/follow/PrzemyslawKlys.svg?label=Twitter%20%40PrzemyslawKlys&style=social)](https://twitter.com/PrzemyslawKlys)
+[![Blog](https://img.shields.io/badge/Blog-evotec.xyz-2A6496.svg)](https://evotec.xyz/hub)
+[![LinkedIn](https://img.shields.io/badge/LinkedIn-pklys-0077B5.svg?logo=LinkedIn)](https://www.linkedin.com/in/pklys)
+[![Threads](https://img.shields.io/badge/Threads-@PrzemyslawKlys-000000.svg?logo=Threads&logoColor=White)](https://www.threads.net/@przemyslaw.klys)
+[![Discord](https://img.shields.io/discord/508328927853281280?style=flat-square&label=discord%20chat)](https://evo.yt/discord)
 
-### Why PSEventViewer?
+## What it's all about
 
-By default in PowerShell we have couple of cmdlets that let you do different things:
+**PSEventViewer** replaces the dated experience of `Get-EventLog` and the verbose XML gymnastics of `Get-WinEvent`. It adds fast parallel queries, curated event packs, intelligent filtering, and real-time watchers while keeping output predictable and script-friendly. The same engine is available as the **EventViewerX** library for C#/.NET applications.
 
-- [x] Microsoft.PowerShell.Diagnostics
-    - [x] `Get-WinEvent`
-    - [x] `New-WinEvent`
+## What we do better than the native tools
 
-- [x] Microsoft.PowerShell.Management - The cmdlets that contain the EventLog noun, the EventLog cmdlets, work only on classic event logs.
-    - [x] `Clear-EventLog` - Clears all of the entries from the specified event logs on the local or remote computers.
-    - [x] `Get-EventLog -list` - alternative to `Get-WmiObject win32_nteventlogfile` - lists event logs
-    - [x] `Get-EventLog` - Gets the events in the event log that match the specified criteria.
-    - [x] `Limit-EventLog` - Sets the event log properties that limit the size of the event log and the age of its entries.
-    - [x] `New-EventLog` - Creates a new event log and a new event source on a local or remote computer.
-    - [x] `Remove-EventLog` - Deletes an event log or unregisters an event source.
-    - [x] `Show-EventLog` - Displays the event logs of the local or a remote computer in Event Viewer.
+- **Multi-threaded, multi-host queries** that automatically chunk large ID lists to avoid Windows API limits.
+- **Curated `NamedEvents` packs** (AD changes, Kerberos, AAD Connect, IIS, DHCP, device changes, crashes, and more) so you can ask for scenarios instead of memorising event IDs.
+- **Stateful runs** with `RecordIdFile`/`RecordIdKey` resume support for monitoring jobs and schedulers.
+- **Structured payloads**: default objects keep named data in dictionaries, `-Expand` flattens them into first-class properties for piping into `Select-Object`/CSV.
+- **Offline EVTX & wire-speed filtering** using include/exclude named data filters, regex on messages, and pre-built XPath generation (`Get-EVXFilter`).
+- **Log lifecycle management** (`New/Limit/Remove/Clear-EVXLog`, `Remove-EVXSource`, `Write-EVXEntry`) without jumping to `wevtutil` or legacy cmdlets.
+- **Real-time watchers** with stop-after, timeout, and staging modes that run scriptblocks on match.
 
-Our module tries to improve on that by providing a bit more flexibility and speed, and also by providing a bit more information about the events.
+## Components
 
-### Recommended read
+- **EventViewerX (.NET library)** - Targets `net472`, `netstandard2.0`, `net8.0`, `net9.0`; Windows-only; ships the query engine, watcher manager, filter builder, and log management APIs.
+- **PSEventViewer (PowerShell module)** - Built on PowerShellStandard.Library 5.1; works on Windows PowerShell 5.1 and PowerShell 7+; exposes the EVX cmdlets and aliases for familiarity with native verbs.
+- **Examples** - PowerShell examples live in `Examples/`; C# samples in `Sources/EventViewerX.Examples/` show how to embed the library.
 
-- [Documentation for PSEventViewer (overview)](https://evotec.xyz/hub/scripts/pseventviewer-powershell-module/)
-- [Documentation for PSEventViewer (examples and how things are different)](https://evotec.xyz/working-with-windows-events-with-powershell/)
-- [PowerShell - Everything you wanted to know about Event Logs and then some](https://evotec.xyz/powershell-everything-you-wanted-to-know-about-event-logs/)
-- [Sending information to Event Log with extended fields using PowerShell](https://evotec.xyz/sending-information-to-event-log-with-extended-fields-using-powershell/)
-- [The only PowerShell Command you will ever need to find out who did what in Active Directory](https://evotec.xyz/the-only-powershell-command-you-will-ever-need-to-find-out-who-did-what-in-active-directory/)
+## Coverage
 
-### Long-running monitoring jobs
+Coverage is uploaded from GitHub Actions test jobs to Codecov; the badge tracks the latest status for the `master` branch. If you see "unknown", rerun tests in GitHub Actions to refresh the report.
 
-`Get-EVXEvent` can keep track of the last processed record. Specify `-RecordIdFile` with a file path. The cmdlet stores the newest record ID there and automatically skips older events on the next run. When multiple monitoring jobs share the same file, use `-RecordIdKey` to persist a value per job.
+## Supported platforms and dependencies
 
-```powershell
-Get-EVXEvent -LogName Security -RecordIdFile C:\Temp\evx.state -RecordIdKey Machine1
+| Component | Target frameworks / Editions | Notes |
+| --- | --- | --- |
+| EventViewerX library | .NET Framework 4.7.2, .NET Standard 2.0, .NET 8, .NET 9 | Windows-only; uses `System.Diagnostics.EventLog` and `System.DirectoryServices`; depends on `DnsClientX` for DNS lookups used in helpers. |
+| PSEventViewer module | Windows PowerShell 5.1, PowerShell 7+ | Ships compiled cmdlets; depends on `PSSharedGoods` plus Microsoft.PowerShell.Management/Utility/Diagnostics. |
+
+## Capabilities at a glance
+
+- Parallel queries across many machines with per-query thread caps.
+- Built-in time shortcuts (`-TimePeriod Last24Hours`, `PastMonth`, etc.) and `StartTime`/`EndTime` for precise windows.
+- `NamedEvents` scenario packs for AD, Kerberos, AAD Connect, DHCP, Hyper-V, IIS, BitLocker, crash detection, device changes, and more.
+- Offline `.evtx` parsing with include/exclude named data filters and message regex.
+- `Get-EVXFilter` builds XPath for `Get-WinEvent -FilterXPath` or Event Viewer custom views.
+- Real-time watchers (`Start-EVXWatcher`) with stop-after, timeout, staging mode, and pluggable actions.
+- Log administration: create/remove logs and sources, size and retention tuning, clear logs, and write events.
+- Output shapes: stream or `-AsArray`, rich objects or `-Expand` flattened records for tabular exports.
+
+## NamedEvents catalog (high value scenarios)
+
+| NamedEvents value | What it targets | Typical use |
+| --- | --- | --- |
+| `ADUserLogon`, `ADUserLogonFailed`, `ADUserLockouts` | User logons, failures, lockouts | Account investigations, SOC triage |
+| `ADUserStatus`, `ADUserRightsAssignment` | Enable/disable, rights assigned/removed | Access reviews, privilege change detection |
+| `ADUserPrivilegeUse`, `ADUserUnlocked` | Privilege elevation, unlocks | Elevated access monitoring |
+| `ADGroupMembershipChange`, `ADGroupChangeDetailed` | Group membership and object changes | Tier-0 group change tracking |
+| `ADComputerCreateChange`, `ADComputerDeleted` | Computer object lifecycle | Join/leave monitoring, stale cleanup |
+| `ADGroupPolicyChanges`, `ADGroupPolicyChangesDetailed`, `ADGroupPolicyLinks` | GPO create/modify/link events | GPO drift detection |
+| `KerberosServiceTicket`, `KerberosTicketFailure`, `KerberosTGTRequest` | Kerberos ticket requests/failures | Lateral movement / Golden Ticket hunting |
+| `ADLdapBindingDetails`, `ADLdapBindingSummary` | LDAP binds | Legacy bind and DC load monitoring |
+| `AADConnectPasswordSyncFailed`, `AADConnectRunProfile`, `AADConnectStagingEnabled` | Azure AD Connect sync health | Hybrid identity monitoring |
+| `NetworkAccessAuthenticationPolicy` | NPS grants/denies | VPN/Wi-Fi auth troubleshooting |
+| `FirewallRuleChange` | Windows Firewall rule edits | Workstation/server hardening drift |
+| `OSCrash`, `OSBugCheck`, `OSUncleanShutdown`, `OSStartupSecurity` | System crash/boot/shutdown | Reliability tracking, post-crash triage |
+| `IISSiteBindingFailure`, `IISSiteStopped` | IIS binding and site state issues | Web farm readiness checks |
+| `BitLockerKeyChange`, `BitLockerSuspended` | BitLocker protector changes/suspends | Device compliance monitoring |
+| `DeviceRecognized`, `DeviceDisabled` | Plug-and-play device lifecycle | USB and device policy auditing |
+| `LogsClearedSecurity`, `LogsFullSecurity` | Security log cleared or full | Tamper detection |
+| `NetworkMonitorDriverLoaded`, `NetworkPromiscuousMode` | Packet capture drivers/promiscuous mode | IDS evasion/tooling detection |
+| `DfsReplicationError` | DFS-R replication issues | File services health |
+| `SqlDatabaseCreated` | SQL database created | DBA change tracking |
+| `HyperVVirtualMachineStarted`, `HyperVVirtualMachineShutdown`, `HyperVCheckpointCreated` | Hyper-V lifecycle | VM uptime/audit |
+| `WindowsUpdateFailure` | Update failures | Patch compliance follow-up |
+| `ScheduledTaskCreated`, `ScheduledTaskDeleted` | Scheduled task changes | Persistence and admin change tracking |
+| `ObjectDeletion` | Arbitrary object deletions | Broad deletion detection |
+
+Tip: use `Get-EVXEvent -Type <NamedEvents>` to query any of the packs without remembering underlying event IDs. Combine multiple values to cover a scenario set.
+
+Tip: use `Get-EVXEvent -Type <NamedEvents>` to query any of the packs without remembering underlying event IDs. Combine multiple values to cover a scenario set.
+
+## C# quick start (EventViewerX)
+
+```csharp
+using EventViewerX;
+using System;
+using System.Collections.Generic;
+
+// Basic queries
+var events = SearchEvents.QueryLog("Security", new List<int> { 4624, 4625 }, machineName: "DC01");
+
+// Parallel across hosts with chunked ID batches
+await foreach (var ev in SearchEvents.QueryLogsParallel(
+    logName: "Security",
+    eventIds: new List<int> { 4624, 4625, 4634, 4647 },
+    machineNames: new List<string?> { "DC01", "DC02" },
+    maxThreads: Environment.ProcessorCount)) {
+    Console.WriteLine($"{ev.MachineName} {ev.Id} {ev.TimeCreated}");
+}
+
+// Scenario-based search using NamedEvents packs
+var named = SearchEvents.FindEventsByNamedEvents(
+    new List<NamedEvents> { NamedEvents.ADUserLockouts, NamedEvents.AADConnectPasswordSyncFailed },
+    machineNames: new List<string?> { "AADSYNC01" });
+
+// Real-time watcher
+var watcher = WatcherManager.StartWatcher(
+    name: "logons",
+    machineName: Environment.MachineName,
+    logName: "Security",
+    eventIds: new List<int> { 4624, 4625 },
+    namedEvents: new List<NamedEvents>(),
+    action: e => Console.WriteLine($"Logon event {e.Id} from {e.MachineName}"),
+    numberOfThreads: 4,
+    staging: false,
+    stopOnMatch: false,
+    stopAfter: 0,
+    timeout: TimeSpan.FromMinutes(5));
+
+// Write your own events
+SearchEvents.WriteEvent("PSEventViewer", "Application", "Health check OK", EventLogEntryType.Information, 1000);
 ```
 
-### Debugging query strings
+## PowerShell quick start (PSEventViewer)
 
-`BuildWinEventFilter` now inserts a newline between each query clause when `xpathOnly` is set to `$false`.
-The additional line breaks make complex XML queries easier to read in logs or debug output.
-### TimePeriod values
+```powershell
+# Install
+Install-Module -Name PSEventViewer -Scope CurrentUser
 
-The `TimePeriod` enumeration simplifies building date ranges. Each option sets the start time, end time or relative period used by the cmdlets.
+# Query AD logons in the last day and flatten payload
+Get-EVXEvent -LogName Security -Type ADUserLogon, ADUserLogonFailed -TimePeriod Last24Hours -Expand | \
+    Select-Object TimeCreated, MachineName, Id, TargetUserName, IpAddress
 
-| Value | Description |
-|-------|-------------|
-| PastHour | Previous hour at the top of the hour |
-| CurrentHour | Current hour |
-| PastDay | Previous day |
-| CurrentDay | Current day |
-| PastMonth | Previous calendar month |
-| CurrentMonth | Current calendar month |
-| PastQuarter | Previous calendar quarter |
-| CurrentQuarter | Current calendar quarter |
-| Last3Days | Last three days from now |
-| Last7Days | Last seven days from now |
-| Last14Days | Last fourteen days from now |
-| Last1Hour | Last one hour from now |
-| Last2Hours | Last two hours from now |
-| Last3Hours | Last three hours from now |
-| Last6Hours | Last six hours from now |
-| Last12Hours | Last twelve hours from now |
-| Last16Hours | Last sixteen hours from now |
-| Last24Hours | Last twenty-four hours from now |
-| Today | Today's events |
-| Yesterday | Yesterday's events |
-| Everything | No time filtering |
-| TillLastMonday | Since last Monday |
-| TillLastTuesday | Since last Tuesday |
-| TillLastWednesday | Since last Wednesday |
-| TillLastThursday | Since last Thursday |
-| TillLastFriday | Since last Friday |
-| TillLastSaturday | Since last Saturday |
-| TillLastSunday | Since last Sunday |
+# Resume a long-running monitor
+Get-EVXEvent -LogName Security -EventId 4625 -RecordIdFile "$env:TEMP\evx.state" -RecordIdKey 'security-failures'
 
-### NasPortType values
+# Offline EVTX with include/exclude filters
+Get-EVXEvent -Path C:\Logs\DC01-Security.evtx -NamedDataFilter @{ TargetUserName = 'alice' } -NamedDataExcludeFilter @{ IpAddress = '10.0.0.1' }
 
-The `NasPortType` enumeration maps common RADIUS NAS-Port-Type values.
+# Build XPath for Event Viewer / Get-WinEvent
+Get-EVXFilter -LogName Security -ID 4624,4625 -UserID 'S-1-5-18' -StartTime (Get-Date).AddDays(-7)
 
-| Value | Description |
-|-------|-------------|
-| Ethernet | IEEE 802.3 Ethernet |
-| WirelessIEEE80211 | Wireless IEEE 802.11 |
-| Virtual | Virtual port |
+# Real-time watcher with auto-stop
+Start-EVXWatcher -MachineName . -LogName Security -EventId 4625 -StopAfter 3 -Action { param($e) $e | Select-Object Id, TimeCreated, TargetUserName }
 
-### Example scripts
+# Log maintenance
+New-EVXLog -LogName 'MyApp' -MachineName .
+Set-EVXLogLimit -LogName 'MyApp' -MaximumKilobytes 20480 -OverflowAction OverwriteOlder -RetentionDays 7
+Write-EVXEntry -LogName 'MyApp' -Source 'PSEventViewer' -Message 'Started' -EntryType Information -Id 1001
+Clear-EVXLog -LogName 'MyApp'
+Remove-EVXLog -LogName 'MyApp'
+```
 
-See the `Examples` folder for more scenarios.
+## How we're different in practice
 
-- `Example.NamedDataFilterAdvanced.ps1` shows how to combine include and exclude named data filters.
-- `Example.WatchAdvanced.ps1` demonstrates a watcher using staging mode with `-StopOnMatch`.
+- **Productivity**: avoid hand-written XML by generating XPath, using time shortcuts, and calling scenarios by name instead of memorising IDs.
+- **Performance**: async/parallel query paths, event ID chunking, and minimal allocations keep queries responsive even on busy Security logs.
+- **Safety for long runs**: resume files and per-watcher keys prevent double-processing; watchers include stop-after/timeouts to avoid runaway jobs.
+- **Consistency**: the same core runs in both C# and PowerShell, so automation and compiled tools share behaviour, outputs, and bug fixes.
 
+## Where to go next
+
+- Browse PowerShell samples in `Examples/` and C# samples in `Sources/EventViewerX.Examples/`.
+- Need a specific filter or scenario? `Get-EVXFilter` and `Get-EVXEvent -Type <NamedEvents>` are the fastest entry points.
+- Open an issue or PR if you spot provider differences or missing scenarios—the module translates and normalises common quirks across vendors.
