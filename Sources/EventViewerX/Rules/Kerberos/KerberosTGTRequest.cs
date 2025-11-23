@@ -5,26 +5,43 @@ namespace EventViewerX.Rules.Kerberos;
 /// </summary>
 public class KerberosTGTRequest : EventRuleBase
 {
+    /// <inheritdoc />
     public override List<int> EventIds => new() { 4768 };
+    /// <inheritdoc />
     public override string LogName => "Security";
+    /// <inheritdoc />
     public override NamedEvents NamedEvent => NamedEvents.KerberosTGTRequest;
 
+    /// <summary>Checks whether the supplied event originates from the security auditing provider.</summary>
     public override bool CanHandle(EventObject eventObject)
     {
         return RuleHelpers.IsProvider(eventObject, "Microsoft-Windows-Security-Auditing");
     }
+
+    /// <summary>Domain controller that issued the TGT.</summary>
     public string Computer;
+    /// <summary>Action reported by the event (e.g., issued, failed).</summary>
     public string Action;
+    /// <summary>Target account requesting the ticket.</summary>
     public string AccountName;
+    /// <summary>Client IP address.</summary>
     public string IpAddress;
+    /// <summary>Client source port.</summary>
     public string IpPort;
+    /// <summary>Ticket options bitmask parsed from the event.</summary>
     public TicketOptions? TicketOptions;
+    /// <summary>Status code reported by the KDC.</summary>
     public Status? Status;
+    /// <summary>Encryption type used for the ticket.</summary>
     public TicketEncryptionType? EncryptionType;
+    /// <summary>Pre-authentication type used by the client.</summary>
     public PreAuthType? PreAuthType;
+    /// <summary>True when a weak encryption algorithm (e.g., RC4/DES) was used.</summary>
     public bool WeakEncryptionAlgorithm;
+    /// <summary>Time the event was created.</summary>
     public DateTime When;
 
+    /// <summary>Initialises a TGT request wrapper from an event record.</summary>
     public KerberosTGTRequest(EventObject eventObject) : base(eventObject)
     {
         _eventObject = eventObject;
