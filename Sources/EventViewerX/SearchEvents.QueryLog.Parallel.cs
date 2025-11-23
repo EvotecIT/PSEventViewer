@@ -80,7 +80,7 @@ public partial class SearchEvents : Settings {
             await semaphore.WaitAsync(cancellationToken);
             try {
                 _logger.WriteVerbose($"Querying log on machine: {machineName}, logName: {logName}, event ids: {string.Join(", ", eventIds ?? new List<int>())}");
-                foreach (var result in QueryLogEnumerable(logName, eventIds, machineName, providerName, keywords, level, startTime, endTime, userId, maxEvents, eventRecordId, timePeriod, cancellationToken)) {
+                foreach (var result in QueryLogEnumerable(logName, eventIds, machineName, providerName, keywords, level, startTime, endTime, userId, maxEvents, eventRecordId, timePeriod, QuerySessionTimeoutMs, cancellationToken)) {
                     if (cancellationToken.IsCancellationRequested) break;
                     results.Add(result, cancellationToken);
                 }

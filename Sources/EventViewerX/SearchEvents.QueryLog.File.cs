@@ -8,12 +8,12 @@ namespace EventViewerX;
 public partial class SearchEvents : Settings {
     public static IEnumerable<EventObject> QueryLogFile(string filePath, List<int> eventIds = null, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null, int maxEvents = 0, List<long> eventRecordId = null, TimePeriod? timePeriod = null, bool oldest = false, System.Collections.Hashtable namedDataFilter = null, System.Collections.Hashtable namedDataExcludeFilter = null, CancellationToken cancellationToken = default) {
 
-        // Sanitize the provided path in case it contains wrapping quotes or extra spaces
+        // Sanitize and resolve path; allow UNC and relative.
         string sanitizedPath = filePath.Trim().Trim('"', '\'');
-
         string absolutePath = Path.GetFullPath(sanitizedPath);
 
-        if (!File.Exists(absolutePath)) {
+        bool fileExists = File.Exists(absolutePath);
+        if (!fileExists) {
             throw new FileNotFoundException($"The log file '{absolutePath}' does not exist.", absolutePath);
         }
 
@@ -32,8 +32,8 @@ public partial class SearchEvents : Settings {
 
         EventLogQuery query;
 
+        // Use XPath only; path is supplied via EventLogQuery FilePath
         if (hasFilters) {
-            // Build complex XML query with filters
             var namedDataFilterArray = namedDataFilter != null ? new[] { namedDataFilter } : null;
             var namedDataExcludeFilterArray = namedDataExcludeFilter != null ? new[] { namedDataExcludeFilter } : null;
             var idArray = eventIds?.Select(i => i.ToString()).ToArray();
@@ -43,7 +43,7 @@ public partial class SearchEvents : Settings {
             var levelArray = level != null ? new[] { level.ToString() } : null;
             var userIdArray = !string.IsNullOrEmpty(userId) ? new[] { userId } : null;
 
-            string queryString = BuildWinEventFilter(
+            string xpath = BuildWinEventFilter(
                 id: idArray,
                 eventRecordId: eventRecordIdArray,
                 startTime: startTime,
@@ -54,47 +54,70 @@ public partial class SearchEvents : Settings {
                 userId: userIdArray,
                 namedDataFilter: namedDataFilterArray,
                 namedDataExcludeFilter: namedDataExcludeFilterArray,
-                path: absolutePath,
-                xpathOnly: false
+                xpathOnly: true
             );
 
-            _logger.WriteVerbose($"Querying file '{filePath}' with complex query: {queryString}");
+            if (string.IsNullOrWhiteSpace(xpath)) {
+                xpath = "*";
+            }
 
-            // Complex query with filters - use XML with null path
-            query = new EventLogQuery(null, PathType.LogName, queryString) {
-                ReverseDirection = !oldest
+            _logger.WriteVerbose($"QueryLogFile: path '{absolutePath}', exists: True, xpath '{xpath}', mode: complex");
+
+            query = new EventLogQuery(absolutePath, PathType.FilePath, xpath) {
+                ReverseDirection = !oldest,
+                TolerateQueryErrors = true
             };
         } else {
-            // Simple query without filters - use XML with wildcard filter
-            string queryString = BuildWinEventFilter(
-                path: absolutePath,
-                xpathOnly: false
-            );
+            string xpath = BuildWinEventFilter(xpathOnly: true);
 
-            _logger.WriteVerbose($"Querying file '{filePath}' with simple query: {queryString}");
+            if (string.IsNullOrWhiteSpace(xpath)) {
+                xpath = "*";
+            }
 
-            query = new EventLogQuery(null, PathType.LogName, queryString) {
-                ReverseDirection = !oldest
+            _logger.WriteVerbose($"QueryLogFile: path '{absolutePath}', exists: True, xpath '{xpath}', mode: simple");
+
+            query = new EventLogQuery(absolutePath, PathType.FilePath, xpath) {
+                ReverseDirection = !oldest,
+                TolerateQueryErrors = true
             };
         }
 
-        // We need to keep record not disposed to be able to access it after the using block
-        // Maybe there's a better way to do this
-        EventRecord record;
-        using (EventLogReader reader = CreateEventLogReader(query, filePath)) {
-            if (reader != null) {
-                int eventCount = 0;
-                while (!cancellationToken.IsCancellationRequested && (record = reader.ReadEvent()) != null) {
-                    // using (record) {
-                    EventObject eventObject = new EventObject(record, filePath);
-                    yield return eventObject;
-                    eventCount++;
-                    if (maxEvents > 0 && eventCount >= maxEvents) {
-                        break;
-                    }
-                    // }
+        using (EventLogReader reader = CreateEventLogReader(query, null)) {
+            if (reader == null) {
+                yield break;
+            }
+
+            int eventCount = 0;
+            while (true) {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                var record = reader.ReadEvent();
+                if (record == null) {
+                    break;
+                }
+
+                yield return new EventObject(record, filePath);
+                eventCount++;
+                if (maxEvents > 0 && eventCount >= maxEvents) {
+                    break;
                 }
             }
+        }
+    }
+
+    private static EventLogQuery CreateFileQueryWithFallback(string absolutePath, string xpath, bool oldest) {
+        try {
+            return new EventLogQuery(absolutePath, PathType.FilePath, xpath) {
+                ReverseDirection = !oldest,
+                TolerateQueryErrors = true
+            };
+        } catch (System.Diagnostics.Eventing.Reader.EventLogNotFoundException) {
+            // Fall back to QueryList XML with embedded path (works on some systems/PS builds)
+            string queryString = BuildWinEventFilter(path: absolutePath, xpathOnly: false);
+            return new EventLogQuery(null, PathType.LogName, queryString) {
+                ReverseDirection = !oldest,
+                TolerateQueryErrors = true
+            };
         }
     }
 }

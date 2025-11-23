@@ -31,9 +31,11 @@ public partial class SearchEvents : Settings {
         EventLogSession? session = null;
         var result = new ChannelPolicyApplyResult { LogName = policy.LogName, MachineName = policy.MachineName };
         try {
-            session = string.IsNullOrEmpty(policy.MachineName)
-                ? new EventLogSession()
-                : new EventLogSession(policy.MachineName);
+            session = CreateSession(policy.MachineName, "ChannelPolicy.Set", policy.LogName, DefaultSessionTimeoutMs);
+            if (session == null) {
+                result.Errors.Add("Session open timed out or failed.");
+                return result;
+            }
 
             try {
                 using var cfg = new EventLogConfiguration(policy.LogName, session);

@@ -6,6 +6,24 @@ namespace EventViewerX;
 public class Settings {
     public static InternalLogger _logger = new InternalLogger();
 
+    /// <summary>TTL (seconds) for negative host reachability cache; adjust for slower/faster networks.</summary>
+    public static int NegativeCacheTtlSeconds { get; set; } = 15;
+
+    /// <summary>RPC reachability probe port; defaults to 135 but can be changed for locked-down environments.</summary>
+    public static int RpcProbePort { get; set; } = 135;
+
+    /// <summary>Default timeout (ms) when opening EventLogSession connections.</summary>
+    public static int SessionTimeoutMs { get; set; } = 5000;
+
+    /// <summary>Timeout (ms) for RPC probe before attempting a session.</summary>
+    public static int RpcProbeTimeoutMs { get; set; } = 2500;
+
+    /// <summary>Timeout (ms) for ICMP ping reachability check.</summary>
+    public static int PingTimeoutMs { get; set; } = 1000;
+
+    /// <summary>Warm-up budget (ms) for listing log names before queries.</summary>
+    public static int ListLogWarmupMs { get; set; } = 3000;
+
     /// <summary>When set, error messages are written to the console.</summary>
     public bool Error {
         get => _logger.IsError;

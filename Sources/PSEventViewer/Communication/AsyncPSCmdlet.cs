@@ -155,6 +155,9 @@ public abstract class AsyncPSCmdlet : PSCmdlet, IDisposable {
         }
 
         blockTask.GetAwaiter().GetResult();
+        if (_cancelSource.IsCancellationRequested) {
+            throw new PipelineStoppedException();
+        }
     }
 
     /// <summary>

@@ -2,33 +2,44 @@ Describe 'Limit-EVXLog cmdlet' {
     BeforeAll {
         $script:log = 'EVXLimitTestLog'
         $script:provider = 'EVXLimitTestSource'
-        if ([System.Diagnostics.EventLog]::SourceExists($script:provider)) {
-            [System.Diagnostics.EventLog]::DeleteEventSource($script:provider)
+        $script:isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltinRole]::Administrator)
+        $script:skip = -not $script:isAdmin
+
+        if (-not $script:skip) {
+            Remove-EVXSource -SourceName $script:provider -LogName $script:log -ErrorAction SilentlyContinue
+            Remove-EVXLog -LogName $script:log -ErrorAction SilentlyContinue
+            New-EVXLog -LogName $script:log -ProviderName $script:provider -SourceLogName $script:log | Out-Null
         }
-        if ([System.Diagnostics.EventLog]::Exists($script:log)) {
-            [System.Diagnostics.EventLog]::Delete($script:log)
-        }
-        New-EVXLog -LogName $script:log -ProviderName $script:provider | Out-Null
     }
     AfterAll {
-        if ([System.Diagnostics.EventLog]::Exists($script:log)) {
-            [System.Diagnostics.EventLog]::Delete($script:log)
-        }
-        if ([System.Diagnostics.EventLog]::SourceExists($script:provider)) {
-            [System.Diagnostics.EventLog]::DeleteEventSource($script:provider)
+        if (-not $script:skip) {
+            Remove-EVXLog -LogName $script:log -ErrorAction SilentlyContinue
+            Remove-EVXSource -SourceName $script:provider -LogName $script:log -ErrorAction SilentlyContinue
         }
     }
-    It 'limits log settings' {
-        Limit-EVXLog -LogName $script:log -MaximumKilobytes 2048 -OverflowAction OverwriteOlder -RetentionDays 2 | Should -Be $true
-        $eventLog = New-Object System.Diagnostics.EventLog $script:log
-        $eventLog.MaximumKilobytes | Should -Be 2048
-        $eventLog.OverflowAction | Should -Be 'OverwriteOlder'
-        $eventLog.MinimumRetentionDays | Should -Be 2
+    It 'limits log settings' -Skip:$script:skip {
+        $result = Limit-EVXLog -LogName $script:log -MaximumKilobytes 2048 -OverflowAction OverwriteOlder -RetentionDays 2 -SourceLogName $script:log
+        if ($script:isAdmin) {
+            $result | Should -Be $true
+            $eventLog = New-Object System.Diagnostics.EventLog $script:log
+            $eventLog.MaximumKilobytes | Should -Be 2048
+            $eventLog.OverflowAction | Should -Be 'OverwriteOlder'
+            $eventLog.MinimumRetentionDays | Should -Be 2
+        }
+        else {
+            $result | Should -Be $false
+        }
     }
-    It 'supports overwrite as needed' {
-        Limit-EVXLog -LogName $script:log -MaximumKilobytes 4096 -OverflowAction OverwriteAsNeeded | Should -Be $true
-        $eventLog = New-Object System.Diagnostics.EventLog $script:log
-        $eventLog.MaximumKilobytes | Should -Be 4096
-        $eventLog.OverflowAction | Should -Be 'OverwriteAsNeeded'
+    It 'supports overwrite as needed' -Skip:$script:skip {
+        $result = Limit-EVXLog -LogName $script:log -MaximumKilobytes 4096 -OverflowAction OverwriteAsNeeded -SourceLogName $script:log
+        if ($script:isAdmin) {
+            $result | Should -Be $true
+            $eventLog = New-Object System.Diagnostics.EventLog $script:log
+            $eventLog.MaximumKilobytes | Should -Be 4096
+            $eventLog.OverflowAction | Should -Be 'OverwriteAsNeeded'
+        }
+        else {
+            $result | Should -Be $false
+        }
     }
 }

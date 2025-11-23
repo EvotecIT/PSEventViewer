@@ -91,7 +91,7 @@ public class EventLogDetails {
         try {
             ProviderNames = new List<string>(logConfig.ProviderNames);
         } catch (Exception ex) {
-            internalLogger.WriteWarning("Couldn't get provider names for " + LogName + ". Error: " + ex.Message);
+            internalLogger.WriteWarning($"Couldn't get provider names for {LogName} on {machineName}. Error: {ex.Message}");
             ProviderNames = new List<string>();
         }
         ProviderBufferSize = logConfig.ProviderBufferSize.GetValueOrDefault();

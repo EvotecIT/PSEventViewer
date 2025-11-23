@@ -40,8 +40,11 @@ namespace EventViewerX {
 
         /// <summary>
         /// Human readable event level name.
+        /// Falls back to numeric level when the provider omits a display string (e.g., synthetic or test events).
         /// </summary>
-        public string LevelDisplayName => _eventRecord.LevelDisplayName;
+        private readonly string _levelDisplayName;
+
+        public string LevelDisplayName => _levelDisplayName;
 
         /// <summary>
         /// Provider that generated the event.
@@ -197,6 +200,20 @@ namespace EventViewerX {
             QueriedMachine = queriedMachine;
             _eventRecord = eventRecord;
 
+            try {
+                _levelDisplayName = eventRecord.LevelDisplayName;
+            } catch (EventLogNotFoundException) {
+                // Some offline .evtx files reference providers that are not installed on the host.
+                // When the metadata DLL is missing, EventLogReader throws while resolving the display name.
+                _levelDisplayName = null;
+            } catch (EventLogException) {
+                _levelDisplayName = null;
+            }
+
+            if (string.IsNullOrEmpty(_levelDisplayName)) {
+                _levelDisplayName = LevelToDisplayName(eventRecord.Level);
+            }
+
             ContainerLog = ((EventLogRecord)_eventRecord).ContainerLog;
 
             if (queriedMachine != null && (queriedMachine.EndsWith(".evtx", StringComparison.OrdinalIgnoreCase) || queriedMachine.Contains("\\"))) {
@@ -215,6 +232,18 @@ namespace EventViewerX {
             }
             NicIdentifiers = ExtractNicIdentifiers();
             Attachments = ExtractAttachments(XMLData);
+        }
+
+        private static string LevelToDisplayName(byte? level)
+        {
+            return level switch {
+                1 => "Critical",
+                2 => "Error",
+                3 => "Warning",
+                4 => "Information",
+                5 => "Verbose",
+                _ => level?.ToString() ?? string.Empty
+            };
         }
     }
 }

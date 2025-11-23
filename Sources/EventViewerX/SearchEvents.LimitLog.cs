@@ -39,7 +39,11 @@ public partial class SearchEvents : Settings {
     ///   </code>
     ///   <para>Oldest events are removed first when the log becomes full.</para>
     /// </example>
-    public static bool LimitLog(string logName, string machineName = null, int maximumKilobytes = 0, OverflowAction overflowAction = OverflowAction.OverwriteAsNeeded, int retentionDays = 7) {
+    public static bool LimitLog(string logName, string machineName = null, int maximumKilobytes = 0, OverflowAction overflowAction = OverflowAction.OverwriteAsNeeded, int retentionDays = 7, string sourceLogName = null) {
+        if (string.IsNullOrWhiteSpace(logName)) {
+            return false;
+        }
+
         try {
             using EventLog log = string.IsNullOrEmpty(machineName)
                 ? new EventLog(logName)
