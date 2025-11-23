@@ -10,6 +10,8 @@ public abstract class ClientGroupPoliciesBase : EventRuleBase {
     public string ItemName;
     public string PolicyName;
     public string Error;
+    public DateTime? ActionTimestampUtc;
+    public string ActionTimestampIso => ActionTimestampUtc?.ToString("o") ?? string.Empty;
     public string Who;
     public DateTime When;
 
@@ -23,7 +25,8 @@ public abstract class ClientGroupPoliciesBase : EventRuleBase {
         PolicyName = _eventObject.GetValueFromDataDictionary("NoNameA2", "ExtensionName");
         Error = _eventObject.GetValueFromDataDictionary("NoNameA3", "ErrorDescription");
         Who = _eventObject.GetValueFromDataDictionary("SubjectUserName", "SubjectDomainName", "\\", reverseOrder: true);
-        When = _eventObject.TimeCreated;
+        ActionTimestampUtc = _eventObject.TimeCreated.ToUniversalTime();
+        When = ActionTimestampUtc ?? _eventObject.TimeCreated;
     }
 
     public override bool CanHandle(EventObject eventObject) {

@@ -16,6 +16,8 @@ public class ADLdapBindingDetails : EventRuleBase {
     public string Computer;
     public string Action;
     public string RemoteEndpoint;
+    public string RemoteIp;
+    public int? RemotePort;
     public string AccountName;
     public string BindType;
     public DateTime When;
@@ -28,6 +30,7 @@ public class ADLdapBindingDetails : EventRuleBase {
         Computer = _eventObject.ComputerName;
         Action = _eventObject.MessageSubject;
         RemoteEndpoint = _eventObject.GetValueFromDataDictionary("NoNameA0");
+        (RemoteIp, RemotePort) = ParseEndpoint(RemoteEndpoint);
         AccountName = _eventObject.GetValueFromDataDictionary("NoNameA1");
         BindType = TranslateBindType(_eventObject.GetValueFromDataDictionary("NoNameA2"));
         When = _eventObject.TimeCreated;
@@ -41,5 +44,26 @@ public class ADLdapBindingDetails : EventRuleBase {
             "1" => "Simple",
             _ => string.IsNullOrWhiteSpace(raw) ? "Unknown" : raw
         };
+    }
+
+    private static (string ip, int? port) ParseEndpoint(string endpoint)
+    {
+        if (string.IsNullOrWhiteSpace(endpoint)) return (string.Empty, null);
+        // Expect formats like "192.168.1.10:389" or "[::1]:389"
+        try
+        {
+            var idx = endpoint.LastIndexOf(':');
+            if (idx > 0 && idx < endpoint.Length - 1)
+            {
+                var ipPart = endpoint[..idx].Trim('[', ']');
+                var portPart = endpoint[(idx + 1)..];
+                return (ipPart, int.TryParse(portPart, out var p) ? p : null);
+            }
+            return (endpoint.Trim('[', ']'), null);
+        }
+        catch
+        {
+            return (endpoint, null);
+        }
     }
 }

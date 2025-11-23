@@ -38,5 +38,9 @@ public class OSCrash : EventRuleBase {
                             ?? _eventObject.TimeCreated.ToUniversalTime();
 
         When = ActionTimestampUtc ?? _eventObject.TimeCreated;
+
+        if (string.IsNullOrWhiteSpace(Action)) {
+            Action = "Unexpected system shutdown";
+        }
     }
 }
