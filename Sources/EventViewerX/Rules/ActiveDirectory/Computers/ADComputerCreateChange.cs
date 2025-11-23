@@ -5,10 +5,14 @@ namespace EventViewerX.Rules.ActiveDirectory;
 /// Handles events 4741 and 4742.
 /// </summary>
 public class ADComputerCreateChange : EventRuleBase {
+    /// <inheritdoc />
     public override List<int> EventIds => new() { 4741, 4742 };
+    /// <inheritdoc />
     public override string LogName => "Security";
+    /// <inheritdoc />
     public override NamedEvents NamedEvent => NamedEvents.ADComputerCreateChange;
 
+    /// <summary>Accepts matching computer create/change events without extra filtering.</summary>
     public override bool CanHandle(EventObject eventObject) {
         // Simple rule - always handle if event ID and log name match
         return true;
@@ -64,6 +68,7 @@ public class ADComputerCreateChange : EventRuleBase {
     /// <summary>Time of the change.</summary>
     public DateTime When;
 
+    /// <summary>Initialises a computer create/change wrapper from an event record.</summary>
     public ADComputerCreateChange(EventObject eventObject) : base(eventObject) {
         // common fields
         _eventObject = eventObject;

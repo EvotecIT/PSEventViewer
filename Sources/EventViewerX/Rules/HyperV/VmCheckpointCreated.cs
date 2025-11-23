@@ -17,10 +17,15 @@ public class VmCheckpointCreated : EventRuleBase {
         return true;
     }
 
+    /// <summary>Hyper-V host where the checkpoint was created.</summary>
     public string Computer;
+    /// <summary>Name of the virtual machine.</summary>
     public string VmName;
+    /// <summary>Name of the created checkpoint.</summary>
     public string CheckpointName;
+    /// <summary>User who created the checkpoint.</summary>
     public string User;
+    /// <summary>Timestamp of checkpoint creation.</summary>
     public DateTime When;
 
     /// <summary>Initialises a Hyper-V checkpoint wrapper from an event record.</summary>

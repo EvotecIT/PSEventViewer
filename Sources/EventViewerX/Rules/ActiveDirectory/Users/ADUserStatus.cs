@@ -1,13 +1,13 @@
 namespace EventViewerX.Rules.ActiveDirectory;
 
 /// <summary>
-/// A user account was enabled, disabled, unlocked, password changed, password reset, or deleted
-/// 4722: A user account was enabled (this includes computer accounts)
-/// 4725: A user account was disabled (this includes computer accounts)
-/// 4767: A user account was unlocked
-/// 4723: An attempt was made to change an account's password
-/// 4724: An attempt was made to reset an account's password
-/// 4726: A user account was deleted
+/// A user account was enabled, disabled, unlocked, password changed, password reset, or deleted.
+/// <para>4722: A user account was enabled (this includes computer accounts)</para>
+/// <para>4725: A user account was disabled (this includes computer accounts)</para>
+/// <para>4767: A user account was unlocked</para>
+/// <para>4723: An attempt was made to change an account's password</para>
+/// <para>4724: An attempt was made to reset an account's password</para>
+/// <para>4726: A user account was deleted</para>
 /// </summary>
 public class ADUserStatus : EventRuleBase {
     /// <inheritdoc />

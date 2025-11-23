@@ -1,8 +1,12 @@
 ﻿namespace EventViewerX.Rules.ActiveDirectory;
 
 /// <summary>
-/// Placeholder for Active Directory replication events documentation.
+/// Documentation stub for future Active Directory replication event handling (e.g., lingering objects, GMSA password fetch failures).
 /// </summary>
+/// <remarks>
+/// The class intentionally has no logic yet; the surrounding comments capture representative replication and NTDS LDAP events
+/// that will be formalised into rules in a later iteration.
+/// </remarks>
 internal class Replication {
 
     //Log Name:      Directory Service

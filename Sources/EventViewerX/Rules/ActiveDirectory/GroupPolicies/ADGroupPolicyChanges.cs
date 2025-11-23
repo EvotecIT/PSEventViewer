@@ -3,6 +3,10 @@
 /// <summary>
 /// Summary information for group policy change events.
 /// </summary>
+/// <remarks>
+/// This rule focuses on high-level fields (DN, attribute, actor) for GPO/container objects; detailed change deltas are handled by
+/// <see cref="ADGroupPolicyChangesDetailed"/>. The <see cref="OperationType"/> value is left as emitted by the provider.
+/// </remarks>
 public class ADGroupPolicyChanges : EventRuleBase {
     /// <summary>Computer where the change occurred.</summary>
     public string Computer;

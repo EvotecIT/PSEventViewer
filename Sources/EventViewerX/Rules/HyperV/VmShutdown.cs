@@ -17,9 +17,13 @@ public class VmShutdown : EventRuleBase {
         return true;
     }
 
+    /// <summary>Hyper-V host where the VM was shut down.</summary>
     public string Computer;
+    /// <summary>Name of the virtual machine.</summary>
     public string VmName;
+    /// <summary>User or account that initiated the shutdown.</summary>
     public string User;
+    /// <summary>Timestamp of the shutdown event.</summary>
     public DateTime When;
 
     /// <summary>Initialises a Hyper-V VM shutdown wrapper from an event record.</summary>

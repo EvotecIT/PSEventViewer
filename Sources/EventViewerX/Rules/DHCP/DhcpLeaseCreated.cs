@@ -12,6 +12,7 @@ public class DhcpLeaseCreated : EventRuleBase {
     /// <inheritdoc />
     public override NamedEvents NamedEvent => NamedEvents.DhcpLeaseCreated;
 
+    /// <summary>Accepts DHCP lease events from the DHCP Server provider.</summary>
     public override bool CanHandle(EventObject eventObject) {
         return RuleHelpers.IsProvider(eventObject, "Microsoft-Windows-DHCP-Server");
     }
