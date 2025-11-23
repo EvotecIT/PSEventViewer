@@ -223,8 +223,8 @@ public partial class SearchEvents : Settings
 
     private static (EventLogSession? Session, QuickProbeStatus Status, string? Message) TryCreateSession(string? machineName, TimeSpan budget)
     {
-        // Local: avoid extra work
-        if (string.IsNullOrWhiteSpace(machineName))
+        // Local: avoid extra work and RPC/ping probes
+        if (IsLocalMachine(machineName))
         {
             try { return (new EventLogSession(), QuickProbeStatus.Ok, null); }
             catch (Exception ex) { return (null, QuickProbeStatus.Error, ex.Message); }

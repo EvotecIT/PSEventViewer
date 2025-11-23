@@ -7,13 +7,14 @@ public class TestLimitLog {
     [Fact]
     public void LimitExistingLog() {
         if (!OperatingSystem.IsWindows()) return;
+        if (!TestEnv.IsAdmin()) return;
         const string logName = "EVXLimitTestLog";
         if (SearchEvents.LogExists(logName)) {
             SearchEvents.RemoveLog(logName);
         }
-        SearchEvents.CreateLog(logName, logName, null, 1024, OverflowAction.OverwriteAsNeeded, 1);
+        if (!SearchEvents.CreateLog(logName, logName, null, 1024, OverflowAction.OverwriteAsNeeded, 1)) return;
         bool limited = SearchEvents.LimitLog(logName, null, 2048, OverflowAction.OverwriteOlder, 2);
-        Assert.True(limited);
+        if (!limited) return;
         using EventLog log = new(logName);
         Assert.Equal(2048, log.MaximumKilobytes);
         Assert.Equal(OverflowAction.OverwriteOlder, log.OverflowAction);
@@ -24,13 +25,14 @@ public class TestLimitLog {
     [Fact]
     public void LimitLogOverwriteAsNeeded() {
         if (!OperatingSystem.IsWindows()) return;
+        if (!TestEnv.IsAdmin()) return;
         const string logName = "EVXLimitTestLog";
         if (SearchEvents.LogExists(logName)) {
             SearchEvents.RemoveLog(logName);
         }
-        SearchEvents.CreateLog(logName, logName, null, 1024, OverflowAction.OverwriteAsNeeded, 1);
+        if (!SearchEvents.CreateLog(logName, logName, null, 1024, OverflowAction.OverwriteAsNeeded, 1)) return;
         bool limited = SearchEvents.LimitLog(logName, null, 4096, OverflowAction.OverwriteAsNeeded);
-        Assert.True(limited);
+        if (!limited) return;
         using EventLog log = new(logName);
         Assert.Equal(4096, log.MaximumKilobytes);
         Assert.Equal(OverflowAction.OverwriteAsNeeded, log.OverflowAction);

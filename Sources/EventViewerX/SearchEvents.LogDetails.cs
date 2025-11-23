@@ -113,7 +113,6 @@ public partial class SearchEvents : Settings {
         bool ownsSession = false;
         try {
             if (!string.IsNullOrEmpty(machineName)) {
-                ClearHostCache(machineName);
                 session = CreateSession(machineName, "DisplayEventLogs", "*", DefaultSessionTimeoutMs);
                 ownsSession = true;
             } else {

@@ -26,8 +26,8 @@ public partial class SearchEvents : Settings
     {
         int budget = Math.Max(1000, timeoutMs ?? DefaultSessionTimeoutMs);
 
-        // Local is fast; avoid Task.Run overhead
-        if (string.IsNullOrWhiteSpace(machineName))
+        // Local is fast; avoid ping/RPC probes (many CI agents block 135)
+        if (IsLocalMachine(machineName))
         {
             try { return new EventLogSession(); }
             catch (Exception ex)
@@ -189,5 +189,14 @@ public partial class SearchEvents : Settings
             _unreachable.TryRemove(lower, out _);
         }
         catch { }
+    }
+
+    private static bool IsLocalMachine(string? machineName)
+    {
+        if (string.IsNullOrWhiteSpace(machineName)) return true;
+
+        string name = machineName.Trim();
+        var cmp = StringComparison.OrdinalIgnoreCase;
+        return name == "." || name == "localhost" || name.Equals(Environment.MachineName, cmp) || name.Equals(GetFQDN(), cmp);
     }
 }
