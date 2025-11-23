@@ -10,8 +10,7 @@ public class DhcpLeaseCreated : EventRuleBase {
     public override NamedEvents NamedEvent => NamedEvents.DhcpLeaseCreated;
 
     public override bool CanHandle(EventObject eventObject) {
-        // Always handle if event ID and log name match
-        return true;
+        return RuleHelpers.IsProvider(eventObject, "Microsoft-Windows-DHCP-Server");
     }
 
     /// <summary>

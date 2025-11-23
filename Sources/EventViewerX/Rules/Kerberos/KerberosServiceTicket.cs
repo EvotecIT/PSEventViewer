@@ -11,8 +11,7 @@ public class KerberosServiceTicket : EventRuleBase
 
     public override bool CanHandle(EventObject eventObject)
     {
-        // Simple rule - always handle if event ID and log name match
-        return true;
+        return RuleHelpers.IsProvider(eventObject, "Microsoft-Windows-Security-Auditing");
     }
     public string Computer = string.Empty;
     public string Action = string.Empty;

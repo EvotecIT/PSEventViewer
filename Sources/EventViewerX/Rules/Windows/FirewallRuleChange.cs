@@ -10,8 +10,7 @@ public class FirewallRuleChange : EventRuleBase {
     public override NamedEvents NamedEvent => NamedEvents.FirewallRuleChange;
 
     public override bool CanHandle(EventObject eventObject) {
-        // Simple rule - always handle if event ID and log name match
-        return true;
+        return RuleHelpers.IsProvider(eventObject, "Microsoft-Windows-Security-Auditing", "Microsoft-Windows-Windows Firewall With Advanced Security");
     }
     /// <summary>Computer where the rule was modified.</summary>
     public string Computer;

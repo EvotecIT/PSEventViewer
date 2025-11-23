@@ -15,9 +15,9 @@ public class ADLdapBindingDetails : EventRuleBase {
     }
     public string Computer;
     public string Action;
-    private string IPPort;
+    public string RemoteEndpoint;
     public string AccountName;
-    private string BindType;
+    public string BindType;
     public DateTime When;
 
 
@@ -27,14 +27,19 @@ public class ADLdapBindingDetails : EventRuleBase {
         Type = "ADLdapBindingDetails";
         Computer = _eventObject.ComputerName;
         Action = _eventObject.MessageSubject;
-        IPPort = _eventObject.GetValueFromDataDictionary("NoNameA0");
+        RemoteEndpoint = _eventObject.GetValueFromDataDictionary("NoNameA0");
         AccountName = _eventObject.GetValueFromDataDictionary("NoNameA1");
-        BindType = _eventObject.GetValueFromDataDictionary("NoNameA2");
-        if (BindType == "0") {
-            BindType = "Unsigned";
-        } else if (BindType == "1") {
-            BindType = "Simple";
-        }
+        BindType = TranslateBindType(_eventObject.GetValueFromDataDictionary("NoNameA2"));
         When = _eventObject.TimeCreated;
+    }
+
+    private static string TranslateBindType(string raw)
+    {
+        return raw switch
+        {
+            "0" => "Unsigned",
+            "1" => "Simple",
+            _ => string.IsNullOrWhiteSpace(raw) ? "Unknown" : raw
+        };
     }
 }

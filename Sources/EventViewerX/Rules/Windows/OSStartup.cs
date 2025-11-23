@@ -10,16 +10,15 @@ public class OSStartup : EventRuleBase {
     public override NamedEvents NamedEvent => NamedEvents.OSStartup;
 
     public override bool CanHandle(EventObject eventObject) {
-        return true;
+        return RuleHelpers.IsProvider(eventObject, "Microsoft-Windows-Kernel-General");
     }
 
     public string Computer;
     public string Action;
     public string ObjectAffected;
     public string ActionDetails;
-    public string ActionDetailsDate;
-    public string ActionDetailsTime;
-    public string ActionDetailsDateTime;
+    public DateTime? ActionTimestampUtc;
+    public string ActionTimestampIso => ActionTimestampUtc?.ToString("o") ?? string.Empty;
     public DateTime When;
 
     public OSStartup(EventObject eventObject) : base(eventObject) {
@@ -29,19 +28,12 @@ public class OSStartup : EventRuleBase {
         Action = "System Start";
         ObjectAffected = _eventObject.MachineName;
         ActionDetails = _eventObject.MessageSubject;
-        ActionDetailsDate = _eventObject.GetValueFromDataDictionary("NoNameA1");
-        ActionDetailsTime = _eventObject.GetValueFromDataDictionary("NoNameA0");
-        ActionDetailsDateTime = _eventObject.GetValueFromDataDictionary("ActionDetailsDateTime");
-        When = _eventObject.TimeCreated;
-
-        var startTime = _eventObject.GetValueFromDataDictionary("StartTime");
-        if (startTime != null) {
-            ActionDetailsDateTime = startTime;
-        } else {
-            var text = _eventObject.GetValueFromDataDictionary("#text");
-            if (text != null) {
-                ActionDetailsDateTime = text;
-            }
-        }
+        var rawStartText = _eventObject.GetValueFromDataDictionary("StartTime") ??
+                           _eventObject.GetValueFromDataDictionary("#text") ??
+                           _eventObject.GetValueFromDataDictionary("ActionDetailsDateTime");
+        ActionTimestampUtc = RuleHelpers.ParseUnlabeledOsTimestamp(_eventObject)
+                            ?? RuleHelpers.ParseDateTimeLoose(rawStartText)
+                            ?? _eventObject.TimeCreated.ToUniversalTime();
+        When = ActionTimestampUtc ?? _eventObject.TimeCreated;
     }
 }

@@ -10,15 +10,14 @@ public class OSCrash : EventRuleBase {
     public override NamedEvents NamedEvent => NamedEvents.OSCrash;
 
     public override bool CanHandle(EventObject eventObject) {
-        // Simple rule - always handle if event ID and log name match
-        return true;
+        return RuleHelpers.IsProvider(eventObject, "EventLog");
     }
     public string Computer;
     public string Action;
     public string ObjectAffected;
     public string ActionDetails;
-    public string ActionDetailsDate;
-    public string ActionDetailsTime;
+    public DateTime? ActionTimestampUtc;
+    public string ActionTimestampIso => ActionTimestampUtc?.ToString("o") ?? string.Empty;
     public string Who;
     public DateTime When;
 
@@ -30,9 +29,14 @@ public class OSCrash : EventRuleBase {
         Action = _eventObject.GetValueFromDataDictionary("EventAction");
         ObjectAffected = _eventObject.MachineName;
         ActionDetails = _eventObject.MessageSubject;
-        ActionDetailsDate = _eventObject.GetValueFromDataDictionary("NoNameA1");
-        ActionDetailsTime = _eventObject.GetValueFromDataDictionary("NoNameA0");
+        var rawStartText = _eventObject.GetValueFromDataDictionary("StartTime") ??
+                           _eventObject.GetValueFromDataDictionary("#text") ??
+                           _eventObject.GetValueFromDataDictionary("ActionDetailsDateTime");
 
-        When = _eventObject.TimeCreated;
+        ActionTimestampUtc = RuleHelpers.ParseUnlabeledOsTimestamp(_eventObject)
+                            ?? RuleHelpers.ParseDateTimeLoose(rawStartText)
+                            ?? _eventObject.TimeCreated.ToUniversalTime();
+
+        When = ActionTimestampUtc ?? _eventObject.TimeCreated;
     }
 }

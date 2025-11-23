@@ -15,8 +15,8 @@ public class ADLdapBindingSummary : EventRuleBase {
     }
     public string Computer;
     public string Action;
-    public string NumberOfSimpleBindsWithoutSSLTLS;
-    public string NumberOfNegotiateKerberosNtlmDigestBindsPerformedWithoutSigning;
+    public int? SimpleBindsWithoutTls;
+    public int? NegotiateBindsWithoutSigning;
     public string TaskDisplayName;
     public string LevelDisplayName;
     public DateTime When;
@@ -27,8 +27,8 @@ public class ADLdapBindingSummary : EventRuleBase {
         Type = "ADLdapBindingSummary";
         Computer = _eventObject.ComputerName;
         Action = _eventObject.MessageSubject;
-        NumberOfSimpleBindsWithoutSSLTLS = _eventObject.GetValueFromDataDictionary("NoNameA0");
-        NumberOfNegotiateKerberosNtlmDigestBindsPerformedWithoutSigning = _eventObject.GetValueFromDataDictionary("NoNameA1");
+        SimpleBindsWithoutTls = RuleHelpers.GetInt(_eventObject, "NoNameA0");
+        NegotiateBindsWithoutSigning = RuleHelpers.GetInt(_eventObject, "NoNameA1");
         When = _eventObject.TimeCreated;
         LevelDisplayName = eventObject.LevelDisplayName;
         TaskDisplayName = eventObject.TaskDisplayName;

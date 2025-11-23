@@ -10,8 +10,7 @@ public class WindowsUpdateFailure : EventRuleBase {
     public override NamedEvents NamedEvent => NamedEvents.WindowsUpdateFailure;
 
     public override bool CanHandle(EventObject eventObject) {
-        // Simple rule - always handle if event ID and log name match
-        return true;
+        return RuleHelpers.IsProvider(eventObject, "Microsoft-Windows-WindowsUpdateClient");
     }
     /// <summary>Computer where the update failed.</summary>
     public string Computer;
