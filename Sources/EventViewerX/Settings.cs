@@ -4,6 +4,7 @@ namespace EventViewerX;
 /// Provides basic logging and threading configuration for the library.
 /// </summary>
 public class Settings {
+    /// <summary>Shared logger used across the library; adjust verbosity via the instance properties.</summary>
     public static InternalLogger _logger = new InternalLogger();
 
     /// <summary>TTL (seconds) for negative host reachability cache; adjust for slower/faster networks.</summary>

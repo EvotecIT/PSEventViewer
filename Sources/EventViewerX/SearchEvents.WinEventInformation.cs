@@ -11,6 +11,14 @@ namespace EventViewerX {
     /// Utility methods for retrieving basic Windows event log information.
     /// </summary>
     public partial class SearchEvents : Settings {
+        /// <summary>
+        /// Returns basic metadata for event channels and EVTX files, optionally across multiple machines.
+        /// </summary>
+        /// <param name="logNames">Log names to query (e.g., Security, Application). When null/empty, only file paths are processed.</param>
+        /// <param name="machines">Optional list of computer names; null/empty means local machine.</param>
+        /// <param name="filePaths">Optional EVTX file paths to inspect.</param>
+        /// <param name="maxDegreeOfParallelism">Cap on concurrent log queries.</param>
+        /// <returns>Sequence of <see cref="WinEventInformation"/> describing each channel or file.</returns>
         public static IEnumerable<WinEventInformation> GetWinEventInformation(string[]? logNames, List<string>? machines, List<string>? filePaths, int maxDegreeOfParallelism = 50) {
             if (machines == null || machines.Count == 0) {
                 machines = new List<string> { null! };

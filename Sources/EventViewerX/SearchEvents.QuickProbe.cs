@@ -25,16 +25,30 @@ public partial class SearchEvents : Settings
     /// <summary>Status of a quick probe.</summary>
     public enum QuickProbeStatus
     {
+        /// <summary>Probe succeeded and returned a timestamp.</summary>
         Ok,
+        /// <summary>No event matched the query within the scanned window.</summary>
         NoEvent,
+        /// <summary>Overall probe timeout was hit.</summary>
         Timeout,
+        /// <summary>Scan limit reached without finding a timestamped event.</summary>
         LimitReached,
+        /// <summary>Probe failed due to an error (see message).</summary>
         Error
     }
 
     /// <summary>Outcome for a quick probe.</summary>
     public sealed class QuickProbeResult
     {
+        /// <summary>Creates a quick probe result.</summary>
+        /// <param name="logName">Log that was queried.</param>
+        /// <param name="machine">Machine that was queried.</param>
+        /// <param name="eventTimeUtc">Timestamp of the newest matching event in UTC, if found.</param>
+        /// <param name="status">Outcome of the probe.</param>
+        /// <param name="message">Optional detail describing errors or limits.</param>
+        /// <param name="eventsScanned">Number of events inspected.</param>
+        /// <param name="recordCount">Optional channel record count when available.</param>
+        /// <param name="duration">Total probe duration.</param>
         public QuickProbeResult(string logName, string machine, DateTime? eventTimeUtc, QuickProbeStatus status, string? message, int eventsScanned, long? recordCount, TimeSpan duration)
         {
             LogName = logName;
@@ -47,19 +61,33 @@ public partial class SearchEvents : Settings
             Duration = duration;
         }
 
+        /// <summary>Log that was queried.</summary>
         public string LogName { get; }
+        /// <summary>Machine that was queried.</summary>
         public string Machine { get; }
+        /// <summary>Timestamp (UTC) of the newest matching event, if found.</summary>
         public DateTime? EventTimeUtc { get; }
+        /// <summary>Outcome status for the probe.</summary>
         public QuickProbeStatus Status { get; }
+        /// <summary>Optional details describing errors or limits.</summary>
         public string? Message { get; }
+        /// <summary>Number of events inspected during the probe.</summary>
         public int EventsScanned { get; }
+        /// <summary>Optional channel record count when available.</summary>
         public long? RecordCount { get; }
+        /// <summary>Total elapsed time for the probe.</summary>
         public TimeSpan Duration { get; }
     }
 
     /// <summary>
     /// Reads the newest matching event from a channel with time/record limits to cope with very large logs.
     /// </summary>
+    /// <param name="logName">Channel name to query.</param>
+    /// <param name="xpathFilter">Optional XPath filter (defaults to '*').</param>
+    /// <param name="machineName">Optional remote computer; null targets local machine.</param>
+    /// <param name="timeout">Total time budget for the probe (default 15s).</param>
+    /// <param name="maxEventsToScan">Maximum events to inspect before returning <see cref="QuickProbeStatus.LimitReached"/>.</param>
+    /// <returns>Quick probe result with status and optional timestamp.</returns>
     public static QuickProbeResult ProbeLatestEvent(string logName, string? xpathFilter = null, string? machineName = null, TimeSpan? timeout = null, int maxEventsToScan = 4096)
     {
         if (string.IsNullOrWhiteSpace(logName)) throw new ArgumentException("logName cannot be null or empty", nameof(logName));
@@ -149,6 +177,13 @@ public partial class SearchEvents : Settings
     /// <summary>
     /// Overload that reuses an existing session (caller owns its lifetime).
     /// </summary>
+    /// <param name="logName">Channel name to query.</param>
+    /// <param name="xpathFilter">Optional XPath filter (defaults to '*').</param>
+    /// <param name="session">Existing EventLogSession to reuse.</param>
+    /// <param name="machineName">Optional remote computer; null targets local machine.</param>
+    /// <param name="timeout">Total time budget for the probe (default 15s).</param>
+    /// <param name="maxEventsToScan">Maximum events to inspect before returning <see cref="QuickProbeStatus.LimitReached"/>.</param>
+    /// <returns>Quick probe result with status and optional timestamp.</returns>
     public static QuickProbeResult ProbeLatestEvent(string logName, string? xpathFilter, EventLogSession session, string? machineName = null, TimeSpan? timeout = null, int maxEventsToScan = 4096)
     {
         if (session == null) throw new ArgumentNullException(nameof(session));
