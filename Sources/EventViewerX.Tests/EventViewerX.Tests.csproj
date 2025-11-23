@@ -10,6 +10,8 @@
         <LangVersion>latest</LangVersion>
         <IsWindows>true</IsWindows>
         <SupportedOSPlatform>windows</SupportedOSPlatform>
+        <!-- Suppress noisy nullable/test analyzer warnings in tests; product warnings still surface in main builds -->
+        <NoWarn>$(NoWarn);CS8600;CS8602;CS8603;CS8618;CS8620;CS8625;SYSLIB0050;xUnit1031</NoWarn>
     </PropertyGroup>
 
     <ItemGroup>
