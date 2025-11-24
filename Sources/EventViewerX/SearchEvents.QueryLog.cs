@@ -206,29 +206,37 @@ public partial class SearchEvents : Settings {
     }
 
     /// <summary>
-    /// Queries the log.
+    /// Queries a Windows event log by name with optional filters.
     /// </summary>
-    /// <param name="logName">Name of the log.</param>
-    /// <param name="eventIds">The event ids.</param>
-    /// <param name="machineName">Name of the machine.</param>
-    /// <param name="providerName">Name of the provider.</param>
-    /// <param name="keywords">The keywords.</param>
-    /// <param name="level">The level.</param>
-    /// <param name="startTime">The start time.</param>
-    /// <param name="endTime">The end time.</param>
-    /// <param name="userId">The user identifier.</param>
-    /// <param name="maxEvents">The maximum events.</param>
-    /// <param name="eventRecordId">The event record identifier.</param>
-    /// <param name="timePeriod">The time period.</param>
+    /// <param name="logName">Log name (e.g., Security, System).</param>
+    /// <param name="eventIds">Event IDs to include.</param>
+    /// <param name="machineName">Remote computer name (null = local).</param>
+    /// <param name="providerName">Provider name to include.</param>
+    /// <param name="keywords">Keyword mask to include.</param>
+    /// <param name="level">Event level to include.</param>
+    /// <param name="startTime">Earliest event time.</param>
+    /// <param name="endTime">Latest event time.</param>
+    /// <param name="userId">User SID to include.</param>
+    /// <param name="maxEvents">Maximum events to return (0 = all).</param>
+    /// <param name="eventRecordId">Specific record IDs to include.</param>
+    /// <param name="timePeriod">Relative time window (overrides start/end).</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <param name="sessionTimeoutMs">Session open/read timeout (ms); null uses defaults.</param>
     /// <returns>Enumerable collection of matching events.</returns>
     public static IEnumerable<EventObject> QueryLog(string logName, List<int>? eventIds = null, string? machineName = null, string? providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string? userId = null, int maxEvents = 0, List<long>? eventRecordId = null, TimePeriod? timePeriod = null, CancellationToken cancellationToken = default, int? sessionTimeoutMs = null) {
         return QueryLogEnumerable(logName, eventIds, machineName, providerName, keywords, level, startTime, endTime, userId, maxEvents, eventRecordId, timePeriod, cancellationToken, sessionTimeoutMs ?? Settings.QuerySessionTimeoutMs);
     }
 
+    /// <summary>
+    /// Queries a Windows event log by known-log enum with optional filters.
+    /// </summary>
     public static IEnumerable<EventObject> QueryLog(KnownLog logName, List<int>? eventIds = null, string? machineName = null, string? providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string? userId = null, int maxEvents = 0, List<long>? eventRecordId = null, TimePeriod? timePeriod = null, CancellationToken cancellationToken = default, int? sessionTimeoutMs = null) {
         return QueryLog(LogNameToString(logName), eventIds, machineName, providerName, keywords, level, startTime, endTime, userId, maxEvents, eventRecordId, timePeriod, cancellationToken, sessionTimeoutMs ?? Settings.QuerySessionTimeoutMs);
     }
 
+    /// <summary>
+    /// Asynchronously queries a Windows event log by name with optional filters.
+    /// </summary>
     public static async Task<IEnumerable<EventObject>> QueryLogAsync(string logName, List<int> eventIds = null, string machineName = null, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null, int maxEvents = 0, List<long> eventRecordId = null, TimePeriod? timePeriod = null, CancellationToken cancellationToken = default, int? sessionTimeoutMs = null) {
         int timeout = sessionTimeoutMs ?? Settings.QuerySessionTimeoutMs;
         return await Task.Run(() => QueryLogEnumerable(logName, eventIds, machineName, providerName, keywords, level, startTime, endTime, userId, maxEvents, eventRecordId, timePeriod, cancellationToken, timeout).ToList().AsEnumerable(), cancellationToken);

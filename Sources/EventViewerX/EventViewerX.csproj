@@ -7,6 +7,7 @@
         <AssemblyTitle>EventViewerX</AssemblyTitle>
         <VersionPrefix>3.0.0</VersionPrefix>
         <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+        <GenerateDocumentationFile>false</GenerateDocumentationFile>
         <Company>Evotec</Company>
         <Authors>Przemyslaw Klys</Authors>
         <LangVersion>latest</LangVersion>

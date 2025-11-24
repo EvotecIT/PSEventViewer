@@ -1,7 +1,7 @@
 namespace EventViewerX;
 
 /// <summary>
-/// Provides basic logging and threading configuration for the library.
+/// Provides logging verbosity switches and default timeouts used throughout EventViewerX.
 /// </summary>
 public class Settings {
     /// <summary>Shared logger used across the library; adjust verbosity via the instance properties.</summary>
@@ -61,9 +61,7 @@ public class Settings {
         set => _logger.IsDebug = value;
     }
 
-    /// <summary>
-    /// Number of threads to use for lingering object detection
-    /// </summary>
+    /// <summary>Default degree of parallelism used by operations that support threading.</summary>
     public int NumberOfThreads = 8;
 
 }
