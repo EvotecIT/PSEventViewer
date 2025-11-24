@@ -16,9 +16,13 @@ public class ObjectDeletion : EventRuleBase {
     public override bool CanHandle(EventObject eventObject) {
         return true;
     }
+    /// <summary>Machine where the object was deleted.</summary>
     public string Computer;
+    /// <summary>Path of the deleted object.</summary>
     public string Path;
+    /// <summary>Account that performed the deletion.</summary>
     public string Who;
+    /// <summary>Event timestamp.</summary>
     public DateTime When;
 
     /// <summary>Initialises an object deletion wrapper from an event record.</summary>

@@ -17,12 +17,19 @@ public class OSStartup : EventRuleBase {
         return RuleHelpers.IsProvider(eventObject, "Microsoft-Windows-Kernel-General");
     }
 
+    /// <summary>Machine that generated the startup event.</summary>
     public string Computer;
+    /// <summary>Action name (System Start).</summary>
     public string Action;
+    /// <summary>Object affected by the action (typically the host).</summary>
     public string ObjectAffected;
+    /// <summary>Additional details from the event payload.</summary>
     public string ActionDetails;
+    /// <summary>Timestamp in UTC parsed from the event if present.</summary>
     public DateTime? ActionTimestampUtc;
+    /// <summary>ISO-8601 representation of the UTC timestamp.</summary>
     public string ActionTimestampIso => ActionTimestampUtc?.ToString("o") ?? string.Empty;
+    /// <summary>Event timestamp.</summary>
     public DateTime When;
 
     /// <summary>Initialises an OS startup wrapper from an event record.</summary>

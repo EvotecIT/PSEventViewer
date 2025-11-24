@@ -26,7 +26,7 @@ public class Settings {
     public static int ListLogWarmupMs { get; set; } = 3000;
 
     /// <summary>
-    /// Stall timeout (ms) while reading events from a log. <=0 disables the stall timeout (unbounded reads).
+    /// Stall timeout (ms) while reading events from a log. Values less than or equal to zero disable the stall timeout (unbounded reads).
     /// Session establishment still respects <see cref="SessionTimeoutMs"/>.
     /// </summary>
     public static int QuerySessionTimeoutMs { get; set; } = 0;

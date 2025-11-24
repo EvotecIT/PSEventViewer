@@ -12,18 +12,31 @@ public class AADSyncCycleStage : EventRuleBase
     public override string LogName => "Application";
     public override NamedEvents NamedEvent => NamedEvents.AADSyncCycleStage;
 
+    /// <summary>Accepts Directory Synchronization provider events.</summary>
+    /// <param name="eventObject">Event to evaluate.</param>
+    /// <returns><c>true</c> when the provider is Directory Synchronization.</returns>
     public override bool CanHandle(EventObject eventObject)
     {
         return RuleHelpers.IsProvider(eventObject, "Directory Synchronization");
     }
 
+    /// <summary>Host where the sync stage ran.</summary>
     public string Computer;
+    /// <summary>Derived stage name (CycleStarted/Importing/Finished/etc.).</summary>
     public string Stage;
+    /// <summary>Connector referenced in the event, when present.</summary>
     public string? Connector;
+    /// <summary>Delta or full cycle indicator, when detectable.</summary>
     public string? CycleType;
+    /// <summary>Tracking identifier emitted by ADSync.</summary>
     public string? TrackingId;
+    /// <summary>Event timestamp.</summary>
     public DateTime When;
 
+    /// <summary>
+    /// Builds a cycle stage record from a Directory Synchronization event (ID 904).
+    /// </summary>
+    /// <param name="eventObject">Event carrying ADSync cycle information.</param>
     public AADSyncCycleStage(EventObject eventObject) : base(eventObject)
     {
         _eventObject = eventObject;

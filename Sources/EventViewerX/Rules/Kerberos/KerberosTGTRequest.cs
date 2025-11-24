@@ -44,10 +44,15 @@ public class KerberosTGTRequest : EventRuleBase
     public string ClientAdvertizedEncryptionTypes;
     /// <summary>Supported/available encryption types reported by account/service/DC.</summary>
     public string AccountSupportedEncryptionTypes;
+    /// <summary>Keys currently available on the account (from event data).</summary>
     public string AccountAvailableKeys;
+    /// <summary>Encryption types the service advertises as supported.</summary>
     public string ServiceSupportedEncryptionTypes;
+    /// <summary>Keys actually available on the service account.</summary>
     public string ServiceAvailableKeys;
+    /// <summary>Encryption types supported by the issuing domain controller.</summary>
     public string DCSupportedEncryptionTypes;
+    /// <summary>Key material available to the domain controller.</summary>
     public string DCAvailableKeys;
     /// <summary>Response ticket hash when present.</summary>
     public string ResponseTicket;

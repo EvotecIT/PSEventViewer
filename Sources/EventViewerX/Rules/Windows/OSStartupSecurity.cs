@@ -13,12 +13,19 @@ public class OSStartupSecurity : EventRuleBase {
         return true;
     }
 
+    /// <summary>Machine that logged the startup in the Security log.</summary>
     public string Computer;
+    /// <summary>Action description (Windows is starting up).</summary>
     public string Action;
+    /// <summary>Object affected by the action (typically the host).</summary>
     public string ObjectAffected;
+    /// <summary>Detail string from the security event.</summary>
     public string ActionDetails;
+    /// <summary>Timestamp in UTC parsed from the payload when present.</summary>
     public DateTime? ActionTimestampUtc;
+    /// <summary>ISO-8601 representation of the UTC timestamp.</summary>
     public string ActionTimestampIso => ActionTimestampUtc?.ToString("o") ?? string.Empty;
+    /// <summary>Event timestamp.</summary>
     public DateTime When;
 
     public OSStartupSecurity(EventObject eventObject) : base(eventObject) {

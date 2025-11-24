@@ -14,6 +14,9 @@ public class NetworkMonitorDriverLoaded : EventRuleBase {
 
     private static readonly string[] _driverNames = ["npcap", "npf", "netmon"];
 
+    /// <summary>Checks for netmon/Npcap driver load or service events.</summary>
+    /// <param name="eventObject">Event to evaluate.</param>
+    /// <returns><c>true</c> when the provider and IDs match supported driver events.</returns>
     public override bool CanHandle(EventObject eventObject) {
         if (eventObject.ProviderName.Equals("Service Control Manager", StringComparison.OrdinalIgnoreCase) &&
             (eventObject.Id == 7035 || eventObject.Id == 7045)) {

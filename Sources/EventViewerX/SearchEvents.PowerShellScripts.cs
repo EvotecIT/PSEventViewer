@@ -92,6 +92,17 @@ namespace EventViewerX {
             return sb.ToString();
         }
 
+        /// <summary>
+        /// Restores PowerShell scripts from operational logs for the specified edition.
+        /// </summary>
+        /// <param name="type">Windows PowerShell or PowerShell Core.</param>
+        /// <param name="machineName">Remote machine to query; <c>null</c> targets local logs.</param>
+        /// <param name="eventLogPath">Custom path to an .evtx file; <c>null</c> reads the live log.</param>
+        /// <param name="dateFrom">Optional start time filter.</param>
+        /// <param name="dateTo">Optional end time filter.</param>
+        /// <param name="format">Whether to re-indent the recovered script text.</param>
+        /// <param name="containsText">Optional text filters applied to the script content.</param>
+        /// <returns>Recovered script blocks in the order they are read.</returns>
         public static IEnumerable<RestoredPowerShellScript> GetPowerShellScripts(
             PowerShellEdition type,
             string machineName = null,

@@ -25,6 +25,8 @@ public enum TicketEncryptionType : uint
     AuditFailure = 0xFFFFFFFF,
 
     // Friendly aliases
+    /// <summary>Alias for <see cref="AES128_CTS_HMAC_SHA1_96"/>.</summary>
     AES128 = AES128_CTS_HMAC_SHA1_96,
+    /// <summary>Alias for <see cref="AES256_CTS_HMAC_SHA1_96"/>.</summary>
     AES256 = AES256_CTS_HMAC_SHA1_96
 }

@@ -44,6 +44,9 @@ namespace EventViewerX {
         /// </summary>
         private readonly string _levelDisplayName;
 
+        /// <summary>
+        /// Display-friendly level name resolved from the provider metadata; falls back to the numeric level when unavailable.
+        /// </summary>
         public string LevelDisplayName => _levelDisplayName;
 
         /// <summary>
@@ -196,6 +199,11 @@ namespace EventViewerX {
         /// </summary>
         public readonly EventRecord _eventRecord;
 
+        /// <summary>
+        /// Creates a rich event wrapper around a raw <see cref="EventRecord"/> and annotates it with the queried machine name.
+        /// </summary>
+        /// <param name="eventRecord">Underlying Windows event record.</param>
+        /// <param name="queriedMachine">Computer name or file path the event was read from.</param>
         public EventObject(EventRecord eventRecord, string queriedMachine) {
             QueriedMachine = queriedMachine;
             _eventRecord = eventRecord;

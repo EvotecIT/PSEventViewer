@@ -33,6 +33,11 @@ public class SMBServerAudit : EventRuleBase {
     /// <inheritdoc />
     public override NamedEvents NamedEvent => NamedEvents.ADSMBServerAuditV1;
 
+    /// <summary>
+    /// Accepts events emitted by the Microsoft-Windows-SMBServer provider.
+    /// </summary>
+    /// <param name="eventObject">Event to evaluate.</param>
+    /// <returns><c>true</c> when the provider matches; otherwise <c>false</c>.</returns>
     public override bool CanHandle(EventObject eventObject) {
         return RuleHelpers.IsProvider(eventObject, "Microsoft-Windows-SMBServer");
     }

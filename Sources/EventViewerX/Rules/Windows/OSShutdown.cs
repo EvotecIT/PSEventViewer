@@ -17,12 +17,19 @@ public class OSShutdown : EventRuleBase {
         return RuleHelpers.IsProvider(eventObject, "Microsoft-Windows-Kernel-General");
     }
 
+    /// <summary>Machine that generated the shutdown event.</summary>
     public string Computer;
+    /// <summary>Action name (Shutdown).</summary>
     public string Action;
+    /// <summary>Object affected by the action (typically the host).</summary>
     public string ObjectAffected;
+    /// <summary>Additional details from the event payload.</summary>
     public string ActionDetails;
+    /// <summary>Timestamp in UTC parsed from the event if present.</summary>
     public DateTime? ActionTimestampUtc;
+    /// <summary>ISO-8601 representation of the UTC timestamp.</summary>
     public string ActionTimestampIso => ActionTimestampUtc?.ToString("o") ?? string.Empty;
+    /// <summary>Event timestamp.</summary>
     public DateTime When;
 
     /// <summary>Initialises an OS shutdown wrapper from an event record.</summary>

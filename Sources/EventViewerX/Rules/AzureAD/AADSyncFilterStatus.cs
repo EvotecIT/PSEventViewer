@@ -12,16 +12,27 @@ public class AADSyncFilterStatus : EventRuleBase
     public override string LogName => "Application";
     public override NamedEvents NamedEvent => NamedEvents.AADSyncFilterStatus;
 
+    /// <summary>Accepts ADSync provider filter status events.</summary>
+    /// <param name="eventObject">Event to evaluate.</param>
+    /// <returns><c>true</c> when the provider is ADSync.</returns>
     public override bool CanHandle(EventObject eventObject)
     {
         return RuleHelpers.IsProvider(eventObject, "ADSync");
     }
 
+    /// <summary>Server running the connector.</summary>
     public string Computer;
+    /// <summary>Connector name if present in the message.</summary>
     public string? Connector;
+    /// <summary>True when the connector filter is enabled.</summary>
     public bool Enabled;
+    /// <summary>Event timestamp.</summary>
     public DateTime When;
 
+    /// <summary>
+    /// Builds a filter status record from ADSync event 6952.
+    /// </summary>
+    /// <param name="eventObject">Event describing the filter status.</param>
     public AADSyncFilterStatus(EventObject eventObject) : base(eventObject)
     {
         _eventObject = eventObject;

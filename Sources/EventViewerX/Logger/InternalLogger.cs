@@ -73,6 +73,14 @@ public class InternalLogger {
         IsVerbose = isVerbose;
     }
 
+    /// <summary>
+    /// Raises a progress update and optionally writes it to the console.
+    /// </summary>
+    /// <param name="activity">High-level activity name.</param>
+    /// <param name="currentOperation">Current operation within the activity.</param>
+    /// <param name="percentCompleted">Completion percentage (0-100).</param>
+    /// <param name="currentSteps">Current step index when a step count is known.</param>
+    /// <param name="totalSteps">Total number of steps when known.</param>
     public void WriteProgress(string activity, string currentOperation, int percentCompleted, int? currentSteps = null, int? totalSteps = null) {
         lock (_lock) {
             OnProgressMessage?.Invoke(this, new LogEventArgs(activity, currentOperation, currentSteps, totalSteps, totalSteps));
@@ -86,6 +94,8 @@ public class InternalLogger {
         }
     }
 
+    /// <summary>Logs an error message and raises the error event.</summary>
+    /// <param name="message">Error text to emit.</param>
     public void WriteError(string message) {
         lock (_lock) {
             OnErrorMessage?.Invoke(this, new LogEventArgs(message));
@@ -95,6 +105,9 @@ public class InternalLogger {
         }
     }
 
+    /// <summary>Formats and logs an error message with arguments.</summary>
+    /// <param name="message">Composite format string.</param>
+    /// <param name="args">Format arguments.</param>
     public void WriteError(string message, params object[] args) {
         lock (_lock) {
             OnErrorMessage?.Invoke(this, new LogEventArgs(string.Format(message, args)));
@@ -104,6 +117,8 @@ public class InternalLogger {
         }
     }
 
+    /// <summary>Logs a warning message.</summary>
+    /// <param name="message">Warning text to emit.</param>
     public void WriteWarning(string message) {
         lock (_lock) {
             OnWarningMessage?.Invoke(this, new LogEventArgs(message));
@@ -113,6 +128,9 @@ public class InternalLogger {
         }
     }
 
+    /// <summary>Formats and logs a warning message with arguments.</summary>
+    /// <param name="message">Composite format string.</param>
+    /// <param name="args">Format arguments.</param>
     public void WriteWarning(string message, params object[] args) {
         lock (_lock) {
             OnWarningMessage?.Invoke(this, new LogEventArgs(string.Format(message, args)));
@@ -122,6 +140,8 @@ public class InternalLogger {
         }
     }
 
+    /// <summary>Emits a verbose message.</summary>
+    /// <param name="message">Verbose text to write.</param>
     public void WriteVerbose(string message) {
         lock (_lock) {
             OnVerboseMessage?.Invoke(this, new LogEventArgs(message));
@@ -131,6 +151,9 @@ public class InternalLogger {
         }
     }
 
+    /// <summary>Formats and emits a verbose message.</summary>
+    /// <param name="message">Composite format string.</param>
+    /// <param name="args">Format arguments.</param>
     public void WriteVerbose(string message, params object[] args) {
         lock (_lock) {
             OnVerboseMessage?.Invoke(this, new LogEventArgs(message, args));
@@ -140,6 +163,9 @@ public class InternalLogger {
         }
     }
 
+    /// <summary>Formats and emits a debug message.</summary>
+    /// <param name="message">Composite format string.</param>
+    /// <param name="args">Format arguments.</param>
     public void WriteDebug(string message, params object[] args) {
         lock (_lock) {
             OnDebugMessage?.Invoke(this, new LogEventArgs(message, args));
@@ -149,6 +175,9 @@ public class InternalLogger {
         }
     }
 
+    /// <summary>Formats and emits an informational message.</summary>
+    /// <param name="message">Composite format string.</param>
+    /// <param name="args">Format arguments.</param>
     public void WriteInformation(string message, params object[] args) {
         lock (_lock) {
             OnInformationMessage?.Invoke(this, new LogEventArgs(message, args));
@@ -198,19 +227,37 @@ public class LogEventArgs : EventArgs {
     /// </summary>
     public string Message { get; set; }
 
+    /// <summary>Original format arguments supplied to the logger.</summary>
     public object[] Args { get; set; }
 
+    /// <summary>
+    /// Creates event args for formatted log messages.
+    /// </summary>
+    /// <param name="message">Composite format string.</param>
+    /// <param name="args">Arguments used to format the message.</param>
     public LogEventArgs(string message, object[] args) {
         Message = message;
         Args = args;
         FullMessage = string.Format(message, args);
     }
 
+    /// <summary>
+    /// Creates event args for a simple message without formatting.
+    /// </summary>
+    /// <param name="message">Message to expose to subscribers.</param>
     public LogEventArgs(string message) {
         Message = message;
         FullMessage = message;
     }
 
+    /// <summary>
+    /// Creates progress-oriented event args for long-running operations.
+    /// </summary>
+    /// <param name="activity">High-level activity label.</param>
+    /// <param name="currentOperation">Current operation name.</param>
+    /// <param name="currentSteps">Completed steps so far.</param>
+    /// <param name="totalSteps">Total steps expected.</param>
+    /// <param name="percentage">Optional completion percentage.</param>
     public LogEventArgs(string activity, string currentOperation, int? currentSteps, int? totalSteps, int? percentage) {
         ProgressActivity = activity;
         ProgressCurrentOperation = currentOperation;

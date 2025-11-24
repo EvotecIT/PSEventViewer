@@ -33,6 +33,11 @@ public class ADComputerChangeDetailed : EventRuleBase {
     /// <inheritdoc />
     public override NamedEvents NamedEvent => NamedEvents.ADComputerChangeDetailed;
 
+    /// <summary>
+    /// Determines whether the event represents a computer object change.
+    /// </summary>
+    /// <param name="eventObject">Event to evaluate.</param>
+    /// <returns><c>true</c> when the ObjectClass indicates a computer; otherwise <c>false</c>.</returns>
     public override bool CanHandle(EventObject eventObject) {
         // Check if this is a computer object change
         return eventObject.Data.TryGetValue("ObjectClass", out var objectClass) &&

@@ -108,6 +108,12 @@ public partial class SearchEvents : Settings {
         }
     }
 
+    /// <summary>
+    /// Enumerates event logs on the specified machine and returns their configuration details.
+    /// </summary>
+    /// <param name="listLog">Optional list of log name patterns (supports * and ?) to include.</param>
+    /// <param name="machineName">Remote machine name; <c>null</c> targets the local computer.</param>
+    /// <returns>An enumerable of <see cref="EventLogDetails"/> objects for each matching log.</returns>
     public static IEnumerable<EventLogDetails> DisplayEventLogs(string[] listLog = null, string machineName = null) {
         EventLogSession session = null;
         bool ownsSession = false;
@@ -186,6 +192,14 @@ public partial class SearchEvents : Settings {
         }
     }
 
+    /// <summary>
+    /// Retrieves event log details from multiple machines in parallel with cancellation support.
+    /// </summary>
+    /// <param name="listLog">Optional list of log name patterns (supports * and ?).</param>
+    /// <param name="machineNames">List of remote machines to query; <c>null</c> or empty defaults to the local host.</param>
+    /// <param name="maxDegreeOfParallelism">Maximum concurrent queries.</param>
+    /// <param name="cancellationToken">Cancellation token to abort enumeration.</param>
+    /// <returns>An enumerable of <see cref="EventLogDetails"/> objects streamed as they are collected.</returns>
     public static IEnumerable<EventLogDetails> DisplayEventLogsParallel(string[] listLog = null, List<string> machineNames = null, int maxDegreeOfParallelism = 8, CancellationToken cancellationToken = default) {
         if (machineNames == null || !machineNames.Any()) {
             machineNames = new List<string> { null };
