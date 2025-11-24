@@ -41,7 +41,7 @@ public partial class SearchEvents : Settings {
             var eventRecordIdArray = eventRecordId?.Select(i => i.ToString()).ToArray();
             var providerNameArray = !string.IsNullOrEmpty(providerName) ? new[] { providerName } : null;
             var keywordsArray = keywords != null ? new[] { (long)keywords.Value } : null;
-            var levelArray = level != null ? new[] { level.ToString() } : null;
+            var levelArray = level != null ? new[] { level.Value.ToString() } : null;
             var userIdArray = !string.IsNullOrEmpty(userId) ? new[] { userId } : null;
 
             xpath = BuildWinEventFilter(

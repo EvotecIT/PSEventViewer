@@ -1,5 +1,7 @@
 using System;
 using System.Globalization;
+using System.Collections.Concurrent;
+using System.Linq;
 
 namespace EventViewerX.Rules;
 
@@ -126,23 +128,44 @@ internal static class RuleHelpers
         return ip;
     }
 
+    // Cache to avoid repeated reflection when describing flags.
+    private static readonly ConcurrentDictionary<Type, EnumFlag[]> _enumFlagCache = new();
+
+    private sealed class EnumFlag
+    {
+        public EnumFlag(Enum value, ulong raw, string name)
+        {
+            Value = value;
+            Raw = raw;
+            Name = name;
+        }
+
+        public Enum Value { get; }
+        public ulong Raw { get; }
+        public string Name { get; }
+    }
+
     /// <summary>
     /// Returns a comma-separated list of flagged enum names, falling back to the raw value when no flags are set.
     /// </summary>
     internal static string DescribeFlags<TEnum>(TEnum? value) where TEnum : struct, Enum
     {
         if (!value.HasValue) return string.Empty;
-        var v = value.Value;
-        var names = Enum.GetValues(typeof(TEnum))
-            .Cast<Enum>()
-            .Where(flag => v.HasFlag((Enum)(object)flag) && Convert.ToUInt64(flag) != 0)
-            .Select(flag => flag.ToString())
+
+        var enumType = typeof(TEnum);
+        var flags = _enumFlagCache.GetOrAdd(enumType, static t =>
+            Enum.GetValues(t)
+                .Cast<Enum>()
+                .Select(ev => new EnumFlag(ev, Convert.ToUInt64(ev), ev.ToString()))
+                .ToArray());
+
+        var rawValue = Convert.ToUInt64(value.Value);
+        var names = flags
+            .Where(f => f.Raw != 0 && (rawValue & f.Raw) == f.Raw)
+            .Select(f => f.Name)
             .ToList();
-        if (names.Count == 0)
-        {
-            return v.ToString();
-        }
-        return string.Join(", ", names);
+
+        return names.Count == 0 ? value.Value.ToString() : string.Join(", ", names);
     }
 
     /// <summary>
