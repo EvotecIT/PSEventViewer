@@ -1,9 +1,10 @@
 namespace EventViewerX;
 
 /// <summary>
-/// Provides basic logging and threading configuration for the library.
+/// Provides logging verbosity switches and default timeouts used throughout EventViewerX.
 /// </summary>
 public class Settings {
+    /// <summary>Shared logger used across the library; adjust verbosity via the instance properties.</summary>
     public static InternalLogger _logger = new InternalLogger();
 
     /// <summary>TTL (seconds) for negative host reachability cache; adjust for slower/faster networks.</summary>
@@ -23,6 +24,12 @@ public class Settings {
 
     /// <summary>Warm-up budget (ms) for listing log names before queries.</summary>
     public static int ListLogWarmupMs { get; set; } = 3000;
+
+    /// <summary>
+    /// Stall timeout (ms) while reading events from a log. Values less than or equal to zero disable the stall timeout (unbounded reads).
+    /// Session establishment still respects <see cref="SessionTimeoutMs"/>.
+    /// </summary>
+    public static int QuerySessionTimeoutMs { get; set; } = 0;
 
     /// <summary>When set, error messages are written to the console.</summary>
     public bool Error {
@@ -54,9 +61,7 @@ public class Settings {
         set => _logger.IsDebug = value;
     }
 
-    /// <summary>
-    /// Number of threads to use for lingering object detection
-    /// </summary>
+    /// <summary>Default degree of parallelism used by operations that support threading.</summary>
     public int NumberOfThreads = 8;
 
 }

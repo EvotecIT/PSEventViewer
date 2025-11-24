@@ -34,13 +34,23 @@ public interface IEventRule {
 /// Base class for event rules with metadata
 /// </summary>
 public abstract class EventRuleBase : EventObjectSlim, IEventRule {
+    /// <summary>Event identifiers this rule is responsible for.</summary>
     public abstract List<int> EventIds { get; }
+    /// <summary>Windows log name (channel) where the events are emitted.</summary>
     public abstract string LogName { get; }
+    /// <summary>Named logical category used by the module for routing results.</summary>
     public abstract NamedEvents NamedEvent { get; }
 
+    /// <summary>
+    /// Initializes the rule with the raw event data so subclasses can hydrate their fields.
+    /// </summary>
+    /// <param name="eventObject">Underlying event record to wrap.</param>
     protected EventRuleBase(EventObject eventObject) : base(eventObject) {
     }
 
+    /// <summary>Checks whether the supplied event matches this rule.</summary>
+    /// <param name="eventObject">Candidate event to evaluate.</param>
+    /// <returns><c>true</c> when the rule can parse the event; otherwise <c>false</c>.</returns>
     public abstract bool CanHandle(EventObject eventObject);
 
     /// <summary>

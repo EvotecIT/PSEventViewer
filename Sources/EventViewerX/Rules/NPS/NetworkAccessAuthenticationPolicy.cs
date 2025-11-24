@@ -6,10 +6,14 @@ namespace EventViewerX.Rules.NPS;
 /// 6273: Network Policy Server denied access to a user
 /// </summary>
 public class NetworkAccessAuthenticationPolicy : EventRuleBase {
+    /// <inheritdoc />
     public override List<int> EventIds => new() { 6272, 6273 };
+    /// <inheritdoc />
     public override string LogName => "Security";
+    /// <inheritdoc />
     public override NamedEvents NamedEvent => NamedEvents.NetworkAccessAuthenticationPolicy;
 
+    /// <summary>Accepts any event whose ID/log match the overrides.</summary>
     public override bool CanHandle(EventObject eventObject) {
         // Simple rule - always handle if event ID and log name match
         return true;
@@ -138,6 +142,7 @@ public class NetworkAccessAuthenticationPolicy : EventRuleBase {
     /// </summary>
     public DateTime When;
 
+    /// <summary>Initialises an NPS authentication policy wrapper from an event record.</summary>
     public NetworkAccessAuthenticationPolicy(EventObject eventObject) : base(eventObject) {
         _eventObject = eventObject;
 

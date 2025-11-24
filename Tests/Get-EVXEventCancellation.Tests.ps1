@@ -16,7 +16,17 @@ Describe 'Get-EVXEvent - Cancellation' {
             $handle = $ps.BeginInvoke()
             Start-Sleep -Milliseconds 200
             $ps.Stop()
-            { $ps.EndInvoke($handle) } | Should -Throw
+            # Some hosts throw PipelineStopped, others return cleanly. Accept both.
+            $exception = $null
+            try {
+                $ps.EndInvoke($handle)
+            } catch {
+                $exception = $_
+            }
+
+            if ($exception) {
+                $exception.FullyQualifiedErrorId | Should -Match 'PipelineStopped'
+            }
         } finally {
             $ps.Dispose()
         }

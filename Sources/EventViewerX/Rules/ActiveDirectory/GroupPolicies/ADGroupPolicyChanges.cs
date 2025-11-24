@@ -3,6 +3,10 @@
 /// <summary>
 /// Summary information for group policy change events.
 /// </summary>
+/// <remarks>
+/// This rule focuses on high-level fields (DN, attribute, actor) for GPO/container objects; detailed change deltas are handled by
+/// <see cref="ADGroupPolicyChangesDetailed"/>. The <see cref="OperationType"/> value is left as emitted by the provider.
+/// </remarks>
 public class ADGroupPolicyChanges : EventRuleBase {
     /// <summary>Computer where the change occurred.</summary>
     public string Computer;
@@ -22,16 +26,21 @@ public class ADGroupPolicyChanges : EventRuleBase {
     public string AttributeLDAPDisplayName;
     /// <summary>Value of the attribute.</summary>
     public string AttributeValue;
+    /// <inheritdoc />
     public override List<int> EventIds => new() { 5136, 5137, 5141 };
+    /// <inheritdoc />
     public override string LogName => "Security";
+    /// <inheritdoc />
     public override NamedEvents NamedEvent => NamedEvents.ADGroupPolicyChanges;
 
+    /// <summary>Handles groupPolicyContainer or container objects in the Security log.</summary>
     public override bool CanHandle(EventObject eventObject) {
         // Check if this is a group policy container or container object
         return eventObject.Data.TryGetValue("ObjectClass", out var objectClass) &&
                (objectClass == "groupPolicyContainer" || objectClass == "container");
     }
 
+    /// <summary>Initialises a group policy change wrapper from an event record.</summary>
     public ADGroupPolicyChanges(EventObject eventObject) : base(eventObject) {
         _eventObject = eventObject;
         Type = "ADGroupPolicyChanges";

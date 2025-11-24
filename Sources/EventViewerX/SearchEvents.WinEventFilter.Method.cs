@@ -7,6 +7,25 @@ using System.Linq;
 namespace EventViewerX;
 
 public partial class SearchEvents {
+    /// <summary>
+    /// Builds an Event Viewer / Get-WinEvent compatible XPath query (or XML QueryList) from high-level filters.
+    /// </summary>
+    /// <param name="id">Event IDs to include.</param>
+    /// <param name="eventRecordId">Specific record IDs to include.</param>
+    /// <param name="startTime">Earliest timestamp to include (converted to timediff).</param>
+    /// <param name="endTime">Latest timestamp to include (converted to timediff).</param>
+    /// <param name="data">EventData string values to match.</param>
+    /// <param name="providerName">Provider names to match.</param>
+    /// <param name="keywords">Keyword bitmasks to match.</param>
+    /// <param name="level">Trace/Event levels to include (e.g., Error, Warning).</param>
+    /// <param name="userId">SIDs or accounts to match in Security context.</param>
+    /// <param name="namedDataFilter">Hashtable filters for EventData[@Name] equality.</param>
+    /// <param name="namedDataExcludeFilter">Hashtable filters for EventData[@Name] inequality.</param>
+    /// <param name="excludeId">Event IDs to exclude.</param>
+    /// <param name="logName">Log name (used when emitting QueryList XML).</param>
+    /// <param name="path">Optional EVTX file path; when set, QueryList uses file://.</param>
+    /// <param name="xpathOnly">When true, returns raw XPath instead of QueryList XML.</param>
+    /// <returns>XPath fragment or full QueryList XML depending on <paramref name="xpathOnly"/> and <paramref name="path"/>.</returns>
     public static string BuildWinEventFilter(
         string[]? id = null,
         string[]? eventRecordId = null,
@@ -123,7 +142,14 @@ public partial class SearchEvents {
         }
 
         if (xpathOnly) {
+            if (string.IsNullOrWhiteSpace(filter)) {
+                filter = "*";
+            }
             return filter;
+        }
+
+        if (string.IsNullOrWhiteSpace(filter)) {
+            filter = "*";
         }
 
         if (!string.IsNullOrEmpty(path)) {

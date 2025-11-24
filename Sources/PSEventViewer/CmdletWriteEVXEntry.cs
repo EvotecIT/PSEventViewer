@@ -1,11 +1,31 @@
 ﻿namespace PSEventViewer;
 
 /// <summary>
-/// Writes custom events to Windows Event Logs for testing, debugging, or application logging.
-/// Supports creating events with custom data, providers, and event IDs.
+/// <para type="synopsis">Writes custom events to Windows Event Logs for testing, debugging, or application logging.</para>
+/// <para type="description">Wraps SearchEvents.WriteEvent so you can specify provider, log, event ID, type, category, message, and additional fields locally or remotely.</para>
 /// </summary>
+/// <example>
+///   <summary>Write informational message</summary>
+///   <code>Write-EVXEntry -LogName Application -ProviderName MyApp -EventId 1000 -Message "Startup complete"</code>
+///   <para>Creates an information entry in Application using provider MyApp.</para>
+/// </example>
+/// <example>
+///   <summary>Write warning to remote server</summary>
+///   <code>Write-EVXEntry -MachineName SRV01 -LogName Application -ProviderName MyApp -EventId 2001 -EventLogEntryType Warning -Message "Cache warming delayed"</code>
+///   <para>Targets a remote machine and sets the entry type to Warning.</para>
+/// </example>
+/// <example>
+///   <summary>Include custom fields</summary>
+///   <code>Write-EVXEntry -LogName Application -ProviderName MyApp -EventId 3001 -Message "User action" -AdditionalFields User:alice Action:Delete</code>
+///   <para>Stores extra key/value data alongside the event for later filtering.</para>
+/// </example>
+/// <example>
+///   <summary>Write error with category</summary>
+///   <code>Write-EVXEntry -LogName Application -ProviderName MyApp -EventId 4001 -Category 42 -EventLogEntryType Error -Message "Unhandled exception"</code>
+///   <para>Records an error and sets a custom category value.</para>
+/// </example>
 [Cmdlet(VerbsCommunications.Write, "EVXEntry")]
-[Alias("Write-EventViewerXEntry", "Write-WinEvent")]
+[Alias("Write-EventViewerXEntry", "Write-WinEvent", "Write-Event")]
 [OutputType(typeof(bool))]
 public sealed class CmdletWriteEVXEntry : AsyncPSCmdlet {
     /// <summary>

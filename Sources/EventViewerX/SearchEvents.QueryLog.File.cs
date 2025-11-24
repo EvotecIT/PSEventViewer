@@ -6,8 +6,26 @@ using System.Threading;
 namespace EventViewerX;
 
 public partial class SearchEvents : Settings {
+    /// <summary>
+    /// Reads events from an EVTX file with optional filtering (IDs, provider, level, keywords, time, data).
+    /// </summary>
+    /// <param name="filePath">Path to the .evtx file (relative or absolute).</param>
+    /// <param name="eventIds">Event IDs to include.</param>
+    /// <param name="providerName">Provider name to include.</param>
+    /// <param name="keywords">Keyword mask to include.</param>
+    /// <param name="level">Event level to include.</param>
+    /// <param name="startTime">Earliest event time.</param>
+    /// <param name="endTime">Latest event time.</param>
+    /// <param name="userId">User SID to include.</param>
+    /// <param name="maxEvents">Maximum events to return (0 = all).</param>
+    /// <param name="eventRecordId">Specific record IDs to include.</param>
+    /// <param name="timePeriod">Relative time window (overrides start/end).</param>
+    /// <param name="oldest">If true, read from oldest to newest.</param>
+    /// <param name="namedDataFilter">Hashtable of EventData name/value filters to include.</param>
+    /// <param name="namedDataExcludeFilter">Hashtable of EventData name/value filters to exclude.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Enumerable sequence of <see cref="EventObject"/> read from the file.</returns>
     public static IEnumerable<EventObject> QueryLogFile(string filePath, List<int> eventIds = null, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null, int maxEvents = 0, List<long> eventRecordId = null, TimePeriod? timePeriod = null, bool oldest = false, System.Collections.Hashtable namedDataFilter = null, System.Collections.Hashtable namedDataExcludeFilter = null, CancellationToken cancellationToken = default) {
-
         // Sanitize and resolve path; allow UNC and relative.
         string sanitizedPath = filePath.Trim().Trim('"', '\'');
         string absolutePath = Path.GetFullPath(sanitizedPath);
@@ -30,6 +48,7 @@ public partial class SearchEvents : Settings {
                          !string.IsNullOrEmpty(providerName) || keywords != null || level != null || startTime != null ||
                          endTime != null || userId != null || eventRecordId != null;
 
+        string xpath;
         EventLogQuery query;
 
         // Use XPath only; path is supplied via EventLogQuery FilePath
@@ -40,10 +59,10 @@ public partial class SearchEvents : Settings {
             var eventRecordIdArray = eventRecordId?.Select(i => i.ToString()).ToArray();
             var providerNameArray = !string.IsNullOrEmpty(providerName) ? new[] { providerName } : null;
             var keywordsArray = keywords != null ? new[] { (long)keywords.Value } : null;
-            var levelArray = level != null ? new[] { level.ToString() } : null;
+            var levelArray = level != null ? new[] { level.Value.ToString() } : null;
             var userIdArray = !string.IsNullOrEmpty(userId) ? new[] { userId } : null;
 
-            string xpath = BuildWinEventFilter(
+            xpath = BuildWinEventFilter(
                 id: idArray,
                 eventRecordId: eventRecordIdArray,
                 startTime: startTime,
@@ -68,7 +87,7 @@ public partial class SearchEvents : Settings {
                 TolerateQueryErrors = true
             };
         } else {
-            string xpath = BuildWinEventFilter(xpathOnly: true);
+            xpath = BuildWinEventFilter(xpathOnly: true);
 
             if (string.IsNullOrWhiteSpace(xpath)) {
                 xpath = "*";
@@ -82,7 +101,8 @@ public partial class SearchEvents : Settings {
             };
         }
 
-        using (EventLogReader reader = CreateEventLogReader(query, null)) {
+        using (EventLogReader reader = CreateEventLogReader(query, null) ??
+                                       CreateEventLogReader(CreateFileQueryWithFallback(absolutePath, xpath, oldest), null)) {
             if (reader == null) {
                 yield break;
             }

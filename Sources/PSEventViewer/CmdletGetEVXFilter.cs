@@ -1,9 +1,29 @@
 namespace PSEventViewer;
 
 /// <summary>
-/// Generates XPath filters for Windows Event Log queries.
-/// Creates filters compatible with Get-WinEvent -FilterXPath and Event Viewer Custom Views.
+/// <para type="synopsis">Generates XPath filters for Windows Event Log queries.</para>
+/// <para type="description">Produces filter strings compatible with Get-WinEvent -FilterXPath and Event Viewer Custom Views, supporting include/exclude IDs, time windows, providers, users, keywords, levels, and named data.</para>
 /// </summary>
+/// <example>
+///   <summary>Simple ID filter</summary>
+///   <code>Get-EVXFilter -ID 4624,4625 -LogName Security</code>
+///   <para>Returns an XPath that matches successful and failed logons.</para>
+/// </example>
+/// <example>
+///   <summary>Filter by provider and time</summary>
+///   <code>Get-EVXFilter -ProviderName "Microsoft-Windows-Security-Auditing" -StartTime (Get-Date).AddHours(-4)</code>
+///   <para>Limits results to the auditing provider over the last four hours.</para>
+/// </example>
+/// <example>
+///   <summary>Named data include/exclude</summary>
+///   <code>Get-EVXFilter -NamedDataFilter @{ TargetUserName='alice' } -ExcludeID 4723</code>
+///   <para>Matches events where TargetUserName is alice while excluding password-change attempts.</para>
+/// </example>
+/// <example>
+///   <summary>Output raw XPath only</summary>
+///   <code>Get-EVXFilter -ID 1102 -LogName Security -XPathOnly</code>
+///   <para>Emits only the XPath expression for use with custom tooling.</para>
+/// </example>
 [Cmdlet(VerbsCommon.Get, "EVXFilter")]
 [Alias("Get-EventViewerXFilter", "Get-WinEventFilter", "Get-EventsFilter")]
 [OutputType(typeof(string))]

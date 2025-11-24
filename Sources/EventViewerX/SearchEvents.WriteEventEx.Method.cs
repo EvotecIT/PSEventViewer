@@ -4,6 +4,19 @@ using System.Text;
 
 namespace EventViewerX {
     public partial class SearchEvents {
+        /// <summary>
+        /// Writes a structured ETW event using EventWriteEx for advanced scenarios (e.g., custom provider payloads).
+        /// </summary>
+        /// <param name="log">Target log/channel name.</param>
+        /// <param name="serviceName">Service or provider name associated with the event.</param>
+        /// <param name="message">Event message text (Unicode).</param>
+        /// <param name="eventId">Event identifier.</param>
+        /// <param name="version">Event version.</param>
+        /// <param name="opcode">Event opcode.</param>
+        /// <param name="channel">Channel identifier.</param>
+        /// <param name="level">Event level.</param>
+        /// <param name="task">Task identifier.</param>
+        /// <param name="keyword">Keyword bitmask.</param>
         public static void WriteEventEx(string log, string serviceName, string message, ushort eventId, byte version, byte opcode, byte channel, byte level, ushort task, ulong keyword) {
             string providerId = "dbe9b383-7cf3-4331-91cc-a3cb16a3b538";
             providerId = providerId.Trim('{', '}');

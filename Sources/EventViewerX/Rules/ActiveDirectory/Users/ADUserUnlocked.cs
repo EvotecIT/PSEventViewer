@@ -4,12 +4,15 @@ namespace EventViewerX.Rules.ActiveDirectory;
 /// Handles user account unlock events (4767).
 /// </summary>
 public class ADUserUnlocked : EventRuleBase {
+    /// <inheritdoc />
     public override List<int> EventIds => new() { 4767 };
+    /// <inheritdoc />
     public override string LogName => "Security";
+    /// <inheritdoc />
     public override NamedEvents NamedEvent => NamedEvents.ADUserUnlocked;
 
+    /// <summary>Accepts account unlock events (4767).</summary>
     public override bool CanHandle(EventObject eventObject) {
-        // Simple rule - always handle if event ID and log name match
         return true;
     }
     /// <summary>Machine where the unlock occurred.</summary>
@@ -25,6 +28,7 @@ public class ADUserUnlocked : EventRuleBase {
     /// <summary>Time of the unlock.</summary>
     public DateTime When;
 
+    /// <summary>Initialises an account unlock wrapper from an event record.</summary>
     public ADUserUnlocked(EventObject eventObject) : base(eventObject) {
         _eventObject = eventObject;
         Type = "ADUserUnlocked";

@@ -26,16 +26,27 @@ public class ADComputerChangeDetailed : EventRuleBase {
 
     //public string ClientDNSName;
 
+    /// <inheritdoc />
     public override List<int> EventIds => new() { 5136, 5137, 5139, 5141 };
+    /// <inheritdoc />
     public override string LogName => "Security";
+    /// <inheritdoc />
     public override NamedEvents NamedEvent => NamedEvents.ADComputerChangeDetailed;
 
+    /// <summary>
+    /// Determines whether the event represents a computer object change.
+    /// </summary>
+    /// <param name="eventObject">Event to evaluate.</param>
+    /// <returns><c>true</c> when the ObjectClass indicates a computer; otherwise <c>false</c>.</returns>
     public override bool CanHandle(EventObject eventObject) {
         // Check if this is a computer object change
         return eventObject.Data.TryGetValue("ObjectClass", out var objectClass) &&
                objectClass == "computer";
     }
 
+    /// <summary>
+    /// Creates a detailed computer change wrapper when the event matches, otherwise returns <c>null</c>.
+    /// </summary>
     public static EventObjectSlim Create(EventObject eventObject) {
         var rule = new ADComputerChangeDetailed(eventObject);
         return rule.CanHandle(eventObject) ? rule : null;

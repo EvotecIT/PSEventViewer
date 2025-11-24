@@ -7,10 +7,34 @@ using System.Threading.Tasks;
 
 namespace PSEventViewer {
     /// <summary>
-    /// Comprehensive cmdlet for retrieving Windows Event Log information and settings.
-    /// Supports single or multiple logs, machines, and files with parallel processing.
-    /// Consolidates functionality from Get-EventsSettings and Get-WinEventSettings.
+    /// <para type="synopsis">Retrieves Windows Event Log information and settings.</para>
+    /// <para type="description">Supports multiple logs, machines, EVTX files, DC discovery, and parallel querying. Consolidates functionality from Get-EventsSettings and Get-WinEventSettings.</para>
     /// </summary>
+    /// <example>
+    ///   <summary>Default security info</summary>
+    ///   <code>Get-EVXInfo</code>
+    ///   <para>Returns Security log info for the local computer.</para>
+    /// </example>
+    /// <example>
+    ///   <summary>Multiple logs on remote host</summary>
+    ///   <code>Get-EVXInfo -Machine SRV01 -LogName Security,Application</code>
+    ///   <para>Retrieves two logs from SRV01.</para>
+    /// </example>
+    /// <example>
+    ///   <summary>Process EVTX files only</summary>
+    ///   <code>Get-EVXInfo -FilePath C:\logs\app.evtx,C:\logs\sys.evtx</code>
+    ///   <para>Outputs metadata for the specified EVTX files.</para>
+    /// </example>
+    /// <example>
+    ///   <summary>Query all domain controllers</summary>
+    ///   <code>Get-EVXInfo -RunAgainstDC -LogName Security -MaxRunspaces 20</code>
+    ///   <para>Discovers DCs in the forest and queries their Security logs in parallel.</para>
+    /// </example>
+    /// <example>
+    ///   <summary>Custom runspace limit</summary>
+    ///   <code>Get-EVXInfo -Machine SRV01,SRV02 -LogName System -MaxRunspaces 10</code>
+    ///   <para>Restricts concurrency when querying multiple servers.</para>
+    /// </example>
     [Cmdlet(VerbsCommon.Get, "EVXInfo")]
     [Alias("Get-EventViewerXInfo", "Get-EventsSettings", "Get-EventsInformation")]
     [OutputType(typeof(WinEventInformation))]

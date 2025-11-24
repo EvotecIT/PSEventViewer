@@ -43,8 +43,4 @@ public partial class SearchEvents {
     /// </summary>
     private static readonly ConcurrentDictionary<string, string> userSidCache = new ConcurrentDictionary<string, string>();
 
-    /// <summary>
-    /// Builds an XPath query string based on provided filter criteria.
-    /// </summary>
-
 }

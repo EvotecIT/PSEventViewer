@@ -58,18 +58,30 @@ namespace EventViewerX.Rules.ActiveDirectory {
         //            IgnoreWords      = @{ }
         //        }
         //        }
+        /// <summary>Domain controller where the OU event originated.</summary>
         public string Computer;
+        /// <summary>Short description of the OU change.</summary>
         public string Action;
+        /// <summary>Translated action description.</summary>
         public string OperationType;
+        /// <summary>Account that performed the change.</summary>
         public string Who;
+        /// <summary>Timestamp of the change.</summary>
         public DateTime When;
+        /// <summary>Distinguished name of the OU affected.</summary>
         public string OrganizationalUnit; // 'User Object'
+        /// <summary>Attribute that was modified.</summary>
         public string FieldChanged; // 'Field Changed'
+        /// <summary>Value written to the attribute.</summary>
         public string FieldValue; // 'Field Value'
+    /// <inheritdoc />
     public override List<int> EventIds => new() { 5136, 5137, 5139, 5141 };
+    /// <inheritdoc />
     public override string LogName => "Security";
+    /// <inheritdoc />
     public override NamedEvents NamedEvent => NamedEvents.ADOrganizationalUnitChangeDetailed;
 
+    /// <summary>Handles OU object events, ignoring the qPLik attribute noise.</summary>
     public override bool CanHandle(EventObject eventObject) {
         // Check if this is an organizational unit object and not the qPLik attribute
         return eventObject.Data.TryGetValue("ObjectClass", out var objectClass) &&
@@ -78,6 +90,7 @@ namespace EventViewerX.Rules.ActiveDirectory {
     }
 
 
+        /// <summary>Initialises a detailed OU change wrapper from an event record.</summary>
         public ADOrganizationalUnitChangeDetailed(EventObject eventObject) : base(eventObject) {
             // common fields
             _eventObject = eventObject;

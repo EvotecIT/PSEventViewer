@@ -256,8 +256,10 @@ public class EventObjectSlim {
         {"%%14675", "Value Deleted"},
         {"%%14676", "Unknown"}
     };
-
-
+    /// <summary>
+    /// Creates a lightweight projection of an <see cref="EventObject"/> for rule processing and serialization.
+    /// </summary>
+    /// <param name="eventObject">Full event wrapper to down-sample.</param>
     public EventObjectSlim(EventObject eventObject) {
         _eventObject = eventObject;
         EventID = _eventObject.Id;

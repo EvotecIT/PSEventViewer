@@ -8,9 +8,34 @@ using System.Linq;
 namespace PSEventViewer;
 
 /// <summary>
-/// Enhanced event querying cmdlet that replaces and extends Get-WinEvent functionality.
-/// Provides powerful filtering, parallel processing, and advanced event retrieval capabilities.
+/// <para type="synopsis">Enhanced event querying cmdlet that replaces and extends Get-WinEvent functionality.</para>
+/// <para type="description">Supports local/remote logs, named event shortcuts, record ID resumes, parallel queries, and rich filtering (IDs, providers, keywords, levels, time windows, named data).</para>
 /// </summary>
+/// <example>
+///   <summary>Query successful logons from Security</summary>
+///   <code>Get-EVXEvent -LogName Security -EventId 4624 -StartTime (Get-Date).AddHours(-1)</code>
+///   <para>Shows only successful logons from the last hour.</para>
+/// </example>
+/// <example>
+///   <summary>Read events from an EVTX file</summary>
+///   <code>Get-EVXEvent -Path C:\Logs\App.evtx -EventId 1000,1001</code>
+///   <para>Filters specific application error IDs from an offline log.</para>
+/// </example>
+/// <example>
+///   <summary>Resume from last record ID</summary>
+///   <code>Get-EVXEvent -LogName Security -RecordIdFile C:\temp\resume.json -RecordIdKey Sec</code>
+///   <para>Continues from the last processed record and updates the checkpoint file.</para>
+/// </example>
+/// <example>
+///   <summary>Use named event shortcuts</summary>
+///   <code>Get-EVXEvent -NamedEvents ADUserLogonFailed -StartTime (Get-Date).AddDays(-1)</code>
+///   <para>Expands the named event definition to fetch all related logon failure IDs.</para>
+/// </example>
+/// <example>
+///   <summary>Parallel query across servers</summary>
+///   <code>Get-EVXEvent -LogName Security -MachineName DC1,DC2 -EventId 4740 -Parallel</code>
+///   <para>Retrieves account lockouts from multiple domain controllers concurrently.</para>
+/// </example>
 [OutputType(typeof(EventObject), ParameterSetName = new string[] { "GenericEvents" })]
 [OutputType(typeof(EventObject), ParameterSetName = new string[] { "PathEvents" })]
 [OutputType(typeof(EventObjectSlim), ParameterSetName = new string[] { "NamedEvents" })]
@@ -214,7 +239,7 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
     /// Predefined named events to query.
     /// </summary>
     [Parameter(Mandatory = true, ParameterSetName = "NamedEvents")]
-    public NamedEvents[] Type { get; set; }
+    public NamedEvents[] Type { get; set; } = Array.Empty<NamedEvents>();
 
     /// <summary>
     /// The list log parameter is used to list the logs on the machine.
@@ -303,7 +328,7 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
                 }
             }
         } else {
-            if (Type != null) {
+            if (ParameterSetName == "NamedEvents") {
                 // let's find the events prepared for search
                 List<NamedEvents> typeList = Type.ToList();
                 await foreach (EventObjectSlim eventObject in SearchEvents.FindEventsByNamedEvents(typeList, MachineName, StartTime, EndTime, TimePeriod, maxThreads: NumberOfThreads, maxEvents: MaxEvents, cancellationToken: token)) {

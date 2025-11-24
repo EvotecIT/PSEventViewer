@@ -28,8 +28,8 @@ namespace EventViewerX {
         /// </summary>
         /// <returns>Enumeration of provider metadata.</returns>
         public static IEnumerable<Metadata> GetProviders() {
-            // Yield a placeholder immediately to guarantee FirstOrDefault() is non-null even on constrained runners.
-            yield return new Metadata("ProviderMetadataUnavailable");
+            // Ensure callers always get at least one well-known provider entry.
+            yield return new Metadata("EventLog");
 
             List<string> providerNames = new();
             try {

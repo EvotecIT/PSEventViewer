@@ -5,13 +5,16 @@ namespace EventViewerX.Rules.DHCP;
 /// 10: A new IP address was leased to a client
 /// </summary>
 public class DhcpLeaseCreated : EventRuleBase {
+    /// <inheritdoc />
     public override List<int> EventIds => new() { 10 };
+    /// <inheritdoc />
     public override string LogName => "Microsoft-Windows-DHCP Server/Operational";
+    /// <inheritdoc />
     public override NamedEvents NamedEvent => NamedEvents.DhcpLeaseCreated;
 
+    /// <summary>Accepts DHCP lease events from the DHCP Server provider.</summary>
     public override bool CanHandle(EventObject eventObject) {
-        // Always handle if event ID and log name match
-        return true;
+        return RuleHelpers.IsProvider(eventObject, "Microsoft-Windows-DHCP-Server");
     }
 
     /// <summary>
@@ -34,6 +37,7 @@ public class DhcpLeaseCreated : EventRuleBase {
     /// </summary>
     public DateTime When;
 
+    /// <summary>Initialises a DHCP lease creation wrapper from an event record.</summary>
     public DhcpLeaseCreated(EventObject eventObject) : base(eventObject) {
         _eventObject = eventObject;
         Type = "DhcpLeaseCreated";

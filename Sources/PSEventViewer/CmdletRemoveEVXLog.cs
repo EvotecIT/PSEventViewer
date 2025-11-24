@@ -5,8 +5,24 @@ using EventViewerX;
 namespace PSEventViewer;
 
 /// <summary>
-/// Removes an event log from the system.
+/// <para type="synopsis">Removes an event log from the system.</para>
+/// <para type="description">Supports local or remote removal with ShouldProcess confirmation; useful for cleanup of custom logs.</para>
 /// </summary>
+/// <example>
+///   <summary>Remove local custom log</summary>
+///   <code>Remove-EVXLog -LogName MyApp</code>
+///   <para>Deletes the MyApp log from the local computer.</para>
+/// </example>
+/// <example>
+///   <summary>Remove log on remote host</summary>
+///   <code>Remove-EVXLog -LogName MyApp -MachineName SRV01</code>
+///   <para>Deletes the log on SRV01.</para>
+/// </example>
+/// <example>
+///   <summary>Prompt before removal</summary>
+///   <code>Remove-EVXLog -LogName MyApp -Confirm</code>
+///   <para>Asks for confirmation prior to deletion.</para>
+/// </example>
 [Cmdlet(VerbsCommon.Remove, "EVXLog", SupportsShouldProcess = true)]
 [Alias("Remove-EventViewerXLog", "Remove-WinEventLog")]
 [OutputType(typeof(bool))]

@@ -18,16 +18,21 @@ public class GpoModified : EventRuleBase {
     public string Who;
     /// <summary>Time of the modification.</summary>
     public DateTime When;
+    /// <inheritdoc />
     public override List<int> EventIds => new() { 5136 };
+    /// <inheritdoc />
     public override string LogName => "Security";
+    /// <inheritdoc />
     public override NamedEvents NamedEvent => NamedEvents.GpoModified;
 
+    /// <summary>Processes only GPO container modifications.</summary>
     public override bool CanHandle(EventObject eventObject) {
         // Check if this is a group policy container object
         return eventObject.Data.TryGetValue("ObjectClass", out var objectClass) &&
                objectClass == "groupPolicyContainer";
     }
 
+    /// <summary>Initialises a GPO modification wrapper from an event record.</summary>
     public GpoModified(EventObject eventObject) : base(eventObject) {
         _eventObject = eventObject;
         Type = "GpoModified";

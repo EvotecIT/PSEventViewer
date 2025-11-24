@@ -14,7 +14,7 @@ on:
   workflow_dispatch:  # 👈 enables manual triggering
 
 env:
-  DOTNET_VERSION: '8.x'
+  DOTNET_VERSION: '10.0.x'
   BUILD_CONFIGURATION: 'Debug'
 
 jobs:
@@ -24,6 +24,11 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
 
       - name: Setup PowerShell modules
         run: |

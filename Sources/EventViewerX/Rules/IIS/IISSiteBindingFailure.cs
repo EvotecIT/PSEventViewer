@@ -9,19 +9,28 @@ namespace EventViewerX.Rules.IIS;
 /// 1007: The World Wide Web Publishing Service did not register the URL prefix for a site
 /// </summary>
 public class IISSiteBindingFailure : EventRuleBase {
+    /// <inheritdoc />
     public override List<int> EventIds => new() { 1007 };
+    /// <inheritdoc />
     public override string LogName => "System";
+    /// <inheritdoc />
     public override NamedEvents NamedEvent => NamedEvents.IISSiteBindingFailure;
 
+    /// <summary>Accepts IIS binding failure events (1007).</summary>
     public override bool CanHandle(EventObject eventObject) {
         return true;
     }
 
+    /// <summary>Machine hosting IIS.</summary>
     public string Computer;
+    /// <summary>Site name reported by the event.</summary>
     public string SiteName;
+    /// <summary>Binding that failed to register.</summary>
     public string Binding;
+    /// <summary>Event timestamp.</summary>
     public DateTime When;
 
+    /// <summary>Initialises an IIS binding failure wrapper from an event record.</summary>
     public IISSiteBindingFailure(EventObject eventObject) : base(eventObject) {
         _eventObject = eventObject;
         Type = "IISSiteBindingFailure";

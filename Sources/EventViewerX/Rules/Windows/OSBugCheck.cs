@@ -5,12 +5,15 @@ namespace EventViewerX.Rules.Windows;
 /// 1001: The computer has rebooted from a bugcheck.
 /// </summary>
 public class OSBugCheck : EventRuleBase {
+    /// <inheritdoc />
     public override List<int> EventIds => new() { 1001 };
+    /// <inheritdoc />
     public override string LogName => "System";
+    /// <inheritdoc />
     public override NamedEvents NamedEvent => NamedEvents.OSBugCheck;
 
+    /// <summary>Accepts any bugcheck (1001) event in the System log.</summary>
     public override bool CanHandle(EventObject eventObject) {
-        // Simple rule - always handle if event ID and log name match
         return true;
     }
 
@@ -33,6 +36,7 @@ public class OSBugCheck : EventRuleBase {
     /// <summary>Event time.</summary>
     public DateTime When;
 
+    /// <summary>Initialises a bugcheck wrapper from an event record.</summary>
     public OSBugCheck(EventObject eventObject) : base(eventObject) {
         _eventObject = eventObject;
         Type = "OSBugCheck";

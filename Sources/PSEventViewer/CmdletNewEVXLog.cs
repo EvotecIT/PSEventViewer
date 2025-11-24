@@ -6,8 +6,24 @@ using EventViewerX;
 namespace PSEventViewer;
 
 /// <summary>
-/// Creates a new Windows event log with optional size and retention settings.
+/// <para type="synopsis">Creates a new Windows event log with optional size and retention settings.</para>
+/// <para type="description">Wraps SearchEvents.CreateLog to add a log/provider pair locally or remotely, with overflow behavior and retention tuning.</para>
 /// </summary>
+/// <example>
+///   <summary>Create custom log</summary>
+///   <code>New-EVXLog -LogName MyApp -ProviderName MyApp</code>
+///   <para>Creates a new log and provider for application events.</para>
+/// </example>
+/// <example>
+///   <summary>Set size and overwrite policy</summary>
+///   <code>New-EVXLog -LogName MyApp -MaximumKilobytes 102400 -OverflowAction OverwriteOlder -RetentionDays 30</code>
+///   <para>Limits the log to ~100 MB and retains events for 30 days.</para>
+/// </example>
+/// <example>
+///   <summary>Create log on remote server</summary>
+///   <code>New-EVXLog -LogName MyApp -ProviderName MyApp -MachineName SRV01</code>
+///   <para>Creates the log on SRV01.</para>
+/// </example>
 [Cmdlet(VerbsCommon.New, "EVXLog", SupportsShouldProcess = true)]
 [Alias("New-EventViewerXLog", "New-WinEventLog")]
 [OutputType(typeof(bool))]

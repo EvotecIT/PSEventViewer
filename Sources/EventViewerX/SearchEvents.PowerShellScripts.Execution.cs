@@ -8,6 +8,15 @@ using System.Xml.Linq;
 
 namespace EventViewerX {
     public partial class SearchEvents {
+        /// <summary>
+        /// Retrieves execution records (event 4100) for PowerShell script blocks.
+        /// </summary>
+        /// <param name="type">Windows PowerShell or PowerShell Core.</param>
+        /// <param name="machineName">Remote machine to query; <c>null</c> targets local logs.</param>
+        /// <param name="eventLogPath">Optional .evtx file path to read from instead of the live log.</param>
+        /// <param name="dateFrom">Lower bound for the query time window.</param>
+        /// <param name="dateTo">Upper bound for the query time window.</param>
+        /// <returns>Execution records in reverse chronological order.</returns>
         public static IEnumerable<PowerShellScriptExecutionInfo> GetPowerShellScriptExecution(
             PowerShellEdition type,
             string machineName = null,
@@ -68,6 +77,17 @@ namespace EventViewerX {
             }
         }
 
+        /// <summary>
+        /// Reassembles PowerShell script blocks (events 4103/4104) from the operational log.
+        /// </summary>
+        /// <param name="type">Windows PowerShell or PowerShell Core.</param>
+        /// <param name="machineName">Remote machine to query; <c>null</c> targets local logs.</param>
+        /// <param name="eventLogPath">Optional .evtx file path to read from instead of the live log.</param>
+        /// <param name="dateFrom">Lower bound for the query time window.</param>
+        /// <param name="dateTo">Upper bound for the query time window.</param>
+        /// <param name="format">When true, re-indents the captured script text.</param>
+        /// <param name="containsText">Optional text filters applied to reconstructed scripts.</param>
+        /// <returns>Restored script blocks in reverse chronological order.</returns>
         public static IEnumerable<RestoredPowerShellScript> RestorePowerShellScripts(
             PowerShellEdition type,
             string machineName = null,
