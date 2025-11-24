@@ -239,7 +239,7 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
     /// Predefined named events to query.
     /// </summary>
     [Parameter(Mandatory = true, ParameterSetName = "NamedEvents")]
-    public NamedEvents[] Type { get; set; }
+    public NamedEvents[] Type { get; set; } = Array.Empty<NamedEvents>();
 
     /// <summary>
     /// The list log parameter is used to list the logs on the machine.
