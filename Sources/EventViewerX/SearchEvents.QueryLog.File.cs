@@ -30,6 +30,7 @@ public partial class SearchEvents : Settings {
                          !string.IsNullOrEmpty(providerName) || keywords != null || level != null || startTime != null ||
                          endTime != null || userId != null || eventRecordId != null;
 
+        string xpath;
         EventLogQuery query;
 
         // Use XPath only; path is supplied via EventLogQuery FilePath
@@ -43,7 +44,7 @@ public partial class SearchEvents : Settings {
             var levelArray = level != null ? new[] { level.ToString() } : null;
             var userIdArray = !string.IsNullOrEmpty(userId) ? new[] { userId } : null;
 
-            string xpath = BuildWinEventFilter(
+            xpath = BuildWinEventFilter(
                 id: idArray,
                 eventRecordId: eventRecordIdArray,
                 startTime: startTime,
@@ -68,7 +69,7 @@ public partial class SearchEvents : Settings {
                 TolerateQueryErrors = true
             };
         } else {
-            string xpath = BuildWinEventFilter(xpathOnly: true);
+            xpath = BuildWinEventFilter(xpathOnly: true);
 
             if (string.IsNullOrWhiteSpace(xpath)) {
                 xpath = "*";
@@ -82,7 +83,8 @@ public partial class SearchEvents : Settings {
             };
         }
 
-        using (EventLogReader reader = CreateEventLogReader(query, null)) {
+        using (EventLogReader reader = CreateEventLogReader(query, null) ??
+                                       CreateEventLogReader(CreateFileQueryWithFallback(absolutePath, xpath, oldest), null)) {
             if (reader == null) {
                 yield break;
             }
