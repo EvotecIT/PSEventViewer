@@ -119,11 +119,6 @@
         ADUserLogonNTLMv1,
       
         /// <summary>
-        /// Kerberos authentication ticket requests
-        /// </summary>
-        ADUserLogonKerberos,
-      
-        /// <summary>
         /// Failed user logon attempts
         /// </summary>
         ADUserLogonFailed,

@@ -39,14 +39,14 @@ public class TestKerberosTgtRequest
         var rule = new Rules.Kerberos.KerberosTGTRequest(eo);
 
         Assert.Equal("MSOL_6f0d1d4965ec", rule.AccountName.Split('\\')[1]);
-        Assert.Equal("192.168.241.15", rule.IpAddressNormalized);
-        Assert.Equal(TicketEncryptionType.AES256, rule.EncryptionType);
+        Assert.Equal("192.168.241.15", rule.IpAddress);
+        Assert.Contains("AES256", rule.EncryptionTypeText);
         Assert.Contains("0x00000000", rule.StatusText);
         Assert.Equal("AES-SHA1, RC4", rule.AccountAvailableKeys);
         Assert.Equal("AES256 AES128 RC4", rule.ClientAdvertizedEncryptionTypes);
         Assert.Equal("ABC==", rule.ResponseTicket);
-        Assert.Equal(TicketEncryptionType.AES256, rule.SessionKeyEncryptionType);
-        Assert.Equal(TicketEncryptionType.AES256, rule.PreAuthEncryptionType);
+        Assert.Contains("AES256", rule.SessionKeyEncryptionTypeText);
+        Assert.Contains("AES256", rule.PreAuthEncryptionTypeText);
         Assert.Contains("Forwardable", rule.TicketOptionsText);
         Assert.Contains("Renewable", rule.TicketOptionsText);
         Assert.Contains("0x40810010", rule.TicketOptionsText);

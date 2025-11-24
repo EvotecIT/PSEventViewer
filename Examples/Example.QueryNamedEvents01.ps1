@@ -1,7 +1,7 @@
 ﻿Clear-Host
 Import-Module $PSScriptRoot\..\PSEventViewer.psd1 -Force -Verbose
 
-$T = Find-WinEvent -Machine AD0 -Type ADUserLogonKerberos -Verbose  # | Format-Table
+$T = Find-WinEvent -Machine AD0 -Type ADUser -Verbose  # | Format-Table
 $T.Count
 return
 

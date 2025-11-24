@@ -24,31 +24,21 @@ public class KerberosTGTRequest : EventRuleBase
     public string Action;
     /// <summary>Target account requesting the ticket.</summary>
     public string AccountName;
-    /// <summary>Client IP address.</summary>
+    /// <summary>Client IP address (normalized).</summary>
     public string IpAddress;
-    /// <summary>Client IP normalized (v4-mapped/loopback).</summary>
-    public string IpAddressNormalized;
     /// <summary>Client source port.</summary>
     public string IpPort;
-    /// <summary>Ticket options bitmask parsed from the event.</summary>
-    public TicketOptions? TicketOptions;
     /// <summary>Human-friendly ticket options.</summary>
     public string TicketOptionsText;
-    /// <summary>Status code reported by the KDC.</summary>
-    public StatusCode? Status;
     /// <summary>Status with hex representation.</summary>
     public string StatusText;
     /// <summary>Encryption type used for the ticket.</summary>
-    public TicketEncryptionType? EncryptionType;
     public string EncryptionTypeText;
     /// <summary>Pre-authentication type used by the client.</summary>
-    public PreAuthType? PreAuthType;
     public string PreAuthTypeText;
     /// <summary>Session key encryption type (from SessionKeyEncryptionType).</summary>
-    public TicketEncryptionType? SessionKeyEncryptionType;
     public string SessionKeyEncryptionTypeText;
     /// <summary>Pre-auth encryption type (from PreAuthEncryptionType).</summary>
-    public TicketEncryptionType? PreAuthEncryptionType;
     public string PreAuthEncryptionTypeText;
     /// <summary>Client-advertised encryption types string.</summary>
     public string ClientAdvertizedEncryptionTypes;
@@ -74,32 +64,31 @@ public class KerberosTGTRequest : EventRuleBase
         Computer = _eventObject.ComputerName;
         Action = _eventObject.MessageSubject;
         AccountName = _eventObject.GetValueFromDataDictionary("TargetUserName", "TargetDomainName", "\\", reverseOrder: true);
-        IpAddress = _eventObject.GetValueFromDataDictionary("IpAddress");
-        IpAddressNormalized = Rules.RuleHelpers.NormalizeIp(IpAddress);
+        IpAddress = Rules.RuleHelpers.NormalizeIp(_eventObject.GetValueFromDataDictionary("IpAddress"));
         IpPort = _eventObject.GetValueFromDataDictionary("IpPort");
         var rawTicketOptions = _eventObject.GetValueFromDataDictionary("TicketOptions");
-        TicketOptions = EventsHelper.GetTicketOptions(rawTicketOptions);
-        TicketOptionsText = EventsHelper.DescribeTicketOptions(TicketOptions, rawTicketOptions);
+        var ticketOptions = EventsHelper.GetTicketOptions(rawTicketOptions);
+        TicketOptionsText = EventsHelper.DescribeTicketOptions(ticketOptions, rawTicketOptions);
 
         var rawStatus = _eventObject.GetValueFromDataDictionary("Status");
-        Status = EventsHelper.GetStatusCode(rawStatus);
-        StatusText = EventsHelper.DescribeStatus(Status, rawStatus);
+        var status = EventsHelper.GetStatusCode(rawStatus);
+        StatusText = EventsHelper.DescribeStatus(status, rawStatus);
 
         var rawTicketEtype = _eventObject.GetValueFromDataDictionary("TicketEncryptionType");
-        EncryptionType = EventsHelper.GetTicketEncryptionType(rawTicketEtype);
-        EncryptionTypeText = EventsHelper.DescribeEncryption(EncryptionType, rawTicketEtype);
+        var encryptionType = EventsHelper.GetTicketEncryptionType(rawTicketEtype);
+        EncryptionTypeText = EventsHelper.DescribeEncryption(encryptionType, rawTicketEtype);
 
         var rawPreAuth = _eventObject.GetValueFromDataDictionary("PreAuthType");
-        PreAuthType = EventsHelper.GetPreAuthType(rawPreAuth);
-        PreAuthTypeText = EventsHelper.DescribePreAuthType(PreAuthType, rawPreAuth);
+        var preAuthType = EventsHelper.GetPreAuthType(rawPreAuth);
+        PreAuthTypeText = EventsHelper.DescribePreAuthType(preAuthType, rawPreAuth);
 
         var rawSessionEtype = _eventObject.GetValueFromDataDictionary("SessionKeyEncryptionType");
-        SessionKeyEncryptionType = EventsHelper.GetTicketEncryptionType(rawSessionEtype);
-        SessionKeyEncryptionTypeText = EventsHelper.DescribeEncryption(SessionKeyEncryptionType, rawSessionEtype);
+        var sessionKeyEncryptionType = EventsHelper.GetTicketEncryptionType(rawSessionEtype);
+        SessionKeyEncryptionTypeText = EventsHelper.DescribeEncryption(sessionKeyEncryptionType, rawSessionEtype);
 
         var rawPreAuthEtype = _eventObject.GetValueFromDataDictionary("PreAuthEncryptionType");
-        PreAuthEncryptionType = EventsHelper.GetTicketEncryptionType(rawPreAuthEtype);
-        PreAuthEncryptionTypeText = EventsHelper.DescribeEncryption(PreAuthEncryptionType, rawPreAuthEtype);
+        var preAuthEncryptionType = EventsHelper.GetTicketEncryptionType(rawPreAuthEtype);
+        PreAuthEncryptionTypeText = EventsHelper.DescribeEncryption(preAuthEncryptionType, rawPreAuthEtype);
         ClientAdvertizedEncryptionTypes = _eventObject.GetValueFromDataDictionary("ClientAdvertizedEncryptionTypes");
         AccountSupportedEncryptionTypes = _eventObject.GetValueFromDataDictionary("AccountSupportedEncryptionTypes");
         AccountAvailableKeys = _eventObject.GetValueFromDataDictionary("AccountAvailableKeys");
@@ -110,15 +99,10 @@ public class KerberosTGTRequest : EventRuleBase
         ResponseTicket = _eventObject.GetValueFromDataDictionary("ResponseTicket");
         When = _eventObject.TimeCreated;
 
-        WeakEncryptionAlgorithm = EncryptionType is TicketEncryptionType.DES_CBC_CRC
+        WeakEncryptionAlgorithm = encryptionType is TicketEncryptionType.DES_CBC_CRC
             or TicketEncryptionType.DES_CBC_MD5
             or TicketEncryptionType.RC4_HMAC
             or TicketEncryptionType.RC4_HMAC_EXP;
-
-        if (IpAddress == "::1")
-        {
-            IpAddress = "Localhost";
-        }
     }
 }
 
