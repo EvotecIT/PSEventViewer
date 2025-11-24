@@ -9,8 +9,11 @@ namespace EventViewerX.Rules.AzureAD;
 /// </summary>
 public class AADSyncImportStatus : EventRuleBase
 {
+    /// <inheritdoc />
     public override List<int> EventIds => new() { 105, 132, 133, 134 };
+    /// <inheritdoc />
     public override string LogName => "Application";
+    /// <inheritdoc />
     public override NamedEvents NamedEvent => NamedEvents.AADSyncImportStatus;
 
     /// <summary>Accepts Directory Synchronization import/status events.</summary>

@@ -8,8 +8,11 @@ namespace EventViewerX.Rules.AzureAD;
 /// </summary>
 public class AADSyncCycleStage : EventRuleBase
 {
+    /// <inheritdoc />
     public override List<int> EventIds => new() { 904 };
+    /// <inheritdoc />
     public override string LogName => "Application";
+    /// <inheritdoc />
     public override NamedEvents NamedEvent => NamedEvents.AADSyncCycleStage;
 
     /// <summary>Accepts Directory Synchronization provider events.</summary>

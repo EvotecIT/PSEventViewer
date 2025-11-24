@@ -5,8 +5,11 @@ namespace EventViewerX.Rules.Windows;
 /// Event ID 4621
 /// </summary>
 public class OSCrashOnAuditFailRecovery : EventRuleBase {
+    /// <inheritdoc />
     public override List<int> EventIds => new() { 4621 };
+    /// <inheritdoc />
     public override string LogName => "Security";
+    /// <inheritdoc />
     public override NamedEvents NamedEvent => NamedEvents.OSCrashOnAuditFailRecovery;
 
     /// <summary>Accepts security auditing provider events for CrashOnAuditFail recovery.</summary>

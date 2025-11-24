@@ -9,8 +9,11 @@ namespace EventViewerX.Rules.AzureAD;
 /// </summary>
 public class AADSyncPasswordHashSyncStatus : EventRuleBase
 {
+    /// <inheritdoc />
     public override List<int> EventIds => new() { 663 };
+    /// <inheritdoc />
     public override string LogName => "Application";
+    /// <inheritdoc />
     public override NamedEvents NamedEvent => NamedEvents.AADSyncPasswordHashSyncStatus;
 
     /// <summary>Accepts Directory Synchronization password hash sync heartbeat events.</summary>

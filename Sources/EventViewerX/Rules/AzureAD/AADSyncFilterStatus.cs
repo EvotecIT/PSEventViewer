@@ -8,8 +8,11 @@ namespace EventViewerX.Rules.AzureAD;
 /// </summary>
 public class AADSyncFilterStatus : EventRuleBase
 {
+    /// <inheritdoc />
     public override List<int> EventIds => new() { 6952 };
+    /// <inheritdoc />
     public override string LogName => "Application";
+    /// <inheritdoc />
     public override NamedEvents NamedEvent => NamedEvents.AADSyncFilterStatus;
 
     /// <summary>Accepts ADSync provider filter status events.</summary>

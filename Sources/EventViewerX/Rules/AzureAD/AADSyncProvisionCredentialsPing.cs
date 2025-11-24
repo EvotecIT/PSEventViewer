@@ -9,8 +9,11 @@ namespace EventViewerX.Rules.AzureAD;
 /// </summary>
 public class AADSyncProvisionCredentialsPing : EventRuleBase
 {
+    /// <inheritdoc />
     public override List<int> EventIds => new() { 653, 654 };
+    /// <inheritdoc />
     public override string LogName => "Application";
+    /// <inheritdoc />
     public override NamedEvents NamedEvent => NamedEvents.AADSyncProvisionCredentialsPing;
 
     /// <summary>Accepts Directory Synchronization credential ping events.</summary>

@@ -5,10 +5,16 @@ namespace EventViewerX.Rules.Windows;
 /// Event ID 4608
 /// </summary>
 public class OSStartupSecurity : EventRuleBase {
+    /// <inheritdoc />
     public override List<int> EventIds => new() { 4608 };
+    /// <inheritdoc />
     public override string LogName => "Security";
+    /// <inheritdoc />
     public override NamedEvents NamedEvent => NamedEvents.OSStartupSecurity;
 
+    /// <summary>Accepts all startup events within the Security log.</summary>
+    /// <param name="eventObject">Event to evaluate.</param>
+    /// <returns>Always <c>true</c> for this rule.</returns>
     public override bool CanHandle(EventObject eventObject) {
         return true;
     }
@@ -28,6 +34,8 @@ public class OSStartupSecurity : EventRuleBase {
     /// <summary>Event timestamp.</summary>
     public DateTime When;
 
+    /// <summary>Creates a wrapper for Security log startup events (4608).</summary>
+    /// <param name="eventObject">Event carrying startup details.</param>
     public OSStartupSecurity(EventObject eventObject) : base(eventObject) {
         _eventObject = eventObject;
         Type = "OSStartupSecurity";
