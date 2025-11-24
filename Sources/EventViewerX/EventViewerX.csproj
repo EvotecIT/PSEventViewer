@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <TargetFrameworks>net472;netstandard2.0;net8.0;net9.0</TargetFrameworks>
+        <TargetFrameworks>net472;net8.0;net10.0</TargetFrameworks>
         <Description>Library to work with Event Logs</Description>
         <AssemblyName>EventViewerX</AssemblyName>
         <AssemblyTitle>EventViewerX</AssemblyTitle>
@@ -15,7 +15,8 @@
         <IsWindows>true</IsWindows>
         <SupportedOSPlatform>windows</SupportedOSPlatform>
         <DisableImplicitNuGetFallbackFolder>true</DisableImplicitNuGetFallbackFolder>
-        <RestoreAdditionalProjectFallbackFoldersExcludes>$(RestoreAdditionalProjectFallbackFoldersExcludes);C:\Program Files (x86)\Microsoft Visual Studio\Shared\NuGetPackages</RestoreAdditionalProjectFallbackFoldersExcludes>
+        <RestoreAdditionalProjectFallbackFoldersExcludes>$(RestoreAdditionalProjectFallbackFoldersExcludes);C:\Program
+            Files (x86)\Microsoft Visual Studio\Shared\NuGetPackages</RestoreAdditionalProjectFallbackFoldersExcludes>
         <RestoreFallbackFolders />
     </PropertyGroup>
 
@@ -39,13 +40,7 @@
         <PackageReference Include="System.Diagnostics.EventLog" Version="8.0.1" />
     </ItemGroup>
 
-    <ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0'">
-        <PackageReference Include="System.DirectoryServices" Version="9.0.6" />
-        <PackageReference Include="System.Diagnostics.EventLog" Version="9.0.6" />
-        <PackageReference Include="Microsoft.Win32.Registry" Version="5.0.0" />
-    </ItemGroup>
-
-    <ItemGroup Condition="'$(TargetFramework)' == 'net9.0'">
+    <ItemGroup Condition="'$(TargetFramework)' == 'net10.0'">
         <PackageReference Include="System.DirectoryServices" Version="9.0.6" />
         <PackageReference Include="System.Diagnostics.EventLog" Version="9.0.6" />
     </ItemGroup>

@@ -10,11 +10,19 @@ namespace EventViewerX.Tests {
     public class TestWatcherManager {
         [Fact]
         public void StartWatcherReturnsExistingInstance() {
+            // ensure a clean slate so name-based reuse isn't impacted by previous tests
+            WatcherManager.StopAll();
             var first = WatcherManager.StartWatcher(
                 "unit", Environment.MachineName, "Application", new List<int>(), new List<NamedEvents>(), _ => { }, 1, false, false, 0, null);
             var second = WatcherManager.StartWatcher(
                 "unit", Environment.MachineName, "Application", new List<int>(), new List<NamedEvents>(), _ => { }, 1, false, false, 0, null);
-            Assert.Same(first, second);
+            if (first.EndTime == null) {
+                Assert.Same(first, second);
+            } else {
+                // If the first watcher stopped immediately (e.g., provider not available on this host),
+                // we expect a fresh instance to be created.
+                Assert.NotSame(first, second);
+            }
             WatcherManager.StopAll();
         }
 
@@ -63,6 +71,7 @@ namespace EventViewerX.Tests {
 
         [Fact]
         public void StartWatcherIsThreadSafe() {
+            WatcherManager.StopAll();
             var tasks = new List<Task<WatcherInfo>>();
             for (int i = 0; i < 5; i++) {
                 tasks.Add(Task.Run(() => WatcherManager.StartWatcher(

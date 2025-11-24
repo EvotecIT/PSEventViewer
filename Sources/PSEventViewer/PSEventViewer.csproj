@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <TargetFrameworks>net472;netstandard2.0;net8.0</TargetFrameworks>
+    <TargetFrameworks>net472;net8.0;net10.0</TargetFrameworks>
         <Description>PowerShell Module for working with Event Logs</Description>
         <AssemblyName>PSEventViewer</AssemblyName>
         <AssemblyTitle>PSEventViewer</AssemblyTitle>
@@ -25,10 +25,6 @@
       <PackageReference Include="System.Text.Json" Version="8.0.5" />
       <PackageReference Include="Microsoft.Bcl.AsyncInterfaces" Version="8.0.0" />
       <PackageReference Include="System.Threading.Tasks.Extensions" Version="4.5.4" />
-  </ItemGroup>
-
-  <ItemGroup Condition=" '$(TargetFramework)' == 'netstandard2.0' ">
-      <PackageReference Include="System.Text.Json" Version="9.0.0" />
   </ItemGroup>
 
     <!-- Make sure the output DLL's from library are included in the output -->
