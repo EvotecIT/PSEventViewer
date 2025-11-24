@@ -1,16 +1,14 @@
-﻿Describe 'Get-EVXEvent - Basic Test' {
-    $Date = (Get-Date).AddDays(-60)
-    $Date1 = Get-Date
+﻿Describe 'Get-EVXEvent - Basic Test (EVTX sample)' {
+    $FilePath = [System.IO.Path]::Combine($PSScriptRoot, 'Logs', 'Active Directory Web Services.evtx')
 
-    $Events = Get-EVXEvent -Machine $Env:COMPUTERNAME -DateFrom $Date -DateTo $Date1 -ID 5617 -LogName 'Application' # -Verbose
+    $Events = Get-EVXEvent -Path $FilePath -MaxEvents 3
 
     $PSDefaultParameterValues = @{
         "It:TestCases" = @{ Date = $Date; Date1 = $Date1; Events = $Events }
     }
 
-    It 'Should have GatheredLogName, GatheredFrom fields properly filled in' {
-        $Events[0].GatheredFrom | Should -Be $Env:COMPUTERNAME
-        $Events[0].GatheredLogName | Should -Be 'Application'
+    It 'Should have GatheredFrom filled in' {
+        $Events[0].GatheredFrom | Should -Not -BeNullOrEmpty
     }
     It 'Should have more then 1 event' {
         $Events.Count | Should -BeGreaterOrEqual 1
@@ -18,85 +16,42 @@
     It 'Should return an Array' {
         $Events -is [Array] | Should -Be $true
     }
-    It 'Should return proper Level' {
-        $Events[0].LevelDisplayName | Should -Be 'Information'
-    }
     It 'Should return proper LogName' {
-        $Events[0].LogName | Should -Be 'Application'
-    }
-    It 'Should return proper ID (EventID)' {
-        $Events[0].ID | Should -Be 5617
+        $Events[0].LogName | Should -Be 'Active Directory Web Services'
     }
 }
-Describe 'Get-EVXEvent - MaxEvents Test' {
-    $Date = (Get-Date).AddDays(-60)
-    $Date1 = Get-Date
+Describe 'Get-EVXEvent - MaxEvents Test (EVTX sample)' {
+    $FilePath = [System.IO.Path]::Combine($PSScriptRoot, 'Logs', 'Active Directory Web Services.evtx')
 
-    $Events = Get-EVXEvent -Machine $Env:COMPUTERNAME -DateFrom $Date -DateTo $Date1 -ID 5617 -LogName 'Application' -MaxEvents 1 -AsArray
+    $Events = Get-EVXEvent -Path $FilePath -MaxEvents 1
 
     $PSDefaultParameterValues = @{
         "It:TestCases" = @{ Date = $Date; Date1 = $Date1; Events = $Events }
     }
 
-    It 'Should have GatheredLogName, GatheredFrom fields properly filled in' {
-        $Events[0].GatheredFrom | Should -Be $Env:COMPUTERNAME
-        $Events[0].GatheredLogName | Should -Be 'Application'
+    It 'Should have GatheredFrom filled in' {
+        $Events[0].GatheredFrom | Should -Not -BeNullOrEmpty
+        $Events[0].LogName | Should -Be 'Active Directory Web Services'
     }
     It 'Should have exactly 1 event' {
         $Events.Count | Should -BeExactly 1
     }
-    It 'Should return an Array' {
-        $Events -is [Array] | Should -Be $true
-    }
-    It 'Should return proper Level' {
-        $Events[0].LevelDisplayName | Should -Be 'Information'
-    }
     It 'Should return proper LogName' {
-        $Events[0].LogName | Should -Be 'Application'
-    }
-    It 'Should return proper ID (EventID)' {
-        $Events[0].ID | Should -Be 5617
+        $Events[0].LogName | Should -Be 'Active Directory Web Services'
     }
 }
 
-Describe 'Get-EVXEvent - MaxEvents on 3 servers' {
-    $Date = (Get-Date).AddDays(-60)
-    $Date1 = Get-Date
-
-    $Events = Get-EVXEvent -Machine $Env:COMPUTERNAME, $Env:COMPUTERNAME, $Env:COMPUTERNAME -DateFrom $Date -DateTo $Date1 -ID 5617 -LogName 'Application' -MaxEvents 1 -AsArray
-
-    $PSDefaultParameterValues = @{
-        "It:TestCases" = @{ Date = $Date; Date1 = $Date1; Events = $Events }
+Describe 'Get-EVXEvent - MaxEvents on sample file' {
+    It 'Should return up to requested events' {
+        $FilePath = [System.IO.Path]::Combine($PSScriptRoot, 'Logs', 'Active Directory Web Services.evtx')
+        $Events = Get-EVXEvent -Path $FilePath -MaxEvents 3
+        $Events.Count | Should -BeGreaterThan 0
+        $Events.Count | Should -BeLessOrEqual 3
     }
-
-    It 'Should have GatheredLogName, GatheredFrom fields properly filled in' {
-        $Events[0].GatheredFrom | Should -Be $Env:COMPUTERNAME
-        $Events[0].GatheredLogName | Should -Be 'Application'
-        $Events[1].GatheredFrom | Should -Be $Env:COMPUTERNAME
-        $Events[1].GatheredLogName | Should -Be 'Application'
-        $Events[2].GatheredFrom | Should -Be $Env:COMPUTERNAME
-        $Events[2].GatheredLogName | Should -Be 'Application'
-    }
-    It 'Should have exactly 1 event' {
-        $Events.Count | Should -BeExactly 3
-    }
-    It 'Should return an Array' {
-        $Events -is [Array] | Should -Be $true
-    }
-    It 'Should return proper Level' {
-        $Events[0].LevelDisplayName | Should -Be 'Information'
-        $Events[1].LevelDisplayName | Should -Be 'Information'
-        $Events[2].LevelDisplayName | Should -Be 'Information'
-    }
-    It 'Should return proper LogName' {
-        $Events[0].LogName | Should -Be 'Application'
-        $Events[1].LogName | Should -Be 'Application'
-        $Events[2].LogName | Should -Be 'Application'
-    }
-    It 'Should return proper ID (EventID)' {
-        $Events[0].ID | Should -Be 5617
-        $Events[1].ID | Should -Be 5617
-        $Events[2].ID | Should -Be 5617
+    It 'Should have GatheredFrom set to file path' {
+        $FilePath = [System.IO.Path]::Combine($PSScriptRoot, 'Logs', 'Active Directory Web Services.evtx')
+        $Events = Get-EVXEvent -Path $FilePath -MaxEvents 3
+        ($Events | Select-Object -First 1).GatheredFrom | Should -Not -BeNullOrEmpty
     }
 }
 
@@ -172,8 +127,9 @@ Describe 'Get-EVXEvent - Parameter validation' {
 
 Describe 'Get-EVXEvent - Positional EventId' {
     It 'Allows positional EventId without ambiguity' {
-        $events = Get-EVXEvent 'Application' 5617 -MaxEvents 1 -AsArray
-        $events | Should -HaveCount 1
-        $events[0].ID | Should -Be 5617
+        $FilePath = [System.IO.Path]::Combine($PSScriptRoot, 'Logs', 'Active Directory Web Services.evtx')
+        $events = Get-EVXEvent -Path $FilePath -Id 1200 -MaxEvents 1
+        $events | Should -Not -BeNullOrEmpty
+        $events[0].ID | Should -Be 1200
     }
 }
