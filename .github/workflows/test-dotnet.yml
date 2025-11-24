@@ -24,7 +24,7 @@ jobs:
     runs-on: windows-latest
     strategy:
       matrix:
-        dotnet-version: ['8.0.x', '9.0.x']
+        dotnet-version: ['8.0.x', '10.0.x']
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -40,7 +40,7 @@ jobs:
       - name: Build solution
         run: dotnet build Sources/EventViewerX.sln --configuration ${{ env.BUILD_CONFIGURATION }} --no-restore
 
-      - name: Run tests
+      - name: Run tests (all TFMs)
         run: dotnet test Sources/EventViewerX.sln --configuration ${{ env.BUILD_CONFIGURATION }} --no-build --verbosity ${{ env.TEST_VERBOSITY }} --logger "console;verbosity=${{ env.TEST_VERBOSITY }}" --logger trx --collect:"XPlat Code Coverage"
         timeout-minutes: 30
 
