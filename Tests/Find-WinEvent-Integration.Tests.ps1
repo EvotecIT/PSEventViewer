@@ -16,6 +16,18 @@ Describe 'Find-WinEvent integration (local)' {
         { Find-WinEvent -Verbose -LogName 'Application' -MachineName $localMachine -MaxEvents 1 | Select-Object -First 1 } | Should -Not -Throw
     }
 
+    It 'returns events from Application locally when MachineName is omitted' {
+        $events = Find-WinEvent -Verbose -LogName 'Application' -MaxEvents 2
+        $events | Should -Not -BeNullOrEmpty
+        $events.Count = 2
+    }
+
+    It 'runs on local machine without MachineName specified' {
+        $events = Find-WinEvent -Verbose -LogName 'System' -MaxEvents 2
+        $events | Should -Not -BeNullOrEmpty
+        $events.Count = 2
+    }
+
     It 'queries a named event type without throwing (OS startup)' {
         { Find-WinEvent -Verbose -Type OSStartup -MachineName $localMachine -MaxEvents 1 | Select-Object -First 1 } | Should -Not -Throw
     }

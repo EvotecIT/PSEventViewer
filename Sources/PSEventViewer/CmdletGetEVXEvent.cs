@@ -328,7 +328,7 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
                 }
             }
         } else {
-            if (Type != null) {
+            if (ParameterSetName == "NamedEvents") {
                 // let's find the events prepared for search
                 List<NamedEvents> typeList = Type.ToList();
                 await foreach (EventObjectSlim eventObject in SearchEvents.FindEventsByNamedEvents(typeList, MachineName, StartTime, EndTime, TimePeriod, maxThreads: NumberOfThreads, maxEvents: MaxEvents, cancellationToken: token)) {

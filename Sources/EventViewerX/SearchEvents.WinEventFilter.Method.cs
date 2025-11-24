@@ -142,7 +142,14 @@ public partial class SearchEvents {
         }
 
         if (xpathOnly) {
+            if (string.IsNullOrWhiteSpace(filter)) {
+                filter = "*";
+            }
             return filter;
+        }
+
+        if (string.IsNullOrWhiteSpace(filter)) {
+            filter = "*";
         }
 
         if (!string.IsNullOrEmpty(path)) {
