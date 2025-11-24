@@ -25,7 +25,7 @@
 ///   <para>Records an error and sets a custom category value.</para>
 /// </example>
 [Cmdlet(VerbsCommunications.Write, "EVXEntry")]
-[Alias("Write-EventViewerXEntry", "Write-WinEvent")]
+[Alias("Write-EventViewerXEntry", "Write-WinEvent", "Write-Event")]
 [OutputType(typeof(bool))]
 public sealed class CmdletWriteEVXEntry : AsyncPSCmdlet {
     /// <summary>
