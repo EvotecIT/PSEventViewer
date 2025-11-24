@@ -3,4 +3,4 @@
 $Path = "$PSScriptRoot\..\EventViewerX"
 
 Get-ProjectVersion -Path "$Path" -ExcludeFolders @("$Path\Module\Artefacts") | Format-Table
-Set-ProjectVersion -Path "$Path" -NewVersion "3.0.0" -WhatIf:$false -Verbose -ExcludeFolders @("$Path\Module\Artefacts") | Format-Table
+Set-ProjectVersion -Path "$Path" -NewVersion "3.1.0" -WhatIf:$false -Verbose -ExcludeFolders @("$Path\Module\Artefacts") | Format-Table
