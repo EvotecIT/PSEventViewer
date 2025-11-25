@@ -97,9 +97,9 @@ namespace EventViewerX {
                 _eventLogWatcher.EventRecordWritten += DetectEventsLogCallback;
                 _eventLogWatcher.Enabled = true;
                 cancellationToken.Register(() => Dispose());
-                _logger.WriteVerbose("Created event log subscription to {0}.", machineName);
+                _logger.WriteVerbose("Created event log subscription to {0}.", _machineName ?? Environment.MachineName);
             } catch (Exception ex) {
-                _logger.WriteWarning("Failed to create event log subscription to Target Machine {0}. Verify network connectivity, firewall settings, permissions, etc. Continuing on to next DC if applicable...  ({1})", machineName, ex.Message.Trim());
+                _logger.WriteWarning("Failed to create event log subscription to Target Machine {0}. Verify network connectivity, firewall settings, permissions, etc. Continuing on to next DC if applicable...  ({1})", _machineName ?? Environment.MachineName, ex.Message.Trim());
             }
         }
         private void DetectEventsLogCallback(object? sender, EventRecordWrittenEventArgs args) {
@@ -118,7 +118,7 @@ namespace EventViewerX {
                     Interlocked.Increment(ref _eventsFound);
                     _logger.WriteVerbose("Found event id {0} on {1}.", Event.Id, Event.MachineName);
 
-                    var eventObject = new EventObject(Event, _machineName);
+                    var eventObject = new EventObject(Event, _machineName ?? Event.MachineName ?? Environment.MachineName);
                     WatchedEvents.TryAdd(eventObject.RecordId ?? -1L, eventObject);
                     _eventAction?.Invoke(eventObject);
                 }

@@ -12,6 +12,7 @@
         <Authors>Przemyslaw Klys</Authors>
         <LangVersion>latest</LangVersion>
         <Nullable>enable</Nullable>
+        <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
         <IsWindows>true</IsWindows>
         <SupportedOSPlatform>windows</SupportedOSPlatform>

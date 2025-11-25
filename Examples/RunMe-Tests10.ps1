@@ -1,6 +1,5 @@
 Clear-Host
-Import-Module PSEventViewer -Force
-Import-Module PSSharedGoods -Force
+Import-Module $PSScriptRoot\..\PSEventViewer.psd1 -Force
 
 #Get-EVXEvent -LogName 'Security' -ID 4624 -MaxEvents 10 -Verbose | `
 # Format-Table Date, Action, Who, ObjectAffected, Computer, IpAddress, IpPort, MachineName,ProviderName, LogonProcessName -AutoSize

@@ -19,8 +19,8 @@ namespace EventViewerX {
         /// <returns>Execution records in reverse chronological order.</returns>
         public static IEnumerable<PowerShellScriptExecutionInfo> GetPowerShellScriptExecution(
             PowerShellEdition type,
-            string machineName = null,
-            string eventLogPath = null,
+            string? machineName = null,
+            string? eventLogPath = null,
             DateTime? dateFrom = null,
             DateTime? dateTo = null) {
             string logName = type == PowerShellEdition.WindowsPowerShell
@@ -46,7 +46,7 @@ namespace EventViewerX {
             }
 
             try {
-                using EventLogReader reader = CreateEventLogReader(query, machineName, DefaultSessionTimeoutMs);
+                using EventLogReader? reader = CreateEventLogReader(query, machineName, DefaultSessionTimeoutMs);
                 if (reader == null) {
                     yield break;
                 }
@@ -67,7 +67,7 @@ namespace EventViewerX {
                     if (record == null) break;
 
                     var element = XElement.Parse(record.ToXml());
-                    string contextInfo = ExtractData(element, "ContextInfo");
+                    string? contextInfo = ExtractData(element, "ContextInfo");
                     var data = ParseContextInfo(contextInfo);
                     yield return new PowerShellScriptExecutionInfo(record, data);
                 }
@@ -90,12 +90,12 @@ namespace EventViewerX {
         /// <returns>Restored script blocks in reverse chronological order.</returns>
         public static IEnumerable<RestoredPowerShellScript> RestorePowerShellScripts(
             PowerShellEdition type,
-            string machineName = null,
-            string eventLogPath = null,
+            string? machineName = null,
+            string? eventLogPath = null,
             DateTime? dateFrom = null,
             DateTime? dateTo = null,
             bool format = false,
-            IEnumerable<string> containsText = null) {
+            IEnumerable<string>? containsText = null) {
             string logName = type == PowerShellEdition.WindowsPowerShell
                 ? "Microsoft-Windows-PowerShell/Operational"
                 : "PowerShellCore/Operational";
@@ -119,7 +119,7 @@ namespace EventViewerX {
             }
 
             try {
-                using EventLogReader reader = CreateEventLogReader(query, machineName, DefaultSessionTimeoutMs);
+                using EventLogReader? reader = CreateEventLogReader(query, machineName, DefaultSessionTimeoutMs);
                 if (reader == null) {
                     yield break;
                 }
@@ -140,11 +140,12 @@ namespace EventViewerX {
                     if (record == null) break;
 
                     var element = XElement.Parse(record.ToXml());
-                    string scriptText = ExtractData(element, "ScriptBlockText");
+                    string? scriptText = ExtractData(element, "ScriptBlockText");
                     if (string.IsNullOrEmpty(scriptText) || scriptText == "0") {
                         continue;
                     }
-                    string scriptId = ExtractData(element, "ScriptBlockId");
+                    string nonNullScriptText = scriptText!;
+                    string? scriptId = ExtractData(element, "ScriptBlockId");
                     if (scriptId == null) {
                         continue;
                     }
@@ -153,11 +154,11 @@ namespace EventViewerX {
                         inner = new ScriptCache();
                         cache[scriptId] = inner;
                     }
-                    inner.Events.Add(record);
+                    inner.Events.Add(record!);
                     if (messageNumber == "0") {
                         inner.MetaRecord = record;
                     } else if (int.TryParse(messageNumber, out int num)) {
-                        inner.Parts[num] = scriptText;
+                        inner.Parts[num] = nonNullScriptText;
                     }
                 }
 
@@ -203,7 +204,7 @@ namespace EventViewerX {
         }
 
         private sealed class ScriptCache {
-            public EventRecord MetaRecord { get; set; }
+            public EventRecord? MetaRecord { get; set; }
             public List<EventRecord> Events { get; } = new List<EventRecord>();
             public Dictionary<int, string> Parts { get; } = new Dictionary<int, string>();
         }

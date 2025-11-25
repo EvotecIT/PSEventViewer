@@ -47,7 +47,7 @@ public class ADComputerChangeDetailed : EventRuleBase {
     /// <summary>
     /// Creates a detailed computer change wrapper when the event matches, otherwise returns <c>null</c>.
     /// </summary>
-    public static EventObjectSlim Create(EventObject eventObject) {
+    public static EventObjectSlim? Create(EventObject eventObject) {
         var rule = new ADComputerChangeDetailed(eventObject);
         return rule.CanHandle(eventObject) ? rule : null;
     }

@@ -52,7 +52,7 @@ public class ADGroupPolicyLinks : EventRuleBase {
     /// <summary>Computer where the change occurred.</summary>
     public string Computer;
     /// <summary>Description of the operation (linked/unlinked).</summary>
-    public string Action;
+    public string Action { get; set; } = string.Empty;
     /// <summary>Type of operation.</summary>
     public string OperationType;
     /// <summary>User performing the change.</summary>

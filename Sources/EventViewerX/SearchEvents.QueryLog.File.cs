@@ -25,7 +25,7 @@ public partial class SearchEvents : Settings {
     /// <param name="namedDataExcludeFilter">Hashtable of EventData name/value filters to exclude.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Enumerable sequence of <see cref="EventObject"/> read from the file.</returns>
-    public static IEnumerable<EventObject> QueryLogFile(string filePath, List<int> eventIds = null, string providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string userId = null, int maxEvents = 0, List<long> eventRecordId = null, TimePeriod? timePeriod = null, bool oldest = false, System.Collections.Hashtable namedDataFilter = null, System.Collections.Hashtable namedDataExcludeFilter = null, CancellationToken cancellationToken = default) {
+    public static IEnumerable<EventObject> QueryLogFile(string filePath, List<int>? eventIds = null, string? providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string? userId = null, int maxEvents = 0, List<long>? eventRecordId = null, TimePeriod? timePeriod = null, bool oldest = false, System.Collections.Hashtable? namedDataFilter = null, System.Collections.Hashtable? namedDataExcludeFilter = null, CancellationToken cancellationToken = default) {
         // Sanitize and resolve path; allow UNC and relative.
         string sanitizedPath = filePath.Trim().Trim('"', '\'');
         string absolutePath = Path.GetFullPath(sanitizedPath);
@@ -53,14 +53,14 @@ public partial class SearchEvents : Settings {
 
         // Use XPath only; path is supplied via EventLogQuery FilePath
         if (hasFilters) {
-            var namedDataFilterArray = namedDataFilter != null ? new[] { namedDataFilter } : null;
-            var namedDataExcludeFilterArray = namedDataExcludeFilter != null ? new[] { namedDataExcludeFilter } : null;
+            var namedDataFilterArray = namedDataFilter != null ? new[] { namedDataFilter! } : null;
+            var namedDataExcludeFilterArray = namedDataExcludeFilter != null ? new[] { namedDataExcludeFilter! } : null;
             var idArray = eventIds?.Select(i => i.ToString()).ToArray();
             var eventRecordIdArray = eventRecordId?.Select(i => i.ToString()).ToArray();
-            var providerNameArray = !string.IsNullOrEmpty(providerName) ? new[] { providerName } : null;
+            var providerNameArray = !string.IsNullOrEmpty(providerName) ? new[] { providerName! } : null;
             var keywordsArray = keywords != null ? new[] { (long)keywords.Value } : null;
             var levelArray = level != null ? new[] { level.Value.ToString() } : null;
-            var userIdArray = !string.IsNullOrEmpty(userId) ? new[] { userId } : null;
+            var userIdArray = !string.IsNullOrEmpty(userId) ? new[] { userId! } : null;
 
             xpath = BuildWinEventFilter(
                 id: idArray,
@@ -101,7 +101,7 @@ public partial class SearchEvents : Settings {
             };
         }
 
-        using (EventLogReader reader = CreateEventLogReader(query, null) ??
+        using (EventLogReader? reader = CreateEventLogReader(query, null) ??
                                        CreateEventLogReader(CreateFileQueryWithFallback(absolutePath, xpath, oldest), null)) {
             if (reader == null) {
                 yield break;

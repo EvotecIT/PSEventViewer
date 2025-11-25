@@ -12,7 +12,7 @@ namespace EventViewerX.Examples {
                 NumberOfThreads = 1,
             };
 
-            var machineNames = new List<string> { "AD1", "AD2", "AD3" }; // Add your machine names here
+            var machineNames = new List<string?> { "AD1", "AD2", "AD3" }; // Add your machine names here
             var eventIds = new List<int> { 4932, 4933 }; // Add your event IDs here
 
             Parallel.ForEach(machineNames, machine => {
@@ -30,7 +30,7 @@ namespace EventViewerX.Examples {
                 Debug = true
             };
 
-            var machineNames = new List<string> { "AD1", "AD2", "AD3" }; // Add your machine names here
+            var machineNames = new List<string?> { "AD1", "AD2", "AD3" }; // Add your machine names here
             var eventIds = new List<int> { 4932, 4933 }; // Add your event IDs here
 
             var stopwatch = Stopwatch.StartNew();

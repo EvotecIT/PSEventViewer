@@ -1,9 +1,10 @@
-﻿namespace EventViewerX;
+﻿using System.Globalization;
+
+namespace EventViewerX;
 
 /// <summary>
 /// Event helper methods.
 /// </summary>
-using System.Globalization;
 
 internal static class EventsHelper {
     /// <summary>

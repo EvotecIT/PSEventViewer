@@ -29,12 +29,12 @@ namespace PSEventViewer;
 public sealed class CmdletClearEVXLog : AsyncPSCmdlet {
     /// <summary>Log name to clear.</summary>
     [Parameter(Mandatory = true, Position = 0)]
-    public string LogName { get; set; }
+    public string LogName { get; set; } = null!;
 
     /// <summary>Target computer.</summary>
     [Alias("ComputerName", "ServerName")]
     [Parameter]
-    public string MachineName { get; set; }
+    public string? MachineName { get; set; }
 
     /// <summary>Retention days to set after clearing.</summary>
     [Parameter]

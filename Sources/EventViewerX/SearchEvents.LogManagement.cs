@@ -19,8 +19,9 @@ public partial class SearchEvents : Settings {
     /// <param name="maximumKilobytes">Maximum size in KB.</param>
     /// <param name="overflowAction">Overflow policy.</param>
     /// <param name="retentionDays">Retention in days for OverwriteOlder policy.</param>
+    /// <param name="sourceLogName">Optional log name used for source creation checks.</param>
     /// <returns><c>true</c> if creation succeeded.</returns>
-    public static bool CreateLog(string logName, string sourceName = null, string machineName = null, int maximumKilobytes = 0, OverflowAction overflowAction = OverflowAction.OverwriteAsNeeded, int retentionDays = 7, string sourceLogName = null) {
+    public static bool CreateLog(string logName, string? sourceName = null, string? machineName = null, int maximumKilobytes = 0, OverflowAction overflowAction = OverflowAction.OverwriteAsNeeded, int retentionDays = 7, string? sourceLogName = null) {
         if (string.IsNullOrEmpty(sourceName)) {
             sourceName = logName;
         }
@@ -28,6 +29,8 @@ public partial class SearchEvents : Settings {
         if (string.IsNullOrEmpty(sourceLogName)) {
             sourceLogName = logName;
         }
+        sourceName ??= logName;
+        sourceLogName ??= logName;
 
         try {
             bool logExists = LogExistsSafe(logName, machineName);
@@ -83,7 +86,7 @@ public partial class SearchEvents : Settings {
         try {
             if (string.IsNullOrEmpty(machineName) && !string.IsNullOrEmpty(logName)) {
                 // Local, scoped check via registry to avoid probing restricted logs.
-                exists = SourceExistsRegistryLocal(sourceName, logName);
+                exists = SourceExistsRegistryLocal(sourceName, logName!);
             } else {
                 exists = string.IsNullOrEmpty(machineName)
                     ? EventLog.SourceExists(sourceName)
@@ -126,7 +129,7 @@ public partial class SearchEvents : Settings {
     /// <param name="logName">Name of the log.</param>
     /// <param name="machineName">Target machine.</param>
     /// <returns><c>true</c> when log is removed.</returns>
-    public static bool RemoveLog(string logName, string machineName = null) {
+    public static bool RemoveLog(string logName, string? machineName = null) {
         try {
             bool exists = LogExistsSafe(logName, machineName);
             if (!exists) {
@@ -151,11 +154,11 @@ public partial class SearchEvents : Settings {
     /// <param name="logName">The log name.</param>
     /// <param name="machineName">Target machine.</param>
     /// <returns><c>true</c> when log exists.</returns>
-    public static bool LogExists(string logName, string machineName = null) {
+    public static bool LogExists(string logName, string? machineName = null) {
         return LogExistsSafe(logName, machineName);
     }
 
-    private static bool LogExistsSafe(string logName, string machineName) {
+    private static bool LogExistsSafe(string logName, string? machineName) {
         if (string.IsNullOrWhiteSpace(logName)) {
             return false;
         }
@@ -176,7 +179,7 @@ public partial class SearchEvents : Settings {
     /// <param name="machineName">Target machine.</param>
     /// <param name="retentionDays">Retention days when setting overwrite policy.</param>
     /// <returns><c>true</c> when clearing succeeds.</returns>
-    public static bool ClearLog(string logName, string machineName = null, int? retentionDays = null) {
+    public static bool ClearLog(string logName, string? machineName = null, int? retentionDays = null) {
         if (string.IsNullOrWhiteSpace(logName)) {
             return false;
         }

@@ -96,5 +96,11 @@ namespace EventViewerX.Tests {
             var result = SearchEvents.BuildWinEventFilter(providerName: ["O'Reilly & Co"], logName: "x", xpathOnly: true);
             Assert.Equal("*[System[Provider[@Name='O&apos;Reilly &amp; Co']]]", result);
         }
+
+        [Fact]
+        public void NullFiltersReturnWildcard() {
+            var result = SearchEvents.BuildWinEventFilter(xpathOnly: true);
+            Assert.Equal("*", result);
+        }
     }
 }

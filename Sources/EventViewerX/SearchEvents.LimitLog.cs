@@ -24,6 +24,7 @@ public partial class SearchEvents : Settings {
     /// stops writing new events when the log reaches its limit.
     /// </param>
     /// <param name="retentionDays">Retention in days when using <see cref="OverflowAction.OverwriteOlder"/>.</param>
+    /// <param name="sourceLogName">Optional source log name used when modifying overflow policy.</param>
     /// <returns><c>true</c> when modification succeeds; otherwise, <c>false</c>.</returns>
     /// <example>
     ///   <summary>Increase size and keep events for seven days.</summary>
@@ -39,7 +40,7 @@ public partial class SearchEvents : Settings {
     ///   </code>
     ///   <para>Oldest events are removed first when the log becomes full.</para>
     /// </example>
-    public static bool LimitLog(string logName, string machineName = null, int maximumKilobytes = 0, OverflowAction overflowAction = OverflowAction.OverwriteAsNeeded, int retentionDays = 7, string sourceLogName = null) {
+    public static bool LimitLog(string logName, string? machineName = null, int maximumKilobytes = 0, OverflowAction overflowAction = OverflowAction.OverwriteAsNeeded, int retentionDays = 7, string? sourceLogName = null) {
         if (string.IsNullOrWhiteSpace(logName)) {
             return false;
         }

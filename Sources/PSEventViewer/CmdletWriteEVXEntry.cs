@@ -33,21 +33,21 @@ public sealed class CmdletWriteEVXEntry : AsyncPSCmdlet {
     /// </summary>
     [Alias("ComputerName", "ServerName")]
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
-    public string MachineName { get; set; }
+    public string? MachineName { get; set; }
 
     /// <summary>
     /// Name of the event log where the entry will be written.
     /// </summary>
     [Parameter(Mandatory = true, Position = 0, ParameterSetName = "RecordId")]
     [Parameter(Mandatory = true, Position = 0, ParameterSetName = "GenericEvents")]
-    public string LogName { get; set; }
+    public string LogName { get; set; } = null!;
 
     /// <summary>
     /// Name of the provider that writes the entry.
     /// </summary>
     [Alias("Source", "Provider")]
     [Parameter(Mandatory = true, ParameterSetName = "GenericEvents")]
-    public string ProviderName { get; set; }
+    public string ProviderName { get; set; } = null!;
 
     /// <summary>
     /// Category for the event entry.
@@ -73,13 +73,13 @@ public sealed class CmdletWriteEVXEntry : AsyncPSCmdlet {
     /// Message for the event entry.
     /// </summary>
     [Parameter(Mandatory = true, ParameterSetName = "GenericEvents")]
-    public string Message { get; set; }
+    public string Message { get; set; } = null!;
 
     /// <summary>
     /// Additional custom fields to include with the event.
     /// </summary>
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
-    public string[] AdditionalFields { get; set; }
+    public string[]? AdditionalFields { get; set; }
 
     private ActionPreference errorAction;
 
@@ -92,8 +92,8 @@ public sealed class CmdletWriteEVXEntry : AsyncPSCmdlet {
         // If the user has specified the error action, it will set the error action to the user specified error action
         errorAction = (ActionPreference)this.SessionState.PSVariable.GetValue("ErrorActionPreference");
         if (this.MyInvocation.BoundParameters.ContainsKey("ErrorAction")) {
-            string errorActionString = this.MyInvocation.BoundParameters["ErrorAction"].ToString();
-            if (Enum.TryParse(errorActionString, true, out ActionPreference actionPreference)) {
+            string? errorActionString = this.MyInvocation.BoundParameters["ErrorAction"]?.ToString();
+            if (!string.IsNullOrEmpty(errorActionString) && Enum.TryParse(errorActionString, true, out ActionPreference actionPreference)) {
                 errorAction = actionPreference;
             }
         }

@@ -33,20 +33,20 @@ public sealed class CmdletRemoveEVXSource : AsyncPSCmdlet {
     /// </summary>
     [Parameter(Mandatory = true, Position = 0)]
     [Alias("Source", "Provider")]
-    public string SourceName { get; set; }
+    public string SourceName { get; set; } = null!;
 
     /// <summary>
     /// Optional log name to scope source checks (avoids probing Security/State). Defaults to Application when specified.
     /// </summary>
     [Parameter]
-    public string LogName { get; set; }
+    public string? LogName { get; set; }
 
     /// <summary>
     /// Target computer where the source resides.
     /// </summary>
     [Parameter]
     [Alias("ComputerName", "ServerName")]
-    public string MachineName { get; set; }
+    public string? MachineName { get; set; }
 
     /// <summary>
     /// Removes the specified event source from the system.

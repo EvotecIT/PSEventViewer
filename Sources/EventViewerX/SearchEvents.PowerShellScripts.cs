@@ -11,12 +11,12 @@ namespace EventViewerX {
     /// </summary>
     public partial class SearchEvents {
 
-        private static Dictionary<string, string?> ParseContextInfo(string context) {
+        private static Dictionary<string, string?> ParseContextInfo(string? context) {
             var result = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
             if (string.IsNullOrEmpty(context)) {
                 return result;
             }
-            var lines = context.Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries);
+            var lines = context!.Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries);
             foreach (var line in lines) {
                 var parts = line.Split(new[] { '=' }, 2);
                 var key = parts[0].Trim().Replace(" ", string.Empty);
@@ -26,7 +26,7 @@ namespace EventViewerX {
             return result;
         }
 
-        private static string ExtractData(EventRecord record, string name) {
+        private static string? ExtractData(EventRecord record, string name) {
             try {
                 if (record == null) {
                     throw new ArgumentNullException(nameof(record));
@@ -39,10 +39,10 @@ namespace EventViewerX {
             }
         }
 
-        private static string ExtractData(XElement element, string name) {
+        private static string? ExtractData(XElement element, string name) {
             XNamespace ns = element.GetDefaultNamespace();
             return element.Descendants(ns + "Data")
-                .FirstOrDefault(e => (string)e.Attribute("Name") == name)?.Value;
+                .FirstOrDefault(e => (string?)e.Attribute("Name") == name)?.Value;
         }
 
         private static Dictionary<string, string?> GetAllData(EventRecord record) {
@@ -66,7 +66,7 @@ namespace EventViewerX {
             var result = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
             XNamespace ns = element.GetDefaultNamespace();
             foreach (var data in element.Descendants(ns + "Data")) {
-                var key = (string)data.Attribute("Name");
+                string? key = (string?)data.Attribute("Name");
                 if (key != null) {
                     result[key] = data.Value;
                 }
@@ -105,12 +105,12 @@ namespace EventViewerX {
         /// <returns>Recovered script blocks in the order they are read.</returns>
         public static IEnumerable<RestoredPowerShellScript> GetPowerShellScripts(
             PowerShellEdition type,
-            string machineName = null,
-            string eventLogPath = null,
+            string? machineName = null,
+            string? eventLogPath = null,
             DateTime? dateFrom = null,
             DateTime? dateTo = null,
             bool format = false,
-            IEnumerable<string> containsText = null) {
+            IEnumerable<string>? containsText = null) {
             return RestorePowerShellScripts(type, machineName, eventLogPath, dateFrom, dateTo, format, containsText);
         }
     }

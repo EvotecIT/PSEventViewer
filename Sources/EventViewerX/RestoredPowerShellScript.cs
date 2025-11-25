@@ -35,16 +35,17 @@ public class RestoredPowerShellScript {
     /// Saves the script to the specified directory.
     /// </summary>
     public string Save(string directory, bool addComment = true, bool unblock = false) {
+        var primary = EventRecord ?? throw new InvalidOperationException("No event data available to save script.");
         Directory.CreateDirectory(directory);
-        string fileName = $"{EventRecord.MachineName}_{ScriptBlockId}.ps1";
+        string fileName = $"{primary.MachineName}_{ScriptBlockId}.ps1";
         string filePath = Path.Combine(directory, fileName);
         if (addComment) {
             var header = string.Join(Environment.NewLine,
                 "<#",
-                $"RecordID = {EventRecord.RecordId}",
-                $"LogName = {EventRecord.LogName}",
-                $"MachineName = {EventRecord.MachineName}",
-                $"TimeCreated = {EventRecord.TimeCreated}",
+                $"RecordID = {primary.RecordId}",
+                $"LogName = {primary.LogName}",
+                $"MachineName = {primary.MachineName}",
+                $"TimeCreated = {primary.TimeCreated}",
                 "#>");
             File.WriteAllText(filePath, header + Environment.NewLine + Script);
         } else {

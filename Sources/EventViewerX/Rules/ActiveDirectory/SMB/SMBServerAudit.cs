@@ -52,11 +52,11 @@ public class SMBServerAudit : EventRuleBase {
         Action = _eventObject.MessageSubject;
         ClientAddress = _eventObject.GetValueFromDataDictionary("ClientName");
         When = _eventObject.TimeCreated;
-        ClientDNSName = Task.Run(() => QueryDnsAsync(ClientAddress)).Result;
+        ClientDNSName = Task.Run(() => QueryDnsAsync(ClientAddress)).Result ?? string.Empty;
     }
 
 
-    private static async Task<string> QueryDnsAsync(string clientAddress) {
+    private static async Task<string?> QueryDnsAsync(string clientAddress) {
         if (string.IsNullOrEmpty(clientAddress)) {
             return null;
         }
