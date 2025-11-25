@@ -176,6 +176,33 @@ Clear-EVXLog -LogName 'MyApp'
 Remove-EVXLog -LogName 'MyApp'
 ```
 
+## Timeouts and long-running queries
+
+- **Defaults (safe/unbounded reads)**: `Settings.SessionTimeoutMs` = 5000 (session open), `Settings.QuerySessionTimeoutMs` = 0 (no stall timeout), `Settings.ListLogWarmupMs` = 3000 (log list warm-up), `Settings.PingTimeoutMs` = 1000, `Settings.RpcProbeTimeoutMs` = 2500.
+- **When to use limits**: protect against hung remotes or dead firewalled hosts. Leave `QuerySessionTimeoutMs` at `0` when you need complete log exports.
+- **C#**:
+  ```csharp
+  // Global defaults for this process
+  Settings.SessionTimeoutMs = 15_000;
+  Settings.QuerySessionTimeoutMs = 30_000; // set to 0 for unlimited reads
+
+  // Per-call override takes precedence over defaults
+  var events = SearchEvents.QueryLog(
+      "Security",
+      sessionTimeoutMs: 45_000,
+      machineName: "DC01");
+  ```
+- **PowerShell**:
+  ```powershell
+  # Set static defaults for the current session
+  [EventViewerX.Settings]::SessionTimeoutMs = 15000
+  [EventViewerX.Settings]::QuerySessionTimeoutMs = 30000  # or 0 for unlimited
+
+  # Watchers have their own timeout
+  Start-EVXWatcher -LogName Security -EventId 4624,4625 -TimeOut (New-TimeSpan -Minutes 10) -Action { $_.WriteToHost() }
+  ```
+- **Design intent**: timeouts cap connect time and idle/read stalls; they do not truncate already-returned events. Use small budgets for probes/health checks, and `0` (unbounded) for bulk exports.
+
 ## How we're different in practice
 
 - **Productivity**: avoid hand-written XML by generating XPath, using time shortcuts, and calling scenarios by name instead of memorising IDs.
