@@ -268,7 +268,7 @@ public partial class SearchEvents : Settings
         int budgetMs = (int)Math.Max(500, budget.TotalMilliseconds);
 
         // Shared preflight with negative cache + RPC probe
-        var preflight = Preflight(machineName, budgetMs);
+        var preflight = Preflight(machineName!, budgetMs);
         if (preflight.Status != QuickProbeStatus.Ok)
         {
             return (null, preflight.Status, preflight.Message);

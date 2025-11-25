@@ -122,10 +122,10 @@ internal static class RuleHelpers
     internal static string NormalizeIp(string? ip)
     {
         if (string.IsNullOrWhiteSpace(ip)) return string.Empty;
-        ip = ip.Trim();
-        if (ip.Equals("::1", StringComparison.OrdinalIgnoreCase)) return "127.0.0.1";
-        if (ip.StartsWith("::ffff:", StringComparison.OrdinalIgnoreCase)) return ip.Substring("::ffff:".Length);
-        return ip;
+        var trimmedIp = ip!.Trim();
+        if (trimmedIp.Equals("::1", StringComparison.OrdinalIgnoreCase)) return "127.0.0.1";
+        if (trimmedIp.StartsWith("::ffff:", StringComparison.OrdinalIgnoreCase)) return trimmedIp.Substring("::ffff:".Length);
+        return trimmedIp;
     }
 
     // Cache to avoid repeated reflection when describing flags.

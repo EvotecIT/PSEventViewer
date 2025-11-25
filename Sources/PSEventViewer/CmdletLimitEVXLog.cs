@@ -53,12 +53,12 @@ namespace PSEventViewer;
 public sealed class CmdletLimitEVXLog : AsyncPSCmdlet {
     /// <summary>Log name to modify.</summary>
     [Parameter(Mandatory = true, Position = 0)]
-    public string LogName { get; set; }
+    public string LogName { get; set; } = null!;
 
     /// <summary>Target machine.</summary>
     [Parameter]
     [Alias("ComputerName", "ServerName")]
-    public string MachineName { get; set; }
+    public string? MachineName { get; set; }
 
     /// <summary>Maximum size in KB.</summary>
     [Parameter]
@@ -66,7 +66,7 @@ public sealed class CmdletLimitEVXLog : AsyncPSCmdlet {
 
     /// <summary>Optional log name to scope source checks (defaults to LogName when set).</summary>
     [Parameter]
-    public string SourceLogName { get; set; }
+    public string? SourceLogName { get; set; }
 
     /// <summary>Overflow behavior.</summary>
     [Parameter]
@@ -81,7 +81,7 @@ public sealed class CmdletLimitEVXLog : AsyncPSCmdlet {
         var errorAction = GetErrorActionPreference();
         try {
             if (ShouldProcess($"{LogName} on {MachineName ?? "localhost"}", "Limit event log")) {
-                string sourceLog = string.IsNullOrEmpty(SourceLogName) ? LogName : SourceLogName;
+                string sourceLog = string.IsNullOrEmpty(SourceLogName) ? LogName : SourceLogName!;
                 bool result = SearchEvents.LimitLog(LogName, MachineName, MaximumKilobytes, OverflowAction, RetentionDays, sourceLog);
                 WriteObject(result);
             } else {

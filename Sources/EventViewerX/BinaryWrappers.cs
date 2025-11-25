@@ -54,7 +54,7 @@ namespace EventViewerX {
         /// <param name="xmlPath">Path to the manifest XML.</param>
         /// <param name="manPath">Path to the output <c>.man</c> file.</param>
         /// <param name="mcPath">Optional explicit path to <c>mc.exe</c>.</param>
-        public static void ConvertXMLtoMAN(string xmlPath, string manPath, string mcPath = null) {
+        public static void ConvertXMLtoMAN(string xmlPath, string manPath, string? mcPath = null) {
             //string xmlPath = @"C:\path\to\your\manifest.xml";
             //string manPath = @"C:\path\to\output\manifest.man";
 
@@ -82,21 +82,20 @@ namespace EventViewerX {
             };
 
             try {
-                using (Process process = Process.Start(startInfo)) {
-                    if (process == null) {
-                        Console.WriteLine("`mc.exe` is not available.");
-                        return;
-                    }
+                using Process? process = Process.Start(startInfo);
+                if (process == null) {
+                    Console.WriteLine("`mc.exe` is not available.");
+                    return;
+                }
 
-                    string output = process.StandardOutput.ReadToEnd();
-                    process.WaitForExit();
+                string output = process.StandardOutput.ReadToEnd();
+                process.WaitForExit();
 
-                    if (process.ExitCode == 0) {
-                        Console.WriteLine("Manifest compiled successfully.");
-                    } else {
-                        Console.WriteLine($"Failed to compile manifest. Exit code: {process.ExitCode}");
-                        Console.WriteLine($"Output: {output}");
-                    }
+                if (process.ExitCode == 0) {
+                    Console.WriteLine("Manifest compiled successfully.");
+                } else {
+                    Console.WriteLine($"Failed to compile manifest. Exit code: {process.ExitCode}");
+                    Console.WriteLine($"Output: {output}");
                 }
             } catch (System.ComponentModel.Win32Exception) {
                 Console.WriteLine("`mc.exe` is not available.");
@@ -114,8 +113,8 @@ namespace EventViewerX {
             // For each provider, get its metadata and print its name, GUID, and log names
             foreach (string provider in providers) {
                 string metadata = GetProviderMetadata(provider);
-                string name = GetMetadataProperty(metadata, "name");
-                string guid = GetMetadataProperty(metadata, "guid");
+                string name = GetMetadataProperty(metadata, "name") ?? string.Empty;
+                string guid = GetMetadataProperty(metadata, "guid") ?? string.Empty;
                 string[] logNames = GetMetadataProperty(metadata, "channelReferences")?.Split(new[] { '\n' }, StringSplitOptions.RemoveEmptyEntries).Select(s => s.Trim()).ToArray() ?? Array.Empty<string>();
                 Console.WriteLine($"Provider Name: {name}, Provider GUID: {guid}, Log Names: {string.Join(", ", logNames)}");
             }
@@ -144,7 +143,7 @@ namespace EventViewerX {
         /// <param name="metadata">Metadata text.</param>
         /// <param name="propertyName">Property name to search for.</param>
         /// <returns>Property value if found, otherwise <c>null</c>.</returns>
-        private static string GetMetadataProperty(string metadata, string propertyName) {
+        private static string? GetMetadataProperty(string metadata, string propertyName) {
             string marker = propertyName + ":";
             int startIndex = metadata.IndexOf(marker);
             if (startIndex == -1) {
@@ -175,11 +174,14 @@ namespace EventViewerX {
                 CreateNoWindow = true
             };
 
-            using (Process process = Process.Start(startInfo)) {
-                string output = process.StandardOutput.ReadToEnd();
-                process.WaitForExit();
-                return output;
+            using Process? process = Process.Start(startInfo);
+            if (process == null) {
+                return string.Empty;
             }
+
+            string output = process.StandardOutput.ReadToEnd();
+            process.WaitForExit();
+            return output;
         }
     }
 }

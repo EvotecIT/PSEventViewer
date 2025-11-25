@@ -31,14 +31,14 @@ public sealed class CmdletGetEVXLog : AsyncPSCmdlet {
     /// Name of the log to retrieve. Wildcards supported.
     /// </summary>
     [Parameter(Mandatory = true, Position = 0)]
-    public string[] LogName { get; set; }
+    public string[] LogName { get; set; } = Array.Empty<string>();
 
     /// <summary>
     /// Target machine to query.
     /// </summary>
     [Parameter]
     [Alias("ComputerName", "ServerName")]
-    public string MachineName { get; set; }
+    public string? MachineName { get; set; }
 
     /// <summary>
     /// Queries the log information.

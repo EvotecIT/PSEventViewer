@@ -38,6 +38,7 @@ public partial class SearchEvents : Settings
         }
 
         var normalizedHost = machineName?.Trim() ?? string.Empty;
+        var targetHost = string.IsNullOrWhiteSpace(normalizedHost) ? GetFQDN() : normalizedHost;
         if (IsHostNegativeCached(normalizedHost))
         {
             _logger.WriteVerbose($"{purpose ?? "Session"}: skipping {normalizedHost} (cached unreachable)");
@@ -48,11 +49,11 @@ public partial class SearchEvents : Settings
         try
         {
             using var ping = new System.Net.NetworkInformation.Ping();
-            var reply = ping.Send(machineName, Math.Min(DefaultPingTimeoutMs, budget));
+            var reply = ping.Send(targetHost, Math.Min(DefaultPingTimeoutMs, budget));
             if (reply == null || reply.Status != System.Net.NetworkInformation.IPStatus.Success)
             {
-                _logger.WriteWarning($"{purpose ?? "Session"}: ping failed for '{machineName}' when opening '{logName}'. Skipping.");
-                MarkHostUnreachable(normalizedHost);
+                _logger.WriteWarning($"{purpose ?? "Session"}: ping failed for '{targetHost}' when opening '{logName}'. Skipping.");
+                MarkHostUnreachable(targetHost);
                 return null;
             }
         }
@@ -205,7 +206,7 @@ public partial class SearchEvents : Settings
     {
         if (string.IsNullOrWhiteSpace(machineName)) return true;
 
-        string name = machineName.Trim();
+        string name = machineName!.Trim();
         var cmp = StringComparison.OrdinalIgnoreCase;
         return name == "." || name == "localhost" || name.Equals(Environment.MachineName, cmp) || name.Equals(GetFQDN(), cmp);
     }

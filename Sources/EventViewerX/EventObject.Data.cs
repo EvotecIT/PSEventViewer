@@ -18,7 +18,7 @@ namespace EventViewerX {
             string[] lines = Regex.Split(message, "\r?\n");
 
             // Find the first non-empty line and add it to the dictionary with a default key of "Message"
-            string firstLine = lines.FirstOrDefault(line => !string.IsNullOrWhiteSpace(line));
+            string? firstLine = lines.FirstOrDefault(line => !string.IsNullOrWhiteSpace(line));
             if (firstLine != null) {
                 data["Message"] = firstLine.Trim();
                 MessageSubject = firstLine.Trim();
@@ -99,7 +99,7 @@ namespace EventViewerX {
 
             XNamespace ns = root.GetDefaultNamespace();
 
-            XElement eventData = root.Element(ns + "EventData");
+            XElement? eventData = root.Element(ns + "EventData");
             if (eventData == null) {
                 eventData = root.Element(ns + "UserData")?.Elements().FirstOrDefault();
             }
@@ -108,7 +108,7 @@ namespace EventViewerX {
                 int noNameIndex = 0;
                 foreach (XElement dataElement in eventData.Elements()) {
                     string value = dataElement.Value;
-                    string name = dataElement.Attribute("Name")?.Value;
+                    string? name = dataElement.Attribute("Name")?.Value;
                     if (string.IsNullOrEmpty(name)) {
                         if (dataElement.Name.LocalName == "Data") {
                             if (string.IsNullOrEmpty(value)) {
@@ -119,7 +119,10 @@ namespace EventViewerX {
                             name = dataElement.Name.LocalName;
                         }
                     }
-                    data[name] = value;
+                    if (string.IsNullOrEmpty(name)) {
+                        continue;
+                    }
+                    data[name!] = value;
                     foreach (var kv in ParseColonSeparatedLines(value)) {
                         if (!data.ContainsKey(kv.Key)) {
                             data[kv.Key] = kv.Value;

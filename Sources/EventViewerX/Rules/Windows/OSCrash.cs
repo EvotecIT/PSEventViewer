@@ -29,7 +29,7 @@ public class OSCrash : EventRuleBase {
     /// <summary>Crash timestamp in ISO-8601 format.</summary>
     public string ActionTimestampIso => ActionTimestampUtc?.ToString("o") ?? string.Empty;
     /// <summary>User field if available (often empty for system crashes).</summary>
-    public string Who;
+    public string Who { get; set; } = string.Empty;
     /// <summary>Event time used for ordering.</summary>
     public DateTime When;
 

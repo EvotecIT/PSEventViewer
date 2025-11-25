@@ -40,17 +40,17 @@ namespace PSEventViewer {
     [OutputType(typeof(WinEventInformation))]
     public sealed class CmdletGetEVXInfo : AsyncPSCmdlet {
         /// <summary>
-        /// Target machines from which to gather log information.
-        /// </summary>
-        [Alias("ADDomainControllers", "DomainController", "Server", "Servers", "Computer", "Computers", "ComputerName")]
-        [Parameter(Mandatory = false)]
-        public List<string> Machine { get; set; } = new() { Environment.MachineName };
+    /// Target machines from which to gather log information.
+    /// </summary>
+    [Alias("ADDomainControllers", "DomainController", "Server", "Servers", "Computer", "Computers", "ComputerName")]
+    [Parameter(Mandatory = false)]
+    public List<string?> Machine { get; set; } = new() { Environment.MachineName };
 
         /// <summary>
-        /// Paths to event log files to analyse.
-        /// </summary>
-        [Parameter(Mandatory = false)]
-        public List<string> FilePath { get; set; }
+    /// Paths to event log files to analyse.
+    /// </summary>
+    [Parameter(Mandatory = false)]
+    public List<string>? FilePath { get; set; }
 
         /// <summary>
         /// Names of logs to retrieve information about.
@@ -81,13 +81,13 @@ namespace PSEventViewer {
             var logger = new InternalLoggerPowerShell(internalLogger, WriteVerbose, WriteWarning, WriteDebug, WriteError, WriteProgress, WriteInformation);
             var searchEvents = new SearchEvents(internalLogger);
 
-            var machines = Machine ?? new List<string>();
+            List<string?> machines = Machine ?? new List<string?>();
             if (RunAgainstDC.IsPresent) {
                 try {
                     var forest = System.DirectoryServices.ActiveDirectory.Forest.GetCurrentForest();
                     machines = forest.Domains.Cast<System.DirectoryServices.ActiveDirectory.Domain>()
                         .SelectMany(d => d.DomainControllers.Cast<System.DirectoryServices.ActiveDirectory.DomainController>())
-                        .Select(dc => dc.Name).Distinct().ToList();
+                        .Select(dc => (string?)dc.Name).Distinct().ToList();
                 } catch {
                     // ignored
                 }
@@ -107,7 +107,7 @@ namespace PSEventViewer {
             } else {
                 // Process logs/machines (use defaults if nothing specified)
                 List<string> logsToProcess = logNameSpecified ? LogName : new List<string> { "Security" };
-                List<string> machinesToProcess = machineSpecified ? machines : new List<string> { Environment.MachineName };
+                List<string?> machinesToProcess = machineSpecified ? machines : new List<string?> { Environment.MachineName };
 
                 foreach (var info in SearchEvents.GetWinEventInformation(logsToProcess?.ToArray(), machinesToProcess, FilePath, MaxRunspaces)) {
                     WriteObject(info);

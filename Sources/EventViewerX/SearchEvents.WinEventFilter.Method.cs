@@ -154,7 +154,7 @@ public partial class SearchEvents {
 
         if (!string.IsNullOrEmpty(path)) {
             var selectFilter = string.IsNullOrEmpty(filter) ? "*" : filter;
-            var escapedPath = EscapeXPathValue(path);
+            var escapedPath = EscapeXPathValue(path!);
             return $"<QueryList><Query Id=\"0\" Path=\"file://{escapedPath}\"><Select>{selectFilter}</Select></Query></QueryList>";
         }
         var escapedLog = EscapeXPathValue(logName ?? string.Empty);

@@ -19,9 +19,9 @@ namespace EventViewerX {
         /// <param name="filePaths">Optional EVTX file paths to inspect.</param>
         /// <param name="maxDegreeOfParallelism">Cap on concurrent log queries.</param>
         /// <returns>Sequence of <see cref="WinEventInformation"/> describing each channel or file.</returns>
-        public static IEnumerable<WinEventInformation> GetWinEventInformation(string[]? logNames, List<string>? machines, List<string>? filePaths, int maxDegreeOfParallelism = 50) {
+        public static IEnumerable<WinEventInformation> GetWinEventInformation(string[]? logNames, List<string?>? machines, List<string>? filePaths, int maxDegreeOfParallelism = 50) {
             if (machines == null || machines.Count == 0) {
-                machines = new List<string> { null! };
+                machines = new List<string?> { null };
             }
 
             if (logNames != null && logNames.Length > 0) {

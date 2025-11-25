@@ -23,7 +23,7 @@ namespace EventViewerX {
             Guid providerGuid = new Guid(providerId);
 
             IntPtr registrationHandle;
-            uint result = EventRegister(ref providerGuid, null, IntPtr.Zero, out registrationHandle);
+            uint result = EventRegister(ref providerGuid, null!, IntPtr.Zero, out registrationHandle);
             if (result != 0) {
                 Console.WriteLine("EventRegister failed with error: " + result);
                 return;

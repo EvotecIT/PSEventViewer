@@ -37,25 +37,25 @@ namespace PSEventViewer {
         /// Name of the computer to monitor events on.
         /// </summary>
         [Parameter(Mandatory = true, Position = 0)]
-        public string MachineName { get; set; }
+        public string MachineName { get; set; } = null!;
 
         /// <summary>
         /// Name of the log to watch on the specified machine.
         /// </summary>
         [Parameter(Mandatory = true, Position = 1)]
-        public string LogName { get; set; }
+        public string LogName { get; set; } = null!;
 
         /// <summary>
         /// Array of event identifiers to monitor.
         /// </summary>
         [Parameter(Mandatory = true, Position = 2, ParameterSetName = "EventId")]
-        public int[] EventId { get; set; }
+        public int[] EventId { get; set; } = Array.Empty<int>();
 
         /// <summary>
         /// Array of predefined event groups to monitor.
         /// </summary>
         [Parameter(Mandatory = true, Position = 2, ParameterSetName = "NamedEvent")]
-        public NamedEvents[] NamedEvent { get; set; }
+        public NamedEvents[] NamedEvent { get; set; } = Array.Empty<NamedEvents>();
 
         /// <summary>
         /// Enables staging mode which also watches for event ID 350.
@@ -67,13 +67,13 @@ namespace PSEventViewer {
         /// Script block executed when matching events are detected.
         /// </summary>
         [Parameter(Mandatory = true, Position = 3)]
-        public ScriptBlock Action { get; set; }
+        public ScriptBlock Action { get; set; } = null!;
 
         /// <summary>
         /// Optional name for the watcher instance.
         /// </summary>
         [Parameter]
-        public string Name { get; set; }
+        public string? Name { get; set; }
 
         /// <summary>
         /// Duration after which the watcher stops automatically.
@@ -121,7 +121,7 @@ namespace PSEventViewer {
                 MachineName,
                 LogName,
                 ids,
-                ParameterSetName == "NamedEvent" ? NamedEvent.ToList() : new System.Collections.Generic.List<NamedEvents>(),
+                ParameterSetName == "NamedEvent" ? (NamedEvent?.ToList() ?? new System.Collections.Generic.List<NamedEvents>()) : new System.Collections.Generic.List<NamedEvents>(),
                 e => Action.Invoke(e),
                 NumberOfThreads,
                 Staging.IsPresent,

@@ -9,9 +9,9 @@ namespace EventViewerX {
     /// </summary>
     public partial class EventObject {
         /// <summary>
-        /// Time and date when the event was created
-        /// </summary>
-        public DateTime TimeCreated => _eventRecord.TimeCreated.Value;
+    /// Time and date when the event was created
+    /// </summary>
+    public DateTime TimeCreated => _eventRecord.TimeCreated ?? DateTime.MinValue;
 
         /// <summary>
         /// Event ID
@@ -28,15 +28,15 @@ namespace EventViewerX {
         /// </summary>
         public string LogName => _eventRecord.LogName;
 
-        /// <summary>
-        /// Log name where the event was queried from
-        /// </summary>
-        public string ContainerLog;
+    /// <summary>
+    /// Log name where the event was queried from
+    /// </summary>
+    public string ContainerLog { get; set; } = string.Empty;
 
         /// <summary>
-        /// Computer name where the event was logged
-        /// </summary>
-        public string ComputerName => _eventRecord.MachineName;
+    /// Computer name where the event was logged
+    /// </summary>
+    public string ComputerName => _eventRecord.MachineName;
 
         /// <summary>
         /// Human readable event level name.
@@ -44,10 +44,10 @@ namespace EventViewerX {
         /// </summary>
         private readonly string _levelDisplayName;
 
-        /// <summary>
-        /// Display-friendly level name resolved from the provider metadata; falls back to the numeric level when unavailable.
-        /// </summary>
-        public string LevelDisplayName => _levelDisplayName;
+    /// <summary>
+    /// Display-friendly level name resolved from the provider metadata; falls back to the numeric level when unavailable.
+    /// </summary>
+    public string LevelDisplayName => _levelDisplayName;
 
         /// <summary>
         /// Provider that generated the event.
@@ -57,7 +57,7 @@ namespace EventViewerX {
         /// <summary>
         /// Additional event qualifiers if present.
         /// </summary>
-        public string Qualifiers => _eventRecord.Qualifiers?.ToString();
+    public string? Qualifiers => _eventRecord.Qualifiers?.ToString();
 
         /// <summary>
         /// Opcode of the event record.
@@ -80,9 +80,9 @@ namespace EventViewerX {
         public Guid? ActivityId => _eventRecord.ActivityId;
 
         /// <summary>
-        /// Security identifier associated with the event.
-        /// </summary>
-        public SecurityIdentifier UserId => _eventRecord.UserId;
+    /// Security identifier associated with the event.
+    /// </summary>
+    public SecurityIdentifier UserId => _eventRecord.UserId;
 
         /// <summary>
         /// Event bookmark for resuming queries.
@@ -150,49 +150,49 @@ namespace EventViewerX {
         public IList<EventProperty> Properties => _eventRecord.Properties;
 
         /// <summary>
-        /// Data available in XML converted to a dictionary
-        /// </summary>
-        public Dictionary<string, string> Data { get; private set; }
+    /// Data available in XML converted to a dictionary
+    /// </summary>
+    public Dictionary<string, string> Data { get; private set; } = new Dictionary<string, string>();
 
         /// <summary>
-        /// NIC identifiers extracted from event data
-        /// </summary>
-        public List<string> NicIdentifiers { get; private set; }
+    /// NIC identifiers extracted from event data
+    /// </summary>
+    public List<string> NicIdentifiers { get; private set; } = new List<string>();
 
         /// <summary>
-        /// Data available in the message converted to a dictionary
-        /// </summary>
-        public Dictionary<string, string> MessageData { get; private set; }
+    /// Data available in the message converted to a dictionary
+    /// </summary>
+    public Dictionary<string, string> MessageData { get; private set; } = new Dictionary<string, string>();
 
-        /// <summary>
-        /// First line of the formatted message.
-        /// </summary>
-        public string MessageSubject;
+    /// <summary>
+    /// First line of the formatted message.
+    /// </summary>
+    public string MessageSubject { get; set; } = string.Empty;
 
-        /// <summary>
-        /// Attachments extracted from the event if present
-        /// </summary>
-        public IReadOnlyList<byte[]> Attachments { get; private set; }
+    /// <summary>
+    /// Attachments extracted from the event if present
+    /// </summary>
+    public IReadOnlyList<byte[]> Attachments { get; private set; } = Array.Empty<byte[]>();
 
-        /// <summary>
-        /// Data available in XML format
-        /// </summary>
-        public string XMLData;
+    /// <summary>
+    /// Data available in XML format
+    /// </summary>
+    public string XMLData { get; set; } = string.Empty;
 
-        /// <summary>
-        /// Machine from which the event was queried.
-        /// </summary>
-        public string QueriedMachine;
+    /// <summary>
+    /// Machine from which the event was queried.
+    /// </summary>
+    public string QueriedMachine { get; set; } = string.Empty;
 
-        /// <summary>
-        /// Source from which the event was gathered (computer name or file path).
-        /// </summary>
-        public string GatheredFrom;
+    /// <summary>
+    /// Source from which the event was gathered (computer name or file path).
+    /// </summary>
+    public string GatheredFrom { get; set; } = string.Empty;
 
-        /// <summary>
-        /// Log name that contained the event.
-        /// </summary>
-        public string GatheredLogName;
+    /// <summary>
+    /// Log name that contained the event.
+    /// </summary>
+    public string GatheredLogName { get; set; } = string.Empty;
 
         /// <summary>
         /// Original event record
@@ -213,9 +213,9 @@ namespace EventViewerX {
             } catch (EventLogNotFoundException) {
                 // Some offline .evtx files reference providers that are not installed on the host.
                 // When the metadata DLL is missing, EventLogReader throws while resolving the display name.
-                _levelDisplayName = null;
+                _levelDisplayName = string.Empty;
             } catch (EventLogException) {
-                _levelDisplayName = null;
+                _levelDisplayName = string.Empty;
             }
 
             if (string.IsNullOrEmpty(_levelDisplayName)) {

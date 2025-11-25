@@ -58,8 +58,8 @@ public abstract class EventRuleBase : EventObjectSlim, IEventRule {
     /// </summary>
     /// <param name="eventObject">The event object to process</param>
     /// <returns>An instance of the event rule or null if it cannot be processed</returns>
-    public static EventObjectSlim TryCreate<T>(EventObject eventObject) where T : EventRuleBase, new() {
+    public static EventObjectSlim? TryCreate<T>(EventObject eventObject) where T : EventRuleBase, new() {
         var instance = new T();
-        return instance.CanHandle(eventObject) ? (T)Activator.CreateInstance(typeof(T), eventObject) : null;
+        return instance.CanHandle(eventObject) ? Activator.CreateInstance(typeof(T), eventObject) as T : null;
     }
 }
