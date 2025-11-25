@@ -1,7 +1,7 @@
 ﻿Clear-Host
 Import-Module $PSScriptRoot\..\PSEventViewer.psd1 -Force
 
-Find-WinEvent -LogName 'Security' -Verbose -MachineName 'AD1', 'AD2', 'AD0', "ADRODC.ad.evotec.pl" -ParallelOption Parallel -EventId 4768 | Select-Object -First 2
+$T2 = Find-WinEvent -LogName 'Security' -Verbose -MachineName 'AD1', 'AD2', 'AD0', "ADRODC.ad.evotec.pl" -ParallelOption Parallel -EventId 4768 #| Select-Object -First 2
 Find-WinEvent -LogName 'Application' -Verbose | Select-Object -First 2
 
 #$Output[0] | Format-List

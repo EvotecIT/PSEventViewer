@@ -71,29 +71,34 @@ Coverage is uploaded from GitHub Actions test jobs to Codecov; the badge tracks 
 
 | NamedEvents value | What it targets | Typical use |
 | --- | --- | --- |
-| `ADUserLogon`, `ADUserLogonFailed`, `ADUserLockouts` | User logons, failures, lockouts | Account investigations, SOC triage |
-| `ADUserStatus`, `ADUserRightsAssignment` | Enable/disable, rights assigned/removed | Access reviews, privilege change detection |
-| `ADUserPrivilegeUse`, `ADUserUnlocked` | Privilege elevation, unlocks | Elevated access monitoring |
-| `ADGroupMembershipChange`, `ADGroupChangeDetailed` | Group membership and object changes | Tier-0 group change tracking |
-| `ADComputerCreateChange`, `ADComputerDeleted` | Computer object lifecycle | Join/leave monitoring, stale cleanup |
-| `ADGroupPolicyChanges`, `ADGroupPolicyChangesDetailed`, `ADGroupPolicyLinks` | GPO create/modify/link events | GPO drift detection |
-| `KerberosServiceTicket`, `KerberosTicketFailure`, `KerberosTGTRequest` | Kerberos ticket requests/failures | Lateral movement / Golden Ticket hunting |
-| `ADLdapBindingDetails`, `ADLdapBindingSummary` | LDAP binds | Legacy bind and DC load monitoring |
-| `AADConnectPasswordSyncFailed`, `AADConnectRunProfile`, `AADConnectStagingEnabled` | Azure AD Connect sync health | Hybrid identity monitoring |
-| `NetworkAccessAuthenticationPolicy` | NPS grants/denies | VPN/Wi-Fi auth troubleshooting |
-| `FirewallRuleChange` | Windows Firewall rule edits | Workstation/server hardening drift |
-| `OSCrash`, `OSBugCheck`, `OSUncleanShutdown`, `OSStartupSecurity` | System crash/boot/shutdown | Reliability tracking, post-crash triage |
-| `IISSiteBindingFailure`, `IISSiteStopped` | IIS binding and site state issues | Web farm readiness checks |
+| `ADUserLogon`, `ADUserLogonFailed`, `ADUserLockouts`, `ADUserLogonNTLMv1`, `ADUserPrivilegeUse`, `ADUserUnlocked` | User logon/authentication outcomes | Account investigations, SOC triage |
+| `ADUserStatus`, `ADUserRightsAssignment`, `ADUserCreateChange`, `ADUserChangeDetailed` | User lifecycle and rights changes | Access reviews, privilege drift detection |
+| `ADGroupMembershipChange`, `ADGroupChange`, `ADGroupChangeDetailed`, `ADGroupCreateDelete`, `ADGroupEnumeration` | Group membership/object lifecycle | Tier-0 group change tracking |
+| `ADComputerCreateChange`, `ADComputerDeleted`, `ADComputerChangeDetailed` | Computer objects created/modified/deleted | Join/leave monitoring, stale cleanup |
+| `ADGroupPolicyChanges`, `ADGroupPolicyChangesDetailed`, `ADGroupPolicyEdits`, `ADGroupPolicyLinks`, `GpoCreated`, `GpoDeleted`, `GpoModified` | GPO create/edit/link | GPO drift and delegation reviews |
+| `ADOrganizationalUnitChangeDetailed`, `ADOtherChangeDetailed`, `ObjectDeletion` | OU/other directory object changes/deletions | Broad directory change detection |
+| `ADLdapBindingDetails`, `ADLdapBindingSummary` | LDAP bind activity | Legacy bind detection, DC load monitoring |
+| `KerberosServiceTicket`, `KerberosTicketFailure`, `KerberosTGTRequest`, `KerberosPolicyChange` | Kerberos tickets/policy | Lateral movement & ticket abuse hunting |
+| `ADSMBServerAuditV1` | SMBv1 access | Legacy protocol detection |
+| `NetworkAccessAuthenticationPolicy` | NPS grants/denies | VPN/Wi‑Fi/RADIUS auth troubleshooting |
+| `FirewallRuleChange` | Windows Firewall rule edits | Hardening drift monitoring |
+| `LogsClearedSecurity`, `LogsClearedOther`, `LogsFullSecurity` | Log clear/full events | Tamper and log exhaustion detection |
+| `AuditPolicyChange` | Audit policy edits | Compliance and tamper detection |
+| `CertificateIssued` | CA certificate issuance | PKI auditing |
+| `DhcpLeaseCreated` | DHCP lease creations | Network access tracing |
 | `BitLockerKeyChange`, `BitLockerSuspended` | BitLocker protector changes/suspends | Device compliance monitoring |
-| `DeviceRecognized`, `DeviceDisabled` | Plug-and-play device lifecycle | USB and device policy auditing |
-| `LogsClearedSecurity`, `LogsFullSecurity` | Security log cleared or full | Tamper detection |
-| `NetworkMonitorDriverLoaded`, `NetworkPromiscuousMode` | Packet capture drivers/promiscuous mode | IDS evasion/tooling detection |
-| `DfsReplicationError` | DFS-R replication issues | File services health |
-| `SqlDatabaseCreated` | SQL database created | DBA change tracking |
+| `DeviceRecognized`, `DeviceDisabled` | Device/USB lifecycle | Peripheral policy enforcement |
+| `ScheduledTaskCreated`, `ScheduledTaskDeleted` | Scheduled task lifecycle | Persistence/admin change tracking |
+| `OSCrash`, `OSBugCheck`, `OSStartup`, `OSShutdown`, `OSUncleanShutdown`, `OSStartupSecurity`, `OSCrashOnAuditFailRecovery`, `OSTimeChange`, `WindowsUpdateFailure` | OS crash/boot/time/patch events | Reliability tracking, post-crash triage |
+| `ClientGroupPoliciesApplication`, `ClientGroupPoliciesSystem` | Client-side GPO processing | Workstation policy health |
 | `HyperVVirtualMachineStarted`, `HyperVVirtualMachineShutdown`, `HyperVCheckpointCreated` | Hyper-V lifecycle | VM uptime/audit |
-| `WindowsUpdateFailure` | Update failures | Patch compliance follow-up |
-| `ScheduledTaskCreated`, `ScheduledTaskDeleted` | Scheduled task changes | Persistence and admin change tracking |
-| `ObjectDeletion` | Arbitrary object deletions | Broad deletion detection |
+| `IISSiteBindingFailure`, `IISSiteStopped` | IIS binding/site state | Web farm readiness checks |
+| `ExchangeDatabaseMounted` | Exchange mailbox DB mounted | Exchange availability checks |
+| `DfsReplicationError` | DFS-R partner errors | File services health |
+| `SqlDatabaseCreated` | SQL DB created | DBA change tracking |
+| `SyncCompleted` | Sync/replication completion | General sync monitoring |
+| `AADConnectStagingEnabled`, `AADConnectStagingDisabled`, `AADConnectPasswordSyncFailed`, `AADConnectRunProfile`, `AADSyncCycleStage`, `AADSyncProvisionCredentialsPing`, `AADSyncPasswordHashSyncStatus`, `AADSyncImportStatus`, `AADSyncFilterStatus` | Azure AD Connect health signals | Hybrid identity monitoring |
+| `NetworkMonitorDriverLoaded`, `NetworkPromiscuousMode` | Packet capture drivers/promiscuous mode | IDS evasion/tooling detection |
 
 Tip: use `Get-EVXEvent -Type <NamedEvents>` to query any of the packs without remembering underlying event IDs. Combine multiple values to cover a scenario set.
 
