@@ -25,7 +25,14 @@ public partial class SearchEvents : Settings {
     /// </summary>
     private static bool TryListLogWarmup(EventLogSession session, string? machineName, int budgetMs) {
         try {
-            var namesTask = Task.Run(() => session.GetLogNames());
+            var namesTask = Task.Run(() => {
+                try {
+                    return session.GetLogNames().ToArray();
+                } catch (Exception ex) {
+                    _logger.WriteVerbose($"ListLog warm-up faulted on {machineName ?? GetFQDN()}: {ex.Message}");
+                    return Array.Empty<string>();
+                }
+            });
             var completed = Task.WhenAny(namesTask, Task.Delay(budgetMs)).GetAwaiter().GetResult();
             if (completed != namesTask) {
                 _logger.WriteVerbose($"ListLog warm-up timed out on {machineName ?? GetFQDN()} after {budgetMs} ms");
