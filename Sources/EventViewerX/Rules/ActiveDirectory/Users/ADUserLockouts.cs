@@ -43,7 +43,8 @@ public class ADUserLockouts : EventRuleBase {
         Computer = _eventObject.ComputerName;
         Action = _eventObject.MessageSubject;
 
-        CallerComputerName = _eventObject.GetValueFromDataDictionary("CallerComputerName");
+        var caller = _eventObject.GetValueFromDataDictionary("CallerComputerName");
+        CallerComputerName = string.IsNullOrWhiteSpace(caller) ? string.Empty : caller.Trim();
         ComputerLockoutOn = CallerComputerName;
 
         UserAffected = _eventObject.GetValueFromDataDictionary("TargetUserName", "TargetDomainName", "\\", reverseOrder: true);
