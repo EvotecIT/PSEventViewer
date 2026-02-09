@@ -1,14 +1,10 @@
-﻿using System.Reflection;
-using EventViewerX.Rules.ActiveDirectory;
-using EventViewerX.Rules.Kerberos;
-using EventViewerX.Rules.Logging;
-using EventViewerX.Rules.Windows;
-using EventViewerX.Rules.CertificateAuthority;
-using EventViewerX.Rules.NPS;
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Linq;
+using System.Reflection;
 
 namespace EventViewerX;
-
-#pragma warning disable SYSLIB0050
 
 /// <summary>
 /// Lightweight representation of an event used for rule processing.
@@ -44,11 +40,37 @@ public class EventObjectSlim {
     /// </summary>
     public string Type { get; set; } = string.Empty;
 
+    private sealed class RuleFactoryRegistration {
+        public RuleFactoryRegistration(NamedEvents namedEvent, string logName, IReadOnlyList<int> eventIds,
+            Func<EventObject, EventObjectSlim> factory, Func<EventObject, bool>? canHandle, Type? ruleType) {
+            NamedEvent = namedEvent;
+            LogName = logName;
+            EventIds = eventIds;
+            Factory = factory;
+            CanHandle = canHandle;
+            RuleType = ruleType;
+        }
+
+        public NamedEvents NamedEvent { get; }
+        public string LogName { get; }
+        public IReadOnlyList<int> EventIds { get; }
+        public Func<EventObject, EventObjectSlim> Factory { get; }
+        public Func<EventObject, bool>? CanHandle { get; }
+        public Type? RuleType { get; }
+    }
+
     private static readonly Dictionary<NamedEvents, Type> _eventRuleTypes = new();
     private static readonly Dictionary<(int EventId, string LogName), List<Type>> _eventHandlers = new();
-    private static bool _initialized = false;
 
-    private static readonly Dictionary<int, string> uacFlags = new Dictionary<int, string> {
+    // AOT-friendly path: explicit, delegate-based rule registration.
+    private static readonly Dictionary<NamedEvents, RuleFactoryRegistration> _ruleFactories = new();
+    private static readonly Dictionary<(int EventId, string LogName), List<RuleFactoryRegistration>> _factoryHandlers = new();
+
+    private static readonly object _initLock = new();
+    private static bool _initialized = false;
+    private static EventRuleDiscoveryMode _discoveryMode = EventRuleDiscoveryMode.Auto;
+
+    private static readonly Dictionary<int, string> uacFlags = new() {
         { 0x0001, "SCRIPT" },
         { 0x0002, "ACCOUNTDISABLE" },
         { 0x0008, "HOMEDIR_REQUIRED" },
@@ -73,19 +95,103 @@ public class EventObjectSlim {
         { 0x04000000, "PARTIAL_SECRETS_ACCOUNT" }
     };
 
-    static EventObjectSlim() {
-        InitializeEventRules();
+    /// <summary>
+    /// Configures how rule discovery works. Call this once at startup (before any queries) for AOT-friendly behavior.
+    /// </summary>
+    public static void Configure(EventRuleDiscoveryMode mode) {
+        lock (_initLock) {
+            if (_initialized) {
+                throw new InvalidOperationException(
+                    "EventObjectSlim has already been initialized. Configure() must be called before first use.");
+            }
+            _discoveryMode = mode;
+        }
     }
 
     /// <summary>
-    /// Discovers and registers all event rule types using reflection
+    /// Registers a rule factory for a named event without relying on reflection.
+    /// This enables AOT-friendly ingestion of selected rules.
     /// </summary>
-    private static void InitializeEventRules() {
-        if (_initialized) return;
+    /// <param name="namedEvent">Named event identifier.</param>
+    /// <param name="logName">Windows log name (channel).</param>
+    /// <param name="eventIds">Event IDs this rule handles.</param>
+    /// <param name="factory">Factory creating a rule instance from an <see cref="EventObject"/>.</param>
+    /// <param name="canHandle">Optional predicate to further validate an event before instantiation.</param>
+    /// <param name="ruleType">Optional rule type used for legacy APIs returning <see cref="Type"/>.</param>
+    public static void RegisterRuleFactory(
+        NamedEvents namedEvent,
+        string logName,
+        IReadOnlyList<int> eventIds,
+        Func<EventObject, EventObjectSlim> factory,
+        Func<EventObject, bool>? canHandle = null,
+        Type? ruleType = null) {
+        if (string.IsNullOrWhiteSpace(logName)) {
+            throw new ArgumentException("logName cannot be null or whitespace.", nameof(logName));
+        }
+        if (eventIds is null || eventIds.Count == 0) {
+            throw new ArgumentException("eventIds cannot be null or empty.", nameof(eventIds));
+        }
+        if (factory is null) {
+            throw new ArgumentNullException(nameof(factory));
+        }
 
+        var normalizedLog = logName.Trim();
+        var ids = eventIds.Where(x => x > 0).Distinct().ToArray();
+        if (ids.Length == 0) {
+            throw new ArgumentException("eventIds must contain at least one positive event id.", nameof(eventIds));
+        }
+
+        var reg = new RuleFactoryRegistration(namedEvent, normalizedLog, ids, factory, canHandle, ruleType);
+        _ruleFactories[namedEvent] = reg;
+
+        if (ruleType is not null) {
+            _eventRuleTypes[namedEvent] = ruleType;
+        }
+
+        foreach (var eventId in ids) {
+            var factoryKey = (eventId, normalizedLog);
+            if (!_factoryHandlers.TryGetValue(factoryKey, out var factoryList)) {
+                factoryList = new List<RuleFactoryRegistration>();
+                _factoryHandlers[factoryKey] = factoryList;
+            }
+            if (!factoryList.Contains(reg)) {
+                factoryList.Add(reg);
+            }
+
+            if (ruleType is not null) {
+                var legacyKey = (eventId, normalizedLog);
+                if (!_eventHandlers.TryGetValue(legacyKey, out var legacyList)) {
+                    legacyList = new List<Type>();
+                    _eventHandlers[legacyKey] = legacyList;
+                }
+                if (!legacyList.Contains(ruleType)) {
+                    legacyList.Add(ruleType);
+                }
+            }
+        }
+    }
+
+    private static void EnsureInitialized() {
+        if (_initialized) {
+            return;
+        }
+        lock (_initLock) {
+            if (_initialized) {
+                return;
+            }
+            if (_discoveryMode != EventRuleDiscoveryMode.ExplicitOnly) {
+                InitializeEventRulesWithReflection();
+            }
+            _initialized = true;
+        }
+    }
+
+    /// <summary>
+    /// Discovers and registers all event rule types using reflection (legacy behavior).
+    /// </summary>
+    private static void InitializeEventRulesWithReflection() {
         var assembly = typeof(EventObjectSlim).Assembly;
 
-        // Find all EventRuleBase classes
         var eventRuleTypes = assembly.GetTypes()
             .Where(t => t.IsClass && !t.IsAbstract &&
                    (t.IsSubclassOf(typeof(EventRuleBase)) ||
@@ -94,20 +200,17 @@ public class EventObjectSlim {
         foreach (var type in eventRuleTypes) {
             RegisterEventRuleType(type);
         }
-
-        _initialized = true;
     }
 
-
-
     /// <summary>
-    /// Registers a single event rule type
+    /// Registers a single event rule type (reflection-based).
     /// </summary>
     private static void RegisterEventRuleType(Type ruleType) {
-        // For EventRuleBase classes, we get the NamedEvent from the rule itself
         if (ruleType.IsSubclassOf(typeof(EventRuleBase))) {
             try {
+#pragma warning disable SYSLIB0050
                 var instance = (EventRuleBase)System.Runtime.Serialization.FormatterServices.GetUninitializedObject(ruleType);
+#pragma warning restore SYSLIB0050
                 _eventRuleTypes[instance.NamedEvent] = ruleType;
 
                 foreach (var eventId in instance.EventIds) {
@@ -121,7 +224,6 @@ public class EventObjectSlim {
                 return;
             }
         } else {
-            // Try EventRuleAttribute for legacy support
             var attr = ruleType.GetCustomAttribute<EventRuleAttribute>();
             if (attr != null) {
                 _eventRuleTypes[attr.NamedEvent] = ruleType;
@@ -138,46 +240,69 @@ public class EventObjectSlim {
     }
 
     /// <summary>
-    /// Gets all event rule types that can handle the given event
+    /// Gets all event rule types that can handle the given event.
     /// </summary>
     public static List<Type> GetEventHandlers(int eventId, string logName) {
+        EnsureInitialized();
         var key = (eventId, logName);
         return _eventHandlers.TryGetValue(key, out var handlers) ? handlers : new List<Type>();
     }
 
     /// <summary>
-    /// Gets the event rule type for a named event
+    /// Gets the event rule type for a named event.
     /// </summary>
     public static Type? GetEventRuleType(NamedEvents namedEvent) {
+        EnsureInitialized();
         return _eventRuleTypes.TryGetValue(namedEvent, out var type) ? type : null;
     }
 
     /// <summary>
-    /// Creates an event rule instance from an EventObject
+    /// Creates an event rule instance from an <see cref="EventObject"/>.
     /// </summary>
     public static EventObjectSlim? CreateEventRule(EventObject eventObject, List<NamedEvents> targetNamedEvents) {
-        // Try each target named event to find a matching rule
+        EnsureInitialized();
+
         foreach (var namedEvent in targetNamedEvents) {
+            if (_ruleFactories.TryGetValue(namedEvent, out var reg)) {
+                try {
+                    if (reg.CanHandle != null && !reg.CanHandle(eventObject)) {
+                        continue;
+                    }
+
+                    var instance = reg.Factory(eventObject);
+                    if (instance is IEventRule eventRule) {
+                        if (eventRule.CanHandle(eventObject)) {
+                            return instance;
+                        }
+                        continue;
+                    }
+                    return instance;
+                } catch {
+                    continue;
+                }
+            }
+
             var ruleType = GetEventRuleType(namedEvent);
-            if (ruleType == null) continue;
+            if (ruleType == null) {
+                continue;
+            }
 
             try {
                 var constructor = ruleType.GetConstructor(new[] { typeof(EventObject) });
-                if (constructor == null) continue;
+                if (constructor == null) {
+                    continue;
+                }
 
                 var instance = (EventObjectSlim)constructor.Invoke(new object[] { eventObject });
 
-                // For EventRuleBase classes, check if they can handle this specific event
                 if (instance is IEventRule eventRule) {
                     if (eventRule.CanHandle(eventObject)) {
                         return instance;
                     }
                 } else {
-                    // For simple rules without conditions, return the instance
                     return instance;
                 }
             } catch {
-                // Continue to next rule if creation fails
                 continue;
             }
         }
@@ -188,14 +313,14 @@ public class EventObjectSlim {
     private static NamedEvents GetNamedEventForType(Type type) {
         if (type.IsSubclassOf(typeof(EventRuleBase))) {
             try {
+#pragma warning disable SYSLIB0050
                 var instance = (EventRuleBase)System.Runtime.Serialization.FormatterServices.GetUninitializedObject(type);
+#pragma warning restore SYSLIB0050
                 return instance.NamedEvent;
             } catch {
-                // Fall through to exception
             }
         }
 
-        // Try attribute for legacy rules
         var attr = type.GetCustomAttribute<EventRuleAttribute>();
         if (attr != null) {
             return attr.NamedEvent;
@@ -205,29 +330,44 @@ public class EventObjectSlim {
     }
 
     /// <summary>
-    /// Gets event IDs and log name for named events using rule classes
+    /// Gets event IDs and log name for named events using rule classes.
     /// </summary>
     public static Dictionary<string, HashSet<int>> GetEventInfoForNamedEvents(List<NamedEvents> namedEvents) {
+        EnsureInitialized();
+
         var eventInfoDict = new Dictionary<string, HashSet<int>>();
 
         foreach (var namedEvent in namedEvents) {
+            if (_ruleFactories.TryGetValue(namedEvent, out var reg)) {
+                if (!eventInfoDict.TryGetValue(reg.LogName, out var idSet)) {
+                    idSet = new HashSet<int>();
+                    eventInfoDict[reg.LogName] = idSet;
+                }
+                foreach (var id in reg.EventIds) {
+                    idSet.Add(id);
+                }
+                continue;
+            }
+
             var ruleType = GetEventRuleType(namedEvent);
-            if (ruleType == null) continue;
+            if (ruleType == null) {
+                continue;
+            }
 
             List<int>? ruleEventIds = null;
             string? ruleLogName = null;
 
-            // Check if it's an EventRuleBase class
             if (ruleType.IsSubclassOf(typeof(EventRuleBase))) {
                 try {
+#pragma warning disable SYSLIB0050
                     var instance = (EventRuleBase)System.Runtime.Serialization.FormatterServices.GetUninitializedObject(ruleType);
+#pragma warning restore SYSLIB0050
                     ruleEventIds = instance.EventIds;
                     ruleLogName = instance.LogName;
                 } catch {
                     continue;
                 }
             } else {
-                // Try EventRuleAttribute for legacy rules
                 var attr = ruleType.GetCustomAttribute<EventRuleAttribute>();
                 if (attr != null) {
                     ruleEventIds = attr.EventIds;
@@ -250,14 +390,12 @@ public class EventObjectSlim {
         return eventInfoDict;
     }
 
-
-
-    private static readonly Dictionary<string, string> OperationTypeLookup = new()
-    {
-        {"%%14674", "Value Added"},
-        {"%%14675", "Value Deleted"},
-        {"%%14676", "Unknown"}
+    private static readonly Dictionary<string, string> OperationTypeLookup = new() {
+        { "%%14674", "Value Added" },
+        { "%%14675", "Value Deleted" },
+        { "%%14676", "Unknown" }
     };
+
     /// <summary>
     /// Creates a lightweight projection of an <see cref="EventObject"/> for rule processing and serialization.
     /// </summary>
@@ -287,6 +425,7 @@ public class EventObjectSlim {
             ? samAccountName
             : string.Empty;
     }
+
     internal string ConvertFromOperationType(string s) {
         if (OperationTypeLookup.ContainsKey(s)) {
             return OperationTypeLookup[s];
@@ -294,42 +433,28 @@ public class EventObjectSlim {
 
         return "Unknown Operation";
     }
+
     internal static string OverwriteByField(string findField, string expectedValue, string currentValue, string insertValue) {
-        //OverwriteByField = [ordered] @{
-        //    'User Object' = 'Action', 'A directory service object was moved.', 'OldObjectDN'
-        //    'Field Value' = 'Action', 'A directory service object was moved.', 'NewObjectDN'
-        //}
         if (findField == expectedValue) {
             return insertValue;
-        } else {
-            return currentValue;
         }
-
+        return currentValue;
     }
+
     internal static string TranslateUacValue(string hexValue) {
         if (hexValue == null || hexValue.Trim() == "-") {
             return "";
         }
-        // <Data Name="OldUacValue">0x10</Data>
-        // <Data Name="NewUacValue">0x11</Data>
-        // <Data Name="UserAccountControl">%%2080</Data>
 
-        // Convert the hexadecimal value to an integer
-        int uacValue = int.Parse(hexValue, System.Globalization.NumberStyles.HexNumber);
+        var uacValue = int.Parse(hexValue, NumberStyles.HexNumber, CultureInfo.InvariantCulture);
 
-        // Use predefined UAC flags dictionary
-
-        // Map each bit in the UAC value to a UAC flag
-        List<string> translatedFlags = new List<string>();
+        var translatedFlags = new List<string>();
         foreach (var flag in uacFlags) {
             if ((uacValue & flag.Key) != 0) {
                 translatedFlags.Add(flag.Value);
             }
         }
 
-        // Return the translated UAC flags as a comma-separated string
         return string.Join(", ", translatedFlags);
     }
 }
-
-#pragma warning restore SYSLIB0050
