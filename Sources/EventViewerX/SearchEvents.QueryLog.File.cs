@@ -101,9 +101,12 @@ public partial class SearchEvents : Settings {
             };
         }
 
-        using (EventLogReader? reader = CreateEventLogReader(query, null) ??
-                                       CreateEventLogReader(CreateFileQueryWithFallback(absolutePath, xpath, oldest), null)) {
-            if (reader == null) {
+        var fallbackQuery = CreateFileQueryWithFallback(absolutePath, xpath, oldest);
+        var primaryReader = CreateEventLogReader(query, null);
+
+        if (primaryReader == null) {
+            using var fallbackReader = CreateEventLogReader(fallbackQuery, null);
+            if (fallbackReader == null) {
                 yield break;
             }
 
@@ -111,7 +114,7 @@ public partial class SearchEvents : Settings {
             while (true) {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                var record = reader.ReadEvent();
+                var record = fallbackReader.ReadEvent();
                 if (record == null) {
                     break;
                 }
@@ -119,6 +122,54 @@ public partial class SearchEvents : Settings {
                 yield return new EventObject(record, filePath);
                 eventCount++;
                 if (maxEvents > 0 && eventCount >= maxEvents) {
+                    break;
+                }
+            }
+
+            yield break;
+        }
+
+        using (primaryReader) {
+            int eventCount = 0;
+
+            // Some runtimes return a valid reader but yield no events for FilePath queries on specific EVTX files.
+            // If this happens, retry with the QueryList fallback.
+            var record = primaryReader.ReadEvent();
+            if (record == null) {
+                using var fallbackReader = CreateEventLogReader(fallbackQuery, null);
+                if (fallbackReader == null) {
+                    yield break;
+                }
+
+                while (true) {
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    record = fallbackReader.ReadEvent();
+                    if (record == null) {
+                        break;
+                    }
+
+                    yield return new EventObject(record, filePath);
+                    eventCount++;
+                    if (maxEvents > 0 && eventCount >= maxEvents) {
+                        break;
+                    }
+                }
+
+                yield break;
+            }
+
+            while (true) {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                yield return new EventObject(record, filePath);
+                eventCount++;
+                if (maxEvents > 0 && eventCount >= maxEvents) {
+                    break;
+                }
+
+                record = primaryReader.ReadEvent();
+                if (record == null) {
                     break;
                 }
             }
