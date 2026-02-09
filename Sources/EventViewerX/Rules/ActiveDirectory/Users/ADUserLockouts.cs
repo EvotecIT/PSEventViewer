@@ -19,7 +19,14 @@ public class ADUserLockouts : EventRuleBase {
     public string Computer;
     /// <summary>Description of the action.</summary>
     public string Action;
-    /// <summary>Domain controller recording the lockout.</summary>
+    /// <summary>
+    /// Caller computer name reported by the event (machine where bad-password attempts were observed).
+    /// </summary>
+    public string CallerComputerName;
+
+    /// <summary>
+    /// Back-compat alias for <see cref="CallerComputerName"/>.
+    /// </summary>
     public string ComputerLockoutOn;
     /// <summary>Locked out account.</summary>
     public string UserAffected;
@@ -36,7 +43,9 @@ public class ADUserLockouts : EventRuleBase {
         Computer = _eventObject.ComputerName;
         Action = _eventObject.MessageSubject;
 
-        ComputerLockoutOn = _eventObject.GetValueFromDataDictionary("TargetDomainName");
+        var caller = _eventObject.GetValueFromDataDictionary("CallerComputerName");
+        CallerComputerName = string.IsNullOrWhiteSpace(caller) ? string.Empty : caller.Trim();
+        ComputerLockoutOn = CallerComputerName;
 
         UserAffected = _eventObject.GetValueFromDataDictionary("TargetUserName", "TargetDomainName", "\\", reverseOrder: true);
 
