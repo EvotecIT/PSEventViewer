@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Threading;
+using EventViewerX.Reports.QueryHelpers;
 
 namespace EventViewerX.Reports.Evtx;
 
@@ -42,7 +42,7 @@ public static class EvtxQueryExecutor {
             return false;
         }
 
-        if (request.StartTimeUtc.HasValue && request.EndTimeUtc.HasValue && request.StartTimeUtc.Value > request.EndTimeUtc.Value) {
+        if (QueryValidationHelpers.HasInvalidUtcRange(request.StartTimeUtc, request.EndTimeUtc)) {
             result = new EvtxQueryResult();
             failure = new EvtxQueryFailure {
                 Kind = EvtxQueryFailureKind.InvalidArgument,
@@ -51,7 +51,7 @@ public static class EvtxQueryExecutor {
             return false;
         }
 
-        if (request.MaxEvents < 0) {
+        if (QueryValidationHelpers.IsNegative(request.MaxEvents)) {
             result = new EvtxQueryResult();
             failure = new EvtxQueryFailure {
                 Kind = EvtxQueryFailureKind.InvalidArgument,
@@ -60,7 +60,7 @@ public static class EvtxQueryExecutor {
             return false;
         }
 
-        if (request.EventIds is not null && request.EventIds.Any(static id => id <= 0)) {
+        if (QueryValidationHelpers.HasNonPositiveValues(request.EventIds)) {
             result = new EvtxQueryResult();
             failure = new EvtxQueryFailure {
                 Kind = EvtxQueryFailureKind.InvalidArgument,

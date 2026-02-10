@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics.Eventing.Reader;
 using System.Threading;
+using EventViewerX.Reports.QueryHelpers;
 
 namespace EventViewerX.Reports.Live;
 
@@ -41,7 +42,7 @@ public static class LiveEventQueryExecutor {
             return false;
         }
 
-        if (request.MaxEvents < 0) {
+        if (QueryValidationHelpers.IsNegative(request.MaxEvents)) {
             result = new LiveEventQueryResult();
             failure = new LiveEventQueryFailure {
                 Kind = LiveEventQueryFailureKind.InvalidArgument,
@@ -50,7 +51,7 @@ public static class LiveEventQueryExecutor {
             return false;
         }
 
-        if (request.MaxMessageChars < 0) {
+        if (QueryValidationHelpers.IsNegative(request.MaxMessageChars)) {
             result = new LiveEventQueryResult();
             failure = new LiveEventQueryFailure {
                 Kind = LiveEventQueryFailureKind.InvalidArgument,
@@ -59,7 +60,7 @@ public static class LiveEventQueryExecutor {
             return false;
         }
 
-        if (request.SessionTimeoutMs.HasValue && request.SessionTimeoutMs.Value <= 0) {
+        if (QueryValidationHelpers.IsNonPositiveWhenProvided(request.SessionTimeoutMs)) {
             result = new LiveEventQueryResult();
             failure = new LiveEventQueryFailure {
                 Kind = LiveEventQueryFailureKind.InvalidArgument,
@@ -95,9 +96,9 @@ public static class LiveEventQueryExecutor {
                     Opcode = (long)(ev.Opcode ?? 0),
                     Keywords = (long)(ev.Keywords ?? 0),
                     MachineName = ev.MachineName ?? string.Empty,
-                    UserSid = SafeGetUserSid(ev),
+                    UserSid = EventProjectionHelpers.SafeGetUserSid(ev),
                     Message = request.IncludeMessage
-                        ? TruncateSafe(SafeGetMessage(ev), request.MaxMessageChars)
+                        ? EventProjectionHelpers.TruncateSafe(EventProjectionHelpers.SafeGetMessage(ev), request.MaxMessageChars)
                         : null
                 });
             }
@@ -130,7 +131,7 @@ public static class LiveEventQueryExecutor {
         } catch (EventLogException ex) {
             result = new LiveEventQueryResult();
             failure = new LiveEventQueryFailure {
-                Kind = IsTimeoutLike(ex.Message) ? LiveEventQueryFailureKind.Timeout : LiveEventQueryFailureKind.Exception,
+                Kind = QueryFailureHelpers.IsTimeoutLike(ex.Message) ? LiveEventQueryFailureKind.Timeout : LiveEventQueryFailureKind.Exception,
                 Message = ex.Message
             };
             return false;
@@ -149,40 +150,5 @@ public static class LiveEventQueryExecutor {
             };
             return false;
         }
-    }
-
-    private static string SafeGetUserSid(EventObject ev) {
-        try {
-            return ev.UserId?.Value ?? string.Empty;
-        } catch {
-            return string.Empty;
-        }
-    }
-
-    private static string SafeGetMessage(EventObject ev) {
-        try {
-            return ev.Message ?? string.Empty;
-        } catch {
-            return string.Empty;
-        }
-    }
-
-    private static string TruncateSafe(string value, int maxChars) {
-        if (maxChars <= 0 || string.IsNullOrEmpty(value)) {
-            return string.Empty;
-        }
-        if (value.Length <= maxChars) {
-            return value;
-        }
-        return value.Substring(0, maxChars);
-    }
-
-    private static bool IsTimeoutLike(string? message) {
-        if (string.IsNullOrWhiteSpace(message)) {
-            return false;
-        }
-        var text = message!;
-        return text.IndexOf("timeout", StringComparison.OrdinalIgnoreCase) >= 0 ||
-               text.IndexOf("timed out", StringComparison.OrdinalIgnoreCase) >= 0;
     }
 }
