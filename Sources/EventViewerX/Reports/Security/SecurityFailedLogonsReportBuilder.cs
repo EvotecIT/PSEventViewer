@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using EventViewerX.Rules.ActiveDirectory;
 
 namespace EventViewerX.Reports.Security;
@@ -111,6 +112,33 @@ public sealed class SecurityFailedLogonsReportBuilder {
                 SubjectUser = Get(data, "SubjectUserName") ?? string.Empty
             });
         }
+    }
+
+    /// <summary>
+    /// Adds multiple events to the report.
+    /// </summary>
+    public void AddRange(IEnumerable<EventObject> events, CancellationToken cancellationToken = default) {
+        if (events is null) {
+            return;
+        }
+        foreach (var ev in events) {
+            cancellationToken.ThrowIfCancellationRequested();
+            Add(ev);
+        }
+    }
+
+    /// <summary>
+    /// Builds a report directly from an event sequence.
+    /// </summary>
+    public static SecurityFailedLogonsReport BuildFromEvents(
+        IEnumerable<EventObject> events,
+        bool includeSamples,
+        int sampleSize,
+        CancellationToken cancellationToken = default) {
+
+        var b = new SecurityFailedLogonsReportBuilder(includeSamples, sampleSize);
+        b.AddRange(events, cancellationToken);
+        return b.Build();
     }
 
     /// <summary>
