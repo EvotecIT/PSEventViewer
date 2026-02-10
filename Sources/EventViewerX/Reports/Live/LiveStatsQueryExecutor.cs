@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics.Eventing.Reader;
 using System.Linq;
 using System.Threading;
+using EventViewerX.Reports.QueryHelpers;
 using EventViewerX.Reports.Stats;
 
 namespace EventViewerX.Reports.Live;
@@ -115,7 +116,7 @@ public static class LiveStatsQueryExecutor {
         } catch (EventLogException ex) {
             result = new LiveStatsQueryResult();
             failure = new LiveStatsQueryFailure {
-                Kind = IsTimeoutLike(ex.Message) ? LiveStatsQueryFailureKind.Timeout : LiveStatsQueryFailureKind.Exception,
+                Kind = QueryFailureHelpers.IsTimeoutLike(ex.Message) ? LiveStatsQueryFailureKind.Timeout : LiveStatsQueryFailureKind.Exception,
                 Message = ex.Message
             };
             return false;
@@ -158,7 +159,7 @@ public static class LiveStatsQueryExecutor {
             return false;
         }
 
-        if (request.MaxEventsScanned < 0) {
+        if (QueryValidationHelpers.IsNegative(request.MaxEventsScanned)) {
             result = new LiveStatsQueryResult();
             failure = new LiveStatsQueryFailure {
                 Kind = LiveStatsQueryFailureKind.InvalidArgument,
@@ -167,7 +168,7 @@ public static class LiveStatsQueryExecutor {
             return false;
         }
 
-        if (request.StartTimeUtc.HasValue && request.EndTimeUtc.HasValue && request.StartTimeUtc.Value > request.EndTimeUtc.Value) {
+        if (QueryValidationHelpers.HasInvalidUtcRange(request.StartTimeUtc, request.EndTimeUtc)) {
             result = new LiveStatsQueryResult();
             failure = new LiveStatsQueryFailure {
                 Kind = LiveStatsQueryFailureKind.InvalidArgument,
@@ -185,7 +186,7 @@ public static class LiveStatsQueryExecutor {
             return false;
         }
 
-        if (request.SessionTimeoutMs.HasValue && request.SessionTimeoutMs.Value <= 0) {
+        if (QueryValidationHelpers.IsNonPositiveWhenProvided(request.SessionTimeoutMs)) {
             result = new LiveStatsQueryResult();
             failure = new LiveStatsQueryFailure {
                 Kind = LiveStatsQueryFailureKind.InvalidArgument,
@@ -207,14 +208,5 @@ public static class LiveStatsQueryExecutor {
             return false;
         }
         return true;
-    }
-
-    private static bool IsTimeoutLike(string? message) {
-        if (string.IsNullOrWhiteSpace(message)) {
-            return false;
-        }
-        var text = message!;
-        return text.IndexOf("timeout", StringComparison.OrdinalIgnoreCase) >= 0 ||
-               text.IndexOf("timed out", StringComparison.OrdinalIgnoreCase) >= 0;
     }
 }

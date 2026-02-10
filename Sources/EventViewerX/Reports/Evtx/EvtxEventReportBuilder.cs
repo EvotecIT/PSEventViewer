@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading;
+using EventViewerX.Reports.QueryHelpers;
 
 namespace EventViewerX.Reports.Evtx;
 
@@ -26,7 +27,7 @@ public static class EvtxEventReportBuilder {
         out EvtxQueryFailure? failure,
         CancellationToken cancellationToken = default) {
 
-        if (maxMessageChars < 0) {
+        if (QueryValidationHelpers.IsNegative(maxMessageChars)) {
             report = new EvtxEventReportResult();
             failure = new EvtxQueryFailure {
                 Kind = EvtxQueryFailureKind.InvalidArgument,
@@ -55,10 +56,10 @@ public static class EvtxEventReportBuilder {
                 QueriedMachine = ev.QueriedMachine ?? string.Empty,
                 GatheredFrom = ev.GatheredFrom ?? string.Empty,
                 MessageSubject = ev.MessageSubject ?? string.Empty,
-                UserSid = SafeGetUserSid(ev),
-                Data = NormalizeDict(ev.Data),
-                MessageData = NormalizeDict(ev.MessageData),
-                Message = includeMessage ? TruncateSafe(SafeGetMessage(ev), maxMessageChars) : null
+                UserSid = EventProjectionHelpers.SafeGetUserSid(ev),
+                Data = EventProjectionHelpers.NormalizeDict(ev.Data),
+                MessageData = EventProjectionHelpers.NormalizeDict(ev.MessageData),
+                Message = includeMessage ? EventProjectionHelpers.TruncateSafe(EventProjectionHelpers.SafeGetMessage(ev), maxMessageChars) : null
             });
         }
 
@@ -71,43 +72,5 @@ public static class EvtxEventReportBuilder {
         };
         failure = null;
         return true;
-    }
-
-    private static IReadOnlyDictionary<string, string> NormalizeDict(IReadOnlyDictionary<string, string>? dict) {
-        if (dict is null || dict.Count == 0) {
-            return new Dictionary<string, string>(StringComparer.Ordinal);
-        }
-
-        var result = new Dictionary<string, string>(dict.Count, StringComparer.Ordinal);
-        foreach (var kvp in dict) {
-            result[kvp.Key] = kvp.Value ?? string.Empty;
-        }
-        return result;
-    }
-
-    private static string SafeGetUserSid(EventObject ev) {
-        try {
-            return ev.UserId?.Value ?? string.Empty;
-        } catch {
-            return string.Empty;
-        }
-    }
-
-    private static string SafeGetMessage(EventObject ev) {
-        try {
-            return ev.Message ?? string.Empty;
-        } catch {
-            return string.Empty;
-        }
-    }
-
-    private static string TruncateSafe(string value, int maxChars) {
-        if (maxChars <= 0 || string.IsNullOrEmpty(value)) {
-            return string.Empty;
-        }
-        if (value.Length <= maxChars) {
-            return value;
-        }
-        return value.Substring(0, maxChars);
     }
 }
