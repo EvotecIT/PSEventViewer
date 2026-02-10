@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading;
+using EventViewerX.Reports.Evtx;
 using EventViewerX.Rules.ActiveDirectory;
 
 namespace EventViewerX.Reports.Security;
@@ -167,6 +168,36 @@ public sealed class SecurityUserLogonsReportBuilder {
         var b = new SecurityUserLogonsReportBuilder(includeSamples, sampleSize, eventIds ?? Array.Empty<int>());
         b.AddRange(events, cancellationToken);
         return b.Build();
+    }
+
+    /// <summary>
+    /// Builds a report directly from an EVTX query request.
+    /// </summary>
+    /// <param name="request">EVTX query request.</param>
+    /// <param name="includeSamples">When true, captures up to <paramref name="sampleSize"/> sample events.</param>
+    /// <param name="sampleSize">Maximum sample events to capture.</param>
+    /// <param name="report">Built report when successful.</param>
+    /// <param name="failure">Failure details when query fails.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns><see langword="true"/> when query succeeds; otherwise <see langword="false"/>.</returns>
+    public static bool TryBuildFromFile(
+        EvtxQueryRequest request,
+        bool includeSamples,
+        int sampleSize,
+        out SecurityUserLogonsReport report,
+        out EvtxQueryFailure? failure,
+        CancellationToken cancellationToken = default) {
+
+        if (!EvtxQueryExecutor.TryRead(request, out var queried, out failure, cancellationToken)) {
+            report = new SecurityUserLogonsReport();
+            return false;
+        }
+
+        var eventIds = request.EventIds ?? Array.Empty<int>();
+        var b = new SecurityUserLogonsReportBuilder(includeSamples, sampleSize, eventIds);
+        b.AddRange(queried.Events, cancellationToken);
+        report = b.Build();
+        return true;
     }
 
     /// <summary>

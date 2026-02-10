@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using EventViewerX.Reports;
+using EventViewerX.Reports.Evtx;
 
 namespace EventViewerX.Reports.Stats;
 
@@ -59,8 +60,24 @@ public sealed class EvtxStatsReportBuilder {
 
         ReportAggregates.AddCount(_byEventId, id);
         ReportAggregates.AddCount(_byProviderName, providerName, useUnknownPlaceholder: true);
-        AddComputer(_byComputerName, computerName);
-        AddLevel(_byLevel, level, levelDisplayName);
+        EvtxStatsAggregates.AddComputerCount(_byComputerName, computerName);
+        EvtxStatsAggregates.AddLevelCount(_byLevel, level, levelDisplayName);
+    }
+
+    /// <summary>
+    /// Adds multiple events to the report.
+    /// </summary>
+    /// <param name="events">Events to aggregate.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    public void AddRange(IEnumerable<EventObject> events, CancellationToken cancellationToken = default) {
+        if (events is null) {
+            return;
+        }
+
+        foreach (var ev in events) {
+            cancellationToken.ThrowIfCancellationRequested();
+            Add(ev);
+        }
     }
 
     /// <summary>
@@ -90,21 +107,46 @@ public sealed class EvtxStatsReportBuilder {
         int maxEvents = 0,
         bool oldestFirst = false,
         CancellationToken cancellationToken = default) {
+        var request = new EvtxQueryRequest {
+            FilePath = filePath,
+            EventIds = eventIds,
+            ProviderName = providerName,
+            StartTimeUtc = startTimeUtc,
+            EndTimeUtc = endTimeUtc,
+            MaxEvents = maxEvents,
+            OldestFirst = oldestFirst
+        };
+
+        if (!TryBuildFromFile(request, out var report, out var failure, cancellationToken)) {
+            throw new InvalidOperationException(failure?.Message ?? "EVTX query failed.");
+        }
+
+        return report;
+    }
+
+    /// <summary>
+    /// Convenience API: reads an EVTX file using an <see cref="EvtxQueryRequest"/> and returns a stats report.
+    /// </summary>
+    /// <param name="request">EVTX query request.</param>
+    /// <param name="report">Built report when successful.</param>
+    /// <param name="failure">Failure details when query fails.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns><see langword="true"/> when query succeeds; otherwise <see langword="false"/>.</returns>
+    public static bool TryBuildFromFile(
+        EvtxQueryRequest request,
+        out EvtxStatsReport report,
+        out EvtxQueryFailure? failure,
+        CancellationToken cancellationToken = default) {
+
+        if (!EvtxQueryExecutor.TryRead(request, out var queried, out failure, cancellationToken)) {
+            report = new EvtxStatsReport();
+            return false;
+        }
 
         var builder = new EvtxStatsReportBuilder();
-        foreach (var ev in SearchEvents.QueryLogFile(
-                     filePath: filePath,
-                     eventIds: eventIds,
-                     providerName: providerName,
-                     startTime: startTimeUtc,
-                     endTime: endTimeUtc,
-                     maxEvents: maxEvents,
-                     oldest: oldestFirst,
-                     cancellationToken: cancellationToken)) {
-            cancellationToken.ThrowIfCancellationRequested();
-            builder.Add(ev);
-        }
-        return builder.Build();
+        builder.AddRange(queried.Events, cancellationToken);
+        report = builder.Build();
+        return true;
     }
 
     /// <summary>
@@ -134,19 +176,4 @@ public sealed class EvtxStatsReportBuilder {
             .ToList();
     }
 
-    private static void AddComputer(Dictionary<string, long> dict, string? computerName) {
-        if (string.IsNullOrWhiteSpace(computerName)) {
-            return;
-        }
-        var k = computerName!.Trim();
-        dict.TryGetValue(k, out var cur);
-        dict[k] = cur + 1;
-    }
-
-    private static void AddLevel(Dictionary<int, EvtxLevelStats> dict, int level, string? displayName) {
-        dict.TryGetValue(level, out var cur);
-        cur ??= new EvtxLevelStats(level, displayName ?? string.Empty);
-        cur.Count++;
-        dict[level] = cur;
-    }
 }

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading;
+using EventViewerX.Reports.Evtx;
 using EventViewerX.Rules.ActiveDirectory;
 
 namespace EventViewerX.Reports.Security;
@@ -139,6 +140,35 @@ public sealed class SecurityFailedLogonsReportBuilder {
         var b = new SecurityFailedLogonsReportBuilder(includeSamples, sampleSize);
         b.AddRange(events, cancellationToken);
         return b.Build();
+    }
+
+    /// <summary>
+    /// Builds a report directly from an EVTX query request.
+    /// </summary>
+    /// <param name="request">EVTX query request.</param>
+    /// <param name="includeSamples">When true, captures up to <paramref name="sampleSize"/> sample events.</param>
+    /// <param name="sampleSize">Maximum sample events to capture.</param>
+    /// <param name="report">Built report when successful.</param>
+    /// <param name="failure">Failure details when query fails.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns><see langword="true"/> when query succeeds; otherwise <see langword="false"/>.</returns>
+    public static bool TryBuildFromFile(
+        EvtxQueryRequest request,
+        bool includeSamples,
+        int sampleSize,
+        out SecurityFailedLogonsReport report,
+        out EvtxQueryFailure? failure,
+        CancellationToken cancellationToken = default) {
+
+        if (!EvtxQueryExecutor.TryRead(request, out var queried, out failure, cancellationToken)) {
+            report = new SecurityFailedLogonsReport();
+            return false;
+        }
+
+        var b = new SecurityFailedLogonsReportBuilder(includeSamples, sampleSize);
+        b.AddRange(queried.Events, cancellationToken);
+        report = b.Build();
+        return true;
     }
 
     /// <summary>
