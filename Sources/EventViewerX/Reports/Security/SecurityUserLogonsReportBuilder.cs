@@ -1,0 +1,172 @@
+using System;
+using System.Collections.Generic;
+using EventViewerX.Rules.ActiveDirectory;
+
+namespace EventViewerX.Reports.Security;
+
+/// <summary>
+/// Report builder for Windows Security logon-related events (4624/4625/4634/4647).
+/// </summary>
+public sealed class SecurityUserLogonsReportBuilder {
+    private readonly bool _includeSamples;
+    private readonly int _sampleSize;
+    private readonly IReadOnlyList<int> _eventIds;
+
+    private readonly Dictionary<int, long> _byEventId = new();
+    private readonly Dictionary<string, long> _byTargetUser = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, long> _byTargetDomain = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, long> _byLogonType = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, long> _byIp = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, long> _byWorkstation = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, long> _byComputer = new(StringComparer.OrdinalIgnoreCase);
+
+    private readonly List<SecurityUserLogonSample> _samples = new();
+
+    private int _scanned;
+    private int _matched;
+    private DateTime? _minUtc;
+    private DateTime? _maxUtc;
+
+    /// <summary>
+    /// Creates a new report builder.
+    /// </summary>
+    /// <param name="includeSamples">When true, captures up to <paramref name="sampleSize"/> sample events.</param>
+    /// <param name="sampleSize">Maximum sample events to capture.</param>
+    /// <param name="eventIds">Event IDs included by the caller (for reporting).</param>
+    public SecurityUserLogonsReportBuilder(bool includeSamples, int sampleSize, IReadOnlyList<int> eventIds) {
+        _includeSamples = includeSamples;
+        _sampleSize = Math.Max(0, sampleSize);
+        _eventIds = eventIds ?? Array.Empty<int>();
+    }
+
+    /// <summary>Number of scanned events passed into the builder.</summary>
+    public int Scanned => _scanned;
+    /// <summary>Number of matched events.</summary>
+    public int Matched => _matched;
+    /// <summary>Minimum event time (UTC) among matched events.</summary>
+    public DateTime? MinUtc => _minUtc;
+    /// <summary>Maximum event time (UTC) among matched events.</summary>
+    public DateTime? MaxUtc => _maxUtc;
+
+    /// <summary>
+    /// Adds an event to the report.
+    /// </summary>
+    public void Add(EventObject ev) {
+        _scanned++;
+        _matched++;
+
+        var utc = ev.TimeCreated.ToUniversalTime();
+        if (!_minUtc.HasValue || utc < _minUtc.Value) _minUtc = utc;
+        if (!_maxUtc.HasValue || utc > _maxUtc.Value) _maxUtc = utc;
+
+        SecurityAggregates.AddCount(_byEventId, ev.Id);
+        SecurityAggregates.AddCount(_byComputer, ev.ComputerName ?? string.Empty);
+
+        var data = ev.Data ?? new Dictionary<string, string>();
+
+        string targetUser;
+        string targetDomain;
+        string logonType;
+        string ip;
+        string workstation;
+
+        switch (ev.Id) {
+            case 4624: {
+                var rule = new ADUserLogon(ev);
+                var acc = SecurityEventText.SplitAccount(rule.ObjectAffected);
+                targetDomain = acc.Domain;
+                targetUser = acc.User;
+                logonType = SecurityEventText.FormatLogonType(rule.LogonType);
+                ip = SecurityEventText.NormalizePlaceholder(rule.IpAddress);
+                workstation = SecurityEventText.NormalizePlaceholder(Get(data, "WorkstationName"));
+                break;
+            }
+            case 4625: {
+                var rule = new ADUserLogonFailed(ev);
+                var acc = SecurityEventText.SplitAccount(rule.ObjectAffected);
+                targetDomain = acc.Domain;
+                targetUser = acc.User;
+                logonType = SecurityEventText.FormatLogonType(rule.LogonType);
+                ip = SecurityEventText.NormalizePlaceholder(rule.IpAddress);
+                workstation = SecurityEventText.NormalizePlaceholder(rule.Who);
+                break;
+            }
+            default: {
+                targetUser = Get(data, "TargetUserName") ?? Get(data, "AccountName") ?? string.Empty;
+                targetDomain = Get(data, "TargetDomainName") ?? string.Empty;
+                logonType = Get(data, "LogonType") ?? string.Empty;
+                ip = Get(data, "IpAddress") ?? Get(data, "ClientAddress") ?? string.Empty;
+                workstation = Get(data, "WorkstationName") ?? string.Empty;
+                workstation = SecurityEventText.NormalizePlaceholder(workstation);
+                ip = SecurityEventText.NormalizePlaceholder(ip);
+                break;
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(targetUser)) {
+            targetUser = Get(data, "TargetUserName") ?? Get(data, "AccountName") ?? string.Empty;
+        }
+        if (string.IsNullOrWhiteSpace(targetDomain)) {
+            targetDomain = Get(data, "TargetDomainName") ?? string.Empty;
+        }
+        if (string.IsNullOrWhiteSpace(logonType)) {
+            logonType = Get(data, "LogonType") ?? string.Empty;
+        }
+        if (string.IsNullOrWhiteSpace(ip)) {
+            ip = SecurityEventText.NormalizePlaceholder(Get(data, "IpAddress") ?? Get(data, "ClientAddress"));
+        }
+        if (string.IsNullOrWhiteSpace(workstation)) {
+            workstation = SecurityEventText.NormalizePlaceholder(Get(data, "WorkstationName"));
+        }
+
+        SecurityAggregates.AddCount(_byTargetUser, targetUser);
+        SecurityAggregates.AddCount(_byTargetDomain, targetDomain);
+        SecurityAggregates.AddCount(_byLogonType, logonType);
+        SecurityAggregates.AddCount(_byIp, ip);
+        SecurityAggregates.AddCount(_byWorkstation, workstation);
+
+        if (_includeSamples && _samples.Count < _sampleSize) {
+            _samples.Add(new SecurityUserLogonSample {
+                TimeCreatedUtc = utc,
+                Id = ev.Id,
+                ComputerName = ev.ComputerName ?? string.Empty,
+                TargetUser = targetUser,
+                TargetDomain = targetDomain,
+                LogonType = logonType,
+                IpAddress = ip,
+                WorkstationName = workstation,
+                SubjectUser = Get(data, "SubjectUserName") ?? string.Empty
+            });
+        }
+    }
+
+    /// <summary>
+    /// Builds a report snapshot.
+    /// </summary>
+    public SecurityUserLogonsReport Build() {
+        return new SecurityUserLogonsReport {
+            Scanned = _scanned,
+            Matched = _matched,
+            MinUtc = _minUtc,
+            MaxUtc = _maxUtc,
+            EventIds = _eventIds,
+            ByEventId = _byEventId,
+            ByTargetUser = _byTargetUser,
+            ByTargetDomain = _byTargetDomain,
+            ByLogonType = _byLogonType,
+            ByIpAddress = _byIp,
+            ByWorkstationName = _byWorkstation,
+            ByComputerName = _byComputer,
+            Samples = _samples
+        };
+    }
+
+    /// <summary>
+    /// Returns top target users by count.
+    /// </summary>
+    public IReadOnlyList<KeyValuePair<string, long>> GetTopTargetUsers(int top) => SecurityAggregates.TopStringPairs(_byTargetUser, top);
+
+    private static string? Get(Dictionary<string, string> dict, string key) {
+        return dict.TryGetValue(key, out var v) ? v : null;
+    }
+}
