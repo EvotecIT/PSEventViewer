@@ -18,7 +18,7 @@ public static class EvtxStatsAggregates {
             return;
         }
 
-        var key = computerName.Trim();
+        var key = computerName!.Trim();
         dict.TryGetValue(key, out var cur);
         dict[key] = cur + 1;
     }
