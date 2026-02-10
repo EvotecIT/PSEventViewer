@@ -113,18 +113,55 @@ public partial class SearchEvents : Settings {
 
         _logger.WriteVerbose($"Querying log '{logName}' on '{machineName} with query: {queryString}");
 
-        EventLogSession? session = null;
         EventLogQuery query = new EventLogQuery(logName, PathType.LogName, queryString)
         {
             ReverseDirection = true,
             TolerateQueryErrors = true
         };
         int effectiveTimeout = sessionTimeoutMs ?? Settings.QuerySessionTimeoutMs;
+        foreach (var ev in QueryLogFromQuery(query, machineName, action: "QueryLog", logName, maxEvents, cancellationToken, effectiveTimeout)) {
+            yield return ev;
+        }
+    }
+
+    /// <summary>
+    /// Queries a Windows event log by name using a caller-provided XPath expression.
+    /// </summary>
+    /// <remarks>
+    /// This exists so callers (tools/hosts) can pass custom XPath without re-implementing the
+    /// session warm-up / reader timeout / streaming logic.
+    /// </remarks>
+    /// <param name="logName">Log name (e.g., Security, System).</param>
+    /// <param name="xpath">XPath filter (default: '*').</param>
+    /// <param name="machineName">Remote computer name (null = local).</param>
+    /// <param name="maxEvents">Maximum events to return (0 = all).</param>
+    /// <param name="oldest">If true, read from oldest to newest.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <param name="sessionTimeoutMs">Session open/read timeout (ms); null uses defaults.</param>
+    public static IEnumerable<EventObject> QueryLogXPath(string logName, string? xpath = null, string? machineName = null, int maxEvents = 0, bool oldest = false, CancellationToken cancellationToken = default, int? sessionTimeoutMs = null) {
+        if (string.IsNullOrWhiteSpace(xpath)) {
+            xpath = "*";
+        }
+
+        var query = new EventLogQuery(logName, PathType.LogName, xpath) {
+            ReverseDirection = !oldest,
+            TolerateQueryErrors = true
+        };
+
+        int effectiveTimeout = sessionTimeoutMs ?? Settings.QuerySessionTimeoutMs;
+        foreach (var ev in QueryLogFromQuery(query, machineName, action: "QueryLogXPath", logName, maxEvents, cancellationToken, effectiveTimeout)) {
+            yield return ev;
+        }
+    }
+
+    private static IEnumerable<EventObject> QueryLogFromQuery(EventLogQuery query, string? machineName, string action, string logName, int maxEvents, CancellationToken cancellationToken, int effectiveTimeout) {
+        EventLogSession? session = null;
         if (!string.IsNullOrEmpty(machineName)) {
-            session = CreateSession(machineName, "QueryLog", logName, effectiveTimeout);
+            session = CreateSession(machineName, action, logName, effectiveTimeout);
             if (session == null) yield break;
             query.Session = session;
-            // Fast, light-weight warm-up mirroring DisplayEventLogs
+
+            // Fast, light-weight warm-up mirroring DisplayEventLogs.
             int warmBudget = Settings.ListLogWarmupMs;
             if (effectiveTimeout > 0) {
                 warmBudget = Math.Min(Settings.ListLogWarmupMs, Math.Max(500, effectiveTimeout / 2));
@@ -137,8 +174,7 @@ public partial class SearchEvents : Settings {
         }
 
         var queriedMachine = string.IsNullOrEmpty(machineName) ? GetFQDN() : machineName!;
-        try
-        {
+        try {
             // Use the same short constructor budget as DisplayEventLogs preflight to fail fast on semi-dead hosts.
             var reader = CreateEventLogReader(query, machineName, effectiveTimeout);
             if (reader == null) {
@@ -212,9 +248,7 @@ public partial class SearchEvents : Settings {
                     }
                 }
             }
-        }
-        finally
-        {
+        } finally {
             session?.Dispose();
         }
     }
