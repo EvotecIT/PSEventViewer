@@ -1,4 +1,3 @@
-using System;
 using EventViewerX.Reports.Evtx;
 using EventViewerX.Reports.Inventory;
 using EventViewerX.Reports.Live;
@@ -38,87 +37,91 @@ public static class EventViewerToolFailureContractResolver {
     /// Resolves EVTX query failure kind to a typed tool-facing contract.
     /// </summary>
     public static EventViewerToolFailureContract Resolve(EvtxQueryFailureKind kind)
-        => ResolveCore(kind.ToString());
+        => kind switch {
+            EvtxQueryFailureKind.InvalidArgument => InvalidArgument(),
+            EvtxQueryFailureKind.AccessDenied => AccessDenied(),
+            EvtxQueryFailureKind.NotFound => NotFound(),
+            EvtxQueryFailureKind.IoError => IoError(),
+            _ => QueryFailed()
+        };
 
     /// <summary>
     /// Resolves live-event query failure kind to a typed tool-facing contract.
     /// </summary>
     public static EventViewerToolFailureContract Resolve(LiveEventQueryFailureKind kind)
-        => ResolveCore(kind.ToString());
+        => kind switch {
+            LiveEventQueryFailureKind.InvalidArgument => InvalidArgument(),
+            LiveEventQueryFailureKind.AccessDenied => AccessDenied(),
+            LiveEventQueryFailureKind.Timeout => Timeout(),
+            _ => QueryFailed()
+        };
 
     /// <summary>
     /// Resolves live-stats query failure kind to a typed tool-facing contract.
     /// </summary>
     public static EventViewerToolFailureContract Resolve(LiveStatsQueryFailureKind kind)
-        => ResolveCore(kind.ToString());
+        => kind switch {
+            LiveStatsQueryFailureKind.InvalidArgument => InvalidArgument(),
+            LiveStatsQueryFailureKind.AccessDenied => AccessDenied(),
+            LiveStatsQueryFailureKind.Timeout => Timeout(),
+            _ => QueryFailed()
+        };
 
     /// <summary>
     /// Resolves event-catalog query failure kind to a typed tool-facing contract.
     /// </summary>
     public static EventViewerToolFailureContract Resolve(EventCatalogFailureKind kind)
-        => ResolveCore(kind.ToString());
-
-    private static EventViewerToolFailureContract ResolveCore(string? codeName) {
-        var normalized = Normalize(codeName);
-        return normalized switch {
-            "invalidargument" or "invalidrequest" => new EventViewerToolFailureContract {
-                ErrorCode = "invalid_argument",
-                Category = "invalid_argument",
-                Entity = "event_log_query",
-                Recoverable = false
-            },
-            "accessdenied" => new EventViewerToolFailureContract {
-                ErrorCode = "access_denied",
-                Category = "access_denied",
-                Entity = "event_log_query",
-                Recoverable = false
-            },
-            "notfound" => new EventViewerToolFailureContract {
-                ErrorCode = "not_found",
-                Category = "not_found",
-                Entity = "event_log_query",
-                Recoverable = false
-            },
-            "timeout" or "timedout" => new EventViewerToolFailureContract {
-                ErrorCode = "timeout",
-                Category = "timeout",
-                Entity = "event_log_query",
-                Recoverable = true
-            },
-            "ioerror" or "iofailure" => new EventViewerToolFailureContract {
-                ErrorCode = "io_error",
-                Category = "io_error",
-                Entity = "event_log_query",
-                Recoverable = true
-            },
-            _ => new EventViewerToolFailureContract {
-                ErrorCode = "query_failed",
-                Category = "query_failed",
-                Entity = "event_log_query",
-                Recoverable = true
-            }
+        => kind switch {
+            EventCatalogFailureKind.InvalidArgument => InvalidArgument(),
+            EventCatalogFailureKind.AccessDenied => AccessDenied(),
+            _ => QueryFailed()
         };
-    }
 
-    private static string Normalize(string? value) {
-        if (value is null) {
-            return string.Empty;
-        }
+    private static EventViewerToolFailureContract InvalidArgument()
+        => new() {
+            ErrorCode = "invalid_argument",
+            Category = "invalid_argument",
+            Entity = "event_log_query",
+            Recoverable = false
+        };
 
-        var chars = value.Trim();
-        if (chars.Length == 0) {
-            return string.Empty;
-        }
+    private static EventViewerToolFailureContract AccessDenied()
+        => new() {
+            ErrorCode = "access_denied",
+            Category = "access_denied",
+            Entity = "event_log_query",
+            Recoverable = false
+        };
 
-        var buffer = new char[chars.Length];
-        var j = 0;
-        for (var i = 0; i < chars.Length; i++) {
-            var c = chars[i];
-            if (char.IsLetterOrDigit(c)) {
-                buffer[j++] = char.ToLowerInvariant(c);
-            }
-        }
+    private static EventViewerToolFailureContract NotFound()
+        => new() {
+            ErrorCode = "not_found",
+            Category = "not_found",
+            Entity = "event_log_query",
+            Recoverable = false
+        };
 
-        return new string(buffer, 0, j);
-    }
+    private static EventViewerToolFailureContract Timeout()
+        => new() {
+            ErrorCode = "timeout",
+            Category = "timeout",
+            Entity = "event_log_query",
+            Recoverable = true
+        };
+
+    private static EventViewerToolFailureContract IoError()
+        => new() {
+            ErrorCode = "io_error",
+            Category = "io_error",
+            Entity = "event_log_query",
+            Recoverable = true
+        };
+
+    private static EventViewerToolFailureContract QueryFailed()
+        => new() {
+            ErrorCode = "query_failed",
+            Category = "query_failed",
+            Entity = "event_log_query",
+            Recoverable = true
+        };
 }
