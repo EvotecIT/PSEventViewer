@@ -5,9 +5,9 @@ using EventViewerX.Reports.Live;
 namespace EventViewerX.Reports;
 
 /// <summary>
-/// Engine-owned failure contract for stable machine-readable failure semantics.
+/// Engine-owned failure descriptor for stable machine-readable failure semantics.
 /// </summary>
-public sealed class EventViewerFailureContract {
+public sealed class EventViewerFailureDescriptor {
     /// <summary>
     /// Stable error code.
     /// </summary>
@@ -30,13 +30,13 @@ public sealed class EventViewerFailureContract {
 }
 
 /// <summary>
-/// Resolves EventViewerX failure kinds to stable engine-facing failure contracts.
+/// Resolves EventViewerX failure kinds to stable engine-facing failure descriptors.
 /// </summary>
-public static class EventViewerFailureContractResolver {
+public static class EventViewerFailureDescriptorResolver {
     /// <summary>
-    /// Resolves EVTX query failure kind to a typed failure contract.
+    /// Resolves EVTX query failure kind to a typed failure descriptor.
     /// </summary>
-    public static EventViewerFailureContract Resolve(EvtxQueryFailureKind kind)
+    public static EventViewerFailureDescriptor Resolve(EvtxQueryFailureKind kind)
         => kind switch {
             EvtxQueryFailureKind.InvalidArgument => InvalidArgument(),
             EvtxQueryFailureKind.AccessDenied => AccessDenied(),
@@ -46,9 +46,9 @@ public static class EventViewerFailureContractResolver {
         };
 
     /// <summary>
-    /// Resolves live-event query failure kind to a typed failure contract.
+    /// Resolves live-event query failure kind to a typed failure descriptor.
     /// </summary>
-    public static EventViewerFailureContract Resolve(LiveEventQueryFailureKind kind)
+    public static EventViewerFailureDescriptor Resolve(LiveEventQueryFailureKind kind)
         => kind switch {
             LiveEventQueryFailureKind.InvalidArgument => InvalidArgument(),
             LiveEventQueryFailureKind.AccessDenied => AccessDenied(),
@@ -57,9 +57,9 @@ public static class EventViewerFailureContractResolver {
         };
 
     /// <summary>
-    /// Resolves live-stats query failure kind to a typed failure contract.
+    /// Resolves live-stats query failure kind to a typed failure descriptor.
     /// </summary>
-    public static EventViewerFailureContract Resolve(LiveStatsQueryFailureKind kind)
+    public static EventViewerFailureDescriptor Resolve(LiveStatsQueryFailureKind kind)
         => kind switch {
             LiveStatsQueryFailureKind.InvalidArgument => InvalidArgument(),
             LiveStatsQueryFailureKind.AccessDenied => AccessDenied(),
@@ -68,16 +68,16 @@ public static class EventViewerFailureContractResolver {
         };
 
     /// <summary>
-    /// Resolves event-catalog query failure kind to a typed failure contract.
+    /// Resolves event-catalog query failure kind to a typed failure descriptor.
     /// </summary>
-    public static EventViewerFailureContract Resolve(EventCatalogFailureKind kind)
+    public static EventViewerFailureDescriptor Resolve(EventCatalogFailureKind kind)
         => kind switch {
             EventCatalogFailureKind.InvalidArgument => InvalidArgument(),
             EventCatalogFailureKind.AccessDenied => AccessDenied(),
             _ => QueryFailed()
         };
 
-    private static EventViewerFailureContract InvalidArgument()
+    private static EventViewerFailureDescriptor InvalidArgument()
         => new() {
             ErrorCode = "invalid_argument",
             Category = "invalid_argument",
@@ -85,7 +85,7 @@ public static class EventViewerFailureContractResolver {
             Recoverable = false
         };
 
-    private static EventViewerFailureContract AccessDenied()
+    private static EventViewerFailureDescriptor AccessDenied()
         => new() {
             ErrorCode = "access_denied",
             Category = "access_denied",
@@ -93,7 +93,7 @@ public static class EventViewerFailureContractResolver {
             Recoverable = false
         };
 
-    private static EventViewerFailureContract NotFound()
+    private static EventViewerFailureDescriptor NotFound()
         => new() {
             ErrorCode = "not_found",
             Category = "not_found",
@@ -101,7 +101,7 @@ public static class EventViewerFailureContractResolver {
             Recoverable = false
         };
 
-    private static EventViewerFailureContract Timeout()
+    private static EventViewerFailureDescriptor Timeout()
         => new() {
             ErrorCode = "timeout",
             Category = "timeout",
@@ -109,7 +109,7 @@ public static class EventViewerFailureContractResolver {
             Recoverable = true
         };
 
-    private static EventViewerFailureContract IoError()
+    private static EventViewerFailureDescriptor IoError()
         => new() {
             ErrorCode = "io_error",
             Category = "io_error",
@@ -117,7 +117,7 @@ public static class EventViewerFailureContractResolver {
             Recoverable = true
         };
 
-    private static EventViewerFailureContract QueryFailed()
+    private static EventViewerFailureDescriptor QueryFailed()
         => new() {
             ErrorCode = "query_failed",
             Category = "query_failed",
