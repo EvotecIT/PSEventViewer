@@ -9,6 +9,7 @@ $publishGitHubReleaseAssetSplat = @{
     GitHubRepositoryName    = "PSEventViewer"
     IsPreRelease            = $false
     IncludeProjectNameInTag = $true
+    GenerateReleaseNotes    = $true
 }
 
 Publish-GitHubReleaseAsset @publishGitHubReleaseAssetSplat
