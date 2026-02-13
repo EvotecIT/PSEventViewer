@@ -18,11 +18,31 @@ public class TestEventViewerFailureDescriptorResolver {
     }
 
     [Fact]
+    public void Resolve_EvtxException_MapsExplicitlyToQueryFailed() {
+        var descriptor = EventViewerFailureDescriptorResolver.Resolve(EvtxQueryFailureKind.Exception);
+
+        Assert.Equal("query_failed", descriptor.ErrorCode);
+        Assert.Equal("query_failed", descriptor.Category);
+        Assert.True(descriptor.Recoverable);
+        Assert.Equal("event_log_query", descriptor.Entity);
+    }
+
+    [Fact]
     public void Resolve_LiveEventTimeout_IsRecoverableTimeout() {
         var descriptor = EventViewerFailureDescriptorResolver.Resolve(LiveEventQueryFailureKind.Timeout);
 
         Assert.Equal("timeout", descriptor.ErrorCode);
         Assert.Equal("timeout", descriptor.Category);
+        Assert.True(descriptor.Recoverable);
+        Assert.Equal("event_log_query", descriptor.Entity);
+    }
+
+    [Fact]
+    public void Resolve_LiveEventException_MapsExplicitlyToQueryFailed() {
+        var descriptor = EventViewerFailureDescriptorResolver.Resolve(LiveEventQueryFailureKind.Exception);
+
+        Assert.Equal("query_failed", descriptor.ErrorCode);
+        Assert.Equal("query_failed", descriptor.Category);
         Assert.True(descriptor.Recoverable);
         Assert.Equal("event_log_query", descriptor.Entity);
     }
@@ -34,6 +54,16 @@ public class TestEventViewerFailureDescriptorResolver {
         Assert.Equal("invalid_argument", descriptor.ErrorCode);
         Assert.Equal("invalid_argument", descriptor.Category);
         Assert.False(descriptor.Recoverable);
+        Assert.Equal("event_log_query", descriptor.Entity);
+    }
+
+    [Fact]
+    public void Resolve_LiveStatsException_MapsExplicitlyToQueryFailed() {
+        var descriptor = EventViewerFailureDescriptorResolver.Resolve(LiveStatsQueryFailureKind.Exception);
+
+        Assert.Equal("query_failed", descriptor.ErrorCode);
+        Assert.Equal("query_failed", descriptor.Category);
+        Assert.True(descriptor.Recoverable);
         Assert.Equal("event_log_query", descriptor.Entity);
     }
 
@@ -55,5 +85,33 @@ public class TestEventViewerFailureDescriptorResolver {
         Assert.Equal("query_failed", descriptor.Category);
         Assert.True(descriptor.Recoverable);
         Assert.Equal("event_log_query", descriptor.Entity);
+    }
+
+    [Fact]
+    public void Resolve_UsesProvidedEntityWhenSpecified() {
+        var descriptor = EventViewerFailureDescriptorResolver.Resolve(
+            EvtxQueryFailureKind.InvalidArgument,
+            entity: "custom_evtx_query");
+
+        Assert.Equal("invalid_argument", descriptor.ErrorCode);
+        Assert.Equal("custom_evtx_query", descriptor.Entity);
+    }
+
+    [Fact]
+    public void Resolve_NormalizesBlankEntityToDefault() {
+        var descriptor = EventViewerFailureDescriptorResolver.Resolve(
+            LiveEventQueryFailureKind.Timeout,
+            entity: "  ");
+
+        Assert.Equal("timeout", descriptor.ErrorCode);
+        Assert.Equal(EventViewerFailureDescriptorResolver.DefaultEntity, descriptor.Entity);
+    }
+
+    [Fact]
+    public void Resolve_DefaultEntityDescriptorsReuseCachedInstances() {
+        var first = EventViewerFailureDescriptorResolver.Resolve(EvtxQueryFailureKind.IoError);
+        var second = EventViewerFailureDescriptorResolver.Resolve(EvtxQueryFailureKind.IoError);
+
+        Assert.Same(first, second);
     }
 }
