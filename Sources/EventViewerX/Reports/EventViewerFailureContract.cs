@@ -5,16 +5,16 @@ using EventViewerX.Reports.Live;
 namespace EventViewerX.Reports;
 
 /// <summary>
-/// Engine-owned typed failure contract used by external tool wrappers.
+/// Engine-owned failure contract for stable machine-readable failure semantics.
 /// </summary>
-public sealed class EventViewerToolFailureContract {
+public sealed class EventViewerFailureContract {
     /// <summary>
-    /// Stable tool error code aligned to host/tool envelope contracts.
+    /// Stable error code.
     /// </summary>
     public string ErrorCode { get; set; } = "query_failed";
 
     /// <summary>
-    /// Machine-readable category for recovery/planning.
+    /// Machine-readable category for recovery and planning.
     /// </summary>
     public string Category { get; set; } = "query_failed";
 
@@ -30,13 +30,13 @@ public sealed class EventViewerToolFailureContract {
 }
 
 /// <summary>
-/// Resolves EventViewerX failure kinds to stable tool-facing contracts.
+/// Resolves EventViewerX failure kinds to stable engine-facing failure contracts.
 /// </summary>
-public static class EventViewerToolFailureContractResolver {
+public static class EventViewerFailureContractResolver {
     /// <summary>
-    /// Resolves EVTX query failure kind to a typed tool-facing contract.
+    /// Resolves EVTX query failure kind to a typed failure contract.
     /// </summary>
-    public static EventViewerToolFailureContract Resolve(EvtxQueryFailureKind kind)
+    public static EventViewerFailureContract Resolve(EvtxQueryFailureKind kind)
         => kind switch {
             EvtxQueryFailureKind.InvalidArgument => InvalidArgument(),
             EvtxQueryFailureKind.AccessDenied => AccessDenied(),
@@ -46,9 +46,9 @@ public static class EventViewerToolFailureContractResolver {
         };
 
     /// <summary>
-    /// Resolves live-event query failure kind to a typed tool-facing contract.
+    /// Resolves live-event query failure kind to a typed failure contract.
     /// </summary>
-    public static EventViewerToolFailureContract Resolve(LiveEventQueryFailureKind kind)
+    public static EventViewerFailureContract Resolve(LiveEventQueryFailureKind kind)
         => kind switch {
             LiveEventQueryFailureKind.InvalidArgument => InvalidArgument(),
             LiveEventQueryFailureKind.AccessDenied => AccessDenied(),
@@ -57,9 +57,9 @@ public static class EventViewerToolFailureContractResolver {
         };
 
     /// <summary>
-    /// Resolves live-stats query failure kind to a typed tool-facing contract.
+    /// Resolves live-stats query failure kind to a typed failure contract.
     /// </summary>
-    public static EventViewerToolFailureContract Resolve(LiveStatsQueryFailureKind kind)
+    public static EventViewerFailureContract Resolve(LiveStatsQueryFailureKind kind)
         => kind switch {
             LiveStatsQueryFailureKind.InvalidArgument => InvalidArgument(),
             LiveStatsQueryFailureKind.AccessDenied => AccessDenied(),
@@ -68,16 +68,16 @@ public static class EventViewerToolFailureContractResolver {
         };
 
     /// <summary>
-    /// Resolves event-catalog query failure kind to a typed tool-facing contract.
+    /// Resolves event-catalog query failure kind to a typed failure contract.
     /// </summary>
-    public static EventViewerToolFailureContract Resolve(EventCatalogFailureKind kind)
+    public static EventViewerFailureContract Resolve(EventCatalogFailureKind kind)
         => kind switch {
             EventCatalogFailureKind.InvalidArgument => InvalidArgument(),
             EventCatalogFailureKind.AccessDenied => AccessDenied(),
             _ => QueryFailed()
         };
 
-    private static EventViewerToolFailureContract InvalidArgument()
+    private static EventViewerFailureContract InvalidArgument()
         => new() {
             ErrorCode = "invalid_argument",
             Category = "invalid_argument",
@@ -85,7 +85,7 @@ public static class EventViewerToolFailureContractResolver {
             Recoverable = false
         };
 
-    private static EventViewerToolFailureContract AccessDenied()
+    private static EventViewerFailureContract AccessDenied()
         => new() {
             ErrorCode = "access_denied",
             Category = "access_denied",
@@ -93,7 +93,7 @@ public static class EventViewerToolFailureContractResolver {
             Recoverable = false
         };
 
-    private static EventViewerToolFailureContract NotFound()
+    private static EventViewerFailureContract NotFound()
         => new() {
             ErrorCode = "not_found",
             Category = "not_found",
@@ -101,7 +101,7 @@ public static class EventViewerToolFailureContractResolver {
             Recoverable = false
         };
 
-    private static EventViewerToolFailureContract Timeout()
+    private static EventViewerFailureContract Timeout()
         => new() {
             ErrorCode = "timeout",
             Category = "timeout",
@@ -109,7 +109,7 @@ public static class EventViewerToolFailureContractResolver {
             Recoverable = true
         };
 
-    private static EventViewerToolFailureContract IoError()
+    private static EventViewerFailureContract IoError()
         => new() {
             ErrorCode = "io_error",
             Category = "io_error",
@@ -117,7 +117,7 @@ public static class EventViewerToolFailureContractResolver {
             Recoverable = true
         };
 
-    private static EventViewerToolFailureContract QueryFailed()
+    private static EventViewerFailureContract QueryFailed()
         => new() {
             ErrorCode = "query_failed",
             Category = "query_failed",
