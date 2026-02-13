@@ -114,4 +114,26 @@ public class TestEventViewerFailureDescriptorResolver {
 
         Assert.Same(first, second);
     }
+
+    [Fact]
+    public void Resolve_UnknownEvtxKind_FallsBackToQueryFailed() {
+        var descriptor = EventViewerFailureDescriptorResolver.Resolve((EvtxQueryFailureKind)999);
+
+        Assert.Equal("query_failed", descriptor.ErrorCode);
+        Assert.Equal("query_failed", descriptor.Category);
+        Assert.True(descriptor.Recoverable);
+    }
+
+    [Fact]
+    public void DescriptorCtor_BlankCategory_UsesUnknownFallback() {
+        var descriptor = new EventViewerFailureDescriptor(
+            errorCode: "",
+            category: " ",
+            entity: "",
+            recoverable: true);
+
+        Assert.Equal(EventViewerFailureDescriptor.DefaultErrorCode, descriptor.ErrorCode);
+        Assert.Equal(EventViewerFailureDescriptor.UnknownCategory, descriptor.Category);
+        Assert.Equal(EventViewerFailureDescriptorResolver.DefaultEntity, descriptor.Entity);
+    }
 }

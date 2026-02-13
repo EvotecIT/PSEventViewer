@@ -10,12 +10,22 @@ namespace EventViewerX.Reports;
 /// </summary>
 public sealed class EventViewerFailureDescriptor {
     /// <summary>
+    /// Fallback error code used when input is missing/blank.
+    /// </summary>
+    public const string DefaultErrorCode = "query_failed";
+
+    /// <summary>
+    /// Fallback category used when input is missing/blank.
+    /// </summary>
+    public const string UnknownCategory = "unknown";
+
+    /// <summary>
     /// Initializes a new instance of the <see cref="EventViewerFailureDescriptor"/> class.
     /// </summary>
     public EventViewerFailureDescriptor(string errorCode, string category, string entity, bool recoverable) {
-        ErrorCode = string.IsNullOrWhiteSpace(errorCode) ? "query_failed" : errorCode.Trim();
-        Category = string.IsNullOrWhiteSpace(category) ? "query_failed" : category.Trim();
-        Entity = string.IsNullOrWhiteSpace(entity) ? EventViewerFailureDescriptorResolver.DefaultEntity : entity.Trim();
+        ErrorCode = NormalizeToken(errorCode, DefaultErrorCode);
+        Category = NormalizeToken(category, UnknownCategory);
+        Entity = NormalizeEntity(entity);
         Recoverable = recoverable;
     }
 
@@ -38,20 +48,43 @@ public sealed class EventViewerFailureDescriptor {
     /// Whether the failure is expected to be recoverable in-session.
     /// </summary>
     public bool Recoverable { get; }
+
+    private static string NormalizeToken(string? value, string fallback) {
+        var trimmed = value?.Trim();
+        if (trimmed is null || trimmed.Length == 0) {
+            return fallback;
+        }
+
+        return trimmed;
+    }
+
+    private static string NormalizeEntity(string? entity) {
+        var trimmed = entity?.Trim();
+        if (trimmed is null || trimmed.Length == 0) {
+            return EventViewerFailureDescriptorResolver.DefaultEntity;
+        }
+
+        return trimmed;
+    }
 }
 
 /// <summary>
 /// Resolves EventViewerX failure kinds to stable engine-facing failure descriptors.
 /// </summary>
+/// <remarks>
+/// Recoverability policy:
+/// <list type="bullet">
+/// <item><description><c>invalid_argument</c>, <c>access_denied</c>, <c>not_found</c> => non-recoverable.</description></item>
+/// <item><description><c>timeout</c>, <c>io_error</c>, <c>query_failed</c> => recoverable.</description></item>
+/// </list>
+/// Unknown enum values are mapped to <c>query_failed</c>.
+/// </remarks>
 public static class EventViewerFailureDescriptorResolver {
     /// <summary>
     /// Default failure entity used when no explicit entity is provided.
     /// </summary>
     public const string DefaultEntity = "event_log_query";
 
-    // Recoverability policy:
-    // - invalid_argument/access_denied/not_found => non-recoverable
-    // - timeout/io_error/query_failed => recoverable
     private static readonly EventViewerFailureDescriptor InvalidArgumentDefault = new("invalid_argument", "invalid_argument", DefaultEntity, recoverable: false);
     private static readonly EventViewerFailureDescriptor AccessDeniedDefault = new("access_denied", "access_denied", DefaultEntity, recoverable: false);
     private static readonly EventViewerFailureDescriptor NotFoundDefault = new("not_found", "not_found", DefaultEntity, recoverable: false);
@@ -62,6 +95,13 @@ public static class EventViewerFailureDescriptorResolver {
     /// <summary>
     /// Resolves EVTX query failure kind to a typed failure descriptor.
     /// </summary>
+    /// <example>
+    /// <code>
+    /// var descriptor = EventViewerFailureDescriptorResolver.Resolve(EvtxQueryFailureKind.IoError);
+    /// var custom = EventViewerFailureDescriptorResolver.Resolve(EvtxQueryFailureKind.InvalidArgument, "security_evtx_query");
+    /// </code>
+    /// </example>
+    /// <remarks><c>Exception</c> and unknown values map to <c>query_failed</c>.</remarks>
     public static EventViewerFailureDescriptor Resolve(EvtxQueryFailureKind kind, string entity = DefaultEntity)
         => kind switch {
             EvtxQueryFailureKind.InvalidArgument => InvalidArgument(entity),
@@ -75,6 +115,7 @@ public static class EventViewerFailureDescriptorResolver {
     /// <summary>
     /// Resolves live-event query failure kind to a typed failure descriptor.
     /// </summary>
+    /// <remarks><c>Exception</c> and unknown values map to <c>query_failed</c>.</remarks>
     public static EventViewerFailureDescriptor Resolve(LiveEventQueryFailureKind kind, string entity = DefaultEntity)
         => kind switch {
             LiveEventQueryFailureKind.InvalidArgument => InvalidArgument(entity),
@@ -87,6 +128,7 @@ public static class EventViewerFailureDescriptorResolver {
     /// <summary>
     /// Resolves live-stats query failure kind to a typed failure descriptor.
     /// </summary>
+    /// <remarks><c>Exception</c> and unknown values map to <c>query_failed</c>.</remarks>
     public static EventViewerFailureDescriptor Resolve(LiveStatsQueryFailureKind kind, string entity = DefaultEntity)
         => kind switch {
             LiveStatsQueryFailureKind.InvalidArgument => InvalidArgument(entity),
@@ -99,6 +141,7 @@ public static class EventViewerFailureDescriptorResolver {
     /// <summary>
     /// Resolves event-catalog query failure kind to a typed failure descriptor.
     /// </summary>
+    /// <remarks><c>Exception</c> and unknown values map to <c>query_failed</c>.</remarks>
     public static EventViewerFailureDescriptor Resolve(EventCatalogFailureKind kind, string entity = DefaultEntity)
         => kind switch {
             EventCatalogFailureKind.InvalidArgument => InvalidArgument(entity),
@@ -127,6 +170,12 @@ public static class EventViewerFailureDescriptorResolver {
             template.Recoverable);
     }
 
-    private static string NormalizeEntity(string? entity)
-        => string.IsNullOrWhiteSpace(entity) ? DefaultEntity : (entity?.Trim() ?? DefaultEntity);
+    private static string NormalizeEntity(string? entity) {
+        var trimmed = entity?.Trim();
+        if (trimmed is null || trimmed.Length == 0) {
+            return DefaultEntity;
+        }
+
+        return trimmed;
+    }
 }
