@@ -125,6 +125,33 @@ public class TestEventViewerFailureDescriptorResolver {
     }
 
     [Fact]
+    public void Resolve_UnknownLiveEventKind_FallsBackToQueryFailed() {
+        var descriptor = EventViewerFailureDescriptorResolver.Resolve((LiveEventQueryFailureKind)999);
+
+        Assert.Equal("query_failed", descriptor.ErrorCode);
+        Assert.Equal("query_failed", descriptor.Category);
+        Assert.True(descriptor.Recoverable);
+    }
+
+    [Fact]
+    public void Resolve_UnknownLiveStatsKind_FallsBackToQueryFailed() {
+        var descriptor = EventViewerFailureDescriptorResolver.Resolve((LiveStatsQueryFailureKind)999);
+
+        Assert.Equal("query_failed", descriptor.ErrorCode);
+        Assert.Equal("query_failed", descriptor.Category);
+        Assert.True(descriptor.Recoverable);
+    }
+
+    [Fact]
+    public void Resolve_UnknownEventCatalogKind_FallsBackToQueryFailed() {
+        var descriptor = EventViewerFailureDescriptorResolver.Resolve((EventCatalogFailureKind)999);
+
+        Assert.Equal("query_failed", descriptor.ErrorCode);
+        Assert.Equal("query_failed", descriptor.Category);
+        Assert.True(descriptor.Recoverable);
+    }
+
+    [Fact]
     public void DescriptorCtor_BlankCategory_UsesUnknownFallback() {
         var descriptor = new EventViewerFailureDescriptor(
             errorCode: "",
