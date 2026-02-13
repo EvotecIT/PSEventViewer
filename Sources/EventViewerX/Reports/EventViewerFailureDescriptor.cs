@@ -25,7 +25,7 @@ public sealed class EventViewerFailureDescriptor {
     public EventViewerFailureDescriptor(string errorCode, string category, string entity, bool recoverable) {
         ErrorCode = NormalizeToken(errorCode, DefaultErrorCode);
         Category = NormalizeToken(category, UnknownCategory);
-        Entity = NormalizeEntity(entity);
+        Entity = NormalizeEntityOrDefault(entity, EventViewerFailureDescriptorResolver.DefaultEntity);
         Recoverable = recoverable;
     }
 
@@ -58,10 +58,10 @@ public sealed class EventViewerFailureDescriptor {
         return trimmed;
     }
 
-    private static string NormalizeEntity(string? entity) {
+    internal static string NormalizeEntityOrDefault(string? entity, string fallbackEntity) {
         var trimmed = entity?.Trim();
         if (trimmed is null || trimmed.Length == 0) {
-            return EventViewerFailureDescriptorResolver.DefaultEntity;
+            return fallbackEntity;
         }
 
         return trimmed;
@@ -78,6 +78,7 @@ public sealed class EventViewerFailureDescriptor {
 /// <item><description><c>timeout</c>, <c>io_error</c>, <c>query_failed</c> => recoverable.</description></item>
 /// </list>
 /// Unknown enum values are mapped to <c>query_failed</c>.
+/// Consumer guidance: retry or adjust scope for recoverable descriptors; for non-recoverable descriptors, prompt for corrected inputs/permissions before retrying.
 /// </remarks>
 public static class EventViewerFailureDescriptorResolver {
     /// <summary>
@@ -158,7 +159,7 @@ public static class EventViewerFailureDescriptorResolver {
     private static EventViewerFailureDescriptor QueryFailed(string entity) => Create(QueryFailedDefault, entity);
 
     private static EventViewerFailureDescriptor Create(EventViewerFailureDescriptor template, string entity) {
-        var normalizedEntity = NormalizeEntity(entity);
+        var normalizedEntity = EventViewerFailureDescriptor.NormalizeEntityOrDefault(entity, DefaultEntity);
         if (string.Equals(normalizedEntity, DefaultEntity, StringComparison.Ordinal)) {
             return template;
         }
@@ -168,14 +169,5 @@ public static class EventViewerFailureDescriptorResolver {
             template.Category,
             normalizedEntity,
             template.Recoverable);
-    }
-
-    private static string NormalizeEntity(string? entity) {
-        var trimmed = entity?.Trim();
-        if (trimmed is null || trimmed.Length == 0) {
-            return DefaultEntity;
-        }
-
-        return trimmed;
     }
 }
