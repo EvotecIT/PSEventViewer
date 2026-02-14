@@ -5,7 +5,7 @@ PSEventViewer ships as a PowerShell module from the PowerShell Gallery and as th
 PowerShell Gallery
 
 [![powershell gallery version](https://img.shields.io/powershellgallery/v/PSEventViewer.svg)](https://www.powershellgallery.com/packages/PSEventViewer)
-[![powershell gallery preview](https://img.shields.io/powershellgallery/vpre/PSEventViewer.svg?label=powershell%20gallery%20preview&colorB=yellow)](https://www.powershellgallery.com/packages/PSEventViewer)
+[![powershell gallery preview](https://img.shields.io/powershellgallery/v/PSEventViewer.svg?label=powershell%20gallery%20preview&colorB=yellow&include_prereleases)](https://www.powershellgallery.com/packages/PSEventViewer)
 [![powershell gallery platforms](https://img.shields.io/powershellgallery/p/PSEventViewer.svg)](https://www.powershellgallery.com/packages/PSEventViewer)
 [![powershell gallery downloads](https://img.shields.io/powershellgallery/dt/PSEventViewer.svg)](https://www.powershellgallery.com/packages/PSEventViewer)
 
