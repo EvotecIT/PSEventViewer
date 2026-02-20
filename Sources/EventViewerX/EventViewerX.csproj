@@ -5,7 +5,7 @@
         <Description>Library to work with Event Logs</Description>
         <AssemblyName>EventViewerX</AssemblyName>
         <AssemblyTitle>EventViewerX</AssemblyTitle>
-        <VersionPrefix>3.3.1</VersionPrefix>
+        <VersionPrefix>3.3.2</VersionPrefix>
         <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
         <Company>Evotec</Company>
