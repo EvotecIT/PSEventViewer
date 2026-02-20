@@ -134,6 +134,8 @@ public sealed class NamedEventsTimelineEventRow {
 
     /// <summary>
     /// Stable correlation identifier derived from correlation key values.
+    /// Uses a compact 64-bit (8-byte) SHA-256 prefix intended for investigation-scale grouping.
+    /// High-volume archival scenarios should also retain raw <see cref="Correlation"/> key/value data.
     /// </summary>
     public string CorrelationId { get; set; } = string.Empty;
 

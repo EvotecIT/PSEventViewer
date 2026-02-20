@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Reflection;
 using System.Security.Cryptography;
+using System.Diagnostics;
 using EventViewerX.Reports.QueryHelpers;
 
 namespace EventViewerX.Reports.Correlation;
@@ -14,6 +15,7 @@ public static class NamedEventsTimelineQueryExecutor {
     private const int MaxGroupsCap = 2000;
     private const int MaxBucketMinutes = 1440;
     private const int MaxThreadsCap = 8;
+    private const int CorrelationIdHashBytes = 8;
     private static readonly string[] AllowedCorrelationKeysValue = {
         "who",
         "object_affected",
@@ -78,11 +80,14 @@ public static class NamedEventsTimelineQueryExecutor {
         var maxEventsPerNamedEvent = request.MaxEventsPerNamedEvent.HasValue && request.MaxEventsPerNamedEvent.Value > 0
             ? request.MaxEventsPerNamedEvent
             : null;
+        var effectiveNamedEvents = normalizedNamedEvents ?? new List<NamedEvents>();
         var includeUncorrelated = request.IncludeUncorrelated;
         var includePayload = request.IncludePayload;
         string? logName = null;
-        if (!string.IsNullOrWhiteSpace(request.LogName)) {
-            logName = request.LogName!.Trim();
+        var requestLogName = request.LogName;
+        var trimmedLogName = requestLogName is null ? string.Empty : requestLogName.Trim();
+        if (trimmedLogName.Length > 0) {
+            logName = trimmedLogName;
         }
 
         var rows = new List<EventRowAccumulator>(Math.Min(maxEvents, 256));
@@ -93,7 +98,7 @@ public static class NamedEventsTimelineQueryExecutor {
 
         try {
             await foreach (var item in SearchEvents.FindEventsByNamedEvents(
-                               typeEventsList: normalizedNamedEvents,
+                               typeEventsList: effectiveNamedEvents,
                                machineNames: normalizedMachines.Count > 0 ? normalizedMachines.Cast<string?>().ToList() : null,
                                startTime: request.StartTimeUtc,
                                endTime: request.EndTimeUtc,
@@ -125,6 +130,7 @@ public static class NamedEventsTimelineQueryExecutor {
 
                 var row = ToAccumulator(item, namedEventName, includePayload, normalizedPayloadKeys);
                 var correlation = BuildCorrelationValues(row, normalizedCorrelationKeys);
+                row.Correlation = correlation;
                 var hasCorrelation = correlation.Values.Any(static value => !string.IsNullOrWhiteSpace(value));
                 if (!hasCorrelation && !includeUncorrelated) {
                     filteredUncorrelated++;
@@ -168,15 +174,14 @@ public static class NamedEventsTimelineQueryExecutor {
 
         for (var i = 0; i < orderedRows.Count; i++) {
             var row = orderedRows[i];
-            var correlation = BuildCorrelationValues(row, normalizedCorrelationKeys);
-            var correlationToken = BuildCorrelationToken(correlation);
+            var correlationToken = BuildCorrelationToken(row.Correlation);
             var correlationId = BuildCorrelationId(correlationToken);
 
             sequence++;
             timelineRows.Add(new NamedEventsTimelineEventRow {
                 Sequence = sequence,
                 CorrelationId = correlationId,
-                Correlation = correlation,
+                Correlation = row.Correlation,
                 NamedEvent = row.NamedEvent,
                 RuleType = row.RuleType,
                 EventId = row.EventId,
@@ -194,7 +199,7 @@ public static class NamedEventsTimelineQueryExecutor {
             if (!groups.TryGetValue(correlationId, out var group)) {
                 group = new GroupAccumulator {
                     CorrelationId = correlationId,
-                    Correlation = correlation
+                    Correlation = row.Correlation
                 };
                 groups[correlationId] = group;
             }
@@ -266,7 +271,7 @@ public static class NamedEventsTimelineQueryExecutor {
             .ToArray();
 
         return (new NamedEventsTimelineQueryResult {
-            RequestedNamedEvents = normalizedNamedEvents
+            RequestedNamedEvents = effectiveNamedEvents
                 .Select(static value => ToSnakeCase(value.ToString()))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .OrderBy(static value => value, StringComparer.OrdinalIgnoreCase)
@@ -385,7 +390,7 @@ public static class NamedEventsTimelineQueryExecutor {
         }
 
         normalizedNamedEvents = request.NamedEvents
-            .Distinct()
+            .Distinct(EqualityComparer<NamedEvents>.Default)
             .ToList();
 
         if (request.MachineNames is not null) {
@@ -480,6 +485,10 @@ public static class NamedEventsTimelineQueryExecutor {
         string namedEvent,
         bool includePayload,
         HashSet<string>? payloadKeySet) {
+        if (item is null) {
+            throw new ArgumentNullException(nameof(item));
+        }
+
         var fullPayload = ExtractPayload(item);
         var payload = includePayload
             ? ProjectPayload(fullPayload, payloadKeySet)
@@ -540,7 +549,8 @@ public static class NamedEventsTimelineQueryExecutor {
             return string.Empty;
         }
 
-        var trimmed = value.Trim();
+        string nonNullValue = value;
+        var trimmed = nonNullValue.Trim();
         return trimmed.Length == 0 ? string.Empty : trimmed;
     }
 
@@ -549,7 +559,13 @@ public static class NamedEventsTimelineQueryExecutor {
             return "uncorrelated";
         }
 
-        var sb = new StringBuilder(correlation.Count * 24);
+        var estimatedChars = 16;
+        foreach (var key in correlation.Keys) {
+            var value = correlation[key];
+            estimatedChars += key.Length + (string.IsNullOrWhiteSpace(value) ? 8 : value.Length) + 2;
+        }
+
+        var sb = new StringBuilder(estimatedChars);
         foreach (var key in correlation.Keys.OrderBy(static value => value, StringComparer.OrdinalIgnoreCase)) {
             var value = correlation[key];
             if (sb.Length > 0) {
@@ -567,7 +583,7 @@ public static class NamedEventsTimelineQueryExecutor {
     private static string BuildCorrelationId(string token) {
         using var sha = SHA256.Create();
         var hash = sha.ComputeHash(Encoding.UTF8.GetBytes(token));
-        return BitConverter.ToString(hash, 0, 8).Replace("-", string.Empty).ToLowerInvariant();
+        return BitConverter.ToString(hash, 0, CorrelationIdHashBytes).Replace("-", string.Empty).ToLowerInvariant();
     }
 
     private static DateTime? ParseUtc(string? value) {
@@ -631,7 +647,8 @@ public static class NamedEventsTimelineQueryExecutor {
             object? value;
             try {
                 value = property.GetValue(item);
-            } catch {
+            } catch (Exception ex) {
+                Debug.WriteLine($"[NamedEventsTimelineQueryExecutor] Failed to read payload property '{property.Name}': {ex.Message}");
                 continue;
             }
 
@@ -672,8 +689,12 @@ public static class NamedEventsTimelineQueryExecutor {
             return null;
         }
 
-        if (value is string text && DateTime.TryParse(text, out var parsed)) {
-            return parsed.ToUniversalTime().ToString("O");
+        if (value is string text && DateTimeOffset.TryParse(
+                text,
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
+                out var parsedOffset)) {
+            return parsedOffset.UtcDateTime.ToString("O");
         }
 
         if (value is DateTime dateTime) {
@@ -802,6 +823,7 @@ public static class NamedEventsTimelineQueryExecutor {
         public long? RecordId { get; }
         public string GatheredFrom { get; }
         public string GatheredLogName { get; }
+        public IReadOnlyDictionary<string, string> Correlation { get; set; } = new Dictionary<string, string>();
         public string? WhenUtc { get; }
         public DateTime? WhenUtcDate { get; }
         public string? Who { get; }
