@@ -1,7 +1,8 @@
+using System.Diagnostics;
+using System.Collections.Concurrent;
 using System.Globalization;
 using System.Reflection;
 using System.Security.Cryptography;
-using System.Diagnostics;
 using EventViewerX.Reports.QueryHelpers;
 
 namespace EventViewerX.Reports.Correlation;
@@ -16,6 +17,8 @@ public static class NamedEventsTimelineQueryExecutor {
     private const int MaxBucketMinutes = 1440;
     private const int MaxThreadsCap = 8;
     private const int CorrelationIdHashBytes = 8;
+    private const int MaxSnakeCaseCacheEntries = 4096;
+    private const string HexSeparator = "-";
     private static readonly string[] AllowedCorrelationKeysValue = {
         "who",
         "object_affected",
@@ -32,6 +35,8 @@ public static class NamedEventsTimelineQueryExecutor {
         "object_affected",
         "computer"
     };
+    private static readonly ConcurrentDictionary<Type, PayloadExtractionPlan> PayloadExtractionPlanCache = new();
+    private static readonly ConcurrentDictionary<string, string> SnakeCaseCache = new(StringComparer.Ordinal);
 
     /// <summary>
     /// Allowed correlation dimensions accepted by <see cref="TryBuildAsync"/>.
@@ -276,12 +281,12 @@ public static class NamedEventsTimelineQueryExecutor {
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .OrderBy(static value => value, StringComparer.OrdinalIgnoreCase)
                 .ToArray(),
-            EffectiveMachines = normalizedMachines.ToArray(),
+            EffectiveMachines = normalizedMachines,
             StartTimeUtc = request.StartTimeUtc,
             EndTimeUtc = request.EndTimeUtc,
             MaxEvents = maxEvents,
             MaxThreads = maxThreads,
-            CorrelationKeys = normalizedCorrelationKeys.ToArray(),
+            CorrelationKeys = normalizedCorrelationKeys,
             IncludeUncorrelated = includeUncorrelated,
             BucketMinutes = bucketMinutes,
             Truncated = truncated,
@@ -583,7 +588,7 @@ public static class NamedEventsTimelineQueryExecutor {
     private static string BuildCorrelationId(string token) {
         using var sha = SHA256.Create();
         var hash = sha.ComputeHash(Encoding.UTF8.GetBytes(token));
-        return BitConverter.ToString(hash, 0, CorrelationIdHashBytes).Replace("-", string.Empty).ToLowerInvariant();
+        return BitConverter.ToString(hash, 0, CorrelationIdHashBytes).Replace(HexSeparator, string.Empty).ToLowerInvariant();
     }
 
     private static DateTime? ParseUtc(string? value) {
@@ -622,16 +627,53 @@ public static class NamedEventsTimelineQueryExecutor {
     }
 
     private static Dictionary<string, object?> ExtractPayload(EventObjectSlim item) {
-        var payload = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
-        var type = item.GetType();
+        if (item is null) {
+            throw new ArgumentNullException(nameof(item));
+        }
+
+        var plan = PayloadExtractionPlanCache.GetOrAdd(
+            item.GetType(),
+            static type => BuildPayloadExtractionPlan(type));
+        var payload = new Dictionary<string, object?>(
+            plan.FieldAccessors.Length + plan.PropertyAccessors.Length,
+            StringComparer.OrdinalIgnoreCase);
+
+        foreach (var accessor in plan.FieldAccessors) {
+            var value = accessor.Field.GetValue(item);
+            payload[accessor.Key] = NormalizeValue(value);
+        }
+
+        foreach (var accessor in plan.PropertyAccessors) {
+            object? value;
+            try {
+                value = accessor.Property.GetValue(item);
+            } catch (Exception ex) {
+                Debug.WriteLine($"[NamedEventsTimelineQueryExecutor] Failed to read payload property '{accessor.Property.Name}': {ex.Message}");
+                continue;
+            }
+
+            payload[accessor.Key] = NormalizeValue(value);
+        }
+
+        return payload;
+    }
+
+    private static PayloadExtractionPlan BuildPayloadExtractionPlan(Type type) {
+        var fieldAccessors = new List<PayloadFieldAccessor>();
+        var propertyAccessors = new List<PayloadPropertyAccessor>();
+        var seenKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var field in type.GetFields(BindingFlags.Public | BindingFlags.Instance)) {
             if (!ShouldIncludeField(field)) {
                 continue;
             }
 
-            var value = field.GetValue(item);
-            payload[ToSnakeCase(field.Name)] = NormalizeValue(value);
+            var key = ToSnakeCase(field.Name);
+            if (!seenKeys.Add(key)) {
+                continue;
+            }
+
+            fieldAccessors.Add(new PayloadFieldAccessor(field, key));
         }
 
         foreach (var property in type.GetProperties(BindingFlags.Public | BindingFlags.Instance)) {
@@ -640,22 +682,14 @@ public static class NamedEventsTimelineQueryExecutor {
             }
 
             var key = ToSnakeCase(property.Name);
-            if (payload.ContainsKey(key)) {
+            if (!seenKeys.Add(key)) {
                 continue;
             }
 
-            object? value;
-            try {
-                value = property.GetValue(item);
-            } catch (Exception ex) {
-                Debug.WriteLine($"[NamedEventsTimelineQueryExecutor] Failed to read payload property '{property.Name}': {ex.Message}");
-                continue;
-            }
-
-            payload[key] = NormalizeValue(value);
+            propertyAccessors.Add(new PayloadPropertyAccessor(property, key));
         }
 
-        return payload;
+        return new PayloadExtractionPlan(fieldAccessors.ToArray(), propertyAccessors.ToArray());
     }
 
     private static Dictionary<string, object?> ProjectPayload(
@@ -756,6 +790,19 @@ public static class NamedEventsTimelineQueryExecutor {
             return string.Empty;
         }
 
+        if (SnakeCaseCache.TryGetValue(value, out var cached)) {
+            return cached;
+        }
+
+        var normalized = ToSnakeCaseCore(value);
+        if (SnakeCaseCache.Count < MaxSnakeCaseCacheEntries) {
+            SnakeCaseCache.TryAdd(value, normalized);
+        }
+
+        return normalized;
+    }
+
+    private static string ToSnakeCaseCore(string value) {
         var sb = new StringBuilder(value.Length + 8);
         for (var i = 0; i < value.Length; i++) {
             var c = value[i];
@@ -785,6 +832,38 @@ public static class NamedEventsTimelineQueryExecutor {
         }
 
         return sb.ToString().Trim('_');
+    }
+
+    private sealed class PayloadExtractionPlan {
+        public PayloadExtractionPlan(
+            PayloadFieldAccessor[] fieldAccessors,
+            PayloadPropertyAccessor[] propertyAccessors) {
+            FieldAccessors = fieldAccessors;
+            PropertyAccessors = propertyAccessors;
+        }
+
+        public PayloadFieldAccessor[] FieldAccessors { get; }
+        public PayloadPropertyAccessor[] PropertyAccessors { get; }
+    }
+
+    private sealed class PayloadFieldAccessor {
+        public PayloadFieldAccessor(FieldInfo field, string key) {
+            Field = field;
+            Key = key;
+        }
+
+        public FieldInfo Field { get; }
+        public string Key { get; }
+    }
+
+    private sealed class PayloadPropertyAccessor {
+        public PayloadPropertyAccessor(PropertyInfo property, string key) {
+            Property = property;
+            Key = key;
+        }
+
+        public PropertyInfo Property { get; }
+        public string Key { get; }
     }
 
     private sealed class EventRowAccumulator {
