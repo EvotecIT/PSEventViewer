@@ -72,4 +72,29 @@ public class TestNamedEventsTimelineQueryExecutor {
         Assert.Equal(NamedEventsTimelineQueryFailureKind.InvalidArgument, failure!.Kind);
         Assert.Contains("eventIds", failure.Message, StringComparison.OrdinalIgnoreCase);
     }
+
+    [Fact]
+    public void TryParseUtcValue_ShouldTreatUnspecifiedTimestampAsUtc() {
+        var parsed = NamedEventsTimelineQueryExecutor.TryParseUtcValue("2026-02-20T12:34:56", out var utc);
+
+        Assert.True(parsed);
+        Assert.Equal(DateTimeKind.Utc, utc.Kind);
+        Assert.Equal(new DateTime(2026, 2, 20, 12, 34, 56, DateTimeKind.Utc), utc);
+    }
+
+    [Fact]
+    public void TryParseUtcValue_ShouldConvertOffsetTimestampToUtc() {
+        var parsed = NamedEventsTimelineQueryExecutor.TryParseUtcValue("2026-02-20T12:34:56+02:00", out var utc);
+
+        Assert.True(parsed);
+        Assert.Equal(DateTimeKind.Utc, utc.Kind);
+        Assert.Equal(new DateTime(2026, 2, 20, 10, 34, 56, DateTimeKind.Utc), utc);
+    }
+
+    [Fact]
+    public void TryParseUtcValue_ShouldReturnFalseForInvalidInput() {
+        var parsed = NamedEventsTimelineQueryExecutor.TryParseUtcValue("not-a-timestamp", out _);
+
+        Assert.False(parsed);
+    }
 }
