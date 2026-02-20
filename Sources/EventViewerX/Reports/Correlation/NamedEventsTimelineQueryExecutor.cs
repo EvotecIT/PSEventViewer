@@ -18,6 +18,10 @@ public static class NamedEventsTimelineQueryExecutor {
     private const int MaxThreadsCap = 8;
     private const int CorrelationIdHashBytes = 8;
     private const int MaxSnakeCaseCacheEntries = 4096;
+    private const int CorrelationTokenMinimumCapacity = 16;
+    private const int CorrelationPairSeparatorChars = 1;
+    private const int CorrelationKeyValueSeparatorChars = 1;
+    private const string EmptyCorrelationValue = "<empty>";
     private const string HexSeparator = "-";
     private static readonly string[] AllowedCorrelationKeysValue = {
         "who",
@@ -564,14 +568,14 @@ public static class NamedEventsTimelineQueryExecutor {
             return "uncorrelated";
         }
 
-        var estimatedChars = 16;
-        foreach (var key in correlation.Keys) {
-            var value = correlation[key];
-            estimatedChars += key.Length + (string.IsNullOrWhiteSpace(value) ? 8 : value.Length) + 2;
-        }
+        var orderedKeys = correlation.Keys
+            .OrderBy(static value => value, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
 
+        var estimatedChars = EstimateCorrelationTokenCapacity(correlation, orderedKeys);
         var sb = new StringBuilder(estimatedChars);
-        foreach (var key in correlation.Keys.OrderBy(static value => value, StringComparer.OrdinalIgnoreCase)) {
+        for (var i = 0; i < orderedKeys.Length; i++) {
+            var key = orderedKeys[i];
             var value = correlation[key];
             if (sb.Length > 0) {
                 sb.Append('|');
@@ -579,10 +583,28 @@ public static class NamedEventsTimelineQueryExecutor {
 
             sb.Append(key);
             sb.Append('=');
-            sb.Append(string.IsNullOrWhiteSpace(value) ? "<empty>" : value);
+            sb.Append(string.IsNullOrWhiteSpace(value) ? EmptyCorrelationValue : value);
         }
 
         return sb.ToString();
+    }
+
+    private static int EstimateCorrelationTokenCapacity(
+        IReadOnlyDictionary<string, string> correlation,
+        IReadOnlyList<string> orderedKeys) {
+        var estimatedChars = CorrelationTokenMinimumCapacity;
+
+        for (var i = 0; i < orderedKeys.Count; i++) {
+            var key = orderedKeys[i];
+            var value = correlation[key];
+            var valueLength = string.IsNullOrWhiteSpace(value) ? EmptyCorrelationValue.Length : value.Length;
+            estimatedChars += key.Length + CorrelationKeyValueSeparatorChars + valueLength;
+            if (i > 0) {
+                estimatedChars += CorrelationPairSeparatorChars;
+            }
+        }
+
+        return estimatedChars;
     }
 
     private static string BuildCorrelationId(string token) {
@@ -591,28 +613,77 @@ public static class NamedEventsTimelineQueryExecutor {
         return BitConverter.ToString(hash, 0, CorrelationIdHashBytes).Replace(HexSeparator, string.Empty).ToLowerInvariant();
     }
 
-    private static DateTime? ParseUtc(string? value) {
-        if (string.IsNullOrWhiteSpace(value)) {
-            return null;
+    internal static bool TryParseUtcValue(string? value, out DateTime utc) {
+        utc = default;
+        var text = value ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(text)) {
+            return false;
         }
 
-        if (DateTimeOffset.TryParse(
-                value,
-                CultureInfo.InvariantCulture,
-                DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
-                out var offset)) {
-            return offset.UtcDateTime;
+        text = text.Trim();
+        var hasExplicitOffset = HasExplicitOffsetOrUtcDesignator(text);
+
+        if (hasExplicitOffset) {
+            if (!DateTimeOffset.TryParse(
+                    text,
+                    CultureInfo.InvariantCulture,
+                    DateTimeStyles.AllowWhiteSpaces | DateTimeStyles.AssumeUniversal,
+                    out var parsedOffset)) {
+                return false;
+            }
+
+            utc = parsedOffset.UtcDateTime;
+            return true;
         }
 
         if (!DateTime.TryParse(
-                value,
+                text,
                 CultureInfo.InvariantCulture,
-                DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
-                out var parsed)) {
+                DateTimeStyles.AllowWhiteSpaces,
+                out var parsedDateTime)) {
+            return false;
+        }
+
+        utc = parsedDateTime.Kind switch {
+            DateTimeKind.Utc => parsedDateTime,
+            DateTimeKind.Local => parsedDateTime.ToUniversalTime(),
+            _ => DateTime.SpecifyKind(parsedDateTime, DateTimeKind.Utc)
+        };
+        return true;
+    }
+
+    private static bool HasExplicitOffsetOrUtcDesignator(string value) {
+        if (value.EndsWith("Z", StringComparison.OrdinalIgnoreCase)) {
+            return true;
+        }
+
+        var searchStart = 0;
+        var tIndex = value.IndexOf('T');
+        if (tIndex >= 0 && tIndex + 1 < value.Length) {
+            searchStart = tIndex + 1;
+        } else {
+            var spaceIndex = value.IndexOf(' ');
+            if (spaceIndex >= 0 && spaceIndex + 1 < value.Length) {
+                searchStart = spaceIndex + 1;
+            }
+        }
+
+        for (var i = value.Length - 1; i >= searchStart; i--) {
+            var ch = value[i];
+            if (ch == '+' || ch == '-') {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static DateTime? ParseUtc(string? value) {
+        if (!TryParseUtcValue(value, out var utc)) {
             return null;
         }
 
-        return parsed.Kind == DateTimeKind.Utc ? parsed : parsed.ToUniversalTime();
+        return utc;
     }
 
     private static DateTime FloorToBucket(DateTime valueUtc, int bucketMinutes) {
@@ -723,16 +794,21 @@ public static class NamedEventsTimelineQueryExecutor {
             return null;
         }
 
-        if (value is string text && DateTimeOffset.TryParse(
-                text,
-                CultureInfo.InvariantCulture,
-                DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
-                out var parsedOffset)) {
-            return parsedOffset.UtcDateTime.ToString("O");
+        if (value is string text && TryParseUtcValue(text, out var parsedUtc)) {
+            return parsedUtc.ToString("O");
+        }
+
+        if (value is DateTimeOffset dateTimeOffset) {
+            return dateTimeOffset.UtcDateTime.ToString("O");
         }
 
         if (value is DateTime dateTime) {
-            return dateTime.ToUniversalTime().ToString("O");
+            var parsed = dateTime.Kind switch {
+                DateTimeKind.Utc => dateTime,
+                DateTimeKind.Local => dateTime.ToUniversalTime(),
+                _ => DateTime.SpecifyKind(dateTime, DateTimeKind.Utc)
+            };
+            return parsed.ToString("O");
         }
 
         return value.ToString();
