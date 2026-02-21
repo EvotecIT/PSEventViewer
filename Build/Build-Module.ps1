@@ -4,7 +4,7 @@ Build-Module -ModuleName 'PSEventViewer' {
     # Usual defaults as per standard module
     $Manifest = [ordered] @{
         # Version number of this module.
-        ModuleVersion        = '3.1.X'
+        ModuleVersion        = '3.4.X'
         # Supported PSEditions
         CompatiblePSEditions = @('Desktop', 'Core')
         # ID used to uniquely identify this module
