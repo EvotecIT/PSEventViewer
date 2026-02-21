@@ -29,19 +29,19 @@ Build-Module -ModuleName 'PSEventViewer' {
     New-ConfigurationManifest @Manifest #-CmdletsToExport 'Find-WinEvent', 'Write-WinEvent', 'Start-EventWatching'
 
     # Add standard module dependencies (directly, but can be used with loop as well)
-    New-ConfigurationModule -Type RequiredModule -Name 'PSSharedGoods' -Guid 'Auto' -Version 'Latest'
+    #New-ConfigurationModule -Type RequiredModule -Name 'PSSharedGoods' -Guid 'Auto' -Version 'Latest'
     # Add external module dependencies, using loop for simplicity
-    New-ConfigurationModule -Type ExternalModule -Name 'Microsoft.PowerShell.Utility', 'Microsoft.PowerShell.Management', 'Microsoft.PowerShell.Diagnostics'
+    #New-ConfigurationModule -Type ExternalModule -Name 'Microsoft.PowerShell.Utility', 'Microsoft.PowerShell.Management', 'Microsoft.PowerShell.Diagnostics'
     # Add approved modules, that can be used as a dependency, but only when specific function from those modules is used
     # And on that time only that function and dependant functions will be copied over
     # Keep in mind it has it's limits when "copying" functions such as it should not depend on DLLs or other external files
-    New-ConfigurationModule -Type ApprovedModule -Name 'PSSharedGoods', 'PSWriteColor', 'Connectimo', 'PSUnifi', 'PSWebToolbox', 'PSMyPassword'
+    #New-ConfigurationModule -Type ApprovedModule -Name 'PSSharedGoods', 'PSWriteColor', 'Connectimo', 'PSUnifi', 'PSWebToolbox', 'PSMyPassword'
 
-    New-ConfigurationModuleSkip -IgnoreModuleName 'ActiveDirectory' -IgnoreFunctionName @(
-        'Get-EventsInternal'
-        'Initialize-XPathFilter'
-        'Join-XPathFilter'
-    )
+    #New-ConfigurationModuleSkip -IgnoreModuleName 'ActiveDirectory' -IgnoreFunctionName @(
+    #    'Get-EventsInternal'
+    #    'Initialize-XPathFilter'
+    #    'Join-XPathFilter'
+    #)
 
     $ConfigurationFormat = [ordered] @{
         RemoveComments                              = $false
@@ -96,7 +96,7 @@ Build-Module -ModuleName 'PSEventViewer' {
         DotSourceLibraries                = $true
         DotSourceClasses                  = $true
         DeleteTargetModuleBeforeBuild     = $true
-        RefreshPSD1Only                   = $true
+        RefreshPSD1Only                   = $false
     }
 
     New-ConfigurationBuild @newConfigurationBuildSplat
@@ -105,6 +105,6 @@ Build-Module -ModuleName 'PSEventViewer' {
     New-ConfigurationArtefact -Type Packed -Enable -Path "$PSScriptRoot\..\Artefacts\Packed" -IncludeTagName
 
     # global options for publishing to github/psgallery
-    #New-ConfigurationPublish -Type PowerShellGallery -FilePath 'C:\Support\Important\PowerShellGalleryAPI.txt' -Enabled:$false
-    #New-ConfigurationPublish -Type GitHub -FilePath 'C:\Support\Important\GitHubAPI.txt' -UserName 'EvotecIT' -Enabled:$false
+    New-ConfigurationPublish -Type PowerShellGallery -FilePath 'C:\Support\Important\PowerShellGalleryAPI.txt' -Enabled:$true
+    New-ConfigurationPublish -Type GitHub -FilePath 'C:\Support\Important\GitHubAPI.txt' -UserName 'EvotecIT' -Enabled:$true -GenerateReleaseNotes -OverwriteTagName 'PSEventViewer-<TagModuleVersionWithPreRelease>'
 }

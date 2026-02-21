@@ -36,5 +36,5 @@
   "GitHubPrimaryProject": "EventViewerX",
   "GitHubTagTemplate": "{PrimaryProject}-v{PrimaryVersion}",
   "GitHubTagConflictPolicy": "Reuse",
-  "GitHubReleaseName": "{Repo} {PrimaryVersion}"
+  "GitHubReleaseName": "{PrimaryProject} {PrimaryVersion}"
 }
