@@ -138,14 +138,19 @@ public sealed class SecurityAccountLockoutsReportBuilder {
         out SecurityAccountLockoutsReport report,
         out EvtxQueryFailure? failure,
         CancellationToken cancellationToken = default) {
-
-        if (!EvtxQueryExecutor.TryRead(request, out var queried, out failure, cancellationToken)) {
+        var b = new SecurityAccountLockoutsReportBuilder(includeSamples, sampleSize);
+        if (!EvtxQueryExecutor.TryForEachEvent(
+                request,
+                ev => {
+                    b.Add(ev);
+                    return true;
+                },
+                out failure,
+                cancellationToken)) {
             report = new SecurityAccountLockoutsReport();
             return false;
         }
 
-        var b = new SecurityAccountLockoutsReportBuilder(includeSamples, sampleSize);
-        b.AddRange(queried.Events, cancellationToken);
         report = b.Build();
         return true;
     }

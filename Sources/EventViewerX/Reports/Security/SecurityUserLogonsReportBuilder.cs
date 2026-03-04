@@ -187,15 +187,20 @@ public sealed class SecurityUserLogonsReportBuilder {
         out SecurityUserLogonsReport report,
         out EvtxQueryFailure? failure,
         CancellationToken cancellationToken = default) {
-
-        if (!EvtxQueryExecutor.TryRead(request, out var queried, out failure, cancellationToken)) {
+        var eventIds = request.EventIds ?? Array.Empty<int>();
+        var b = new SecurityUserLogonsReportBuilder(includeSamples, sampleSize, eventIds);
+        if (!EvtxQueryExecutor.TryForEachEvent(
+                request,
+                ev => {
+                    b.Add(ev);
+                    return true;
+                },
+                out failure,
+                cancellationToken)) {
             report = new SecurityUserLogonsReport();
             return false;
         }
 
-        var eventIds = request.EventIds ?? Array.Empty<int>();
-        var b = new SecurityUserLogonsReportBuilder(includeSamples, sampleSize, eventIds);
-        b.AddRange(queried.Events, cancellationToken);
         report = b.Build();
         return true;
     }

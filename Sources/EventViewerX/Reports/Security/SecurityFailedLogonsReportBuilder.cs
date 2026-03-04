@@ -159,14 +159,19 @@ public sealed class SecurityFailedLogonsReportBuilder {
         out SecurityFailedLogonsReport report,
         out EvtxQueryFailure? failure,
         CancellationToken cancellationToken = default) {
-
-        if (!EvtxQueryExecutor.TryRead(request, out var queried, out failure, cancellationToken)) {
+        var b = new SecurityFailedLogonsReportBuilder(includeSamples, sampleSize);
+        if (!EvtxQueryExecutor.TryForEachEvent(
+                request,
+                ev => {
+                    b.Add(ev);
+                    return true;
+                },
+                out failure,
+                cancellationToken)) {
             report = new SecurityFailedLogonsReport();
             return false;
         }
 
-        var b = new SecurityFailedLogonsReportBuilder(includeSamples, sampleSize);
-        b.AddRange(queried.Events, cancellationToken);
         report = b.Build();
         return true;
     }

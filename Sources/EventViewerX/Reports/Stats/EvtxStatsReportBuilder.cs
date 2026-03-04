@@ -137,14 +137,19 @@ public sealed class EvtxStatsReportBuilder {
         out EvtxStatsReport report,
         out EvtxQueryFailure? failure,
         CancellationToken cancellationToken = default) {
-
-        if (!EvtxQueryExecutor.TryRead(request, out var queried, out failure, cancellationToken)) {
+        var builder = new EvtxStatsReportBuilder();
+        if (!EvtxQueryExecutor.TryForEachEvent(
+                request,
+                ev => {
+                    builder.Add(ev);
+                    return true;
+                },
+                out failure,
+                cancellationToken)) {
             report = new EvtxStatsReport();
             return false;
         }
 
-        var builder = new EvtxStatsReportBuilder();
-        builder.AddRange(queried.Events, cancellationToken);
         report = builder.Build();
         return true;
     }
