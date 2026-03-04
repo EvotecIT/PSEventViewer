@@ -134,65 +134,32 @@ public class ADUserLogonFailed : EventRuleBase {
         Computer = _eventObject.ComputerName;
         Action = _eventObject.MessageSubject;
         //Who = _eventObject.GetValueFromDataDictionary("SubjectUserName", "SubjectDomainName", "\\", reverseOrder: true);
-        Who = _eventObject.GetValueFromDataDictionary("WorkstationName");
+        Who = _eventObject.GetDataValueOrEmpty(KnownEventField.WorkstationName);
         ObjectAffected = _eventObject.GetValueFromDataDictionary("TargetUserName", "TargetDomainName", "\\", reverseOrder: true);
-        IpAddress = _eventObject.GetValueFromDataDictionary("IpAddress");
-        IpPort = _eventObject.GetValueFromDataDictionary("IpPort");
+        IpAddress = _eventObject.GetDataValueOrEmpty(KnownEventField.IpAddress);
+        IpPort = _eventObject.GetDataValueOrEmpty(KnownEventField.IpPort);
         //WorkstationName = _eventObject.GetValueFromDataDictionary("WorkstationName");
-        LogonProcessName = _eventObject.GetValueFromDataDictionary("LogonProcessName");
-        LogonType = ParseLogonType(_eventObject.GetValueFromDataDictionary("LogonType"));
-        // Parse Status, SubStatus, and FailureReason
-        Status = ParseStatus(_eventObject.GetValueFromDataDictionary("Status"));
-        SubStatus = ParseSubStatus(_eventObject.GetValueFromDataDictionary("SubStatus"));
-        FailureReason = ParseFailureReason(_eventObject.GetValueFromDataDictionary("FailureReason"));
+        LogonProcessName = _eventObject.GetDataValueOrEmpty(KnownEventField.LogonProcessName);
+        LogonType = _eventObject.TryGetDataEnum(KnownEventField.LogonType, out EventViewerX.LogonType parsedLogonType, EventFieldNumericBase.Decimal)
+            ? parsedLogonType
+            : null;
+        Status = _eventObject.TryGetDataEnum(KnownEventField.Status, out StatusCode parsedStatus, EventFieldNumericBase.Hexadecimal)
+            ? parsedStatus
+            : null;
+        SubStatus = _eventObject.TryGetDataEnum(KnownEventField.SubStatus, out SubStatusCode parsedSubStatus, EventFieldNumericBase.Hexadecimal)
+            ? parsedSubStatus
+            : null;
+        FailureReason = _eventObject.TryGetDataEnum(KnownEventField.FailureReason, out EventViewerX.FailureReason parsedFailureReason, EventFieldNumericBase.Decimal, "%%")
+            ? parsedFailureReason
+            : null;
 
-        LmPackageName = _eventObject.GetValueFromDataDictionary("LmPackageName");
-        KeyLength = _eventObject.GetValueFromDataDictionary("KeyLength");
-        ProcessId = _eventObject.GetValueFromDataDictionary("ProcessId");
-        ProcessName = _eventObject.GetValueFromDataDictionary("ProcessName");
-        TransmittedServices = _eventObject.GetValueFromDataDictionary("TransmittedServices");
-        PackageName = _eventObject.GetValueFromDataDictionary("AuthenticationPackageName");
+        LmPackageName = _eventObject.GetDataValueOrEmpty(KnownEventField.LmPackageName);
+        KeyLength = _eventObject.GetDataValueOrEmpty(KnownEventField.KeyLength);
+        ProcessId = _eventObject.GetDataValueOrEmpty(KnownEventField.ProcessId);
+        ProcessName = _eventObject.GetDataValueOrEmpty(KnownEventField.ProcessName);
+        TransmittedServices = _eventObject.GetDataValueOrEmpty(KnownEventField.TransmittedServices);
+        PackageName = _eventObject.GetDataValueOrEmpty(KnownEventField.AuthenticationPackageName);
         When = _eventObject.TimeCreated;
-    }
-
-    private StatusCode? ParseStatus(string status) {
-        if (string.IsNullOrEmpty(status)) return null;
-
-        // Remove "0x" prefix if present and parse as hex
-        status = status.ToLowerInvariant().Replace("0x", "");
-        if (uint.TryParse(status, System.Globalization.NumberStyles.HexNumber, null, out uint statusCode)) {
-            return (StatusCode)statusCode;
-        }
-        return null;
-    }
-
-    private SubStatusCode? ParseSubStatus(string subStatus) {
-        if (string.IsNullOrEmpty(subStatus)) return null;
-
-        // Remove "0x" prefix if present and parse as hex
-        subStatus = subStatus.ToLowerInvariant().Replace("0x", "");
-        if (uint.TryParse(subStatus, System.Globalization.NumberStyles.HexNumber, null, out uint subStatusCode)) {
-            return (SubStatusCode)subStatusCode;
-        }
-        return null;
-    }
-
-    private FailureReason? ParseFailureReason(string reason) {
-        if (string.IsNullOrEmpty(reason)) return null;
-
-        // Remove "%%" prefix if present and parse as integer
-        reason = reason.Replace("%%", "");
-        if (int.TryParse(reason, out int reasonCode)) {
-            return (FailureReason)reasonCode;
-        }
-        return null;
-    }
-
-    private LogonType? ParseLogonType(string logonType) {
-        if (int.TryParse(logonType, out int lt)) {
-            return (LogonType)lt;
-        }
-        return null;
     }
 
     /// <summary>

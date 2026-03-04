@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Globalization;
 
 namespace EventViewerX {
     public partial class EventObject {
@@ -37,6 +39,114 @@ namespace EventViewerX {
         }
 
         /// <summary>
+        /// Attempts to retrieve an event data value by key.
+        /// </summary>
+        /// <param name="key">Dictionary key to lookup.</param>
+        /// <param name="value">Resolved value when found.</param>
+        /// <param name="trim">When <c>true</c>, trims whitespace from the returned value.</param>
+        /// <returns><c>true</c> when the key exists; otherwise <c>false</c>.</returns>
+        public bool TryGetDataValue(string key, out string value, bool trim = true) {
+            return TryGetValueFromDictionary(Data, key, out value, trim);
+        }
+
+        /// <summary>
+        /// Attempts to retrieve an event data value by a canonical known field.
+        /// </summary>
+        /// <param name="field">Known field to lookup.</param>
+        /// <param name="value">Resolved value when found.</param>
+        /// <param name="trim">When <c>true</c>, trims whitespace from the returned value.</param>
+        /// <returns><c>true</c> when the key exists; otherwise <c>false</c>.</returns>
+        public bool TryGetDataValue(KnownEventField field, out string value, bool trim = true) {
+            return TryGetDataValue(field.ToEventFieldKey(), out value, trim);
+        }
+
+        /// <summary>
+        /// Returns an event data value by known field or an empty string when missing.
+        /// </summary>
+        /// <param name="field">Known field to lookup.</param>
+        /// <param name="trim">When <c>true</c>, trims whitespace from the returned value.</param>
+        /// <returns>Resolved value, or empty string when key is missing.</returns>
+        public string GetDataValueOrEmpty(KnownEventField field, bool trim = true) {
+            return TryGetDataValue(field, out string value, trim) ? value : string.Empty;
+        }
+
+        /// <summary>
+        /// Attempts to retrieve a message dictionary value by key.
+        /// </summary>
+        /// <param name="key">Dictionary key to lookup.</param>
+        /// <param name="value">Resolved value when found.</param>
+        /// <param name="trim">When <c>true</c>, trims whitespace from the returned value.</param>
+        /// <returns><c>true</c> when the key exists; otherwise <c>false</c>.</returns>
+        public bool TryGetMessageValue(string key, out string value, bool trim = true) {
+            return TryGetValueFromDictionary(MessageData, key, out value, trim);
+        }
+
+        /// <summary>
+        /// Attempts to retrieve a message dictionary value by a canonical known field.
+        /// </summary>
+        /// <param name="field">Known field to lookup.</param>
+        /// <param name="value">Resolved value when found.</param>
+        /// <param name="trim">When <c>true</c>, trims whitespace from the returned value.</param>
+        /// <returns><c>true</c> when the key exists; otherwise <c>false</c>.</returns>
+        public bool TryGetMessageValue(KnownEventField field, out string value, bool trim = true) {
+            return TryGetMessageValue(field.ToEventFieldKey(), out value, trim);
+        }
+
+        /// <summary>
+        /// Returns a message dictionary value by known field or an empty string when missing.
+        /// </summary>
+        /// <param name="field">Known field to lookup.</param>
+        /// <param name="trim">When <c>true</c>, trims whitespace from the returned value.</param>
+        /// <returns>Resolved value, or empty string when key is missing.</returns>
+        public string GetMessageValueOrEmpty(KnownEventField field, bool trim = true) {
+            return TryGetMessageValue(field, out string value, trim) ? value : string.Empty;
+        }
+
+        /// <summary>
+        /// Attempts to parse a known event data field into a target enum.
+        /// </summary>
+        /// <typeparam name="TEnum">Target enum type.</typeparam>
+        /// <param name="field">Known field to lookup.</param>
+        /// <param name="value">Parsed enum value when conversion succeeds.</param>
+        /// <param name="numericBase">Preferred numeric base for numeric payloads.</param>
+        /// <param name="trimPrefix">Optional literal prefix to remove before parsing (for example <c>%%</c>).</param>
+        /// <returns><c>true</c> when conversion succeeds; otherwise <c>false</c>.</returns>
+        public bool TryGetDataEnum<TEnum>(
+            KnownEventField field,
+            out TEnum value,
+            EventFieldNumericBase numericBase = EventFieldNumericBase.Auto,
+            string trimPrefix = "") where TEnum : struct, Enum {
+            value = default;
+            if (!TryGetDataValue(field, out string rawValue)) {
+                return false;
+            }
+
+            return TryParseEnumValue(rawValue, out value, numericBase, trimPrefix);
+        }
+
+        /// <summary>
+        /// Attempts to parse a known message field into a target enum.
+        /// </summary>
+        /// <typeparam name="TEnum">Target enum type.</typeparam>
+        /// <param name="field">Known field to lookup.</param>
+        /// <param name="value">Parsed enum value when conversion succeeds.</param>
+        /// <param name="numericBase">Preferred numeric base for numeric payloads.</param>
+        /// <param name="trimPrefix">Optional literal prefix to remove before parsing (for example <c>%%</c>).</param>
+        /// <returns><c>true</c> when conversion succeeds; otherwise <c>false</c>.</returns>
+        public bool TryGetMessageEnum<TEnum>(
+            KnownEventField field,
+            out TEnum value,
+            EventFieldNumericBase numericBase = EventFieldNumericBase.Auto,
+            string trimPrefix = "") where TEnum : struct, Enum {
+            value = default;
+            if (!TryGetMessageValue(field, out string rawValue)) {
+                return false;
+            }
+
+            return TryParseEnumValue(rawValue, out value, numericBase, trimPrefix);
+        }
+
+        /// <summary>
         /// Gets the value from data dictionary.
         /// </summary>
         /// <param name="key1">The key1.</param>
@@ -70,6 +180,147 @@ namespace EventViewerX {
             }
 
             return false;
+        }
+
+        private static bool TryGetValueFromDictionary(
+            IReadOnlyDictionary<string, string>? dictionary,
+            string key,
+            out string value,
+            bool trim = true) {
+            value = string.Empty;
+            if (string.IsNullOrWhiteSpace(key) || dictionary == null || dictionary.Count == 0) {
+                return false;
+            }
+
+            string? found;
+            if (!dictionary.TryGetValue(key, out found)) {
+                found = null;
+                foreach (KeyValuePair<string, string> kv in dictionary) {
+                    if (string.Equals(kv.Key, key, StringComparison.OrdinalIgnoreCase)) {
+                        found = kv.Value;
+                        break;
+                    }
+                }
+            }
+
+            if (found == null) {
+                return false;
+            }
+
+            value = trim ? found.Trim() : found;
+            return true;
+        }
+
+        private static bool TryParseEnumValue<TEnum>(
+            string rawValue,
+            out TEnum value,
+            EventFieldNumericBase numericBase,
+            string trimPrefix) where TEnum : struct, Enum {
+            value = default;
+            if (string.IsNullOrWhiteSpace(rawValue)) {
+                return false;
+            }
+
+            string normalizedValue = rawValue.Trim();
+            if (!string.IsNullOrEmpty(trimPrefix) && normalizedValue.StartsWith(trimPrefix, StringComparison.OrdinalIgnoreCase)) {
+                normalizedValue = normalizedValue.Substring(trimPrefix.Length).Trim();
+            }
+
+            if (string.IsNullOrWhiteSpace(normalizedValue)) {
+                return false;
+            }
+
+            if (Enum.TryParse(normalizedValue, true, out value)) {
+                return true;
+            }
+
+            if (!TryParseUnsignedIntegerValue(normalizedValue, numericBase, out ulong numericValue)) {
+                return false;
+            }
+
+            return TryConvertToEnumValue(numericValue, out value);
+        }
+
+        private static bool TryParseUnsignedIntegerValue(string value, EventFieldNumericBase numericBase, out ulong parsedValue) {
+            parsedValue = 0;
+            if (string.IsNullOrWhiteSpace(value)) {
+                return false;
+            }
+
+            string normalized = value.Trim();
+            bool hasHexPrefix = normalized.StartsWith("0x", StringComparison.OrdinalIgnoreCase);
+            if (hasHexPrefix) {
+                normalized = normalized.Substring(2);
+            }
+
+            if (string.IsNullOrWhiteSpace(normalized)) {
+                return false;
+            }
+
+            if (numericBase == EventFieldNumericBase.Decimal) {
+                return ulong.TryParse(normalized, NumberStyles.Integer, CultureInfo.InvariantCulture, out parsedValue);
+            }
+
+            if (numericBase == EventFieldNumericBase.Hexadecimal) {
+                return ulong.TryParse(normalized, NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture, out parsedValue);
+            }
+
+            if (hasHexPrefix) {
+                return ulong.TryParse(normalized, NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture, out parsedValue);
+            }
+
+            if (ulong.TryParse(normalized, NumberStyles.Integer, CultureInfo.InvariantCulture, out parsedValue)) {
+                return true;
+            }
+
+            return ulong.TryParse(normalized, NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture, out parsedValue);
+        }
+
+        private static bool TryConvertToEnumValue<TEnum>(ulong rawValue, out TEnum value) where TEnum : struct, Enum {
+            value = default;
+
+            Type underlying = Enum.GetUnderlyingType(typeof(TEnum));
+            object? typedValue = null;
+            switch (Type.GetTypeCode(underlying)) {
+                case TypeCode.Byte:
+                    if (rawValue > byte.MaxValue) return false;
+                    typedValue = (byte)rawValue;
+                    break;
+                case TypeCode.SByte:
+                    if (rawValue > (ulong)sbyte.MaxValue) return false;
+                    typedValue = (sbyte)rawValue;
+                    break;
+                case TypeCode.Int16:
+                    if (rawValue > (ulong)short.MaxValue) return false;
+                    typedValue = (short)rawValue;
+                    break;
+                case TypeCode.UInt16:
+                    if (rawValue > ushort.MaxValue) return false;
+                    typedValue = (ushort)rawValue;
+                    break;
+                case TypeCode.Int32:
+                    if (rawValue > int.MaxValue) return false;
+                    typedValue = (int)rawValue;
+                    break;
+                case TypeCode.UInt32:
+                    if (rawValue > uint.MaxValue) return false;
+                    typedValue = (uint)rawValue;
+                    break;
+                case TypeCode.Int64:
+                    if (rawValue > long.MaxValue) return false;
+                    typedValue = (long)rawValue;
+                    break;
+                case TypeCode.UInt64:
+                    typedValue = rawValue;
+                    break;
+            }
+
+            if (typedValue == null) {
+                return false;
+            }
+
+            value = (TEnum)Enum.ToObject(typeof(TEnum), typedValue);
+            return true;
         }
     }
 }
