@@ -90,9 +90,14 @@ namespace EventViewerX {
         public EventBookmark Bookmark => _eventRecord.Bookmark;
 
         /// <summary>
-        /// Formatted event message.
+        /// Human-readable event message rendered by the provider when available.
         /// </summary>
-        public string Message => _eventRecord.FormatDescription() ?? string.Empty;
+        public string Message => _message ?? string.Empty;
+
+        /// <summary>
+        /// Message split into lines using CRLF/LF boundaries. Indices are stable for callers that need positional parsing.
+        /// </summary>
+        public IReadOnlyList<string> MessageLines { get; private set; } = Array.Empty<string>();
 
         /// <summary>
         /// Display name of the task.
@@ -199,6 +204,8 @@ namespace EventViewerX {
         /// </summary>
         public readonly EventRecord _eventRecord;
 
+        private readonly string _message;
+
         /// <summary>
         /// Creates a rich event wrapper around a raw <see cref="EventRecord"/> and annotates it with the queried machine name.
         /// </summary>
@@ -222,24 +229,54 @@ namespace EventViewerX {
                 _levelDisplayName = LevelToDisplayName(eventRecord.Level);
             }
 
-            ContainerLog = ((EventLogRecord)_eventRecord).ContainerLog;
+            if (_eventRecord is EventLogRecord eventLogRecord) {
+                ContainerLog = eventLogRecord.ContainerLog;
+            } else {
+                ContainerLog = eventRecord.LogName ?? string.Empty;
+            }
 
             if (queriedMachine != null && (queriedMachine.EndsWith(".evtx", StringComparison.OrdinalIgnoreCase) || queriedMachine.Contains("\\"))) {
                 GatheredFrom = queriedMachine;
             } else {
                 GatheredFrom = queriedMachine ?? Environment.MachineName;
             }
-            GatheredLogName = eventRecord.LogName;
+            GatheredLogName = eventRecord.LogName ?? string.Empty;
 
-            XMLData = eventRecord.ToXml();
+            _message = SafeFormatDescription(eventRecord);
+            MessageLines = SplitMessageLines(_message);
+            XMLData = SafeToXml(eventRecord);
             Data = ParseXML<Dictionary<string, string>>(XMLData);
-            try {
-                MessageData = ParseMessage<Dictionary<string, string>>(eventRecord.FormatDescription());
-            } catch {
-                MessageData = new Dictionary<string, string>();
-            }
+            MessageData = ParseMessage<Dictionary<string, string>>(_message);
             NicIdentifiers = ExtractNicIdentifiers();
             Attachments = ExtractAttachments(XMLData);
+        }
+
+        private static string SafeFormatDescription(EventRecord eventRecord) {
+            try {
+                return eventRecord.FormatDescription() ?? string.Empty;
+            } catch (EventLogNotFoundException ex) {
+                Settings._logger.WriteWarning("Failed to format event description due to missing provider metadata. ({0})",
+                    ex.Message);
+                return string.Empty;
+            } catch (EventLogException ex) {
+                Settings._logger.WriteWarning("Failed to format event description. ({0})", ex.Message);
+                return string.Empty;
+            } catch (Exception ex) {
+                Settings._logger.WriteWarning("Unexpected error while formatting event description. ({0})", ex.Message);
+                return string.Empty;
+            }
+        }
+
+        private static string SafeToXml(EventRecord eventRecord) {
+            try {
+                return eventRecord.ToXml() ?? string.Empty;
+            } catch (EventLogException ex) {
+                Settings._logger.WriteWarning("Failed to read event XML payload. ({0})", ex.Message);
+                return string.Empty;
+            } catch (Exception ex) {
+                Settings._logger.WriteWarning("Unexpected error while reading event XML payload. ({0})", ex.Message);
+                return string.Empty;
+            }
         }
 
         private static string LevelToDisplayName(byte? level)

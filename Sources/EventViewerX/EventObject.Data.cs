@@ -6,26 +6,35 @@ using System.Xml.Linq;
 
 namespace EventViewerX {
     public partial class EventObject {
+        private static string[] SplitMessageLines(string message) {
+            if (string.IsNullOrEmpty(message)) {
+                return Array.Empty<string>();
+            }
+
+            return Regex.Split(message, "\r?\n");
+        }
+
         /// <summary>
         /// Parses the message of the event record into a dictionary converting it into a key value pair
         /// </summary>
         /// <param name="message"></param>
         /// <returns></returns>
         private T ParseMessage<T>(string message) where T : IDictionary<string, string>, new() {
-            T data = new();
+            message ??= string.Empty;
+            T data = typeof(T) == typeof(Dictionary<string, string>)
+                ? (T)(object)new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                : new();
 
-            // Split the message into lines
-            string[] lines = Regex.Split(message, "\r?\n");
-
-            // Find the first non-empty line and add it to the dictionary with a default key of "Message"
-            string? firstLine = lines.FirstOrDefault(line => !string.IsNullOrWhiteSpace(line));
-            if (firstLine != null) {
-                data["Message"] = firstLine.Trim();
-                MessageSubject = firstLine.Trim();
+            string[] lines = SplitMessageLines(message);
+            int firstNonEmptyLineIndex = Array.FindIndex(lines, line => !string.IsNullOrWhiteSpace(line));
+            if (firstNonEmptyLineIndex >= 0) {
+                string firstLine = lines[firstNonEmptyLineIndex].Trim();
+                data["Message"] = firstLine;
+                MessageSubject = firstLine;
             }
 
-            // Process the remaining lines
-            for (int i = 1; i < lines.Length; i++) {
+            // Process remaining lines (after the subject) into key:value pairs.
+            for (int i = firstNonEmptyLineIndex + 1; i < lines.Length; i++) {
                 string line = lines[i].Trim();
 
                 // Skip empty lines
@@ -33,13 +42,11 @@ namespace EventViewerX {
                     continue;
                 }
 
-                // Check if the line contains a colon
-                if (line.Contains(':')) {
-                    // Split the line into a key and a value
-                    string[] parts = line.Split(':');
-                    if (parts.Length == 2) {
-                        string key = parts[0].Trim();
-                        string value = parts[1].Trim();
+                int colonIndex = line.IndexOf(':');
+                if (colonIndex > 0) {
+                    string key = line.Substring(0, colonIndex).Trim();
+                    string value = line.Substring(colonIndex + 1).Trim();
+                    if (!string.IsNullOrEmpty(key)) {
                         data[key] = value;
                     }
                 }
