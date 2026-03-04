@@ -1,0 +1,177 @@
+using System;
+using System.Collections.Generic;
+using System.Diagnostics.Eventing.Reader;
+using System.Reflection;
+using System.Runtime.Serialization;
+using System.Security.Principal;
+using EventViewerX.Rules.ActiveDirectory;
+using Xunit;
+
+namespace EventViewerX.Tests;
+
+public class TestEventObjectTypedAccessors
+{
+    [Fact]
+    public void TryGetDataValue_KnownField_IsCaseInsensitive()
+    {
+        var eo = BuildEventObject(data: new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["ipaddress"] = "10.20.30.40"
+        });
+
+        Assert.True(eo.TryGetDataValue(KnownEventField.IpAddress, out var ipAddress));
+        Assert.Equal("10.20.30.40", ipAddress);
+    }
+
+    [Fact]
+    public void TryGetDataEnum_ParsesHexAndPrefixedValues()
+    {
+        var eo = BuildEventObject(data: new Dictionary<string, string>
+        {
+            ["Status"] = "0xC000006D",
+            ["SubStatus"] = "0xC0000072",
+            ["FailureReason"] = "%%2304",
+            ["LogonType"] = "3"
+        });
+
+        Assert.True(eo.TryGetDataEnum(KnownEventField.Status, out StatusCode status, EventFieldNumericBase.Hexadecimal));
+        Assert.Equal(StatusCode.StatusLogonFailure, status);
+
+        Assert.True(eo.TryGetDataEnum(KnownEventField.SubStatus, out SubStatusCode subStatus, EventFieldNumericBase.Hexadecimal));
+        Assert.Equal(SubStatusCode.StatusAccountDisabled, subStatus);
+
+        Assert.True(eo.TryGetDataEnum(KnownEventField.FailureReason, out FailureReason failureReason, EventFieldNumericBase.Decimal, "%%"));
+        Assert.Equal(FailureReason.UnknownUserNameOrBadPassword, failureReason);
+
+        Assert.True(eo.TryGetDataEnum(KnownEventField.LogonType, out LogonType logonType, EventFieldNumericBase.Decimal));
+        Assert.Equal(LogonType.Network, logonType);
+    }
+
+    [Fact]
+    public void TryGetMessageValue_TextPayload_UsesSpecialKeyMapping()
+    {
+        var eo = BuildEventObject(messageData: new Dictionary<string, string>
+        {
+            ["#text"] = "payload from xml text node"
+        });
+
+        Assert.True(eo.TryGetMessageValue(KnownEventField.TextPayload, out var payload));
+        Assert.Equal("payload from xml text node", payload);
+    }
+
+    [Fact]
+    public void ADUserLogonFailed_ParsesTypedEnumFields()
+    {
+        var eo = BuildEventObject(data: new Dictionary<string, string>
+        {
+            ["WorkstationName"] = "CLIENT01",
+            ["TargetUserName"] = "john.smith",
+            ["TargetDomainName"] = "contoso",
+            ["IpAddress"] = "192.168.0.11",
+            ["IpPort"] = "50001",
+            ["LogonProcessName"] = "NtLmSsp",
+            ["LogonType"] = "3",
+            ["Status"] = "0xC000006D",
+            ["SubStatus"] = "0xC0000072",
+            ["FailureReason"] = "%%2304",
+            ["LmPackageName"] = "NTLM V2",
+            ["KeyLength"] = "128",
+            ["ProcessId"] = "0x3e7",
+            ["ProcessName"] = "C:\\Windows\\System32\\lsass.exe",
+            ["TransmittedServices"] = "-",
+            ["AuthenticationPackageName"] = "NTLM"
+        });
+
+        var rule = new ADUserLogonFailed(eo);
+
+        Assert.Equal(LogonType.Network, rule.LogonType);
+        Assert.Equal(StatusCode.StatusLogonFailure, rule.Status);
+        Assert.Equal(SubStatusCode.StatusAccountDisabled, rule.SubStatus);
+        Assert.Equal(FailureReason.UnknownUserNameOrBadPassword, rule.FailureReason);
+        Assert.Equal("NTLM", rule.PackageName);
+        Assert.Equal("CLIENT01", rule.Who);
+    }
+
+    private static EventObject BuildEventObject(
+        Dictionary<string, string>? data = null,
+        Dictionary<string, string>? messageData = null)
+    {
+        var record = (FakeEventRecord)FormatterServices.GetUninitializedObject(typeof(FakeEventRecord));
+        SetField(record, "_provider", "Microsoft-Windows-Security-Auditing");
+        SetField(record, "_log", "Security");
+        SetField(record, "_id", 4625);
+
+        var eo = (EventObject)FormatterServices.GetUninitializedObject(typeof(EventObject));
+        SetField(eo, "_eventRecord", record);
+        eo.MessageSubject = "An account failed to log on.";
+        eo.ContainerLog = "Security";
+        eo.XMLData = "<Event></Event>";
+        eo.GatheredFrom = "testhost";
+        eo.GatheredLogName = "Security";
+        SetProperty(eo, nameof(EventObject.MessageLines), Array.Empty<string>());
+        SetProperty(eo, nameof(EventObject.Data), data ?? new Dictionary<string, string>());
+        SetProperty(eo, nameof(EventObject.MessageData), messageData ?? new Dictionary<string, string>());
+        SetProperty(eo, nameof(EventObject.Attachments), Array.Empty<byte[]>());
+        SetProperty(eo, nameof(EventObject.NicIdentifiers), new List<string>());
+        return eo;
+    }
+
+    private static void SetField(object target, string name, object value)
+    {
+        var f = target.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+        f!.SetValue(target, value);
+    }
+
+    private static void SetProperty(object target, string name, object value)
+    {
+        var p = target.GetType().GetProperty(name, BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+        p!.SetValue(target, value);
+    }
+
+    private sealed class FakeEventRecord : EventRecord
+    {
+        private readonly int _id;
+        private readonly string _log;
+        private readonly string _provider;
+
+        public FakeEventRecord(int id, string log, string provider)
+        {
+            _id = id;
+            _log = log;
+            _provider = provider;
+        }
+
+        public override string ProviderName => _provider;
+        public override string LogName => _log;
+        public override string MachineName => Environment.MachineName;
+        public override int Id => _id;
+        public override byte? Level => 4;
+        public override int? Task => null;
+        public override long? Keywords => null;
+        public override IEnumerable<string> KeywordsDisplayNames => Array.Empty<string>();
+        public override short? Opcode => 0;
+        public override string OpcodeDisplayName => string.Empty;
+        public override string TaskDisplayName => string.Empty;
+        public override Guid? ProviderId => null;
+        public override Guid? ActivityId => null;
+        public override Guid? RelatedActivityId => null;
+        public override int? ProcessId => 0;
+        public override int? ThreadId => 0;
+        public override string LevelDisplayName => "Information";
+        public override string FormatDescription() => string.Empty;
+        public override string FormatDescription(IEnumerable<object> values) => string.Empty;
+        public override IList<EventProperty> Properties => Array.Empty<EventProperty>();
+        public override DateTime? TimeCreated => DateTime.UtcNow;
+        public override int? Qualifiers => null;
+        public override long? RecordId => 1;
+        public override byte? Version => 2;
+        public override SecurityIdentifier UserId => null!;
+        public override EventBookmark Bookmark => null!;
+
+        protected override void Dispose(bool disposing)
+        {
+        }
+
+        public override string ToXml() => "<Event></Event>";
+    }
+}
