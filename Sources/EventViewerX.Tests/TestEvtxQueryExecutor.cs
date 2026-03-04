@@ -20,6 +20,32 @@ public class TestEvtxQueryExecutor {
     }
 
     [Fact]
+    public void TryForEachEvent_ShouldFailForMissingFilePath() {
+        var request = new EvtxQueryRequest {
+            FilePath = string.Empty
+        };
+
+        var ok = EvtxQueryExecutor.TryForEachEvent(request, _ => true, out var failure);
+
+        Assert.False(ok);
+        Assert.NotNull(failure);
+        Assert.Equal(EvtxQueryFailureKind.InvalidArgument, failure!.Kind);
+    }
+
+    [Fact]
+    public void TryForEachEvent_ShouldFailForMissingHandler() {
+        var request = new EvtxQueryRequest {
+            FilePath = "dummy.evtx"
+        };
+
+        var ok = EvtxQueryExecutor.TryForEachEvent(request, null!, out var failure);
+
+        Assert.False(ok);
+        Assert.NotNull(failure);
+        Assert.Equal(EvtxQueryFailureKind.InvalidArgument, failure!.Kind);
+    }
+
+    [Fact]
     public void TryRead_ShouldFailForInvalidTimeRange() {
         var request = new EvtxQueryRequest {
             FilePath = "dummy.evtx",
@@ -55,6 +81,19 @@ public class TestEvtxQueryExecutor {
         };
 
         var ok = EvtxQueryExecutor.TryRead(request, out _, out var failure);
+
+        Assert.False(ok);
+        Assert.NotNull(failure);
+        Assert.Equal(EvtxQueryFailureKind.NotFound, failure!.Kind);
+    }
+
+    [Fact]
+    public void TryForEachEvent_ShouldReturnNotFoundForMissingFile() {
+        var request = new EvtxQueryRequest {
+            FilePath = "C:/this/file/does/not/exist.evtx"
+        };
+
+        var ok = EvtxQueryExecutor.TryForEachEvent(request, _ => true, out var failure);
 
         Assert.False(ok);
         Assert.NotNull(failure);

@@ -36,38 +36,44 @@ public static class EvtxEventReportBuilder {
             return false;
         }
 
-        if (!EvtxQueryExecutor.TryRead(request, out var queried, out failure, cancellationToken)) {
+        int estimatedCapacity = request.MaxEvents > 0 ? request.MaxEvents : 0;
+        var rows = estimatedCapacity > 0
+            ? new List<EvtxEventReportRow>(estimatedCapacity)
+            : new List<EvtxEventReportRow>();
+
+        if (!EvtxQueryExecutor.TryForEachEvent(
+                request,
+                ev => {
+                    rows.Add(new EvtxEventReportRow {
+                        TimeCreatedUtc = ev.TimeCreated.ToUniversalTime().ToString("O"),
+                        Id = ev.Id,
+                        RecordId = ev.RecordId ?? 0,
+                        LogName = ev.LogName ?? string.Empty,
+                        ProviderName = ev.ProviderName ?? string.Empty,
+                        Level = (long)(ev.Level ?? 0),
+                        LevelDisplayName = ev.LevelDisplayName ?? string.Empty,
+                        ComputerName = ev.ComputerName ?? string.Empty,
+                        QueriedMachine = ev.QueriedMachine ?? string.Empty,
+                        GatheredFrom = ev.GatheredFrom ?? string.Empty,
+                        MessageSubject = ev.MessageSubject ?? string.Empty,
+                        UserSid = EventProjectionHelpers.SafeGetUserSid(ev),
+                        Data = EventProjectionHelpers.NormalizeDict(ev.Data),
+                        MessageData = EventProjectionHelpers.NormalizeDict(ev.MessageData),
+                        Message = includeMessage ? EventProjectionHelpers.TruncateSafe(EventProjectionHelpers.SafeGetMessage(ev), maxMessageChars) : null
+                    });
+                    return true;
+                },
+                out failure,
+                cancellationToken)) {
             report = new EvtxEventReportResult();
             return false;
         }
 
-        var rows = new List<EvtxEventReportRow>(queried.Events.Count);
-        foreach (var ev in queried.Events) {
-            cancellationToken.ThrowIfCancellationRequested();
-            rows.Add(new EvtxEventReportRow {
-                TimeCreatedUtc = ev.TimeCreated.ToUniversalTime().ToString("O"),
-                Id = ev.Id,
-                RecordId = ev.RecordId ?? 0,
-                LogName = ev.LogName ?? string.Empty,
-                ProviderName = ev.ProviderName ?? string.Empty,
-                Level = (long)(ev.Level ?? 0),
-                LevelDisplayName = ev.LevelDisplayName ?? string.Empty,
-                ComputerName = ev.ComputerName ?? string.Empty,
-                QueriedMachine = ev.QueriedMachine ?? string.Empty,
-                GatheredFrom = ev.GatheredFrom ?? string.Empty,
-                MessageSubject = ev.MessageSubject ?? string.Empty,
-                UserSid = EventProjectionHelpers.SafeGetUserSid(ev),
-                Data = EventProjectionHelpers.NormalizeDict(ev.Data),
-                MessageData = EventProjectionHelpers.NormalizeDict(ev.MessageData),
-                Message = includeMessage ? EventProjectionHelpers.TruncateSafe(EventProjectionHelpers.SafeGetMessage(ev), maxMessageChars) : null
-            });
-        }
-
-        var effectivePath = request?.FilePath ?? string.Empty;
+        var effectivePath = request.FilePath ?? string.Empty;
         report = new EvtxEventReportResult {
             Path = effectivePath,
             Count = rows.Count,
-            Truncated = request?.MaxEvents > 0 && rows.Count >= request.MaxEvents,
+            Truncated = request.MaxEvents > 0 && rows.Count >= request.MaxEvents,
             Events = rows
         };
         failure = null;
