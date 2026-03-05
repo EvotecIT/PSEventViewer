@@ -52,6 +52,14 @@ public enum KnownEventField {
     TicketEncryptionType,
     /// <summary>Kerberos pre-authentication type.</summary>
     PreAuthType,
+    /// <summary>Client IP address key (<c>ClientIP</c>).</summary>
+    ClientIp,
+    /// <summary>Hardware/MAC address key (<c>HWAddress</c>).</summary>
+    HwAddress,
+    /// <summary>MAC address key (<c>MacAddress</c>).</summary>
+    MacAddress,
+    /// <summary>Privilege list key (<c>PrivilegeList</c>).</summary>
+    PrivilegeList,
     /// <summary>Fallback unlabeled payload field 0.</summary>
     NoNameA0,
     /// <summary>Fallback unlabeled payload field 1.</summary>
@@ -64,6 +72,8 @@ internal static class KnownEventFieldExtensions {
     internal static string ToEventFieldKey(this KnownEventField field) {
         return field switch {
             KnownEventField.TextPayload => "#text",
+            KnownEventField.ClientIp => "ClientIP",
+            KnownEventField.HwAddress => "HWAddress",
             _ => field.ToString()
         };
     }

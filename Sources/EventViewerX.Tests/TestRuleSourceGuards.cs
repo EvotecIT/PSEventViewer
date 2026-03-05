@@ -33,7 +33,11 @@ public class TestRuleSourceGuards
         "TransmittedServices",
         "TicketOptions",
         "TicketEncryptionType",
-        "PreAuthType"
+        "PreAuthType",
+        "ClientIP",
+        "HWAddress",
+        "MacAddress",
+        "PrivilegeList"
     };
 
     [Fact]

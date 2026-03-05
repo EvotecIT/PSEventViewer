@@ -52,7 +52,7 @@ public class ADUserRightsAssignment : EventRuleBase {
             }
         }
 
-        var privileges = _eventObject.GetValueFromDataDictionary("PrivilegeList");
+        var privileges = _eventObject.GetDataValueOrEmpty(KnownEventField.PrivilegeList);
         if (!string.IsNullOrEmpty(privileges)) {
             Rights = privileges.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries).ToList();
             RightsTranslated = Rights.Select(EventsHelper.TranslatePrivilege).ToList();

@@ -42,8 +42,8 @@ public class DhcpLeaseCreated : EventRuleBase {
         _eventObject = eventObject;
         Type = "DhcpLeaseCreated";
         Computer = _eventObject.ComputerName;
-        IPAddress = _eventObject.GetValueFromDataDictionary(KnownEventField.IpAddress, "ClientIP");
-        MacAddress = _eventObject.GetValueFromDataDictionary("HWAddress", "MacAddress");
+        IPAddress = _eventObject.GetValueFromDataDictionary(KnownEventField.IpAddress, KnownEventField.ClientIp);
+        MacAddress = _eventObject.GetValueFromDataDictionary(KnownEventField.HwAddress, KnownEventField.MacAddress);
         When = _eventObject.TimeCreated;
     }
 }
