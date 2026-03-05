@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 
 namespace EventViewerX.Rules.ActiveDirectory {
 
@@ -62,7 +62,7 @@ namespace EventViewerX.Rules.ActiveDirectory {
             Computer = _eventObject.ComputerName;
             Action = _eventObject.MessageSubject;
             ObjectClass = _eventObject.GetValueFromDataDictionary("ObjectClass");
-            OperationType = ConvertFromOperationType(_eventObject.Data["OperationType"]);
+            OperationType = ConvertFromOperationType(_eventObject.GetDataValueOrEmpty("OperationType"));
             User = _eventObject.GetValueFromDataDictionary("ObjectDN");
             FieldChanged = _eventObject.GetValueFromDataDictionary("AttributeLDAPDisplayName");
             FieldValue = _eventObject.GetValueFromDataDictionary("AttributeValue");
@@ -76,3 +76,4 @@ namespace EventViewerX.Rules.ActiveDirectory {
         }
     }
 }
+

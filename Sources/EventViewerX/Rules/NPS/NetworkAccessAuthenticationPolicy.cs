@@ -149,40 +149,40 @@ public class NetworkAccessAuthenticationPolicy : EventRuleBase {
         Type = "NetworkAccessAuthenticationPolicy";
         Computer = _eventObject.ComputerName;
         Action = _eventObject.MessageSubject;
-        SecurityID = _eventObject.GetValueFromDataDictionary("SubjectUserSid");
-        AccountName = _eventObject.GetValueFromDataDictionary("SubjectUserName");
-        AccountDomain = _eventObject.GetValueFromDataDictionary("SubjectDomainName");
+        SecurityID = _eventObject.GetDataValueOrEmpty("SubjectUserSid");
+        AccountName = _eventObject.GetDataValueOrEmpty(KnownEventField.SubjectUserName);
+        AccountDomain = _eventObject.GetDataValueOrEmpty(KnownEventField.SubjectDomainName);
 
-        CalledStationID = _eventObject.GetValueFromDataDictionary("CalledStationID");
-        CallingStationID = _eventObject.GetValueFromDataDictionary("CallingStationID");
+        CalledStationID = _eventObject.GetDataValueOrEmpty("CalledStationID");
+        CallingStationID = _eventObject.GetDataValueOrEmpty("CallingStationID");
 
-        NASIPv4Address = _eventObject.GetValueFromDataDictionary("NASIPv4Address");
-        NASIPv6Address = _eventObject.GetValueFromDataDictionary("NASIPv6Address");
+        NASIPv4Address = _eventObject.GetDataValueOrEmpty("NASIPv4Address");
+        NASIPv6Address = _eventObject.GetDataValueOrEmpty("NASIPv6Address");
 
-        NASIdentifier = _eventObject.GetValueFromDataDictionary("NASIdentifier");
-        NASPort = _eventObject.GetValueFromDataDictionary("NASPort");
+        NASIdentifier = _eventObject.GetDataValueOrEmpty("NASIdentifier");
+        NASPort = _eventObject.GetDataValueOrEmpty("NASPort");
         NASPortType = EventsHelper.GetNasPortType(
-            _eventObject.GetValueFromDataDictionary("NASPortType"));
+            _eventObject.GetDataValueOrEmpty("NASPortType"));
 
 
-        AuthenticationProvider = _eventObject.GetValueFromDataDictionary("AuthenticationProvider");
-        AuthenticationServer = _eventObject.GetValueFromDataDictionary("AuthenticationServer");
-        var authType = _eventObject.GetValueFromDataDictionary("AuthenticationType");
+        AuthenticationProvider = _eventObject.GetDataValueOrEmpty("AuthenticationProvider");
+        AuthenticationServer = _eventObject.GetDataValueOrEmpty("AuthenticationServer");
+        var authType = _eventObject.GetDataValueOrEmpty("AuthenticationType");
         AuthenticationType = ParseAuthenticationType(authType);
 
-        EAPType = _eventObject.GetValueFromDataDictionary("EAPType");
+        EAPType = _eventObject.GetDataValueOrEmpty("EAPType");
 
-        ClientFriendlyIPAddress = _eventObject.GetValueFromDataDictionary("ClientIPAddress");
-        ClientFriendlyName = _eventObject.GetValueFromDataDictionary("ClientName");
+        ClientFriendlyIPAddress = _eventObject.GetDataValueOrEmpty("ClientIPAddress");
+        ClientFriendlyName = _eventObject.GetDataValueOrEmpty("ClientName");
 
-        ConnectionRequestPolicyName = _eventObject.GetValueFromDataDictionary("ProxyPolicyName");
+        ConnectionRequestPolicyName = _eventObject.GetDataValueOrEmpty("ProxyPolicyName");
 
-        NetworkPolicyName = _eventObject.GetValueFromDataDictionary("NetworkPolicyName");
+        NetworkPolicyName = _eventObject.GetDataValueOrEmpty("NetworkPolicyName");
 
-        Reason = _eventObject.GetValueFromDataDictionary("Reason");
-        ReasonCode = _eventObject.GetValueFromDataDictionary("ReasonCode");
+        Reason = _eventObject.GetDataValueOrEmpty("Reason");
+        ReasonCode = _eventObject.GetDataValueOrEmpty("ReasonCode");
         // common fields
-        Who = _eventObject.GetValueFromDataDictionary("FullyQualifiedSubjectUserName");
+        Who = _eventObject.GetDataValueOrEmpty("FullyQualifiedSubjectUserName");
         When = _eventObject.TimeCreated;
     }
 }

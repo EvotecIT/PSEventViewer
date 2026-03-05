@@ -1,4 +1,4 @@
-﻿namespace EventViewerX.Rules.ActiveDirectory;
+namespace EventViewerX.Rules.ActiveDirectory;
 
 /// <summary>
 /// Represents detailed Active Directory computer object changes.
@@ -66,7 +66,7 @@ public class ADComputerChangeDetailed : EventRuleBase {
         Who = _eventObject.GetValueFromDataDictionary("SubjectUserName", "SubjectDomainName", "\\", reverseOrder: true);
         When = _eventObject.TimeCreated;
         //
-        OperationType = ConvertFromOperationType(_eventObject.Data["OperationType"]);
+        OperationType = ConvertFromOperationType(_eventObject.GetDataValueOrEmpty("OperationType"));
         ComputerObject = _eventObject.GetValueFromDataDictionary("ObjectDN");
         FieldChanged = _eventObject.GetValueFromDataDictionary("AttributeLDAPDisplayName");
         FieldValue = _eventObject.GetValueFromDataDictionary("AttributeValue");
@@ -94,3 +94,4 @@ public class ADComputerChangeDetailed : EventRuleBase {
     //    }
     //}
 }
+

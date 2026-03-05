@@ -48,11 +48,11 @@ public class KerberosServiceTicket : EventRuleBase
         Computer = _eventObject.ComputerName;
         Action = _eventObject.MessageSubject;
         AccountName = _eventObject.GetValueFromDataDictionary("TargetUserName", "TargetDomainName", "\\", reverseOrder: true);
-        ServiceName = _eventObject.GetValueFromDataDictionary("ServiceName");
-        IpAddress = _eventObject.GetValueFromDataDictionary("IpAddress");
-        IpPort = _eventObject.GetValueFromDataDictionary("IpPort");
-        TicketOptions = _eventObject.GetValueFromDataDictionary("TicketOptions");
-        EncryptionType = EventsHelper.GetTicketEncryptionType(_eventObject.GetValueFromDataDictionary("TicketEncryptionType"));
+        ServiceName = _eventObject.GetDataValueOrEmpty("ServiceName");
+        IpAddress = _eventObject.GetDataValueOrEmpty(KnownEventField.IpAddress);
+        IpPort = _eventObject.GetDataValueOrEmpty(KnownEventField.IpPort);
+        TicketOptions = _eventObject.GetDataValueOrEmpty(KnownEventField.TicketOptions);
+        EncryptionType = EventsHelper.GetTicketEncryptionType(_eventObject.GetDataValueOrEmpty(KnownEventField.TicketEncryptionType));
         When = _eventObject.TimeCreated;
 
         WeakEncryptionAlgorithm = EncryptionType is TicketEncryptionType.DES_CBC_CRC
@@ -63,4 +63,3 @@ public class KerberosServiceTicket : EventRuleBase
         UnusualTicketOptions = !(TicketOptions?.Equals("0x40810010", StringComparison.OrdinalIgnoreCase) ?? false);
     }
 }
-

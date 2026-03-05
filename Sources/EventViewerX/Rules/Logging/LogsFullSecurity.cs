@@ -35,10 +35,11 @@ public class LogsFullSecurity : EventRuleBase {
         Type = "LogsFullSecurity";
         Computer = _eventObject.ComputerName;
         Action = _eventObject.MessageSubject;
-        LogType = ConvertFromOperationType(_eventObject.Data["Channel"]);
+        LogType = ConvertFromOperationType(_eventObject.GetDataValueOrEmpty("Channel"));
 
         // common fields
         Who = _eventObject.GetValueFromDataDictionary("SubjectUserName", "SubjectDomainName", "\\", reverseOrder: true);
         When = _eventObject.TimeCreated;
     }
 }
+

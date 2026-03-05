@@ -1,4 +1,4 @@
-﻿namespace EventViewerX.Rules.ActiveDirectory;
+namespace EventViewerX.Rules.ActiveDirectory;
 
 /// <summary>
 /// Active Directory User Changes detailed
@@ -77,7 +77,7 @@ public class ADUserChangeDetailed : EventRuleBase {
         Computer = _eventObject.ComputerName;
         Action = _eventObject.MessageSubject;
         ObjectClass = _eventObject.GetValueFromDataDictionary("ObjectClass");
-        OperationType = ConvertFromOperationType(_eventObject.Data["OperationType"]);
+        OperationType = ConvertFromOperationType(_eventObject.GetDataValueOrEmpty("OperationType"));
         User = _eventObject.GetValueFromDataDictionary("ObjectDN");
         FieldChanged = _eventObject.GetValueFromDataDictionary("AttributeLDAPDisplayName");
         FieldValue = _eventObject.GetValueFromDataDictionary("AttributeValue");
@@ -90,3 +90,4 @@ public class ADUserChangeDetailed : EventRuleBase {
         FieldValue = OverwriteByField(Action, "A directory service object was moved.", FieldValue, _eventObject.GetValueFromDataDictionary("NewObjectDN"));
     }
 }
+

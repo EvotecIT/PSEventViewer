@@ -37,7 +37,7 @@ public class LogsClearedOther : EventRuleBase {
         Computer = _eventObject.ComputerName;
         Action = _eventObject.MessageSubject;
         BackupPath = _eventObject.GetValueFromDataDictionary("BackupPath");
-        LogType = ConvertFromOperationType(_eventObject.Data["Channel"]);
+        LogType = ConvertFromOperationType(_eventObject.GetDataValueOrEmpty("Channel"));
 
         // common fields
         Who = _eventObject.GetValueFromDataDictionary("SubjectUserName", "SubjectDomainName", "\\", reverseOrder: true);
@@ -49,3 +49,4 @@ public class LogsClearedOther : EventRuleBase {
         }
     }
 }
+

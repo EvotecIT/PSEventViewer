@@ -1,4 +1,4 @@
-﻿using EventViewerX.Helpers.ActiveDirectory;
+using EventViewerX.Helpers.ActiveDirectory;
 
 namespace EventViewerX.Rules.ActiveDirectory;
 
@@ -52,7 +52,7 @@ public class ADGroupPolicyEdits : EventRuleBase {
         Computer = _eventObject.ComputerName;
         Action = _eventObject.MessageSubject;
         ObjectClass = _eventObject.GetValueFromDataDictionary("ObjectClass");
-        OperationType = ConvertFromOperationType(_eventObject.Data["OperationType"]);
+        OperationType = ConvertFromOperationType(_eventObject.GetDataValueOrEmpty("OperationType"));
         Who = _eventObject.GetValueFromDataDictionary("SubjectUserName", "SubjectDomainName", "\\", reverseOrder: true);
         When = _eventObject.TimeCreated;
         GroupPolicyDisplayName = _eventObject.GetValueFromDataDictionary("ObjectDN");
@@ -111,3 +111,4 @@ public class ADGroupPolicyEdits : EventRuleBase {
 //   <Data Name="OperationType">%%14674</Data>
 //   </EventData>
 //   </Event>
+
