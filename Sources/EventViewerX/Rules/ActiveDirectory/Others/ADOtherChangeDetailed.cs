@@ -46,9 +46,11 @@ namespace EventViewerX.Rules.ActiveDirectory {
     /// <summary>Ignores user, computer, OU and group classes; captures all other object changes.</summary>
     public override bool CanHandle(EventObject eventObject) {
         // Only handle objects that are NOT user, computer, organizationalUnit, or group
-        if (eventObject.Data.TryGetValue("ObjectClass", out var objectClass)) {
-            return objectClass != "user" && objectClass != "computer" &&
-                   objectClass != "organizationalUnit" && objectClass != "group";
+        if (eventObject.TryGetDataValue("ObjectClass", out var objectClass)) {
+            return !objectClass.Equals("user", StringComparison.OrdinalIgnoreCase) &&
+                   !objectClass.Equals("computer", StringComparison.OrdinalIgnoreCase) &&
+                   !objectClass.Equals("organizationalUnit", StringComparison.OrdinalIgnoreCase) &&
+                   !objectClass.Equals("group", StringComparison.OrdinalIgnoreCase);
         }
         return false;
     }

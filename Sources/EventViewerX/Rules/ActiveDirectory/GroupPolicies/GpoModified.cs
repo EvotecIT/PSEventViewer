@@ -28,8 +28,8 @@ public class GpoModified : EventRuleBase {
     /// <summary>Processes only GPO container modifications.</summary>
     public override bool CanHandle(EventObject eventObject) {
         // Check if this is a group policy container object
-        return eventObject.Data.TryGetValue("ObjectClass", out var objectClass) &&
-               objectClass == "groupPolicyContainer";
+        return eventObject.TryGetDataValue("ObjectClass", out var objectClass) &&
+               objectClass.Equals("groupPolicyContainer", StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>Initialises a GPO modification wrapper from an event record.</summary>
@@ -45,5 +45,4 @@ public class GpoModified : EventRuleBase {
         When = _eventObject.TimeCreated;
     }
 }
-
 

@@ -106,6 +106,7 @@ public class TestEventObjectTypedAccessors
         var rule = new ADUserLogon(eo);
 
         Assert.Equal(LogonType.Network, rule.LogonType);
+        Assert.Equal("contoso\\svc.account", rule.Who);
     }
 
     [Fact]
@@ -124,6 +125,33 @@ public class TestEventObjectTypedAccessors
         var rule = new LogsClearedSecurity(eo);
         Assert.Equal("Unknown Operation", rule.LogType);
         Assert.Equal("contoso\\admin", rule.Who);
+    }
+
+    [Fact]
+    public void GetValueFromDataDictionary_IsCaseInsensitive_AndSupportsReverseOrder()
+    {
+        var eo = BuildEventObject(data: new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["subjectusername"] = "svc.account",
+            ["subjectdomainname"] = "contoso"
+        });
+
+        var combined = eo.GetValueFromDataDictionary("SubjectUserName", "SubjectDomainName", "\\", reverseOrder: true);
+
+        Assert.Equal("contoso\\svc.account", combined);
+    }
+
+    [Fact]
+    public void ADComputerChangeDetailed_CanHandle_IsCaseInsensitiveForObjectClass()
+    {
+        var eo = BuildEventObject(data: new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["objectclass"] = "COMPUTER"
+        });
+
+        var rule = new ADComputerChangeDetailed(eo);
+
+        Assert.True(rule.CanHandle(eo));
     }
 
     private static EventObject BuildEventObject(

@@ -167,39 +167,35 @@ namespace EventViewerX {
         }
 
         /// <summary>
-        /// Gets the value from data dictionary.
+        /// Gets one or two data values by key (case-insensitive) and optionally concatenates them.
         /// </summary>
-        /// <param name="key1">The key1.</param>
-        /// <param name="key2">The key2.</param>
-        /// <param name="splitter">The splitter.</param>
-        /// <param name="reverseOrder">if set to <c>true</c> [reverse order].</param>
-        /// <returns></returns>
+        /// <param name="key1">Primary key name.</param>
+        /// <param name="key2">Secondary key name.</param>
+        /// <param name="splitter">Text inserted between values when both keys exist.</param>
+        /// <param name="reverseOrder">When <c>true</c>, returns key2+splitter+key1.</param>
+        /// <returns>Resolved value, concatenated value, or empty string when keys are missing.</returns>
         public string GetValueFromDataDictionary(string key1, string? key2 = null, string splitter = "\\", bool reverseOrder = false) {
-            if (key1 != null && key2 != null && Data.ContainsKey(key1) && Data.ContainsKey(key2)) {
-                if (reverseOrder) {
-                    return Data[key2] + splitter + Data[key1];
-                } else {
-                    return Data[key1] + splitter + Data[key2];
-                }
-            } else if (key1 != null && Data.ContainsKey(key1)) {
-                return Data[key1];
-            } else if (key2 != null && Data.ContainsKey(key2)) {
-                return Data[key2];
-            } else {
-                return "";
+            string secondValue = string.Empty;
+            bool hasFirst = TryGetDataValue(key1, out string firstValue, trim: false);
+            bool hasSecond = key2 != null && TryGetDataValue(key2, out secondValue, trim: false);
+
+            if (hasFirst && hasSecond) {
+                string joiner = splitter ?? string.Empty;
+                return reverseOrder
+                    ? secondValue + joiner + firstValue
+                    : firstValue + joiner + secondValue;
             }
+
+            if (hasFirst) {
+                return firstValue;
+            }
+
+            return hasSecond ? secondValue : string.Empty;
         }
 
         internal bool ValueMatches(string key, string expectedValue) {
-            if (key != null && Data.ContainsKey(key)) {
-                if (Data[key].Equals(expectedValue, StringComparison.OrdinalIgnoreCase)) {
-                    return true;
-                } else {
-                    return false;
-                }
-            }
-
-            return false;
+            return TryGetDataValue(key, out string currentValue) &&
+                   currentValue.Equals(expectedValue, StringComparison.OrdinalIgnoreCase);
         }
 
         private static bool TryGetValueFromDictionary(
