@@ -53,7 +53,7 @@ public class ADGroupPolicyChangesDetailed : EventRuleBase {
         Computer = _eventObject.ComputerName;
         Action = _eventObject.MessageSubject;
         ObjectClass = _eventObject.GetValueFromDataDictionary("ObjectClass");
-        OperationType = ConvertFromOperationType(_eventObject.Data["OperationType"]);
+        OperationType = ConvertFromOperationType(_eventObject.GetDataValueOrEmpty("OperationType"));
         Who = _eventObject.GetValueFromDataDictionary("SubjectUserName", "SubjectDomainName", "\\", reverseOrder: true);
         When = _eventObject.TimeCreated;
         GpoName = _eventObject.GetValueFromDataDictionary("ObjectDN");
@@ -61,3 +61,4 @@ public class ADGroupPolicyChangesDetailed : EventRuleBase {
         AttributeValue = _eventObject.GetValueFromDataDictionary("AttributeValue");
     }
 }
+

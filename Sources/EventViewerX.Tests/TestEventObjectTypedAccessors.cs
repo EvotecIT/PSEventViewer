@@ -5,6 +5,7 @@ using System.Reflection;
 using System.Runtime.Serialization;
 using System.Security.Principal;
 using EventViewerX.Rules.ActiveDirectory;
+using EventViewerX.Rules.Logging;
 using Xunit;
 
 namespace EventViewerX.Tests;
@@ -90,6 +91,39 @@ public class TestEventObjectTypedAccessors
         Assert.Equal(FailureReason.UnknownUserNameOrBadPassword, rule.FailureReason);
         Assert.Equal("NTLM", rule.PackageName);
         Assert.Equal("CLIENT01", rule.Who);
+    }
+
+    [Fact]
+    public void ADUserLogon_ParsesTypedLogonType()
+    {
+        var eo = BuildEventObject(data: new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["logontype"] = "3",
+            ["subjectusername"] = "svc.account",
+            ["subjectdomainname"] = "contoso"
+        });
+
+        var rule = new ADUserLogon(eo);
+
+        Assert.Equal(LogonType.Network, rule.LogonType);
+    }
+
+    [Fact]
+    public void LogsClearedSecurity_MissingChannel_DoesNotThrowAndFallsBack()
+    {
+        var eo = BuildEventObject(data: new Dictionary<string, string>
+        {
+            ["SubjectUserName"] = "admin",
+            ["SubjectDomainName"] = "contoso"
+        });
+
+        Exception? exception = Record.Exception(() => _ = new LogsClearedSecurity(eo));
+
+        Assert.Null(exception);
+
+        var rule = new LogsClearedSecurity(eo);
+        Assert.Equal("Unknown Operation", rule.LogType);
+        Assert.Equal("contoso\\admin", rule.Who);
     }
 
     private static EventObject BuildEventObject(

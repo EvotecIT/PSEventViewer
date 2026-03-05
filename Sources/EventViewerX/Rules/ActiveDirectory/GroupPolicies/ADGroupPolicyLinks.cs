@@ -1,4 +1,4 @@
-﻿using EventViewerX.Helpers.ActiveDirectory;
+using EventViewerX.Helpers.ActiveDirectory;
 
 namespace EventViewerX.Rules.ActiveDirectory;
 
@@ -101,7 +101,7 @@ public class ADGroupPolicyLinks : EventRuleBase {
         Computer = _eventObject.ComputerName;
         //Action = _eventObject.MessageSubject;
         LinkedToType = _eventObject.GetValueFromDataDictionary("ObjectClass");
-        OperationType = ConvertFromOperationType(_eventObject.Data["OperationType"]);
+        OperationType = ConvertFromOperationType(_eventObject.GetDataValueOrEmpty("OperationType"));
         Who = _eventObject.GetValueFromDataDictionary("SubjectUserName", "SubjectDomainName", "\\", reverseOrder: true);
         When = _eventObject.TimeCreated;
         DomainName = _eventObject.GetValueFromDataDictionary("DSName");
@@ -152,3 +152,4 @@ public class ADGroupPolicyLinks : EventRuleBase {
         return links;
     }
 }
+

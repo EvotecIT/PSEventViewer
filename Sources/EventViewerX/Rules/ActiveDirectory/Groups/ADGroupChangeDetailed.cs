@@ -1,4 +1,4 @@
-﻿namespace EventViewerX.Rules.ActiveDirectory;
+namespace EventViewerX.Rules.ActiveDirectory;
 
 /// <summary>
 /// Active Directory Group Change Detailed
@@ -62,7 +62,7 @@ public class ADGroupChangeDetailed : EventRuleBase {
         Computer = _eventObject.ComputerName;
         Action = _eventObject.MessageSubject;
         ObjectClass = _eventObject.GetValueFromDataDictionary("ObjectClass");
-        OperationType = ConvertFromOperationType(_eventObject.Data["OperationType"]);
+        OperationType = ConvertFromOperationType(_eventObject.GetDataValueOrEmpty("OperationType"));
         Group = _eventObject.GetValueFromDataDictionary("ObjectDN");
         FieldChanged = _eventObject.GetValueFromDataDictionary("AttributeLDAPDisplayName");
         FieldValue = _eventObject.GetValueFromDataDictionary("AttributeValue");
@@ -76,3 +76,4 @@ public class ADGroupChangeDetailed : EventRuleBase {
         When = _eventObject.TimeCreated;
     }
 }
+

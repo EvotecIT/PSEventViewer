@@ -71,6 +71,16 @@ namespace EventViewerX {
         }
 
         /// <summary>
+        /// Returns an event data value by key or an empty string when missing.
+        /// </summary>
+        /// <param name="key">Dictionary key to lookup.</param>
+        /// <param name="trim">When <c>true</c>, trims whitespace from the returned value.</param>
+        /// <returns>Resolved value, or empty string when key is missing.</returns>
+        public string GetDataValueOrEmpty(string key, bool trim = true) {
+            return TryGetDataValue(key, out string value, trim) ? value : string.Empty;
+        }
+
+        /// <summary>
         /// Attempts to retrieve a message dictionary value by key.
         /// </summary>
         /// <param name="key">Dictionary key to lookup.</param>
@@ -100,6 +110,16 @@ namespace EventViewerX {
         /// <returns>Resolved value, or empty string when key is missing.</returns>
         public string GetMessageValueOrEmpty(KnownEventField field, bool trim = true) {
             return TryGetMessageValue(field, out string value, trim) ? value : string.Empty;
+        }
+
+        /// <summary>
+        /// Returns a message dictionary value by key or an empty string when missing.
+        /// </summary>
+        /// <param name="key">Dictionary key to lookup.</param>
+        /// <param name="trim">When <c>true</c>, trims whitespace from the returned value.</param>
+        /// <returns>Resolved value, or empty string when key is missing.</returns>
+        public string GetMessageValueOrEmpty(string key, bool trim = true) {
+            return TryGetMessageValue(key, out string value, trim) ? value : string.Empty;
         }
 
         /// <summary>

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 
 namespace EventViewerX.Rules.ActiveDirectory {
     /// <summary>
@@ -100,7 +100,7 @@ namespace EventViewerX.Rules.ActiveDirectory {
             Who = _eventObject.GetValueFromDataDictionary("SubjectUserName", "SubjectDomainName", "\\", reverseOrder: true);
             When = _eventObject.TimeCreated;
 
-            OperationType = ConvertFromOperationType(_eventObject.Data["OperationType"]);
+            OperationType = ConvertFromOperationType(_eventObject.GetDataValueOrEmpty("OperationType"));
             OrganizationalUnit = _eventObject.GetValueFromDataDictionary("ObjectDN");
             FieldChanged = _eventObject.GetValueFromDataDictionary("AttributeLDAPDisplayName");
             FieldValue = _eventObject.GetValueFromDataDictionary("AttributeValue");
@@ -122,3 +122,4 @@ namespace EventViewerX.Rules.ActiveDirectory {
         }
     }
 }
+
