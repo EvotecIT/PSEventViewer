@@ -219,6 +219,34 @@ public class TestEventObjectTypedAccessors
     }
 
     [Fact]
+    public void GetSubjectAccountOrEmpty_UsesKnownSubjectFieldsCaseInsensitive()
+    {
+        var eo = BuildEventObject(data: new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["subjectusername"] = "svc.account",
+            ["subjectdomainname"] = "contoso"
+        });
+
+        var value = eo.GetSubjectAccountOrEmpty();
+
+        Assert.Equal("contoso\\svc.account", value);
+    }
+
+    [Fact]
+    public void GetTargetAccountOrEmpty_UsesKnownTargetFieldsCaseInsensitive()
+    {
+        var eo = BuildEventObject(data: new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["targetusername"] = "john.smith",
+            ["targetdomainname"] = "contoso"
+        });
+
+        var value = eo.GetTargetAccountOrEmpty();
+
+        Assert.Equal("contoso\\john.smith", value);
+    }
+
+    [Fact]
     public void ADComputerChangeDetailed_CanHandle_IsCaseInsensitiveForObjectClass()
     {
         var eo = BuildEventObject(data: new Dictionary<string, string>(StringComparer.Ordinal)

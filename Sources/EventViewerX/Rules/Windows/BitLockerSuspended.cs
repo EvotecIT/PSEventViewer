@@ -32,8 +32,9 @@ public class BitLockerSuspended : EventRuleBase {
         Computer = _eventObject.ComputerName;
         Volume = EventsHelper.GetBitLockerVolumeType(
             _eventObject.GetValueFromDataDictionary("VolumeName", "Volume"));
-        Who = _eventObject.GetValueFromDataDictionary(KnownEventField.SubjectUserName, KnownEventField.SubjectDomainName, "\\", reverseOrder: true);
+        Who = _eventObject.GetSubjectAccountOrEmpty();
         When = _eventObject.TimeCreated;
     }
 }
+
 

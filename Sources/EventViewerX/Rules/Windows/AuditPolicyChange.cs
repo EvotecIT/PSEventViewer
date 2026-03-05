@@ -40,9 +40,10 @@ public class AuditPolicyChange : EventRuleBase {
         SubcategoryId = _eventObject.GetValueFromDataDictionary("SubcategoryId");
         SubcategoryGuid = _eventObject.GetValueFromDataDictionary("SubcategoryGuid");
         AuditPolicyChanges = _eventObject.GetValueFromDataDictionary("AuditPolicyChanges");
-        Who = _eventObject.GetValueFromDataDictionary(KnownEventField.SubjectUserName, KnownEventField.SubjectDomainName, "\\", reverseOrder: true);
+        Who = _eventObject.GetSubjectAccountOrEmpty();
         When = _eventObject.TimeCreated;
     }
 }
+
 
 

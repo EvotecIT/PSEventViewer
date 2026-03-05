@@ -44,8 +44,9 @@ public class DeviceDisabled : EventRuleBase {
         ClassId = _eventObject.GetValueFromDataDictionary("ClassId");
         ClassName = _eventObject.GetValueFromDataDictionary("ClassName");
         Reason = _eventObject.GetValueFromDataDictionary("Reason");
-        Who = _eventObject.GetValueFromDataDictionary(KnownEventField.SubjectUserName, KnownEventField.SubjectDomainName, "\\", reverseOrder: true);
+        Who = _eventObject.GetSubjectAccountOrEmpty();
         When = _eventObject.TimeCreated;
     }
 }
+
 

@@ -37,9 +37,10 @@ public class IISSiteStopped : EventRuleBase {
         }
         User = _eventObject.GetValueFromDataDictionary("User", "UserName");
         if (string.IsNullOrEmpty(User)) {
-            User = _eventObject.GetValueFromDataDictionary(KnownEventField.SubjectUserName, KnownEventField.SubjectDomainName, "\\", reverseOrder: true);
+            User = _eventObject.GetSubjectAccountOrEmpty();
         }
         When = _eventObject.TimeCreated;
     }
 }
+
 

@@ -38,7 +38,7 @@ public abstract class ClientGroupPoliciesBase : EventRuleBase {
         ItemName = _eventObject.GetValueFromDataDictionary("NoNameA1");
         PolicyName = _eventObject.GetValueFromDataDictionary("NoNameA2", "ExtensionName");
         Error = _eventObject.GetValueFromDataDictionary("NoNameA3", "ErrorDescription");
-        Who = _eventObject.GetValueFromDataDictionary(KnownEventField.SubjectUserName, KnownEventField.SubjectDomainName, "\\", reverseOrder: true);
+        Who = _eventObject.GetSubjectAccountOrEmpty();
         ActionTimestampUtc = _eventObject.TimeCreated.ToUniversalTime();
         When = ActionTimestampUtc ?? _eventObject.TimeCreated;
     }
@@ -51,5 +51,6 @@ public abstract class ClientGroupPoliciesBase : EventRuleBase {
                RuleHelpers.IsChannel(eventObject, "Microsoft-Windows-GroupPolicy/Operational");
     }
 }
+
 
 

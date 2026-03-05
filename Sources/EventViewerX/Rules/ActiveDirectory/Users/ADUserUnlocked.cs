@@ -38,10 +38,11 @@ public class ADUserUnlocked : EventRuleBase {
 
         ComputerLockoutOn = _eventObject.GetDataValueOrEmpty(KnownEventField.TargetDomainName);
 
-        UserAffected = _eventObject.GetValueFromDataDictionary(KnownEventField.TargetUserName, KnownEventField.TargetDomainName, "\\", reverseOrder: true);
+        UserAffected = _eventObject.GetTargetAccountOrEmpty();
 
-        Who = _eventObject.GetValueFromDataDictionary(KnownEventField.SubjectUserName, KnownEventField.SubjectDomainName, "\\", reverseOrder: true);
+        Who = _eventObject.GetSubjectAccountOrEmpty();
         When = _eventObject.TimeCreated;
     }
 }
+
 

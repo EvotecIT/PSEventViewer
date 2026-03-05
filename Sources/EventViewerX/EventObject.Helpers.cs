@@ -233,6 +233,32 @@ namespace EventViewerX {
             return GetValueFromDataDictionary(key1, key2.ToEventFieldKey(), splitter, reverseOrder);
         }
 
+        /// <summary>
+        /// Gets a subject account in <c>DOMAIN\user</c> format when available.
+        /// </summary>
+        /// <param name="splitter">Separator used between domain and user name.</param>
+        /// <returns>Subject account, or empty string when both subject fields are missing.</returns>
+        public string GetSubjectAccountOrEmpty(string splitter = "\\") {
+            return GetValueFromDataDictionary(
+                KnownEventField.SubjectUserName,
+                KnownEventField.SubjectDomainName,
+                splitter,
+                reverseOrder: true);
+        }
+
+        /// <summary>
+        /// Gets a target account in <c>DOMAIN\user</c> format when available.
+        /// </summary>
+        /// <param name="splitter">Separator used between domain and user name.</param>
+        /// <returns>Target account, or empty string when both target fields are missing.</returns>
+        public string GetTargetAccountOrEmpty(string splitter = "\\") {
+            return GetValueFromDataDictionary(
+                KnownEventField.TargetUserName,
+                KnownEventField.TargetDomainName,
+                splitter,
+                reverseOrder: true);
+        }
+
         internal bool ValueMatches(string key, string expectedValue) {
             return TryGetDataValue(key, out string currentValue) &&
                    currentValue.Equals(expectedValue, StringComparison.OrdinalIgnoreCase);

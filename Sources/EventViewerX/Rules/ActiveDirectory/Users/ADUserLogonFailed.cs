@@ -133,9 +133,9 @@ public class ADUserLogonFailed : EventRuleBase {
         Type = "ADUserLogonFailed";
         Computer = _eventObject.ComputerName;
         Action = _eventObject.MessageSubject;
-        //Who = _eventObject.GetValueFromDataDictionary(KnownEventField.SubjectUserName, KnownEventField.SubjectDomainName, "\\", reverseOrder: true);
+        //Who = _eventObject.GetSubjectAccountOrEmpty();
         Who = _eventObject.GetDataValueOrEmpty(KnownEventField.WorkstationName);
-        ObjectAffected = _eventObject.GetValueFromDataDictionary(KnownEventField.TargetUserName, KnownEventField.TargetDomainName, "\\", reverseOrder: true);
+        ObjectAffected = _eventObject.GetTargetAccountOrEmpty();
         IpAddress = _eventObject.GetDataValueOrEmpty(KnownEventField.IpAddress);
         IpPort = _eventObject.GetDataValueOrEmpty(KnownEventField.IpPort);
         //WorkstationName = _eventObject.GetDataValueOrEmpty(KnownEventField.WorkstationName);
@@ -180,4 +180,5 @@ public class ADUserLogonFailed : EventRuleBase {
         return description.ToString().TrimEnd();
     }
 }
+
 

@@ -42,7 +42,7 @@ public class KerberosPolicyChange : EventRuleBase
         _eventObject = eventObject;
         Type = "KerberosPolicyChange";
         Computer = _eventObject.ComputerName;
-        Who = _eventObject.GetValueFromDataDictionary(KnownEventField.SubjectUserName, KnownEventField.SubjectDomainName, "\\", reverseOrder: true);
+        Who = _eventObject.GetSubjectAccountOrEmpty();
         PolicyChanges = _eventObject.GetValueFromDataDictionary("KerberosPolicyChange");
         When = _eventObject.TimeCreated;
 
@@ -82,5 +82,6 @@ public class KerberosPolicyChange : EventRuleBase
         }
     }
 }
+
 
 
