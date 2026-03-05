@@ -26,6 +26,26 @@ public class TestEventObjectTypedAccessors
     }
 
     [Fact]
+    public void TryGetDataValue_KnownField_CustomMapping_IsCaseInsensitive()
+    {
+        var eo = BuildEventObject(data: new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["clientip"] = "172.16.10.25",
+            ["hwaddress"] = "AA-BB-CC-DD-EE-11",
+            ["privilegelist"] = "SeBackupPrivilege SeRestorePrivilege"
+        });
+
+        Assert.True(eo.TryGetDataValue(KnownEventField.ClientIp, out var clientIp));
+        Assert.Equal("172.16.10.25", clientIp);
+
+        Assert.True(eo.TryGetDataValue(KnownEventField.HwAddress, out var hwAddress));
+        Assert.Equal("AA-BB-CC-DD-EE-11", hwAddress);
+
+        Assert.True(eo.TryGetDataValue(KnownEventField.PrivilegeList, out var privilegeList));
+        Assert.Equal("SeBackupPrivilege SeRestorePrivilege", privilegeList);
+    }
+
+    [Fact]
     public void TryGetDataEnum_ParsesHexAndPrefixedValues()
     {
         var eo = BuildEventObject(data: new Dictionary<string, string>
@@ -272,6 +292,22 @@ public class TestEventObjectTypedAccessors
 
         Assert.Equal("10.20.30.40", rule.IPAddress);
         Assert.Equal("AA-BB-CC-DD-EE-FF", rule.MacAddress);
+    }
+
+    [Fact]
+    public void DhcpLeaseCreated_WhenHwAndMacPresent_UsesCombinedValue()
+    {
+        var eo = BuildEventObject(data: new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["ipaddress"] = "10.20.30.41",
+            ["hwaddress"] = "AA-BB-CC-DD-EE-01",
+            ["macaddress"] = "AA-BB-CC-DD-EE-FF"
+        });
+
+        var rule = new DhcpLeaseCreated(eo);
+
+        Assert.Equal("10.20.30.41", rule.IPAddress);
+        Assert.Equal("AA-BB-CC-DD-EE-01\\AA-BB-CC-DD-EE-FF", rule.MacAddress);
     }
 
     private static EventObject BuildEventObject(

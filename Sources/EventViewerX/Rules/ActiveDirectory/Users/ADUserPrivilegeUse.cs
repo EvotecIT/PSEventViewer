@@ -57,7 +57,7 @@ public class ADUserPrivilegeUse : EventRuleBase {
         Who = _eventObject.GetSubjectAccountOrEmpty();
         When = _eventObject.TimeCreated;
 
-        var privilegeList = _eventObject.GetValueFromDataDictionary("PrivilegeList");
+        var privilegeList = _eventObject.GetDataValueOrEmpty(KnownEventField.PrivilegeList);
         if (!string.IsNullOrEmpty(privilegeList)) {
             Privileges = privilegeList.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries).ToList();
             PrivilegesTranslated = Privileges.Select(EventsHelper.TranslatePrivilege).ToList();
