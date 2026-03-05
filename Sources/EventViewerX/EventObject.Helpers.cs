@@ -209,6 +209,30 @@ namespace EventViewerX {
                 reverseOrder);
         }
 
+        /// <summary>
+        /// Gets one or two data values by mixed known/string keys (case-insensitive) and optionally concatenates them.
+        /// </summary>
+        /// <param name="key1">Primary known field.</param>
+        /// <param name="key2">Secondary string key.</param>
+        /// <param name="splitter">Text inserted between values when both keys exist.</param>
+        /// <param name="reverseOrder">When <c>true</c>, returns key2+splitter+key1.</param>
+        /// <returns>Resolved value, concatenated value, or empty string when keys are missing.</returns>
+        public string GetValueFromDataDictionary(KnownEventField key1, string? key2 = null, string splitter = "\\", bool reverseOrder = false) {
+            return GetValueFromDataDictionary(key1.ToEventFieldKey(), key2, splitter, reverseOrder);
+        }
+
+        /// <summary>
+        /// Gets one or two data values by mixed string/known keys (case-insensitive) and optionally concatenates them.
+        /// </summary>
+        /// <param name="key1">Primary string key.</param>
+        /// <param name="key2">Secondary known field.</param>
+        /// <param name="splitter">Text inserted between values when both keys exist.</param>
+        /// <param name="reverseOrder">When <c>true</c>, returns key2+splitter+key1.</param>
+        /// <returns>Resolved value, concatenated value, or empty string when keys are missing.</returns>
+        public string GetValueFromDataDictionary(string key1, KnownEventField key2, string splitter = "\\", bool reverseOrder = false) {
+            return GetValueFromDataDictionary(key1, key2.ToEventFieldKey(), splitter, reverseOrder);
+        }
+
         internal bool ValueMatches(string key, string expectedValue) {
             return TryGetDataValue(key, out string currentValue) &&
                    currentValue.Equals(expectedValue, StringComparison.OrdinalIgnoreCase);

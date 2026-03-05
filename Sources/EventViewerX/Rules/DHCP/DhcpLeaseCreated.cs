@@ -42,7 +42,7 @@ public class DhcpLeaseCreated : EventRuleBase {
         _eventObject = eventObject;
         Type = "DhcpLeaseCreated";
         Computer = _eventObject.ComputerName;
-        IPAddress = _eventObject.GetValueFromDataDictionary("IpAddress", "ClientIP");
+        IPAddress = _eventObject.GetValueFromDataDictionary(KnownEventField.IpAddress, "ClientIP");
         MacAddress = _eventObject.GetValueFromDataDictionary("HWAddress", "MacAddress");
         When = _eventObject.TimeCreated;
     }

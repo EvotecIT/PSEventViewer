@@ -5,6 +5,7 @@ using System.Reflection;
 using System.Runtime.Serialization;
 using System.Security.Principal;
 using EventViewerX.Rules.ActiveDirectory;
+using EventViewerX.Rules.DHCP;
 using EventViewerX.Rules.Logging;
 using Xunit;
 
@@ -205,6 +206,19 @@ public class TestEventObjectTypedAccessors
     }
 
     [Fact]
+    public void GetValueFromDataDictionary_MixedKnownFieldString_UsesFallbackKey()
+    {
+        var eo = BuildEventObject(data: new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["clientip"] = "172.16.1.15"
+        });
+
+        var value = eo.GetValueFromDataDictionary(KnownEventField.IpAddress, "ClientIP");
+
+        Assert.Equal("172.16.1.15", value);
+    }
+
+    [Fact]
     public void ADComputerChangeDetailed_CanHandle_IsCaseInsensitiveForObjectClass()
     {
         var eo = BuildEventObject(data: new Dictionary<string, string>(StringComparer.Ordinal)
@@ -215,6 +229,21 @@ public class TestEventObjectTypedAccessors
         var rule = new ADComputerChangeDetailed(eo);
 
         Assert.True(rule.CanHandle(eo));
+    }
+
+    [Fact]
+    public void DhcpLeaseCreated_UsesKnownFieldOrFallbackClientIp()
+    {
+        var eo = BuildEventObject(data: new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["clientip"] = "10.20.30.40",
+            ["macaddress"] = "AA-BB-CC-DD-EE-FF"
+        });
+
+        var rule = new DhcpLeaseCreated(eo);
+
+        Assert.Equal("10.20.30.40", rule.IPAddress);
+        Assert.Equal("AA-BB-CC-DD-EE-FF", rule.MacAddress);
     }
 
     private static EventObject BuildEventObject(
