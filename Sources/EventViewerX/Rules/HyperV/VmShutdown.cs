@@ -47,9 +47,10 @@ public class VmShutdown : EventRuleBase {
             User = _eventObject.GetValueFromDataDictionary("AccountName");
         }
         if (string.IsNullOrEmpty(User)) {
-            User = _eventObject.GetValueFromDataDictionary(KnownEventField.SubjectUserName, KnownEventField.SubjectDomainName, "\\", reverseOrder: true);
+            User = _eventObject.GetSubjectAccountOrEmpty();
         }
         When = _eventObject.TimeCreated;
     }
 }
+
 

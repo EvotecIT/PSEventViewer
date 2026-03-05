@@ -73,7 +73,7 @@ public class ADUserCreateChange : EventRuleBase {
         Type = "ADUserChange";
         Computer = _eventObject.ComputerName;
         Action = _eventObject.MessageSubject;
-        UserAffected = _eventObject.GetValueFromDataDictionary(KnownEventField.TargetUserName, KnownEventField.TargetDomainName, "\\", reverseOrder: true);
+        UserAffected = _eventObject.GetTargetAccountOrEmpty();
         SamAccountName = _eventObject.GetValueFromDataDictionary("SamAccountName");
         DisplayName = _eventObject.GetValueFromDataDictionary("DisplayName");
         UserPrincipalName = _eventObject.GetValueFromDataDictionary("UserPrincipalName");
@@ -92,7 +92,7 @@ public class ADUserCreateChange : EventRuleBase {
         UserParameters = _eventObject.GetValueFromDataDictionary("UserParameters");
         SidHistory = _eventObject.GetValueFromDataDictionary("SidHistory");
         LogonHours = _eventObject.GetValueFromDataDictionary("LogonHours");
-        Who = _eventObject.GetValueFromDataDictionary(KnownEventField.SubjectUserName, KnownEventField.SubjectDomainName, "\\", reverseOrder: true);
+        Who = _eventObject.GetSubjectAccountOrEmpty();
         When = _eventObject.TimeCreated;
 
         // let's try to translate them
@@ -101,4 +101,5 @@ public class ADUserCreateChange : EventRuleBase {
         UserAccountControl = TranslateUacValue(UserAccountControl);
     }
 }
+
 

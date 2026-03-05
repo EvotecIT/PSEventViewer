@@ -55,9 +55,10 @@ public class DeviceRecognized : EventRuleBase {
         LocationInformation = _eventObject.GetValueFromDataDictionary("LocationInformation");
         DeviceType = EventsHelper.TranslateDeviceType(ClassName);
         Vendor = EventsHelper.TranslateVendor(VendorIds);
-        Who = _eventObject.GetValueFromDataDictionary(KnownEventField.SubjectUserName, KnownEventField.SubjectDomainName, "\\", reverseOrder: true);
+        Who = _eventObject.GetSubjectAccountOrEmpty();
         When = _eventObject.TimeCreated;
     }
 }
+
 
 

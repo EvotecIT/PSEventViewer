@@ -40,7 +40,7 @@ public class LogsClearedOther : EventRuleBase {
         LogType = ConvertFromOperationType(_eventObject.GetDataValueOrEmpty("Channel"));
 
         // common fields
-        Who = _eventObject.GetValueFromDataDictionary(KnownEventField.SubjectUserName, KnownEventField.SubjectDomainName, "\\", reverseOrder: true);
+        Who = _eventObject.GetSubjectAccountOrEmpty();
         When = _eventObject.TimeCreated;
 
 
@@ -49,5 +49,6 @@ public class LogsClearedOther : EventRuleBase {
         }
     }
 }
+
 
 

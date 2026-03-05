@@ -31,9 +31,10 @@ public class ScheduledTaskDeleted : EventRuleBase {
         Type = "ScheduledTaskDeleted";
         Computer = _eventObject.ComputerName;
         TaskName = _eventObject.GetValueFromDataDictionary("TaskName");
-        Who = _eventObject.GetValueFromDataDictionary(KnownEventField.SubjectUserName, KnownEventField.SubjectDomainName, "\\", reverseOrder: true);
+        Who = _eventObject.GetSubjectAccountOrEmpty();
         When = _eventObject.TimeCreated;
     }
 }
+
 
 

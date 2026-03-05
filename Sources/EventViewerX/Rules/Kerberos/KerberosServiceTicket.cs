@@ -47,7 +47,7 @@ public class KerberosServiceTicket : EventRuleBase
         Type = "KerberosServiceTicket";
         Computer = _eventObject.ComputerName;
         Action = _eventObject.MessageSubject;
-        AccountName = _eventObject.GetValueFromDataDictionary(KnownEventField.TargetUserName, KnownEventField.TargetDomainName, "\\", reverseOrder: true);
+        AccountName = _eventObject.GetTargetAccountOrEmpty();
         ServiceName = _eventObject.GetDataValueOrEmpty("ServiceName");
         IpAddress = _eventObject.GetDataValueOrEmpty(KnownEventField.IpAddress);
         IpPort = _eventObject.GetDataValueOrEmpty(KnownEventField.IpPort);
@@ -63,4 +63,5 @@ public class KerberosServiceTicket : EventRuleBase
         UnusualTicketOptions = !(TicketOptions?.Equals("0x40810010", StringComparison.OrdinalIgnoreCase) ?? false);
     }
 }
+
 

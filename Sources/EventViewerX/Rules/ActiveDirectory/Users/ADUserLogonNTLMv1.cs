@@ -69,8 +69,8 @@ public class ADUserLogonNTLMv1 : EventRuleBase {
         LogonType = _eventObject.TryGetDataEnum(KnownEventField.LogonType, out EventViewerX.LogonType parsedLogonType, EventFieldNumericBase.Decimal)
             ? parsedLogonType
             : EventsHelper.GetLogonType(_eventObject.GetDataValueOrEmpty(KnownEventField.LogonType));
-        ObjectAffected = _eventObject.GetValueFromDataDictionary(KnownEventField.TargetUserName, KnownEventField.TargetDomainName, "\\", reverseOrder: true);
-        Who = _eventObject.GetValueFromDataDictionary(KnownEventField.SubjectUserName, KnownEventField.SubjectDomainName, "\\", reverseOrder: true);
+        ObjectAffected = _eventObject.GetTargetAccountOrEmpty();
+        Who = _eventObject.GetSubjectAccountOrEmpty();
         When = _eventObject.TimeCreated;
 
         // Additional NTLMv1-specific fields
@@ -81,5 +81,6 @@ public class ADUserLogonNTLMv1 : EventRuleBase {
         ProcessName = _eventObject.GetDataValueOrEmpty(KnownEventField.ProcessName);
     }
 }
+
 
 

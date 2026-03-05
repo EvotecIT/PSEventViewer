@@ -39,7 +39,7 @@ public class ADUserRightsAssignment : EventRuleBase {
         Computer = _eventObject.ComputerName;
         Action = _eventObject.MessageSubject;
 
-        UserAffected = _eventObject.GetValueFromDataDictionary(KnownEventField.TargetUserName, KnownEventField.TargetDomainName, "\\", reverseOrder: true);
+        UserAffected = _eventObject.GetTargetAccountOrEmpty();
         if (string.IsNullOrEmpty(UserAffected)) {
             var sid = _eventObject.GetDataValueOrEmpty(KnownEventField.TargetSid);
             if (!string.IsNullOrEmpty(sid)) {
@@ -61,9 +61,10 @@ public class ADUserRightsAssignment : EventRuleBase {
             RightsTranslated = new List<string>();
         }
 
-        Who = _eventObject.GetValueFromDataDictionary(KnownEventField.SubjectUserName, KnownEventField.SubjectDomainName, "\\", reverseOrder: true);
+        Who = _eventObject.GetSubjectAccountOrEmpty();
         When = _eventObject.TimeCreated;
     }
 }
+
 
 

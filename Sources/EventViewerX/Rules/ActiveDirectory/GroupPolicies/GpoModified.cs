@@ -41,9 +41,10 @@ public class GpoModified : EventRuleBase {
         GpoName = _eventObject.GetValueFromDataDictionary("ObjectDN");
         AttributeLDAPDisplayName = _eventObject.GetValueFromDataDictionary("AttributeLDAPDisplayName");
         AttributeValue = _eventObject.GetValueFromDataDictionary("AttributeValue");
-        Who = _eventObject.GetValueFromDataDictionary(KnownEventField.SubjectUserName, KnownEventField.SubjectDomainName, "\\", reverseOrder: true);
+        Who = _eventObject.GetSubjectAccountOrEmpty();
         When = _eventObject.TimeCreated;
     }
 }
+
 
 

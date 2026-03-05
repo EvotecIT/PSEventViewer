@@ -43,8 +43,9 @@ public class OSTimeChange : EventRuleBase {
         PreviousTime = _eventObject.GetValueFromDataDictionary("PreviousTime");
         NewTime = _eventObject.GetValueFromDataDictionary("NewTime");
 
-        Who = _eventObject.GetValueFromDataDictionary(KnownEventField.SubjectUserName, KnownEventField.SubjectDomainName, "\\", reverseOrder: true);
+        Who = _eventObject.GetSubjectAccountOrEmpty();
         When = _eventObject.TimeCreated;
     }
 }
+
 

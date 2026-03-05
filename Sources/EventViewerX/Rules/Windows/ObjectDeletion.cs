@@ -31,9 +31,10 @@ public class ObjectDeletion : EventRuleBase {
         Type = "ObjectDeletion";
         Computer = _eventObject.ComputerName;
         Path = _eventObject.GetValueFromDataDictionary("ObjectName");
-        Who = _eventObject.GetValueFromDataDictionary(KnownEventField.SubjectUserName, KnownEventField.SubjectDomainName, "\\", reverseOrder: true);
+        Who = _eventObject.GetSubjectAccountOrEmpty();
         When = _eventObject.TimeCreated;
     }
 }
+
 
 

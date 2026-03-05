@@ -43,7 +43,7 @@ public class KerberosTicketFailure : EventRuleBase
         Type = "KerberosTicketFailure";
         Computer = _eventObject.ComputerName;
         Action = _eventObject.MessageSubject;
-        AccountName = _eventObject.GetValueFromDataDictionary(KnownEventField.TargetUserName, KnownEventField.TargetDomainName, "\\", reverseOrder: true);
+        AccountName = _eventObject.GetTargetAccountOrEmpty();
         FailureCode = _eventObject.GetDataValueOrEmpty(KnownEventField.Status);
         IpAddress = _eventObject.GetDataValueOrEmpty(KnownEventField.IpAddress);
         IpPort = _eventObject.GetDataValueOrEmpty(KnownEventField.IpPort);
@@ -56,5 +56,6 @@ public class KerberosTicketFailure : EventRuleBase
             or TicketEncryptionType.RC4_HMAC_EXP;
     }
 }
+
 
 
