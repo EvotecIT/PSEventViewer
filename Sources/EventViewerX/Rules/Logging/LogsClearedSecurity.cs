@@ -42,7 +42,7 @@ public class LogsClearedSecurity : EventRuleBase {
         LogType = ConvertFromOperationType(_eventObject.GetDataValueOrEmpty("Channel"));
 
         // common fields
-        Who = _eventObject.GetValueFromDataDictionary("SubjectUserName", "SubjectDomainName", "\\", reverseOrder: true);
+        Who = _eventObject.GetValueFromDataDictionary(KnownEventField.SubjectUserName, KnownEventField.SubjectDomainName, "\\", reverseOrder: true);
         When = _eventObject.TimeCreated;
 
         if (_eventObject.Id == 1105) {
@@ -54,4 +54,5 @@ public class LogsClearedSecurity : EventRuleBase {
     }
 
 }
+
 

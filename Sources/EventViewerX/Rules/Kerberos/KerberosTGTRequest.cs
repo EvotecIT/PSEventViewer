@@ -68,7 +68,7 @@ public class KerberosTGTRequest : EventRuleBase
         Type = "KerberosTGTRequest";
         Computer = _eventObject.ComputerName;
         Action = _eventObject.MessageSubject;
-        AccountName = _eventObject.GetValueFromDataDictionary("TargetUserName", "TargetDomainName", "\\", reverseOrder: true);
+        AccountName = _eventObject.GetValueFromDataDictionary(KnownEventField.TargetUserName, KnownEventField.TargetDomainName, "\\", reverseOrder: true);
         IpAddress = Rules.RuleHelpers.NormalizeIp(_eventObject.GetDataValueOrEmpty(KnownEventField.IpAddress));
         IpPort = _eventObject.GetDataValueOrEmpty(KnownEventField.IpPort);
         var rawTicketOptions = _eventObject.GetDataValueOrEmpty(KnownEventField.TicketOptions);
@@ -110,3 +110,4 @@ public class KerberosTGTRequest : EventRuleBase
             or TicketEncryptionType.RC4_HMAC_EXP;
     }
 }
+

@@ -1,4 +1,4 @@
-﻿namespace EventViewerX.Rules.ActiveDirectory;
+namespace EventViewerX.Rules.ActiveDirectory;
 
 /// <summary>
 /// Active Directory Group Change
@@ -48,7 +48,7 @@ public class ADGroupChange : EventRuleBase {
     /// <summary>Skips anonymous noise events and only processes real actor changes.</summary>
     public override bool CanHandle(EventObject eventObject) {
         // Ignore *ANONYMOUS* events as they are not useful and clutter the view
-        var who = eventObject.GetValueFromDataDictionary("SubjectUserName", "SubjectDomainName", "\\", reverseOrder: true);
+        var who = eventObject.GetValueFromDataDictionary(KnownEventField.SubjectUserName, KnownEventField.SubjectDomainName, "\\", reverseOrder: true);
         return who != "*ANONYMOUS*";
     }
 
@@ -60,13 +60,14 @@ public class ADGroupChange : EventRuleBase {
         Computer = _eventObject.ComputerName;
         Action = _eventObject.MessageSubject;
 
-        GroupName = _eventObject.GetValueFromDataDictionary("TargetUserName", "TargetDomainName", "\\", reverseOrder: true);
+        GroupName = _eventObject.GetValueFromDataDictionary(KnownEventField.TargetUserName, KnownEventField.TargetDomainName, "\\", reverseOrder: true);
         GroupTypeChange = _eventObject.GetValueFromDataDictionary("GroupTypeChange");
         SamAccountName = _eventObject.GetValueFromDataDictionary("SamAccountName");
         SidHistory = _eventObject.GetValueFromDataDictionary("SidHistory");
 
         // common fields
-        Who = _eventObject.GetValueFromDataDictionary("SubjectUserName", "SubjectDomainName", "\\", reverseOrder: true);
+        Who = _eventObject.GetValueFromDataDictionary(KnownEventField.SubjectUserName, KnownEventField.SubjectDomainName, "\\", reverseOrder: true);
         When = _eventObject.TimeCreated;
     }
 }
+

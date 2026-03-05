@@ -53,7 +53,7 @@ public class ADGroupPolicyEdits : EventRuleBase {
         Action = _eventObject.MessageSubject;
         ObjectClass = _eventObject.GetValueFromDataDictionary("ObjectClass");
         OperationType = ConvertFromOperationType(_eventObject.GetDataValueOrEmpty("OperationType"));
-        Who = _eventObject.GetValueFromDataDictionary("SubjectUserName", "SubjectDomainName", "\\", reverseOrder: true);
+        Who = _eventObject.GetValueFromDataDictionary(KnownEventField.SubjectUserName, KnownEventField.SubjectDomainName, "\\", reverseOrder: true);
         When = _eventObject.TimeCreated;
         GroupPolicyDisplayName = _eventObject.GetValueFromDataDictionary("ObjectDN");
         var dn = _eventObject.GetValueFromDataDictionary("ObjectDN");
@@ -111,4 +111,5 @@ public class ADGroupPolicyEdits : EventRuleBase {
 //   <Data Name="OperationType">%%14674</Data>
 //   </EventData>
 //   </Event>
+
 

@@ -54,7 +54,7 @@ public class ADUserPrivilegeUse : EventRuleBase {
         Computer = _eventObject.ComputerName;
         Action = _eventObject.MessageSubject;
 
-        Who = _eventObject.GetValueFromDataDictionary("SubjectUserName", "SubjectDomainName", "\\", reverseOrder: true);
+        Who = _eventObject.GetValueFromDataDictionary(KnownEventField.SubjectUserName, KnownEventField.SubjectDomainName, "\\", reverseOrder: true);
         When = _eventObject.TimeCreated;
 
         var privilegeList = _eventObject.GetValueFromDataDictionary("PrivilegeList");
@@ -67,4 +67,5 @@ public class ADUserPrivilegeUse : EventRuleBase {
         }
     }
 }
+
 

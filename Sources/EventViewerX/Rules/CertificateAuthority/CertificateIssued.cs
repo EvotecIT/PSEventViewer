@@ -44,7 +44,7 @@ public class CertificateIssued : EventRuleBase
         CertificateTemplate = DecodeHex(_eventObject.GetValueFromDataDictionary("CertificateTemplate", "CertificateTemplateOid"));
         Requester = DecodeHex(_eventObject.GetValueFromDataDictionary("Requester", "RequestSubjectName"));
         SerialNumber = DecodeHex(_eventObject.GetValueFromDataDictionary("SerialNumber"));
-        Who = _eventObject.GetValueFromDataDictionary("SubjectUserName", "SubjectDomainName", "\\", reverseOrder: true);
+        Who = _eventObject.GetValueFromDataDictionary(KnownEventField.SubjectUserName, KnownEventField.SubjectDomainName, "\\", reverseOrder: true);
         When = _eventObject.TimeCreated;
     }
 
@@ -74,4 +74,5 @@ public class CertificateIssued : EventRuleBase
         }
     }
 }
+
 

@@ -98,7 +98,7 @@ namespace EventViewerX.Rules.ActiveDirectory {
             Type = "ADOrganizationalUnitChangeDetailed";
             Computer = _eventObject.ComputerName;
             Action = _eventObject.MessageSubject;
-            Who = _eventObject.GetValueFromDataDictionary("SubjectUserName", "SubjectDomainName", "\\", reverseOrder: true);
+            Who = _eventObject.GetValueFromDataDictionary(KnownEventField.SubjectUserName, KnownEventField.SubjectDomainName, "\\", reverseOrder: true);
             When = _eventObject.TimeCreated;
 
             OperationType = ConvertFromOperationType(_eventObject.GetDataValueOrEmpty("OperationType"));
@@ -123,4 +123,5 @@ namespace EventViewerX.Rules.ActiveDirectory {
         }
     }
 }
+
 

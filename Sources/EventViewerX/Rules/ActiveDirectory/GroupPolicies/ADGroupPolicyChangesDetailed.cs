@@ -54,11 +54,12 @@ public class ADGroupPolicyChangesDetailed : EventRuleBase {
         Action = _eventObject.MessageSubject;
         ObjectClass = _eventObject.GetValueFromDataDictionary("ObjectClass");
         OperationType = ConvertFromOperationType(_eventObject.GetDataValueOrEmpty("OperationType"));
-        Who = _eventObject.GetValueFromDataDictionary("SubjectUserName", "SubjectDomainName", "\\", reverseOrder: true);
+        Who = _eventObject.GetValueFromDataDictionary(KnownEventField.SubjectUserName, KnownEventField.SubjectDomainName, "\\", reverseOrder: true);
         When = _eventObject.TimeCreated;
         GpoName = _eventObject.GetValueFromDataDictionary("ObjectDN");
         AttributeLDAPDisplayName = _eventObject.GetValueFromDataDictionary("AttributeLDAPDisplayName");
         AttributeValue = _eventObject.GetValueFromDataDictionary("AttributeValue");
     }
 }
+
 

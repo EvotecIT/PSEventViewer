@@ -49,8 +49,9 @@ public class BitLockerKeyChange : EventRuleBase {
         MasterKeyId = _eventObject.GetValueFromDataDictionary("MasterKeyId");
         RecoveryKeyId = _eventObject.GetValueFromDataDictionary("RecoveryKeyId");
         RecoveryServer = _eventObject.GetValueFromDataDictionary("RecoveryServer");
-        Who = _eventObject.GetValueFromDataDictionary("SubjectUserName", "SubjectDomainName", "\\", reverseOrder: true);
+        Who = _eventObject.GetValueFromDataDictionary(KnownEventField.SubjectUserName, KnownEventField.SubjectDomainName, "\\", reverseOrder: true);
         When = _eventObject.TimeCreated;
     }
 }
+
 

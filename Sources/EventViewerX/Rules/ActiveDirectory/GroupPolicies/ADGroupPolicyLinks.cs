@@ -105,7 +105,7 @@ public class ADGroupPolicyLinks : EventRuleBase {
         //Action = _eventObject.MessageSubject;
         LinkedToType = _eventObject.GetValueFromDataDictionary("ObjectClass");
         OperationType = ConvertFromOperationType(_eventObject.GetDataValueOrEmpty("OperationType"));
-        Who = _eventObject.GetValueFromDataDictionary("SubjectUserName", "SubjectDomainName", "\\", reverseOrder: true);
+        Who = _eventObject.GetValueFromDataDictionary(KnownEventField.SubjectUserName, KnownEventField.SubjectDomainName, "\\", reverseOrder: true);
         When = _eventObject.TimeCreated;
         DomainName = _eventObject.GetValueFromDataDictionary("DSName");
         LinkedTo = _eventObject.GetValueFromDataDictionary("ObjectDN");
@@ -155,4 +155,5 @@ public class ADGroupPolicyLinks : EventRuleBase {
         return links;
     }
 }
+
 

@@ -69,7 +69,7 @@ namespace EventViewerX.Rules.ActiveDirectory {
             FieldChanged = _eventObject.GetValueFromDataDictionary("AttributeLDAPDisplayName");
             FieldValue = _eventObject.GetValueFromDataDictionary("AttributeValue");
             // common fields
-            Who = _eventObject.GetValueFromDataDictionary("SubjectUserName", "SubjectDomainName", "\\", reverseOrder: true);
+            Who = _eventObject.GetValueFromDataDictionary(KnownEventField.SubjectUserName, KnownEventField.SubjectDomainName, "\\", reverseOrder: true);
             When = _eventObject.TimeCreated;
 
             // OverwriteByField logic
@@ -78,4 +78,5 @@ namespace EventViewerX.Rules.ActiveDirectory {
         }
     }
 }
+
 
