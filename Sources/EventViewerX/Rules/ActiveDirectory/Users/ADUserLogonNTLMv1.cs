@@ -1,4 +1,4 @@
-﻿namespace EventViewerX.Rules.ActiveDirectory;
+namespace EventViewerX.Rules.ActiveDirectory;
 
 /// <summary>
 /// Handles NTLMv1 logon events (4624).
@@ -67,8 +67,8 @@ public class ADUserLogonNTLMv1 : EventRuleBase {
         VirtualAccount = EventsHelper.GetVirtualAccount(_eventObject.GetValueFromDataDictionary("VirtualAccount"));
         ElevatedToken = EventsHelper.GetElevatedToken(_eventObject.GetValueFromDataDictionary("ElevatedToken"));
         LogonType = EventsHelper.GetLogonType(_eventObject.GetValueFromDataDictionary("LogonType"));
-        ObjectAffected = _eventObject.GetValueFromDataDictionary("TargetUserName", "TargetDomainName", "\\", reverseOrder: true);
-        Who = _eventObject.GetValueFromDataDictionary("SubjectUserName", "SubjectDomainName", "\\", reverseOrder: true);
+        ObjectAffected = _eventObject.GetValueFromDataDictionary(KnownEventField.TargetUserName, KnownEventField.TargetDomainName, "\\", reverseOrder: true);
+        Who = _eventObject.GetValueFromDataDictionary(KnownEventField.SubjectUserName, KnownEventField.SubjectDomainName, "\\", reverseOrder: true);
         When = _eventObject.TimeCreated;
 
         // Additional NTLMv1-specific fields
@@ -79,4 +79,5 @@ public class ADUserLogonNTLMv1 : EventRuleBase {
         ProcessName = _eventObject.GetValueFromDataDictionary("ProcessName");
     }
 }
+
 

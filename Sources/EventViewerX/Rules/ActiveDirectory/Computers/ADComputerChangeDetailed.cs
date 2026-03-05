@@ -63,7 +63,7 @@ public class ADComputerChangeDetailed : EventRuleBase {
         Computer = _eventObject.ComputerName;
         ObjectClass = _eventObject.GetValueFromDataDictionary("ObjectClass");
         Action = _eventObject.MessageSubject;
-        Who = _eventObject.GetValueFromDataDictionary("SubjectUserName", "SubjectDomainName", "\\", reverseOrder: true);
+        Who = _eventObject.GetValueFromDataDictionary(KnownEventField.SubjectUserName, KnownEventField.SubjectDomainName, "\\", reverseOrder: true);
         When = _eventObject.TimeCreated;
         //
         OperationType = ConvertFromOperationType(_eventObject.GetDataValueOrEmpty("OperationType"));
@@ -94,4 +94,5 @@ public class ADComputerChangeDetailed : EventRuleBase {
     //    }
     //}
 }
+
 

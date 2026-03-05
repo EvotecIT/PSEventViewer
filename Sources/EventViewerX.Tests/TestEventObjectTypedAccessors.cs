@@ -142,6 +142,20 @@ public class TestEventObjectTypedAccessors
     }
 
     [Fact]
+    public void GetValueFromDataDictionary_KnownFieldOverload_UsesCanonicalKeys()
+    {
+        var eo = BuildEventObject(data: new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["targetusername"] = "john.smith",
+            ["targetdomainname"] = "contoso"
+        });
+
+        var combined = eo.GetValueFromDataDictionary(KnownEventField.TargetUserName, KnownEventField.TargetDomainName, "\\", reverseOrder: true);
+
+        Assert.Equal("contoso\\john.smith", combined);
+    }
+
+    [Fact]
     public void ADComputerChangeDetailed_CanHandle_IsCaseInsensitiveForObjectClass()
     {
         var eo = BuildEventObject(data: new Dictionary<string, string>(StringComparer.Ordinal)

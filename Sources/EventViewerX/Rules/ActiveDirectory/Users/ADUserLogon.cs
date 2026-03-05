@@ -1,4 +1,4 @@
-﻿namespace EventViewerX.Rules.ActiveDirectory;
+namespace EventViewerX.Rules.ActiveDirectory;
 
 /// <summary>
 /// Active Directory User Logon
@@ -95,9 +95,10 @@ public class ADUserLogon : EventRuleBase {
             ? parsedLogonType
             : EventsHelper.GetLogonType(_eventObject.GetDataValueOrEmpty(KnownEventField.LogonType));
 
-        ObjectAffected = _eventObject.GetValueFromDataDictionary("TargetUserName", "TargetDomainName", "\\", reverseOrder: true);
+        ObjectAffected = _eventObject.GetValueFromDataDictionary(KnownEventField.TargetUserName, KnownEventField.TargetDomainName, "\\", reverseOrder: true);
 
-        Who = _eventObject.GetValueFromDataDictionary("SubjectUserName", "SubjectDomainName", "\\", reverseOrder: true);
+        Who = _eventObject.GetValueFromDataDictionary(KnownEventField.SubjectUserName, KnownEventField.SubjectDomainName, "\\", reverseOrder: true);
         When = _eventObject.TimeCreated;
     }
 }
+

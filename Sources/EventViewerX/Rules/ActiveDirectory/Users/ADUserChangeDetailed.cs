@@ -82,7 +82,7 @@ public class ADUserChangeDetailed : EventRuleBase {
         FieldChanged = _eventObject.GetValueFromDataDictionary("AttributeLDAPDisplayName");
         FieldValue = _eventObject.GetValueFromDataDictionary("AttributeValue");
         // common fields
-        Who = _eventObject.GetValueFromDataDictionary("SubjectUserName", "SubjectDomainName", "\\", reverseOrder: true);
+        Who = _eventObject.GetValueFromDataDictionary(KnownEventField.SubjectUserName, KnownEventField.SubjectDomainName, "\\", reverseOrder: true);
         When = _eventObject.TimeCreated;
 
         // OverwriteByField logic
@@ -90,4 +90,5 @@ public class ADUserChangeDetailed : EventRuleBase {
         FieldValue = OverwriteByField(Action, "A directory service object was moved.", FieldValue, _eventObject.GetValueFromDataDictionary("NewObjectDN"));
     }
 }
+
 

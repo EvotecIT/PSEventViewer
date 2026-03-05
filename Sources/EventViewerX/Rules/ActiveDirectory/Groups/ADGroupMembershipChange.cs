@@ -61,11 +61,12 @@ public class ADGroupMembershipChange : EventRuleBase {
         Computer = _eventObject.ComputerName;
         Action = _eventObject.MessageSubject;
 
-        GroupName = _eventObject.GetValueFromDataDictionary("TargetUserName", "TargetDomainName", "\\", reverseOrder: true);
+        GroupName = _eventObject.GetValueFromDataDictionary(KnownEventField.TargetUserName, KnownEventField.TargetDomainName, "\\", reverseOrder: true);
         MemberName = _eventObject.GetValueFromDataDictionary("MemberNameWithoutCN");
 
         // common fields
-        Who = _eventObject.GetValueFromDataDictionary("SubjectUserName", "SubjectDomainName", "\\", reverseOrder: true);
+        Who = _eventObject.GetValueFromDataDictionary(KnownEventField.SubjectUserName, KnownEventField.SubjectDomainName, "\\", reverseOrder: true);
         When = _eventObject.TimeCreated;
     }
 }
+

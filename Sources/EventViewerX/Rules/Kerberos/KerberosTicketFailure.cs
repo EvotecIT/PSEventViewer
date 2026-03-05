@@ -43,11 +43,11 @@ public class KerberosTicketFailure : EventRuleBase
         Type = "KerberosTicketFailure";
         Computer = _eventObject.ComputerName;
         Action = _eventObject.MessageSubject;
-        AccountName = _eventObject.GetValueFromDataDictionary("TargetUserName", "TargetDomainName", "\\", reverseOrder: true);
-        FailureCode = _eventObject.GetValueFromDataDictionary("Status");
-        IpAddress = _eventObject.GetValueFromDataDictionary("IpAddress");
-        IpPort = _eventObject.GetValueFromDataDictionary("IpPort");
-        EncryptionType = EventsHelper.GetTicketEncryptionType(_eventObject.GetValueFromDataDictionary("TicketEncryptionType"));
+        AccountName = _eventObject.GetValueFromDataDictionary(KnownEventField.TargetUserName, KnownEventField.TargetDomainName, "\\", reverseOrder: true);
+        FailureCode = _eventObject.GetDataValueOrEmpty(KnownEventField.Status);
+        IpAddress = _eventObject.GetDataValueOrEmpty(KnownEventField.IpAddress);
+        IpPort = _eventObject.GetDataValueOrEmpty(KnownEventField.IpPort);
+        EncryptionType = EventsHelper.GetTicketEncryptionType(_eventObject.GetDataValueOrEmpty(KnownEventField.TicketEncryptionType));
         When = _eventObject.TimeCreated;
 
         WeakEncryptionAlgorithm = EncryptionType is TicketEncryptionType.DES_CBC_CRC
@@ -56,4 +56,5 @@ public class KerberosTicketFailure : EventRuleBase
             or TicketEncryptionType.RC4_HMAC_EXP;
     }
 }
+
 

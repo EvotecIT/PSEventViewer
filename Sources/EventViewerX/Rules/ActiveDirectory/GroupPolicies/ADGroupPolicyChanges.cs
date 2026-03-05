@@ -1,4 +1,4 @@
-﻿namespace EventViewerX.Rules.ActiveDirectory;
+namespace EventViewerX.Rules.ActiveDirectory;
 
 /// <summary>
 /// Summary information for group policy change events.
@@ -49,7 +49,7 @@ public class ADGroupPolicyChanges : EventRuleBase {
         Action = _eventObject.MessageSubject;
         ObjectClass = _eventObject.GetValueFromDataDictionary("ObjectClass");
         // OperationType = ConvertFromOperationType(_eventObject.Data["OperationType"]);
-        Who = _eventObject.GetValueFromDataDictionary("SubjectUserName", "SubjectDomainName", "\\", reverseOrder: true);
+        Who = _eventObject.GetValueFromDataDictionary(KnownEventField.SubjectUserName, KnownEventField.SubjectDomainName, "\\", reverseOrder: true);
         When = _eventObject.TimeCreated;
         GpoName = _eventObject.GetValueFromDataDictionary("ObjectDN");
         AttributeLDAPDisplayName = _eventObject.GetValueFromDataDictionary("AttributeLDAPDisplayName");
@@ -88,3 +88,4 @@ public class ADGroupPolicyChanges : EventRuleBase {
 //   <Data Name="ObjectClass">groupPolicyContainer</Data>
 //   </EventData>
 //   </Event>
+

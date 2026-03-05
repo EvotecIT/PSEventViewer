@@ -1,4 +1,4 @@
-﻿namespace EventViewerX.Rules.ActiveDirectory;
+namespace EventViewerX.Rules.ActiveDirectory;
 
 /// <summary>
 /// Represents a newly created group policy object event.
@@ -35,8 +35,9 @@ public class GpoCreated : EventRuleBase {
         Computer = _eventObject.ComputerName;
         Action = _eventObject.MessageSubject;
         GpoName = _eventObject.GetValueFromDataDictionary("ObjectDN");
-        Who = _eventObject.GetValueFromDataDictionary("SubjectUserName", "SubjectDomainName", "\\", reverseOrder: true);
+        Who = _eventObject.GetValueFromDataDictionary(KnownEventField.SubjectUserName, KnownEventField.SubjectDomainName, "\\", reverseOrder: true);
         When = _eventObject.TimeCreated;
     }
 }
+
 
