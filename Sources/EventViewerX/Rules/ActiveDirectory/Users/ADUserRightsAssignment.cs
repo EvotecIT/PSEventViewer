@@ -41,7 +41,7 @@ public class ADUserRightsAssignment : EventRuleBase {
 
         UserAffected = _eventObject.GetValueFromDataDictionary(KnownEventField.TargetUserName, KnownEventField.TargetDomainName, "\\", reverseOrder: true);
         if (string.IsNullOrEmpty(UserAffected)) {
-            var sid = _eventObject.GetValueFromDataDictionary("TargetSid");
+            var sid = _eventObject.GetDataValueOrEmpty(KnownEventField.TargetSid);
             if (!string.IsNullOrEmpty(sid)) {
                 try {
                     var identifier = new System.Security.Principal.SecurityIdentifier(sid);

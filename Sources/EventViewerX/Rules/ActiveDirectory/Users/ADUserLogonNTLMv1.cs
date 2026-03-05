@@ -60,23 +60,25 @@ public class ADUserLogonNTLMv1 : EventRuleBase {
         // Copy all the base ADUserLogon fields
         Computer = _eventObject.ComputerName;
         Action = _eventObject.MessageSubject;
-        IpAddress = _eventObject.GetValueFromDataDictionary("IpAddress");
-        IpPort = _eventObject.GetValueFromDataDictionary("IpPort");
-        LogonProcessName = _eventObject.GetValueFromDataDictionary("LogonProcessName");
-        ImpersonationLevel = EventsHelper.GetImpersonationLevel(_eventObject.GetValueFromDataDictionary("ImpersonationLevel"));
-        VirtualAccount = EventsHelper.GetVirtualAccount(_eventObject.GetValueFromDataDictionary("VirtualAccount"));
-        ElevatedToken = EventsHelper.GetElevatedToken(_eventObject.GetValueFromDataDictionary("ElevatedToken"));
-        LogonType = EventsHelper.GetLogonType(_eventObject.GetValueFromDataDictionary("LogonType"));
+        IpAddress = _eventObject.GetDataValueOrEmpty(KnownEventField.IpAddress);
+        IpPort = _eventObject.GetDataValueOrEmpty(KnownEventField.IpPort);
+        LogonProcessName = _eventObject.GetDataValueOrEmpty(KnownEventField.LogonProcessName);
+        ImpersonationLevel = EventsHelper.GetImpersonationLevel(_eventObject.GetDataValueOrEmpty("ImpersonationLevel"));
+        VirtualAccount = EventsHelper.GetVirtualAccount(_eventObject.GetDataValueOrEmpty("VirtualAccount"));
+        ElevatedToken = EventsHelper.GetElevatedToken(_eventObject.GetDataValueOrEmpty("ElevatedToken"));
+        LogonType = _eventObject.TryGetDataEnum(KnownEventField.LogonType, out EventViewerX.LogonType parsedLogonType, EventFieldNumericBase.Decimal)
+            ? parsedLogonType
+            : EventsHelper.GetLogonType(_eventObject.GetDataValueOrEmpty(KnownEventField.LogonType));
         ObjectAffected = _eventObject.GetValueFromDataDictionary(KnownEventField.TargetUserName, KnownEventField.TargetDomainName, "\\", reverseOrder: true);
         Who = _eventObject.GetValueFromDataDictionary(KnownEventField.SubjectUserName, KnownEventField.SubjectDomainName, "\\", reverseOrder: true);
         When = _eventObject.TimeCreated;
 
         // Additional NTLMv1-specific fields
-        LmPackageName = _eventObject.GetValueFromDataDictionary("LmPackageName");
-        PackageName = _eventObject.GetValueFromDataDictionary("AuthenticationPackageName");
-        KeyLength = _eventObject.GetValueFromDataDictionary("KeyLength");
-        ProcessId = _eventObject.GetValueFromDataDictionary("ProcessId");
-        ProcessName = _eventObject.GetValueFromDataDictionary("ProcessName");
+        LmPackageName = _eventObject.GetDataValueOrEmpty(KnownEventField.LmPackageName);
+        PackageName = _eventObject.GetDataValueOrEmpty(KnownEventField.AuthenticationPackageName);
+        KeyLength = _eventObject.GetDataValueOrEmpty(KnownEventField.KeyLength);
+        ProcessId = _eventObject.GetDataValueOrEmpty(KnownEventField.ProcessId);
+        ProcessName = _eventObject.GetDataValueOrEmpty(KnownEventField.ProcessName);
     }
 }
 

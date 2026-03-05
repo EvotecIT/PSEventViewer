@@ -138,7 +138,7 @@ public class ADUserLogonFailed : EventRuleBase {
         ObjectAffected = _eventObject.GetValueFromDataDictionary(KnownEventField.TargetUserName, KnownEventField.TargetDomainName, "\\", reverseOrder: true);
         IpAddress = _eventObject.GetDataValueOrEmpty(KnownEventField.IpAddress);
         IpPort = _eventObject.GetDataValueOrEmpty(KnownEventField.IpPort);
-        //WorkstationName = _eventObject.GetValueFromDataDictionary("WorkstationName");
+        //WorkstationName = _eventObject.GetDataValueOrEmpty(KnownEventField.WorkstationName);
         LogonProcessName = _eventObject.GetDataValueOrEmpty(KnownEventField.LogonProcessName);
         LogonType = _eventObject.TryGetDataEnum(KnownEventField.LogonType, out EventViewerX.LogonType parsedLogonType, EventFieldNumericBase.Decimal)
             ? parsedLogonType
