@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Text.RegularExpressions;
 using Xunit;
 
@@ -12,9 +11,33 @@ public class TestRuleSourceGuards
     [Fact]
     public void RuleSources_DoNotUseDirectEventObjectDataIndexer()
     {
+        Regex directIndexerPattern = new(@"_eventObject\s*\.\s*Data\s*\[", RegexOptions.Compiled);
+        IReadOnlyList<string> offenders = FindRuleSourceOffenders(directIndexerPattern);
+
+        Assert.True(
+            offenders.Count == 0,
+            "Direct _eventObject.Data[...] usage is forbidden in rules. Use TryGetDataValue/GetDataValueOrEmpty. Offenders:" +
+            Environment.NewLine +
+            string.Join(Environment.NewLine, offenders));
+    }
+
+    [Fact]
+    public void RuleSources_DoNotUseDirectDataTryGetValueCalls()
+    {
+        Regex directTryGetValuePattern = new(@"\b(?:_eventObject|eventObject)\s*\.\s*Data\s*\.\s*TryGetValue\s*\(", RegexOptions.Compiled);
+        IReadOnlyList<string> offenders = FindRuleSourceOffenders(directTryGetValuePattern);
+
+        Assert.True(
+            offenders.Count == 0,
+            "Direct eventObject.Data.TryGetValue(...) is forbidden in rules. Use TryGetDataValue instead. Offenders:" +
+            Environment.NewLine +
+            string.Join(Environment.NewLine, offenders));
+    }
+
+    private static IReadOnlyList<string> FindRuleSourceOffenders(Regex pattern)
+    {
         string rulesDirectory = ResolveRulesDirectory();
         string repositoryRoot = Directory.GetParent(Directory.GetParent(rulesDirectory)!.FullName)!.FullName;
-        Regex directIndexerPattern = new(@"_eventObject\s*\.\s*Data\s*\[", RegexOptions.Compiled);
 
         var offenders = new List<string>();
         foreach (string filePath in Directory.EnumerateFiles(rulesDirectory, "*.cs", SearchOption.AllDirectories))
@@ -31,7 +54,7 @@ public class TestRuleSourceGuards
                     continue;
                 }
 
-                if (!directIndexerPattern.IsMatch(line))
+                if (!pattern.IsMatch(line))
                 {
                     continue;
                 }
@@ -41,11 +64,7 @@ public class TestRuleSourceGuards
             }
         }
 
-        Assert.True(
-            offenders.Count == 0,
-            "Direct _eventObject.Data[...] usage is forbidden in rules. Use TryGetDataValue/GetDataValueOrEmpty. Offenders:" +
-            Environment.NewLine +
-            string.Join(Environment.NewLine, offenders));
+        return offenders;
     }
 
     private static string ResolveRulesDirectory()
