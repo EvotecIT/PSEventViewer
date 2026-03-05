@@ -42,8 +42,8 @@ public class ADGroupPolicyChangesDetailed : EventRuleBase {
 
     /// <summary>Handles only events where the object class is a group policy container.</summary>
     public override bool CanHandle(EventObject eventObject) {
-        return eventObject.Data.TryGetValue("ObjectClass", out var objectClass) &&
-               objectClass == "groupPolicyContainer";
+        return eventObject.TryGetDataValue("ObjectClass", out var objectClass) &&
+               objectClass.Equals("groupPolicyContainer", StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>Initialises a detailed GPO change wrapper from an event record.</summary>

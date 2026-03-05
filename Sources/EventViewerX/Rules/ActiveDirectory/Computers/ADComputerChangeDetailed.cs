@@ -40,8 +40,8 @@ public class ADComputerChangeDetailed : EventRuleBase {
     /// <returns><c>true</c> when the ObjectClass indicates a computer; otherwise <c>false</c>.</returns>
     public override bool CanHandle(EventObject eventObject) {
         // Check if this is a computer object change
-        return eventObject.Data.TryGetValue("ObjectClass", out var objectClass) &&
-               objectClass == "computer";
+        return eventObject.TryGetDataValue("ObjectClass", out var objectClass) &&
+               objectClass.Equals("computer", StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>

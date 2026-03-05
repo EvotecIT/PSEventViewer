@@ -35,10 +35,10 @@ public class ADGroupPolicyEdits : EventRuleBase {
     /// <summary>Accepts versionNumber attribute edits on groupPolicyContainer objects.</summary>
     public override bool CanHandle(EventObject eventObject) {
         // Check if this is a group policy container with versionNumber attribute
-        if (eventObject.Data.TryGetValue("ObjectClass", out var objectClass) && objectClass == "groupPolicyContainer") {
-            if (eventObject.Data.TryGetValue("AttributeLDAPDisplayName", out var ldapDisplayObjName) &&
-                ldapDisplayObjName is string ldapDisplayNameValue &&
-                ldapDisplayNameValue == "versionNumber") {
+        if (eventObject.TryGetDataValue("ObjectClass", out var objectClass) &&
+            objectClass.Equals("groupPolicyContainer", StringComparison.OrdinalIgnoreCase)) {
+            if (eventObject.TryGetDataValue("AttributeLDAPDisplayName", out var ldapDisplayNameValue) &&
+                ldapDisplayNameValue.Equals("versionNumber", StringComparison.OrdinalIgnoreCase)) {
                 return true;
             }
         }

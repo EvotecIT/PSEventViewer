@@ -64,8 +64,8 @@ public class ADUserChangeDetailed : EventRuleBase {
     /// <summary>Handles only directory events where the object class is <c>user</c>.</summary>
     public override bool CanHandle(EventObject eventObject) {
         // Check if this is a user object change
-        return eventObject.Data.TryGetValue("ObjectClass", out var objectClass) &&
-               objectClass == "user";
+        return eventObject.TryGetDataValue("ObjectClass", out var objectClass) &&
+               objectClass.Equals("user", StringComparison.OrdinalIgnoreCase);
     }
 
 

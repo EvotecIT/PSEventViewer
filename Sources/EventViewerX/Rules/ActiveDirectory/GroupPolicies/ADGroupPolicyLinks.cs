@@ -87,8 +87,11 @@ public class ADGroupPolicyLinks : EventRuleBase {
     /// <summary>Handles gpLink attribute changes on domain/OU/site objects.</summary>
     public override bool CanHandle(EventObject eventObject) {
         // Check if this is a domain DNS, organizational unit, or site object with gpLink attribute
-        if (eventObject.Data.TryGetValue("ObjectClass", out var objectClass)) {
-            bool isValidObjectClass = objectClass == "domainDNS" || objectClass == "organizationalUnit" || objectClass == "site";
+        if (eventObject.TryGetDataValue("ObjectClass", out var objectClass)) {
+            bool isValidObjectClass =
+                objectClass.Equals("domainDNS", StringComparison.OrdinalIgnoreCase) ||
+                objectClass.Equals("organizationalUnit", StringComparison.OrdinalIgnoreCase) ||
+                objectClass.Equals("site", StringComparison.OrdinalIgnoreCase);
             bool hasGpLinkAttribute = eventObject.ValueMatches("AttributeLDAPDisplayName", "gpLink");
             return isValidObjectClass && hasGpLinkAttribute;
         }

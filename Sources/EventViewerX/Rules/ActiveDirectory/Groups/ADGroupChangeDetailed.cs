@@ -47,8 +47,8 @@ public class ADGroupChangeDetailed : EventRuleBase {
     /// <summary>Processes only directory object events where the object class is <c>group</c>.</summary>
     public override bool CanHandle(EventObject eventObject) {
         // Check if this is a group object change
-        return eventObject.Data.TryGetValue("ObjectClass", out var objectClass) &&
-               objectClass == "group";
+        return eventObject.TryGetDataValue("ObjectClass", out var objectClass) &&
+               objectClass.Equals("group", StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>Initialises a detailed group change wrapper from an event record.</summary>

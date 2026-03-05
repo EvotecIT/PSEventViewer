@@ -36,8 +36,9 @@ public class ADGroupPolicyChanges : EventRuleBase {
     /// <summary>Handles groupPolicyContainer or container objects in the Security log.</summary>
     public override bool CanHandle(EventObject eventObject) {
         // Check if this is a group policy container or container object
-        return eventObject.Data.TryGetValue("ObjectClass", out var objectClass) &&
-               (objectClass == "groupPolicyContainer" || objectClass == "container");
+        return eventObject.TryGetDataValue("ObjectClass", out var objectClass) &&
+               (objectClass.Equals("groupPolicyContainer", StringComparison.OrdinalIgnoreCase) ||
+                objectClass.Equals("container", StringComparison.OrdinalIgnoreCase));
     }
 
     /// <summary>Initialises a group policy change wrapper from an event record.</summary>
