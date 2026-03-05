@@ -36,7 +36,7 @@ public class ADUserUnlocked : EventRuleBase {
         Computer = _eventObject.ComputerName;
         Action = _eventObject.MessageSubject;
 
-        ComputerLockoutOn = _eventObject.GetValueFromDataDictionary("TargetDomainName");
+        ComputerLockoutOn = _eventObject.GetDataValueOrEmpty(KnownEventField.TargetDomainName);
 
         UserAffected = _eventObject.GetValueFromDataDictionary(KnownEventField.TargetUserName, KnownEventField.TargetDomainName, "\\", reverseOrder: true);
 

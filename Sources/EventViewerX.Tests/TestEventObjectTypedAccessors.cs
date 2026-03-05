@@ -110,6 +110,55 @@ public class TestEventObjectTypedAccessors
     }
 
     [Fact]
+    public void ADUserLogonNTLMv1_ParsesKnownFieldsCaseInsensitive()
+    {
+        var eo = BuildEventObject(data: new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["lmPackageName"] = "NTLM V1",
+            ["ipaddress"] = "10.10.10.50",
+            ["ipport"] = "61542",
+            ["logonprocessname"] = "NtLmSsp",
+            ["logontype"] = "3",
+            ["targetusername"] = "john.smith",
+            ["targetdomainname"] = "contoso",
+            ["subjectusername"] = "svc.account",
+            ["subjectdomainname"] = "contoso",
+            ["authenticationpackagename"] = "NTLM",
+            ["keylength"] = "128",
+            ["processid"] = "0x3e7",
+            ["processname"] = "C:\\Windows\\System32\\lsass.exe"
+        });
+
+        var rule = new ADUserLogonNTLMv1(eo);
+
+        Assert.Equal("10.10.10.50", rule.IpAddress);
+        Assert.Equal("61542", rule.IpPort);
+        Assert.Equal(LogonType.Network, rule.LogonType);
+        Assert.Equal("contoso\\john.smith", rule.ObjectAffected);
+        Assert.Equal("contoso\\svc.account", rule.Who);
+        Assert.Equal("NTLM V1", rule.LmPackageName);
+        Assert.Equal("NTLM", rule.PackageName);
+    }
+
+    [Fact]
+    public void ADUserUnlocked_UsesKnownFieldTargetDomainName()
+    {
+        var eo = BuildEventObject(data: new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["targetdomainname"] = "CONTOSO-DC",
+            ["targetusername"] = "john.smith",
+            ["subjectusername"] = "admin",
+            ["subjectdomainname"] = "contoso"
+        });
+
+        var rule = new ADUserUnlocked(eo);
+
+        Assert.Equal("CONTOSO-DC", rule.ComputerLockoutOn);
+        Assert.Equal("CONTOSO-DC\\john.smith", rule.UserAffected);
+        Assert.Equal("contoso\\admin", rule.Who);
+    }
+
+    [Fact]
     public void LogsClearedSecurity_MissingChannel_DoesNotThrowAndFallsBack()
     {
         var eo = BuildEventObject(data: new Dictionary<string, string>
