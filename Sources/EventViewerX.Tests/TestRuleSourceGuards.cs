@@ -79,6 +79,22 @@ public class TestRuleSourceGuards
             string.Join(Environment.NewLine, offenders));
     }
 
+    [Fact]
+    public void RuleSources_DoNotUseDirectSubjectTargetKnownFieldPairCalls()
+    {
+        Regex directSubjectTargetPairPattern = new(
+            @"\bGetValueFromDataDictionary\s*\(\s*KnownEventField\.SubjectUserName\s*,\s*KnownEventField\.SubjectDomainName|\bGetValueFromDataDictionary\s*\(\s*KnownEventField\.TargetUserName\s*,\s*KnownEventField\.TargetDomainName",
+            RegexOptions.Compiled);
+
+        IReadOnlyList<string> offenders = FindRuleSourceOffenders(directSubjectTargetPairPattern);
+
+        Assert.True(
+            offenders.Count == 0,
+            "Use GetSubjectAccountOrEmpty()/GetTargetAccountOrEmpty() instead of direct Subject/Target known-field pair calls. Offenders:" +
+            Environment.NewLine +
+            string.Join(Environment.NewLine, offenders));
+    }
+
     private static IReadOnlyList<string> FindRuleSourceOffenders(Regex pattern)
     {
         string rulesDirectory = ResolveRulesDirectory();
