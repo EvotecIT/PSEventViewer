@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text.RegularExpressions;
 using Xunit;
 
@@ -8,6 +9,33 @@ namespace EventViewerX.Tests;
 
 public class TestRuleSourceGuards
 {
+    private static readonly IReadOnlyList<string> KnownFieldKeys = new[]
+    {
+        "SubjectUserName",
+        "SubjectDomainName",
+        "SubjectLogonId",
+        "TargetUserName",
+        "TargetDomainName",
+        "TargetSid",
+        "WorkstationName",
+        "IpAddress",
+        "IpPort",
+        "LogonType",
+        "Status",
+        "SubStatus",
+        "FailureReason",
+        "AuthenticationPackageName",
+        "LogonProcessName",
+        "LmPackageName",
+        "KeyLength",
+        "ProcessId",
+        "ProcessName",
+        "TransmittedServices",
+        "TicketOptions",
+        "TicketEncryptionType",
+        "PreAuthType"
+    };
+
     [Fact]
     public void RuleSources_DoNotUseDirectEventObjectDataIndexer()
     {
@@ -30,6 +58,23 @@ public class TestRuleSourceGuards
         Assert.True(
             offenders.Count == 0,
             "Direct eventObject.Data.TryGetValue(...) is forbidden in rules. Use TryGetDataValue instead. Offenders:" +
+            Environment.NewLine +
+            string.Join(Environment.NewLine, offenders));
+    }
+
+    [Fact]
+    public void RuleSources_DoNotUseKnownFieldStringLiteralsInAccessors()
+    {
+        string knownKeysPattern = string.Join("|", KnownFieldKeys.Select(Regex.Escape));
+        Regex knownFieldLiteralPattern = new(
+            $@"\b(?:GetValueFromDataDictionary|GetDataValueOrEmpty|TryGetDataValue|TryGetDataEnum)\s*\([^)]*""(?:{knownKeysPattern})""",
+            RegexOptions.Compiled);
+
+        IReadOnlyList<string> offenders = FindRuleSourceOffenders(knownFieldLiteralPattern);
+
+        Assert.True(
+            offenders.Count == 0,
+            "Known event fields should use KnownEventField enum accessors instead of string literals. Offenders:" +
             Environment.NewLine +
             string.Join(Environment.NewLine, offenders));
     }
