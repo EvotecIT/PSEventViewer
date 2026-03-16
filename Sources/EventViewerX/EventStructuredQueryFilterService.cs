@@ -1,0 +1,403 @@
+using System.Collections;
+using System.Globalization;
+using System.Text.Json;
+
+namespace EventViewerX;
+
+/// <summary>
+/// Normalizes structured event query filters and builds XPath expressions from them.
+/// </summary>
+public static class EventStructuredQueryFilterService {
+    /// <summary>
+    /// Maximum event IDs accepted by the structured filter service.
+    /// </summary>
+    public const int MaxEventIds = 256;
+
+    /// <summary>
+    /// Maximum event record IDs accepted by the structured filter service.
+    /// </summary>
+    public const int MaxRecordIds = 256;
+
+    /// <summary>
+    /// Maximum provider-name length.
+    /// </summary>
+    public const int MaxProviderNameLength = 260;
+
+    /// <summary>
+    /// Maximum user-id length.
+    /// </summary>
+    public const int MaxUserIdLength = 260;
+
+    /// <summary>
+    /// Maximum named-data keys.
+    /// </summary>
+    public const int MaxNamedDataKeys = 32;
+
+    /// <summary>
+    /// Maximum values per named-data key.
+    /// </summary>
+    public const int MaxNamedDataValuesPerKey = 16;
+
+    /// <summary>
+    /// Maximum named-data key length.
+    /// </summary>
+    public const int MaxNamedDataKeyLength = 128;
+
+    /// <summary>
+    /// Maximum named-data value length.
+    /// </summary>
+    public const int MaxNamedDataValueLength = 256;
+
+    /// <summary>
+    /// Canonical level names accepted by the service.
+    /// </summary>
+    public static IReadOnlyList<string> LevelNames { get; } = Enum.GetValues<Level>()
+        .Select(static value => ToSnakeCase(value.ToString()))
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .OrderBy(static value => value, StringComparer.OrdinalIgnoreCase)
+        .ToArray();
+
+    /// <summary>
+    /// Canonical keyword names accepted by the service.
+    /// </summary>
+    public static IReadOnlyList<string> KeywordNames { get; } = Enum.GetValues<Keywords>()
+        .Select(static value => ToSnakeCase(value.ToString()))
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .OrderBy(static value => value, StringComparer.OrdinalIgnoreCase)
+        .ToArray();
+
+    private static readonly IReadOnlyDictionary<string, Level> LevelsByName = BuildLevelMap();
+    private static readonly IReadOnlyDictionary<string, Keywords> KeywordsByName = BuildKeywordMap();
+
+    /// <summary>
+    /// Returns true when any structured filter dimension is supplied.
+    /// </summary>
+    public static bool HasAny(EventStructuredQueryFilter? filter) {
+        return filter is not null &&
+               ((filter.EventIds?.Count ?? 0) > 0
+                || !string.IsNullOrWhiteSpace(filter.ProviderName)
+                || filter.StartTimeUtc.HasValue
+                || filter.EndTimeUtc.HasValue
+                || filter.Level.HasValue
+                || filter.Keywords.HasValue
+                || !string.IsNullOrWhiteSpace(filter.UserId)
+                || (filter.RecordIds?.Count ?? 0) > 0
+                || (filter.NamedDataFilter?.Count ?? 0) > 0
+                || (filter.NamedDataExcludeFilter?.Count ?? 0) > 0);
+    }
+
+    /// <summary>
+    /// Validates and normalizes structured filter input.
+    /// </summary>
+    public static bool TryNormalize(
+        EventStructuredQueryFilterInput? input,
+        out EventStructuredQueryFilter? filter,
+        out string? error) {
+        filter = null;
+        error = null;
+
+        if (input is null) {
+            filter = new EventStructuredQueryFilter();
+            return true;
+        }
+
+        if (!TryNormalizeIds(input.EventIds, "event_ids", MaxEventIds, out var eventIds, out error)) {
+            return false;
+        }
+
+        if (!TryNormalizeIds(input.RecordIds, "event_record_ids", MaxRecordIds, out var recordIds, out error)) {
+            return false;
+        }
+
+        if (!TryNormalizeBoundedText(input.ProviderName, "provider_name", MaxProviderNameLength, out var providerName, out error)) {
+            return false;
+        }
+
+        if (!TryNormalizeBoundedText(input.UserId, "user_id", MaxUserIdLength, out var userId, out error)) {
+            return false;
+        }
+
+        if (!TryNormalizeLevel(input.Level, out var level, out error)) {
+            return false;
+        }
+
+        if (!TryNormalizeKeywords(input.Keywords, out var keywords, out error)) {
+            return false;
+        }
+
+        if (!TryNormalizeNamedDataFilter(input.NamedDataFilter, "named_data_filter", out var namedDataFilter, out error)) {
+            return false;
+        }
+
+        if (!TryNormalizeNamedDataFilter(input.NamedDataExcludeFilter, "named_data_exclude_filter", out var namedDataExcludeFilter, out error)) {
+            return false;
+        }
+
+        filter = new EventStructuredQueryFilter {
+            EventIds = eventIds,
+            ProviderName = providerName,
+            StartTimeUtc = input.StartTimeUtc,
+            EndTimeUtc = input.EndTimeUtc,
+            Level = level,
+            Keywords = keywords,
+            UserId = userId,
+            RecordIds = recordIds,
+            NamedDataFilter = namedDataFilter,
+            NamedDataExcludeFilter = namedDataExcludeFilter
+        };
+        return true;
+    }
+
+    /// <summary>
+    /// Builds a raw XPath query from a normalized structured filter.
+    /// </summary>
+    public static string BuildXPath(EventStructuredQueryFilter? filter) {
+        if (!HasAny(filter)) {
+            return "*";
+        }
+
+        var xpath = SearchEvents.BuildWinEventFilter(
+            id: filter!.EventIds?.Select(static value => value.ToString(CultureInfo.InvariantCulture)).ToArray(),
+            eventRecordId: filter.RecordIds?.Select(static value => value.ToString(CultureInfo.InvariantCulture)).ToArray(),
+            startTime: filter.StartTimeUtc,
+            endTime: filter.EndTimeUtc,
+            providerName: string.IsNullOrWhiteSpace(filter.ProviderName) ? null : new[] { filter.ProviderName.Trim() },
+            keywords: filter.Keywords.HasValue ? new[] { (long)filter.Keywords.Value } : null,
+            level: filter.Level.HasValue ? new[] { filter.Level.Value.ToString() } : null,
+            userId: string.IsNullOrWhiteSpace(filter.UserId) ? null : new[] { filter.UserId.Trim() },
+            namedDataFilter: filter.NamedDataFilter is null ? null : new[] { filter.NamedDataFilter },
+            namedDataExcludeFilter: filter.NamedDataExcludeFilter is null ? null : new[] { filter.NamedDataExcludeFilter },
+            xpathOnly: true);
+
+        return string.IsNullOrWhiteSpace(xpath) ? "*" : xpath;
+    }
+
+    private static bool TryNormalizeBoundedText(
+        string? value,
+        string argumentName,
+        int maxLength,
+        out string? normalized,
+        out string? error) {
+        normalized = null;
+        error = null;
+
+        if (string.IsNullOrWhiteSpace(value)) {
+            return true;
+        }
+
+        var trimmed = value.Trim();
+        if (trimmed.Length > maxLength) {
+            error = $"{argumentName} must be <= {maxLength} characters.";
+            return false;
+        }
+
+        for (var i = 0; i < trimmed.Length; i++) {
+            if (char.IsControl(trimmed[i])) {
+                error = $"{argumentName} must not contain control characters.";
+                return false;
+            }
+        }
+
+        normalized = trimmed;
+        return true;
+    }
+
+    private static bool TryNormalizeIds<T>(
+        IReadOnlyList<T>? values,
+        string argumentName,
+        int maxItems,
+        out IReadOnlyList<T>? normalized,
+        out string? error)
+        where T : struct, IComparable<T> {
+        normalized = null;
+        error = null;
+
+        if (values is null || values.Count == 0) {
+            return true;
+        }
+
+        if (values.Count > maxItems) {
+            error = $"{argumentName} supports at most {maxItems} values.";
+            return false;
+        }
+
+        var list = new List<T>(values.Count);
+        var dedup = new HashSet<T>();
+        foreach (var value in values) {
+            if (value.CompareTo(default) <= 0) {
+                error = argumentName == "event_ids"
+                    ? $"{argumentName} values must be positive 32-bit integers."
+                    : $"{argumentName} values must be positive integers.";
+                return false;
+            }
+
+            if (dedup.Add(value)) {
+                list.Add(value);
+            }
+        }
+
+        normalized = list.Count == 0 ? null : list;
+        return true;
+    }
+
+    private static bool TryNormalizeLevel(string? raw, out Level? level, out string? error) {
+        level = null;
+        error = null;
+
+        var normalized = ToSnakeCase(raw ?? string.Empty);
+        if (string.IsNullOrWhiteSpace(normalized) || string.Equals(normalized, "any", StringComparison.OrdinalIgnoreCase)) {
+            return true;
+        }
+
+        if (LevelsByName.TryGetValue(normalized, out var parsed)) {
+            level = parsed;
+            return true;
+        }
+
+        if (int.TryParse(normalized, NumberStyles.Integer, CultureInfo.InvariantCulture, out var numericLevel)) {
+            var value = (Level)numericLevel;
+            if (Enum.IsDefined(value)) {
+                level = value;
+                return true;
+            }
+        }
+
+        error = $"level must be one of: any, {string.Join(", ", LevelNames)}.";
+        return false;
+    }
+
+    private static bool TryNormalizeKeywords(string? raw, out Keywords? keywords, out string? error) {
+        keywords = null;
+        error = null;
+
+        var normalized = ToSnakeCase(raw ?? string.Empty);
+        if (string.IsNullOrWhiteSpace(normalized) || string.Equals(normalized, "any", StringComparison.OrdinalIgnoreCase)) {
+            return true;
+        }
+
+        if (KeywordsByName.TryGetValue(normalized, out var parsed)) {
+            keywords = parsed;
+            return true;
+        }
+
+        if (long.TryParse(normalized, NumberStyles.Integer, CultureInfo.InvariantCulture, out var numericMask) && numericMask >= 0) {
+            keywords = (Keywords)numericMask;
+            return true;
+        }
+
+        error = $"keywords must be one of: any, {string.Join(", ", KeywordNames)}.";
+        return false;
+    }
+
+    private static bool TryNormalizeNamedDataFilter(
+        IReadOnlyDictionary<string, IReadOnlyList<string>>? raw,
+        string argumentName,
+        out Hashtable? filter,
+        out string? error) {
+        filter = null;
+        error = null;
+
+        if (raw is null) {
+            return true;
+        }
+
+        if (raw.Count == 0) {
+            error = $"{argumentName} must include at least one key.";
+            return false;
+        }
+
+        if (raw.Count > MaxNamedDataKeys) {
+            error = $"{argumentName} supports at most {MaxNamedDataKeys} keys.";
+            return false;
+        }
+
+        var table = new Hashtable(StringComparer.OrdinalIgnoreCase);
+        foreach (var (keyRaw, rawValues) in raw) {
+            var key = (keyRaw ?? string.Empty).Trim();
+            if (key.Length == 0) {
+                error = $"{argumentName} keys must be non-empty strings.";
+                return false;
+            }
+
+            if (key.Length > MaxNamedDataKeyLength) {
+                error = $"{argumentName} keys must be <= {MaxNamedDataKeyLength} characters.";
+                return false;
+            }
+
+            var values = rawValues ?? Array.Empty<string>();
+            if (values.Count > MaxNamedDataValuesPerKey) {
+                error = $"{argumentName}.{key} supports at most {MaxNamedDataValuesPerKey} values.";
+                return false;
+            }
+
+            if (values.Count == 0) {
+                table[key] = Array.Empty<string>();
+                continue;
+            }
+
+            var dedup = new List<string>(values.Count);
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var rawValue in values) {
+                var normalized = rawValue?.Trim() ?? string.Empty;
+                if (normalized.Length > MaxNamedDataValueLength) {
+                    error = $"{argumentName}.{key} values must be <= {MaxNamedDataValueLength} characters.";
+                    return false;
+                }
+
+                for (var i = 0; i < normalized.Length; i++) {
+                    if (char.IsControl(normalized[i])) {
+                        error = $"{argumentName}.{key} values must not contain control characters.";
+                        return false;
+                    }
+                }
+
+                if (seen.Add(normalized)) {
+                    dedup.Add(normalized);
+                }
+            }
+
+            table[key] = dedup.ToArray();
+        }
+
+        filter = table.Count == 0 ? null : table;
+        return true;
+    }
+
+    private static string ToSnakeCase(string value) {
+        if (string.IsNullOrWhiteSpace(value)) {
+            return string.Empty;
+        }
+
+        var replaced = value.Trim()
+            .Replace('-', '_')
+            .Replace(' ', '_');
+        var normalized = JsonNamingPolicy.SnakeCaseLower.ConvertName(replaced).Trim('_');
+        while (normalized.Contains("__", StringComparison.Ordinal)) {
+            normalized = normalized.Replace("__", "_", StringComparison.Ordinal);
+        }
+
+        return normalized;
+    }
+
+    private static IReadOnlyDictionary<string, Level> BuildLevelMap() {
+        var map = new Dictionary<string, Level>(StringComparer.OrdinalIgnoreCase);
+        foreach (var value in Enum.GetValues<Level>()) {
+            map[ToSnakeCase(value.ToString())] = value;
+        }
+
+        map["info"] = Level.Informational;
+        map["information"] = Level.Informational;
+        map["warn"] = Level.Warning;
+        map["crit"] = Level.Critical;
+        return map;
+    }
+
+    private static IReadOnlyDictionary<string, Keywords> BuildKeywordMap() {
+        var map = new Dictionary<string, Keywords>(StringComparer.OrdinalIgnoreCase);
+        foreach (var value in Enum.GetValues<Keywords>()) {
+            map[ToSnakeCase(value.ToString())] = value;
+        }
+
+        return map;
+    }
+}
