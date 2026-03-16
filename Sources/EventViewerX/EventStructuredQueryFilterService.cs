@@ -51,19 +51,19 @@ public static class EventStructuredQueryFilterService {
     /// <summary>
     /// Canonical level names accepted by the service.
     /// </summary>
-    public static IReadOnlyList<string> LevelNames { get; } = Enum.GetValues<Level>()
-        .Select(static value => ToSnakeCase(value.ToString()))
+    public static IReadOnlyList<string> LevelNames { get; } = GetEnumValues<Level>()
+        .Select(value => ToSnakeCase(value.ToString()))
         .Distinct(StringComparer.OrdinalIgnoreCase)
-        .OrderBy(static value => value, StringComparer.OrdinalIgnoreCase)
+        .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
         .ToArray();
 
     /// <summary>
     /// Canonical keyword names accepted by the service.
     /// </summary>
-    public static IReadOnlyList<string> KeywordNames { get; } = Enum.GetValues<Keywords>()
-        .Select(static value => ToSnakeCase(value.ToString()))
+    public static IReadOnlyList<string> KeywordNames { get; } = GetEnumValues<Keywords>()
+        .Select(value => ToSnakeCase(value.ToString()))
         .Distinct(StringComparer.OrdinalIgnoreCase)
-        .OrderBy(static value => value, StringComparer.OrdinalIgnoreCase)
+        .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
         .ToArray();
 
     private static readonly IReadOnlyDictionary<string, Level> LevelsByName = BuildLevelMap();
@@ -156,17 +156,21 @@ public static class EventStructuredQueryFilterService {
             return "*";
         }
 
+        var normalizedFilter = filter!;
+        var providerName = CreateSingleValueArray(normalizedFilter.ProviderName);
+        var userId = CreateSingleValueArray(normalizedFilter.UserId);
+
         var xpath = SearchEvents.BuildWinEventFilter(
-            id: filter!.EventIds?.Select(static value => value.ToString(CultureInfo.InvariantCulture)).ToArray(),
-            eventRecordId: filter.RecordIds?.Select(static value => value.ToString(CultureInfo.InvariantCulture)).ToArray(),
-            startTime: filter.StartTimeUtc,
-            endTime: filter.EndTimeUtc,
-            providerName: string.IsNullOrWhiteSpace(filter.ProviderName) ? null : new[] { filter.ProviderName.Trim() },
-            keywords: filter.Keywords.HasValue ? new[] { (long)filter.Keywords.Value } : null,
-            level: filter.Level.HasValue ? new[] { filter.Level.Value.ToString() } : null,
-            userId: string.IsNullOrWhiteSpace(filter.UserId) ? null : new[] { filter.UserId.Trim() },
-            namedDataFilter: filter.NamedDataFilter is null ? null : new[] { filter.NamedDataFilter },
-            namedDataExcludeFilter: filter.NamedDataExcludeFilter is null ? null : new[] { filter.NamedDataExcludeFilter },
+            id: normalizedFilter.EventIds?.Select(static value => value.ToString(CultureInfo.InvariantCulture)).ToArray(),
+            eventRecordId: normalizedFilter.RecordIds?.Select(static value => value.ToString(CultureInfo.InvariantCulture)).ToArray(),
+            startTime: normalizedFilter.StartTimeUtc,
+            endTime: normalizedFilter.EndTimeUtc,
+            providerName: providerName,
+            keywords: normalizedFilter.Keywords.HasValue ? new[] { (long)normalizedFilter.Keywords.Value } : null,
+            level: normalizedFilter.Level.HasValue ? new[] { normalizedFilter.Level.Value.ToString() } : null,
+            userId: userId,
+            namedDataFilter: normalizedFilter.NamedDataFilter is null ? null : new[] { normalizedFilter.NamedDataFilter },
+            namedDataExcludeFilter: normalizedFilter.NamedDataExcludeFilter is null ? null : new[] { normalizedFilter.NamedDataExcludeFilter },
             xpathOnly: true);
 
         return string.IsNullOrWhiteSpace(xpath) ? "*" : xpath;
@@ -185,7 +189,7 @@ public static class EventStructuredQueryFilterService {
             return true;
         }
 
-        var trimmed = value.Trim();
+        var trimmed = (value ?? string.Empty).Trim();
         if (trimmed.Length > maxLength) {
             error = $"{argumentName} must be <= {maxLength} characters.";
             return false;
@@ -256,7 +260,7 @@ public static class EventStructuredQueryFilterService {
 
         if (int.TryParse(normalized, NumberStyles.Integer, CultureInfo.InvariantCulture, out var numericLevel)) {
             var value = (Level)numericLevel;
-            if (Enum.IsDefined(value)) {
+            if (Enum.IsDefined(typeof(Level), value)) {
                 level = value;
                 return true;
             }
@@ -312,7 +316,9 @@ public static class EventStructuredQueryFilterService {
         }
 
         var table = new Hashtable(StringComparer.OrdinalIgnoreCase);
-        foreach (var (keyRaw, rawValues) in raw) {
+        foreach (var entry in raw) {
+            var keyRaw = entry.Key;
+            var rawValues = entry.Value;
             var key = (keyRaw ?? string.Empty).Trim();
             if (key.Length == 0) {
                 error = $"{argumentName} keys must be non-empty strings.";
@@ -371,9 +377,9 @@ public static class EventStructuredQueryFilterService {
         var replaced = value.Trim()
             .Replace('-', '_')
             .Replace(' ', '_');
-        var normalized = JsonNamingPolicy.SnakeCaseLower.ConvertName(replaced).Trim('_');
+        var normalized = TrimUnderscores(JsonNamingPolicy.SnakeCaseLower.ConvertName(replaced) ?? string.Empty);
         while (normalized.Contains("__", StringComparison.Ordinal)) {
-            normalized = normalized.Replace("__", "_", StringComparison.Ordinal);
+            normalized = normalized.Replace("__", "_");
         }
 
         return normalized;
@@ -381,7 +387,7 @@ public static class EventStructuredQueryFilterService {
 
     private static IReadOnlyDictionary<string, Level> BuildLevelMap() {
         var map = new Dictionary<string, Level>(StringComparer.OrdinalIgnoreCase);
-        foreach (var value in Enum.GetValues<Level>()) {
+        foreach (var value in GetEnumValues<Level>()) {
             map[ToSnakeCase(value.ToString())] = value;
         }
 
@@ -394,10 +400,29 @@ public static class EventStructuredQueryFilterService {
 
     private static IReadOnlyDictionary<string, Keywords> BuildKeywordMap() {
         var map = new Dictionary<string, Keywords>(StringComparer.OrdinalIgnoreCase);
-        foreach (var value in Enum.GetValues<Keywords>()) {
+        foreach (var value in GetEnumValues<Keywords>()) {
             map[ToSnakeCase(value.ToString())] = value;
         }
 
         return map;
     }
+
+    private static IEnumerable<TEnum> GetEnumValues<TEnum>() where TEnum : struct {
+        return Enum.GetValues(typeof(TEnum)).Cast<TEnum>();
+    }
+
+    private static string[]? CreateSingleValueArray(string? value) {
+        if (string.IsNullOrWhiteSpace(value)) {
+            return null;
+        }
+
+        var normalized = (value ?? string.Empty).Trim();
+        return new[] { normalized };
+    }
+
+    private static string TrimUnderscores(string value) {
+        return value.Trim(UnderscoreTrimChars);
+    }
+
+    private static readonly char[] UnderscoreTrimChars = { '_' };
 }

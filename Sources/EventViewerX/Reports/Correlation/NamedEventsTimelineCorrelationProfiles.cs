@@ -6,7 +6,15 @@ namespace EventViewerX.Reports.Correlation;
 /// Reusable correlation profile presets for named-events timeline queries.
 /// </summary>
 public static class NamedEventsTimelineCorrelationProfiles {
-    private sealed record CorrelationProfile(string Name, IReadOnlyList<string> Keys);
+    private sealed class CorrelationProfile {
+        public CorrelationProfile(string name, IReadOnlyList<string> keys) {
+            Name = name;
+            Keys = keys;
+        }
+
+        public string Name { get; }
+        public IReadOnlyList<string> Keys { get; }
+    }
 
     private static readonly CorrelationProfile[] ProfilesValue = {
         new("identity", new[] { "who", "object_affected", "computer" }),
@@ -64,14 +72,16 @@ public static class NamedEventsTimelineCorrelationProfiles {
             return string.Empty;
         }
 
-        var replaced = rawProfile.Trim()
+        var replaced = (rawProfile ?? string.Empty).Trim()
             .Replace('-', '_')
             .Replace(' ', '_');
-        var normalized = JsonNamingPolicy.SnakeCaseLower.ConvertName(replaced).Trim('_');
+        var normalized = (JsonNamingPolicy.SnakeCaseLower.ConvertName(replaced) ?? string.Empty).Trim(UnderscoreTrimChars);
         while (normalized.Contains("__", StringComparison.Ordinal)) {
-            normalized = normalized.Replace("__", "_", StringComparison.Ordinal);
+            normalized = normalized.Replace("__", "_");
         }
 
         return normalized;
     }
+
+    private static readonly char[] UnderscoreTrimChars = { '_' };
 }
