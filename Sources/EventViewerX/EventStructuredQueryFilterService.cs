@@ -263,6 +263,11 @@ public static class EventStructuredQueryFilterService {
         }
 
         var normalized = ToSnakeCase(raw ?? string.Empty);
+        if (IsMalformedSignedNumericToken(raw, normalized)) {
+            error = $"level must be one of: any, {string.Join(", ", LevelNames)}.";
+            return false;
+        }
+
         if (string.IsNullOrWhiteSpace(normalized) || string.Equals(normalized, "any", StringComparison.OrdinalIgnoreCase)) {
             return true;
         }
@@ -294,6 +299,11 @@ public static class EventStructuredQueryFilterService {
         }
 
         var normalized = ToSnakeCase(raw ?? string.Empty);
+        if (IsMalformedSignedNumericToken(raw, normalized)) {
+            error = $"keywords must be one of: any, {string.Join(", ", KeywordNames)}.";
+            return false;
+        }
+
         if (string.IsNullOrWhiteSpace(normalized) || string.Equals(normalized, "any", StringComparison.OrdinalIgnoreCase)) {
             return true;
         }
@@ -473,5 +483,23 @@ public static class EventStructuredQueryFilterService {
         return long.TryParse(trimmed, NumberStyles.Integer, CultureInfo.InvariantCulture, out value);
     }
 
+    private static bool IsMalformedSignedNumericToken(string? raw, string normalized) {
+        var trimmed = (raw ?? string.Empty).Trim();
+        if (trimmed.Length == 0) {
+            return false;
+        }
+
+        if (trimmed.IndexOfAny(SignChars) < 0) {
+            return false;
+        }
+
+        if (TryParseSignedIntegerLiteral(trimmed, out _)) {
+            return false;
+        }
+
+        return long.TryParse(normalized, NumberStyles.Integer, CultureInfo.InvariantCulture, out _);
+    }
+
+    private static readonly char[] SignChars = { '-', '+' };
     private static readonly char[] UnderscoreTrimChars = { '_' };
 }

@@ -100,6 +100,8 @@ public class TestEventStructuredQueryFilterService {
     [Theory]
     [InlineData("-1")]
     [InlineData(" -1 ")]
+    [InlineData("- 1")]
+    [InlineData("--1")]
     public void TryNormalize_ShouldRejectNegativeLevelValues(string rawLevel) {
         var ok = EventStructuredQueryFilterService.TryNormalize(
             new EventStructuredQueryFilterInput {
@@ -115,6 +117,8 @@ public class TestEventStructuredQueryFilterService {
     [Theory]
     [InlineData("-1")]
     [InlineData(" -1 ")]
+    [InlineData("- 1")]
+    [InlineData("--1")]
     public void TryNormalize_ShouldRejectNegativeKeywordMasks(string rawKeywords) {
         var ok = EventStructuredQueryFilterService.TryNormalize(
             new EventStructuredQueryFilterInput {
