@@ -280,11 +280,19 @@ public static class EventStructuredQueryFilterService {
         }
 
         if (KeywordsByName.TryGetValue(normalized, out var parsed)) {
+            if (Convert.ToInt64(parsed, CultureInfo.InvariantCulture) == 0L) {
+                return true;
+            }
+
             keywords = parsed;
             return true;
         }
 
         if (long.TryParse(normalized, NumberStyles.Integer, CultureInfo.InvariantCulture, out var numericMask) && numericMask >= 0) {
+            if (numericMask == 0) {
+                return true;
+            }
+
             keywords = (Keywords)numericMask;
             return true;
         }
@@ -342,7 +350,7 @@ public static class EventStructuredQueryFilterService {
             }
 
             var dedup = new List<string>(values.Count);
-            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var seen = new HashSet<string>(StringComparer.Ordinal);
             foreach (var rawValue in values) {
                 var normalized = rawValue?.Trim() ?? string.Empty;
                 if (normalized.Length > MaxNamedDataValueLength) {

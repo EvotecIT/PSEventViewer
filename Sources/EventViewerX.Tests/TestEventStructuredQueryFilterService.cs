@@ -60,4 +60,40 @@ public class TestEventStructuredQueryFilterService {
         Assert.Contains("Provider", xpath, StringComparison.Ordinal);
         Assert.Contains("TargetUserName", xpath, StringComparison.Ordinal);
     }
+
+    [Theory]
+    [InlineData("0")]
+    [InlineData("none")]
+    public void TryNormalize_ShouldTreatZeroKeywordMaskAsUnfiltered(string rawKeywords) {
+        var ok = EventStructuredQueryFilterService.TryNormalize(
+            new EventStructuredQueryFilterInput {
+                Keywords = rawKeywords
+            },
+            out var filter,
+            out var error);
+
+        Assert.True(ok);
+        Assert.Null(error);
+        Assert.NotNull(filter);
+        Assert.False(filter!.Keywords.HasValue);
+    }
+
+    [Fact]
+    public void TryNormalize_ShouldPreserveCaseDistinctNamedDataValues() {
+        var ok = EventStructuredQueryFilterService.TryNormalize(
+            new EventStructuredQueryFilterInput {
+                NamedDataFilter = new Dictionary<string, IReadOnlyList<string>> {
+                    ["TargetUserName"] = new[] { "Alice", "alice" }
+                }
+            },
+            out var filter,
+            out var error);
+
+        Assert.True(ok);
+        Assert.Null(error);
+        Assert.NotNull(filter);
+
+        var values = Assert.IsType<string[]>(filter!.NamedDataFilter!["TargetUserName"]);
+        Assert.Equal(new[] { "Alice", "alice" }, values);
+    }
 }
