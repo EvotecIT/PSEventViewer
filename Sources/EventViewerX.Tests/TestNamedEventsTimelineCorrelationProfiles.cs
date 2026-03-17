@@ -37,4 +37,19 @@ public class TestNamedEventsTimelineCorrelationProfiles {
         Assert.NotNull(error);
         Assert.Contains("Allowed values", error, StringComparison.Ordinal);
     }
+
+    [Theory]
+    [InlineData("-")]
+    [InlineData("___")]
+    public void TryResolve_ShouldRejectTokensThatNormalizeToBlank(string rawProfile) {
+        var resolved = NamedEventsTimelineCorrelationProfiles.TryResolve(
+            rawProfile,
+            out _,
+            out _,
+            out var error);
+
+        Assert.False(resolved);
+        Assert.NotNull(error);
+        Assert.Contains("Allowed values", error, StringComparison.Ordinal);
+    }
 }

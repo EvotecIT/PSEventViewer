@@ -53,6 +53,11 @@ public static class NamedEventsTimelineCorrelationProfiles {
         error = null;
 
         var profile = NormalizeProfileName(rawProfile);
+        if (!string.IsNullOrWhiteSpace(rawProfile) && string.IsNullOrWhiteSpace(profile)) {
+            error = $"correlation_profile ('{rawProfile}') is not recognized. Allowed values: {string.Join(", ", Names)}.";
+            return false;
+        }
+
         if (string.IsNullOrWhiteSpace(profile)) {
             return true;
         }

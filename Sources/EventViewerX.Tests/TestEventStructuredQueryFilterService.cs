@@ -111,6 +111,26 @@ public class TestEventStructuredQueryFilterService {
         Assert.Equal(new[] { "Alice", "alice" }, values);
     }
 
+    [Fact]
+    public void TryNormalize_ShouldPreserveCaseDistinctNamedDataKeys() {
+        var ok = EventStructuredQueryFilterService.TryNormalize(
+            new EventStructuredQueryFilterInput {
+                NamedDataFilter = new Dictionary<string, IReadOnlyList<string>> {
+                    ["TargetUserName"] = new[] { "Alice" },
+                    ["targetusername"] = new[] { "alice" }
+                }
+            },
+            out var filter,
+            out var error);
+
+        Assert.True(ok);
+        Assert.Null(error);
+        Assert.NotNull(filter);
+        Assert.Equal(2, filter!.NamedDataFilter!.Count);
+        Assert.Equal(new[] { "Alice" }, Assert.IsType<string[]>(filter.NamedDataFilter["TargetUserName"]));
+        Assert.Equal(new[] { "alice" }, Assert.IsType<string[]>(filter.NamedDataFilter["targetusername"]));
+    }
+
     [Theory]
     [InlineData("-1")]
     [InlineData(" -1 ")]

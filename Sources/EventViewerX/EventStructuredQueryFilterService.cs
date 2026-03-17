@@ -373,7 +373,7 @@ public static class EventStructuredQueryFilterService {
             return false;
         }
 
-        var table = new Hashtable(StringComparer.OrdinalIgnoreCase);
+        var table = new Hashtable(StringComparer.Ordinal);
         foreach (var entry in raw) {
             var keyRaw = entry.Key;
             var rawValues = entry.Value;
