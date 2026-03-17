@@ -61,6 +61,20 @@ public class TestEventStructuredQueryFilterService {
         Assert.Contains("TargetUserName", xpath, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void TryNormalize_ShouldRejectUnresolvableUserIds() {
+        var ok = EventStructuredQueryFilterService.TryNormalize(
+            new EventStructuredQueryFilterInput {
+                UserId = "not-a-sid-or-account"
+            },
+            out _,
+            out var error);
+
+        Assert.False(ok);
+        Assert.NotNull(error);
+        Assert.Contains("user_id", error, StringComparison.OrdinalIgnoreCase);
+    }
+
     [Theory]
     [InlineData("0")]
     [InlineData("none")]

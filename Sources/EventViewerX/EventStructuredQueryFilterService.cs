@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Globalization;
+using System.Security.Principal;
 using System.Text.Json;
 
 namespace EventViewerX;
@@ -113,7 +114,7 @@ public static class EventStructuredQueryFilterService {
             return false;
         }
 
-        if (!TryNormalizeBoundedText(input.UserId, "user_id", MaxUserIdLength, out var userId, out error)) {
+        if (!TryNormalizeUserId(input.UserId, out var userId, out error)) {
             return false;
         }
 
@@ -210,6 +211,26 @@ public static class EventStructuredQueryFilterService {
         }
 
         normalized = trimmed;
+        return true;
+    }
+
+    private static bool TryNormalizeUserId(string? value, out string? normalized, out string? error) {
+        normalized = null;
+        error = null;
+
+        if (!TryNormalizeBoundedText(value, "user_id", MaxUserIdLength, out var bounded, out error)) {
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(bounded)) {
+            return true;
+        }
+
+        if (!TryResolveUserId(bounded!, out normalized)) {
+            error = "user_id must be a SID or a resolvable account name.";
+            return false;
+        }
+
         return true;
     }
 
@@ -494,6 +515,28 @@ public static class EventStructuredQueryFilterService {
         }
 
         return !TryParseSignedIntegerLiteral(trimmed, out _);
+    }
+
+    private static bool TryResolveUserId(string value, out string? normalized) {
+        normalized = null;
+
+        try {
+            var sid = new SecurityIdentifier(value);
+            normalized = sid.Value;
+            return true;
+        } catch (ArgumentException) {
+            // Fall back to account-name resolution below.
+        }
+
+        try {
+            var account = new NTAccount(value);
+            normalized = account.Translate(typeof(SecurityIdentifier)).Value;
+            return true;
+        } catch (IdentityNotMappedException) {
+            return false;
+        } catch (SystemException) {
+            return false;
+        }
     }
 
     private static bool IsSignChar(char value) {
