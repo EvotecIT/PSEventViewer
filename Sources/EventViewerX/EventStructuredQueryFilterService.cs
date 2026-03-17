@@ -263,7 +263,7 @@ public static class EventStructuredQueryFilterService {
         }
 
         var normalized = ToSnakeCase(raw ?? string.Empty);
-        if (IsMalformedSignedNumericToken(raw, normalized)) {
+        if (IsMalformedSignedToken(raw)) {
             error = $"level must be one of: any, {string.Join(", ", LevelNames)}.";
             return false;
         }
@@ -299,7 +299,7 @@ public static class EventStructuredQueryFilterService {
         }
 
         var normalized = ToSnakeCase(raw ?? string.Empty);
-        if (IsMalformedSignedNumericToken(raw, normalized)) {
+        if (IsMalformedSignedToken(raw)) {
             error = $"keywords must be one of: any, {string.Join(", ", KeywordNames)}.";
             return false;
         }
@@ -483,23 +483,22 @@ public static class EventStructuredQueryFilterService {
         return long.TryParse(trimmed, NumberStyles.Integer, CultureInfo.InvariantCulture, out value);
     }
 
-    private static bool IsMalformedSignedNumericToken(string? raw, string normalized) {
+    private static bool IsMalformedSignedToken(string? raw) {
         var trimmed = (raw ?? string.Empty).Trim();
         if (trimmed.Length == 0) {
             return false;
         }
 
-        if (trimmed.IndexOfAny(SignChars) < 0) {
+        if (!IsSignChar(trimmed[0])) {
             return false;
         }
 
-        if (TryParseSignedIntegerLiteral(trimmed, out _)) {
-            return false;
-        }
-
-        return long.TryParse(normalized, NumberStyles.Integer, CultureInfo.InvariantCulture, out _);
+        return !TryParseSignedIntegerLiteral(trimmed, out _);
     }
 
-    private static readonly char[] SignChars = { '-', '+' };
+    private static bool IsSignChar(char value) {
+        return value == '-' || value == '+';
+    }
+
     private static readonly char[] UnderscoreTrimChars = { '_' };
 }
