@@ -96,4 +96,78 @@ public class TestEventStructuredQueryFilterService {
         var values = Assert.IsType<string[]>(filter!.NamedDataFilter!["TargetUserName"]);
         Assert.Equal(new[] { "Alice", "alice" }, values);
     }
+
+    [Theory]
+    [InlineData("-1")]
+    [InlineData(" -1 ")]
+    public void TryNormalize_ShouldRejectNegativeLevelValues(string rawLevel) {
+        var ok = EventStructuredQueryFilterService.TryNormalize(
+            new EventStructuredQueryFilterInput {
+                Level = rawLevel
+            },
+            out _,
+            out var error);
+
+        Assert.False(ok);
+        Assert.Contains("level", error, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Theory]
+    [InlineData("-1")]
+    [InlineData(" -1 ")]
+    public void TryNormalize_ShouldRejectNegativeKeywordMasks(string rawKeywords) {
+        var ok = EventStructuredQueryFilterService.TryNormalize(
+            new EventStructuredQueryFilterInput {
+                Keywords = rawKeywords
+            },
+            out _,
+            out var error);
+
+        Assert.False(ok);
+        Assert.Contains("keywords", error, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void TryNormalize_ShouldRejectInvertedTimeRange() {
+        var ok = EventStructuredQueryFilterService.TryNormalize(
+            new EventStructuredQueryFilterInput {
+                StartTimeUtc = new DateTime(2026, 3, 17, 12, 0, 0, DateTimeKind.Utc),
+                EndTimeUtc = new DateTime(2026, 3, 17, 11, 0, 0, DateTimeKind.Utc)
+            },
+            out _,
+            out var error);
+
+        Assert.False(ok);
+        Assert.Contains("start_time_utc", error, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void TryNormalize_ShouldRejectEmptyNamedDataExcludeList() {
+        var ok = EventStructuredQueryFilterService.TryNormalize(
+            new EventStructuredQueryFilterInput {
+                NamedDataExcludeFilter = new Dictionary<string, IReadOnlyList<string>> {
+                    ["TargetUserName"] = Array.Empty<string>()
+                }
+            },
+            out _,
+            out var error);
+
+        Assert.False(ok);
+        Assert.Contains("named_data_exclude_filter", error, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void TryNormalize_ShouldRejectControlCharactersInNamedDataKeys() {
+        var ok = EventStructuredQueryFilterService.TryNormalize(
+            new EventStructuredQueryFilterInput {
+                NamedDataFilter = new Dictionary<string, IReadOnlyList<string>> {
+                    ["Target\u0001UserName"] = new[] { "alice" }
+                }
+            },
+            out _,
+            out var error);
+
+        Assert.False(ok);
+        Assert.Contains("named_data_filter", error, StringComparison.OrdinalIgnoreCase);
+    }
 }

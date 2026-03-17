@@ -133,6 +133,13 @@ public static class EventStructuredQueryFilterService {
             return false;
         }
 
+        if (input.StartTimeUtc.HasValue &&
+            input.EndTimeUtc.HasValue &&
+            input.StartTimeUtc.Value > input.EndTimeUtc.Value) {
+            error = "start_time_utc must be less than or equal to end_time_utc.";
+            return false;
+        }
+
         filter = new EventStructuredQueryFilter {
             EventIds = eventIds,
             ProviderName = providerName,
@@ -248,6 +255,13 @@ public static class EventStructuredQueryFilterService {
         level = null;
         error = null;
 
+        if (TryParseSignedIntegerLiteral(raw, out var numericLiteral)) {
+            if (numericLiteral < 0) {
+                error = $"level must be one of: any, {string.Join(", ", LevelNames)}.";
+                return false;
+            }
+        }
+
         var normalized = ToSnakeCase(raw ?? string.Empty);
         if (string.IsNullOrWhiteSpace(normalized) || string.Equals(normalized, "any", StringComparison.OrdinalIgnoreCase)) {
             return true;
@@ -273,6 +287,11 @@ public static class EventStructuredQueryFilterService {
     private static bool TryNormalizeKeywords(string? raw, out Keywords? keywords, out string? error) {
         keywords = null;
         error = null;
+
+        if (TryParseSignedIntegerLiteral(raw, out var numericLiteral) && numericLiteral < 0) {
+            error = $"keywords must be one of: any, {string.Join(", ", KeywordNames)}.";
+            return false;
+        }
 
         var normalized = ToSnakeCase(raw ?? string.Empty);
         if (string.IsNullOrWhiteSpace(normalized) || string.Equals(normalized, "any", StringComparison.OrdinalIgnoreCase)) {
@@ -333,6 +352,13 @@ public static class EventStructuredQueryFilterService {
                 return false;
             }
 
+            for (var i = 0; i < key.Length; i++) {
+                if (char.IsControl(key[i])) {
+                    error = $"{argumentName} keys must not contain control characters.";
+                    return false;
+                }
+            }
+
             if (key.Length > MaxNamedDataKeyLength) {
                 error = $"{argumentName} keys must be <= {MaxNamedDataKeyLength} characters.";
                 return false;
@@ -345,6 +371,11 @@ public static class EventStructuredQueryFilterService {
             }
 
             if (values.Count == 0) {
+                if (string.Equals(argumentName, "named_data_exclude_filter", StringComparison.Ordinal)) {
+                    error = $"{argumentName}.{key} must include at least one value.";
+                    return false;
+                }
+
                 table[key] = Array.Empty<string>();
                 continue;
             }
@@ -430,6 +461,16 @@ public static class EventStructuredQueryFilterService {
 
     private static string TrimUnderscores(string value) {
         return value.Trim(UnderscoreTrimChars);
+    }
+
+    private static bool TryParseSignedIntegerLiteral(string? raw, out long value) {
+        var trimmed = (raw ?? string.Empty).Trim();
+        if (trimmed.Length == 0) {
+            value = 0;
+            return false;
+        }
+
+        return long.TryParse(trimmed, NumberStyles.Integer, CultureInfo.InvariantCulture, out value);
     }
 
     private static readonly char[] UnderscoreTrimChars = { '_' };
