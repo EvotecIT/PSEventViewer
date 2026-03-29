@@ -84,7 +84,8 @@ public static class CollectorSubscriptionXml {
             .Where(static element => element.Name.LocalName.Equals("Select", StringComparison.OrdinalIgnoreCase))
             .Select(static element => NormalizeOptional(element.Value))
             .Where(static value => !string.IsNullOrWhiteSpace(value))
-            .ToArray()!;
+            .Cast<string>()
+            .ToArray();
         return true;
     }
 
@@ -102,16 +103,29 @@ public static class CollectorSubscriptionXml {
     }
 
     private static string? NormalizeForComparison(string? xml) {
-        if (string.IsNullOrWhiteSpace(xml)) {
+        if (xml == null) {
             return null;
         }
 
-        return TryNormalize(xml, out var details, out _)
-            ? details!.NormalizedXml
-            : xml.Trim();
+        var trimmed = xml.Trim();
+        if (trimmed.Length == 0) {
+            return null;
+        }
+
+        if (TryNormalize(trimmed, out var details, out _)
+            && details != null) {
+            return details.NormalizedXml;
+        }
+
+        return trimmed;
     }
 
     private static string? NormalizeOptional(string? value) {
-        return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+        if (value == null) {
+            return null;
+        }
+
+        var trimmed = value.Trim();
+        return trimmed.Length == 0 ? null : trimmed;
     }
 }

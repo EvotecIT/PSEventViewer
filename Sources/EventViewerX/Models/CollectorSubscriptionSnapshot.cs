@@ -42,7 +42,9 @@ public sealed record CollectorSubscriptionSnapshot {
     /// Creates a reusable snapshot from a raw subscription model.
     /// </summary>
     public static CollectorSubscriptionSnapshot FromSubscriptionInfo(SubscriptionInfo subscription, string targetMachineName) {
-        ArgumentNullException.ThrowIfNull(subscription);
+        if (subscription == null) {
+            throw new ArgumentNullException(nameof(subscription));
+        }
 
         var queries = subscription.Queries?
             .Where(static query => !string.IsNullOrWhiteSpace(query))
@@ -64,6 +66,11 @@ public sealed record CollectorSubscriptionSnapshot {
     }
 
     private static string? NormalizeOptional(string? value) {
-        return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+        if (value == null) {
+            return null;
+        }
+
+        var trimmed = value.Trim();
+        return trimmed.Length == 0 ? null : trimmed;
     }
 }

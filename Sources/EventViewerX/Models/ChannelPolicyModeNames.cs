@@ -21,11 +21,17 @@ public static class ChannelPolicyModeNames {
         mode = null;
         error = null;
 
-        if (string.IsNullOrWhiteSpace(value)) {
+        if (value == null) {
             return true;
         }
 
-        switch (value.Trim().ToLowerInvariant()) {
+        var trimmed = value.Trim();
+        if (trimmed.Length == 0) {
+            return true;
+        }
+
+        var candidate = trimmed.ToLowerInvariant();
+        switch (candidate) {
             case "circular":
                 mode = EventLogMode.Circular;
                 return true;

@@ -20,11 +20,17 @@ public static class ClassicLogOverflowActions {
         normalized = null;
         error = null;
 
-        if (string.IsNullOrWhiteSpace(value)) {
+        if (value == null) {
             return true;
         }
 
-        switch (value.Trim().ToLowerInvariant()) {
+        var trimmed = value.Trim();
+        if (trimmed.Length == 0) {
+            return true;
+        }
+
+        var candidate = trimmed.ToLowerInvariant();
+        switch (candidate) {
             case "overwrite_as_needed":
                 normalized = "overwrite_as_needed";
                 return true;
@@ -49,6 +55,10 @@ public static class ClassicLogOverflowActions {
             return false;
         }
 
+        if (string.IsNullOrWhiteSpace(normalized)) {
+            return true;
+        }
+
         switch (normalized) {
             case "overwrite_as_needed":
                 overflowAction = OverflowAction.OverwriteAsNeeded;
@@ -60,7 +70,7 @@ public static class ClassicLogOverflowActions {
                 overflowAction = OverflowAction.DoNotOverwrite;
                 return true;
             default:
-                return string.IsNullOrWhiteSpace(normalized);
+                return false;
         }
     }
 

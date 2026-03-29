@@ -110,8 +110,9 @@ public partial class SearchEvents : Settings {
                 if (!string.IsNullOrWhiteSpace(xml) && xml!.IndexOf("<Subscription", StringComparison.OrdinalIgnoreCase) >= 0) {
                     info.RawXml = xml;
 
-                    if (CollectorSubscriptionXml.TryNormalize(xml, out var details, out var parseError)) {
-                        info.Description = details!.Description;
+                    if (CollectorSubscriptionXml.TryNormalize(xml, out var details, out var parseError)
+                        && details != null) {
+                        info.Description = details.Description;
                         info.Queries = details.Queries;
                     } else {
                         _logger.WriteWarning($"Failed to parse subscription '{name}' XML on '{machineName ?? GetFQDN()}': {parseError}");
@@ -136,8 +137,11 @@ public partial class SearchEvents : Settings {
     }
 
     private static string ResolveCollectorTargetMachineName(string? machineName) {
-        return string.IsNullOrWhiteSpace(machineName)
-            ? Environment.MachineName
-            : machineName.Trim();
+        if (machineName == null) {
+            return Environment.MachineName;
+        }
+
+        var trimmed = machineName.Trim();
+        return trimmed.Length == 0 ? Environment.MachineName : trimmed;
     }
 }
