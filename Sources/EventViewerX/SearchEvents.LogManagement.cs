@@ -22,21 +22,25 @@ public partial class SearchEvents : Settings {
     /// <param name="sourceLogName">Optional log name used for source creation checks.</param>
     /// <returns><c>true</c> if creation succeeded.</returns>
     public static bool CreateLog(string logName, string? sourceName = null, string? machineName = null, int maximumKilobytes = 0, OverflowAction overflowAction = OverflowAction.OverwriteAsNeeded, int retentionDays = 7, string? sourceLogName = null) {
-        if (string.IsNullOrEmpty(sourceName)) {
-            sourceName = logName;
+        string sourceNameValue;
+        if (sourceName == null || sourceName.Length == 0) {
+            sourceNameValue = logName;
+        } else {
+            sourceNameValue = sourceName;
         }
 
-        if (string.IsNullOrEmpty(sourceLogName)) {
-            sourceLogName = logName;
+        string sourceLogNameValue;
+        if (sourceLogName == null || sourceLogName.Length == 0) {
+            sourceLogNameValue = logName;
+        } else {
+            sourceLogNameValue = sourceLogName;
         }
-        sourceName ??= logName;
-        sourceLogName ??= logName;
 
         try {
             bool logExists = LogExistsSafe(logName, machineName);
-            bool sourceExists = SourceExistsSafe(sourceName, sourceLogName, machineName);
+            bool sourceExists = SourceExistsSafe(sourceNameValue, sourceLogNameValue, machineName);
 
-            var data = new EventSourceCreationData(sourceName, sourceLogName);
+            var data = new EventSourceCreationData(sourceNameValue, sourceLogNameValue);
             if (!string.IsNullOrEmpty(machineName)) {
                 data.MachineName = machineName;
             }
