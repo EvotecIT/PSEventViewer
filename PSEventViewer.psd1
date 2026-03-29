@@ -8,7 +8,7 @@
     Description          = 'Simple module allowing parsing of event logs. Has its own quirks...'
     FunctionsToExport    = @()
     GUID                 = '5df72a79-cdf6-4add-b38d-bcacf26fb7bc'
-    ModuleVersion        = '3.4.0'
+    ModuleVersion        = '3.4.1'
     PowerShellVersion    = '5.1'
     PrivateData          = @{
         PSData = @{
