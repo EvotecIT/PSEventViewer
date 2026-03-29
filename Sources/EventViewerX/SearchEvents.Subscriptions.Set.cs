@@ -1,6 +1,4 @@
 using Microsoft.Win32;
-using System.Xml;
-using System.Xml.Linq;
 
 namespace EventViewerX;
 
@@ -33,29 +31,13 @@ public partial class SearchEvents : Settings {
     /// Replaces the subscription XML payload. The caller should ensure XML correctness.
     /// </summary>
     public static bool SetCollectorSubscriptionXml(string name, string xml, string? machineName = null) {
-        if (string.IsNullOrWhiteSpace(xml)) {
-            throw new ArgumentException("XML cannot be null or empty.", nameof(xml));
-        }
-
-        // Basic XML validation with DTD prohibited to limit XML injection/XXE risk
-        try {
-            var settings = new XmlReaderSettings {
-                DtdProcessing = DtdProcessing.Prohibit,
-                XmlResolver = null
-            };
-            using var reader = XmlReader.Create(new System.IO.StringReader(xml), settings);
-            var xdoc = XDocument.Load(reader, LoadOptions.None);
-            var root = xdoc.Root;
-            if (root == null || !root.Name.LocalName.Equals("Subscription", StringComparison.OrdinalIgnoreCase)) {
-                throw new ArgumentException("Root element must be <Subscription>.", nameof(xml));
-            }
-        } catch (XmlException xex) {
-            throw new ArgumentException($"Invalid XML content: {xex.Message}", nameof(xml));
+        if (!CollectorSubscriptionXml.TryNormalize(xml, out var details, out var error)) {
+            throw new ArgumentException(error, nameof(xml));
         }
 
         return WithSubscriptionKey(name, machineName, writable: true, (key, host) => {
             try {
-                key.SetValue("Subscription", xml, RegistryValueKind.String);
+                key.SetValue("Subscription", details!.NormalizedXml, RegistryValueKind.String);
                 return true;
             } catch (UnauthorizedAccessException ex) {
                 _logger.WriteWarning($"Access denied writing XML for subscription '{name}' on '{host}'. Ensure permissions to HKLM are granted. Details: {ex.Message}");
