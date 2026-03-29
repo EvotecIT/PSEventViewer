@@ -22,21 +22,25 @@ public partial class SearchEvents : Settings {
     /// <param name="sourceLogName">Optional log name used for source creation checks.</param>
     /// <returns><c>true</c> if creation succeeded.</returns>
     public static bool CreateLog(string logName, string? sourceName = null, string? machineName = null, int maximumKilobytes = 0, OverflowAction overflowAction = OverflowAction.OverwriteAsNeeded, int retentionDays = 7, string? sourceLogName = null) {
-        if (string.IsNullOrEmpty(sourceName)) {
-            sourceName = logName;
+        string sourceNameValue;
+        if (sourceName == null || sourceName.Length == 0) {
+            sourceNameValue = logName;
+        } else {
+            sourceNameValue = sourceName;
         }
 
-        if (string.IsNullOrEmpty(sourceLogName)) {
-            sourceLogName = logName;
+        string sourceLogNameValue;
+        if (sourceLogName == null || sourceLogName.Length == 0) {
+            sourceLogNameValue = logName;
+        } else {
+            sourceLogNameValue = sourceLogName;
         }
-        sourceName ??= logName;
-        sourceLogName ??= logName;
 
         try {
             bool logExists = LogExistsSafe(logName, machineName);
-            bool sourceExists = SourceExistsSafe(sourceName, sourceLogName, machineName);
+            bool sourceExists = SourceExistsSafe(sourceNameValue, sourceLogNameValue, machineName);
 
-            var data = new EventSourceCreationData(sourceName, sourceLogName);
+            var data = new EventSourceCreationData(sourceNameValue, sourceLogNameValue);
             if (!string.IsNullOrEmpty(machineName)) {
                 data.MachineName = machineName;
             }
@@ -65,6 +69,24 @@ public partial class SearchEvents : Settings {
         } catch {
             return false;
         }
+    }
+
+    /// <summary>
+    /// Creates a new event log with optional configuration using canonical overflow action names.
+    /// </summary>
+    /// <param name="logName">The name of the log.</param>
+    /// <param name="sourceName">The provider name.</param>
+    /// <param name="machineName">Target machine.</param>
+    /// <param name="maximumKilobytes">Maximum size in KB.</param>
+    /// <param name="overflowActionName">Canonical overflow action name.</param>
+    /// <param name="retentionDays">Retention in days for OverwriteOlder policy.</param>
+    /// <param name="sourceLogName">Optional log name used for source creation checks.</param>
+    /// <returns><c>true</c> if creation succeeded.</returns>
+    public static bool CreateLog(string logName, string? sourceName, string? machineName, int maximumKilobytes, string? overflowActionName, int retentionDays = 7, string? sourceLogName = null) {
+        var overflowAction = ClassicLogOverflowActions.TryParse(overflowActionName, out var parsedOverflowAction)
+            ? parsedOverflowAction
+            : OverflowAction.OverwriteAsNeeded;
+        return CreateLog(logName, sourceName, machineName, maximumKilobytes, overflowAction, retentionDays, sourceLogName);
     }
 
     private static readonly ConcurrentDictionary<string, bool> _sourceCache = new(StringComparer.OrdinalIgnoreCase);
@@ -156,6 +178,63 @@ public partial class SearchEvents : Settings {
     /// <returns><c>true</c> when log exists.</returns>
     public static bool LogExists(string logName, string? machineName = null) {
         return LogExistsSafe(logName, machineName);
+    }
+
+    /// <summary>
+    /// Returns a reusable snapshot of classic Event Log and source state for preview/apply workflows.
+    /// </summary>
+    /// <param name="logName">Classic log name to inspect.</param>
+    /// <param name="sourceName">Event source name to inspect.</param>
+    /// <param name="machineName">Target machine; null for local.</param>
+    /// <returns>Classic log state for the requested log and source.</returns>
+    public static ClassicLogState GetClassicLogState(string logName, string sourceName, string? machineName = null) {
+        if (string.IsNullOrWhiteSpace(logName)) {
+            throw new ArgumentException("logName cannot be null or empty", nameof(logName));
+        }
+
+        if (string.IsNullOrWhiteSpace(sourceName)) {
+            throw new ArgumentException("sourceName cannot be null or empty", nameof(sourceName));
+        }
+
+        var logExists = LogExistsSafe(logName, machineName);
+        var sourceExists = SourceExistsSafe(sourceName, null, machineName);
+
+        string? sourceRegisteredLogName = null;
+        if (sourceExists) {
+            sourceRegisteredLogName = string.IsNullOrWhiteSpace(machineName)
+                ? EventLog.LogNameFromSourceName(sourceName, ".")
+                : EventLog.LogNameFromSourceName(sourceName, machineName);
+        }
+
+        string? logDisplayName = null;
+        int? maximumKilobytes = null;
+        string? overflowActionName = null;
+        int? minimumRetentionDays = null;
+
+        if (logExists) {
+            using EventLog log = string.IsNullOrWhiteSpace(machineName)
+                ? new EventLog(logName)
+                : new EventLog(logName, machineName);
+            logDisplayName = string.IsNullOrWhiteSpace(log.LogDisplayName) ? null : log.LogDisplayName;
+            maximumKilobytes = log.MaximumKilobytes > int.MaxValue
+                ? int.MaxValue
+                : (int)log.MaximumKilobytes;
+            overflowActionName = ClassicLogOverflowActions.Normalize(log.OverflowAction);
+            minimumRetentionDays = log.MinimumRetentionDays;
+        }
+
+        return new ClassicLogState {
+            LogName = logName,
+            SourceName = sourceName,
+            MachineName = machineName,
+            LogExists = logExists,
+            SourceExists = sourceExists,
+            SourceRegisteredLogName = sourceRegisteredLogName,
+            LogDisplayName = logDisplayName,
+            MaximumKilobytes = maximumKilobytes,
+            OverflowActionName = overflowActionName,
+            MinimumRetentionDays = minimumRetentionDays
+        };
     }
 
     private static bool LogExistsSafe(string logName, string? machineName) {

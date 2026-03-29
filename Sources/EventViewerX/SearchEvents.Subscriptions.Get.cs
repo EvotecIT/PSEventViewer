@@ -1,5 +1,4 @@
 using Microsoft.Win32;
-using System.Xml.Linq;
 
 namespace EventViewerX;
 
@@ -22,6 +21,50 @@ public partial class SearchEvents : Settings {
 
         // Fallback to 32-bit view if 64-bit view had no data.
         foreach (var sub in GetCollectorSubscriptionsInternal(machineName, RegistryView.Registry32)) yield return sub;
+    }
+
+    /// <summary>
+    /// Returns normalized collector subscription snapshots suitable for preview and reporting.
+    /// </summary>
+    public static IReadOnlyList<CollectorSubscriptionSnapshot> GetCollectorSubscriptionSnapshots(
+        string? machineName = null,
+        string? nameContains = null,
+        bool enabledOnly = false) {
+        var targetMachineName = ResolveCollectorTargetMachineName(machineName);
+
+        IEnumerable<SubscriptionInfo> query = GetCollectorSubscriptions(machineName);
+        if (!string.IsNullOrWhiteSpace(nameContains)) {
+            query = query.Where(subscription =>
+                !string.IsNullOrWhiteSpace(subscription.Name)
+                && subscription.Name.IndexOf(nameContains, StringComparison.OrdinalIgnoreCase) >= 0);
+        }
+
+        if (enabledOnly) {
+            query = query.Where(static subscription => subscription.Enabled == true);
+        }
+
+        return query
+            .OrderBy(static subscription => subscription.Name, StringComparer.OrdinalIgnoreCase)
+            .Select(subscription => CollectorSubscriptionSnapshot.FromSubscriptionInfo(subscription, targetMachineName))
+            .ToArray();
+    }
+
+    /// <summary>
+    /// Returns a normalized collector subscription snapshot for the exact subscription name, if present.
+    /// </summary>
+    public static CollectorSubscriptionSnapshot? GetCollectorSubscriptionSnapshot(string name, string? machineName = null) {
+        if (string.IsNullOrWhiteSpace(name)) {
+            throw new ArgumentException("Subscription name cannot be null or empty.", nameof(name));
+        }
+
+        var targetMachineName = ResolveCollectorTargetMachineName(machineName);
+        var subscription = GetCollectorSubscriptions(machineName)
+            .FirstOrDefault(item =>
+                !string.IsNullOrWhiteSpace(item.Name)
+                && string.Equals(item.Name, name, StringComparison.OrdinalIgnoreCase));
+        return subscription is null
+            ? null
+            : CollectorSubscriptionSnapshot.FromSubscriptionInfo(subscription, targetMachineName);
     }
 
     private static IEnumerable<SubscriptionInfo> GetCollectorSubscriptionsInternal(string? machineName, RegistryView view) {
@@ -67,20 +110,12 @@ public partial class SearchEvents : Settings {
                 if (!string.IsNullOrWhiteSpace(xml) && xml!.IndexOf("<Subscription", StringComparison.OrdinalIgnoreCase) >= 0) {
                     info.RawXml = xml;
 
-                    try {
-                        var xdoc = XDocument.Parse(xml);
-                        // Description
-                        info.Description = xdoc.Root?.Element(XName.Get("Description", xdoc.Root?.Name.NamespaceName ?? ""))?.Value;
-
-                        // Queries: collect any <Query> text under <Select> or direct XPath
-                        var queries = new List<string>();
-                        foreach (var sel in xdoc.Descendants().Where(e => e.Name.LocalName.Equals("Select", StringComparison.OrdinalIgnoreCase))) {
-                            var q = sel.Value?.Trim();
-                            if (!string.IsNullOrEmpty(q)) queries.Add(q!);
-                        }
-                        if (queries.Count > 0) info.Queries = queries;
-                    } catch (Exception ex) {
-                        _logger.WriteWarning($"Failed to parse subscription '{name}' XML on '{machineName ?? GetFQDN()}': {ex.Message}");
+                    if (CollectorSubscriptionXml.TryNormalize(xml, out var details, out var parseError)
+                        && details != null) {
+                        info.Description = details.Description;
+                        info.Queries = details.Queries;
+                    } else {
+                        _logger.WriteWarning($"Failed to parse subscription '{name}' XML on '{machineName ?? GetFQDN()}': {parseError}");
                     }
                 }
 
@@ -99,5 +134,14 @@ public partial class SearchEvents : Settings {
             hklm?.Dispose();
         }
         return results;
+    }
+
+    private static string ResolveCollectorTargetMachineName(string? machineName) {
+        if (machineName == null) {
+            return Environment.MachineName;
+        }
+
+        var trimmed = machineName.Trim();
+        return trimmed.Length == 0 ? Environment.MachineName : trimmed;
     }
 }

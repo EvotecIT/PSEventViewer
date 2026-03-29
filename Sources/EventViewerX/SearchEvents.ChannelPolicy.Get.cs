@@ -22,10 +22,10 @@ public partial class SearchEvents : Settings {
 
             try {
                 using var cfg = new EventLogConfiguration(logName, session);
-                return new ChannelPolicy {
-                    LogName = cfg.LogName,
-                    MachineName = machineName,
-                    IsEnabled = cfg.IsEnabled,
+                    return new ChannelPolicy {
+                        LogName = cfg.LogName,
+                        MachineName = machineName,
+                        IsEnabled = cfg.IsEnabled,
                     MaximumSizeInBytes = cfg.MaximumSizeInBytes,
                     LogFilePath = cfg.LogFilePath,
                     Isolation = cfg.LogIsolation,

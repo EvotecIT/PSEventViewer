@@ -22,8 +22,22 @@ public sealed class ChannelPolicy {
     public EventLogIsolation? Isolation { get; set; }
     /// <summary>Retention mode for the channel.</summary>
     public EventLogMode? Mode { get; set; }
+    /// <summary>Canonical retention mode name for callers that should not bind directly to <see cref="EventLogMode"/>.</summary>
+    public string? ModeName => ChannelPolicyModeNames.Normalize(Mode);
     /// <summary>SDDL security descriptor controlling access.</summary>
     public string? SecurityDescriptor { get; set; }
+
+    /// <summary>
+    /// Applies a canonical mode name to <see cref="Mode"/>.
+    /// </summary>
+    public bool TrySetModeName(string? value, out string? error) {
+        if (!ChannelPolicyModeNames.TryParse(value, out var mode, out error)) {
+            return false;
+        }
+
+        Mode = mode;
+        return true;
+    }
 
     /// <summary>Serializes the policy into a key/value dictionary for diagnostics or JSON output.</summary>
     public IReadOnlyDictionary<string, object?> ToDictionary() => new Dictionary<string, object?> {
@@ -33,7 +47,7 @@ public sealed class ChannelPolicy {
         [nameof(MaximumSizeInBytes)] = MaximumSizeInBytes,
         [nameof(LogFilePath)] = LogFilePath,
         [nameof(Isolation)] = Isolation?.ToString(),
-        [nameof(Mode)] = Mode?.ToString(),
+        [nameof(Mode)] = ModeName,
         [nameof(SecurityDescriptor)] = SecurityDescriptor,
     };
 }

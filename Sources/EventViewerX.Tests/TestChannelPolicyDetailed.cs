@@ -7,6 +7,30 @@ namespace EventViewerX.Tests;
 public class TestChannelPolicyDetailed
 {
     [Fact]
+    public void ChannelPolicy_TrySetModeName_UsesCanonicalModeNames()
+    {
+        var policy = new ChannelPolicy();
+
+        var success = policy.TrySetModeName("AUTO_BACKUP", out var error);
+
+        Assert.True(success);
+        Assert.Null(error);
+        Assert.Equal("auto_backup", policy.ModeName);
+    }
+
+    [Fact]
+    public void ChannelPolicy_TrySetModeName_RejectsUnknownValues()
+    {
+        var policy = new ChannelPolicy();
+
+        var success = policy.TrySetModeName("archive_forever", out var error);
+
+        Assert.False(success);
+        Assert.Equal("mode must be one of: circular, retain, auto_backup.", error);
+        Assert.Null(policy.ModeName);
+    }
+
+    [Fact]
     public void GetChannelPolicies_ParallelEnumerates()
     {
         if (!OperatingSystem.IsWindows())
@@ -49,4 +73,3 @@ public class TestChannelPolicyDetailed
         Assert.Empty(result.Errors);
     }
 }
-
