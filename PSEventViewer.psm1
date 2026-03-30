@@ -1,7 +1,7 @@
 ﻿# to speed up development adding direct path to binaries, instead of the the Lib folder
 $Development = $true
 $DevelopmentPath = "$PSScriptRoot\Sources\PSEventViewer\bin\Debug"
-$DevelopmentFolderCore = "net8.0"
+$DevelopmentFolderCore = "net8.0-windows"
 $DevelopmentFolderDefault = "net472"
 $BinaryModules = @(
     "PSEventViewer.dll"

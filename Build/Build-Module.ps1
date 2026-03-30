@@ -89,7 +89,7 @@ Build-Module -ModuleName 'PSEventViewer' {
         ResolveBinaryConflictsName        = 'PSEventViewer'
         NETProjectName                    = 'PSEventViewer'
         NETConfiguration                  = 'Release'
-        NETFramework                      = 'net8.0', 'net472'
+        NETFramework                      = 'net8.0-windows', 'net472'
         NETSearchClass                    = "PSEventViewer.CmdletFindEvent"
         NETHandleAssemblyWithSameName     = $true
         #NETMergeLibraryDebugging          = $true
