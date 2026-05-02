@@ -27,17 +27,24 @@ public class TestLogManagement {
         if (!OperatingSystem.IsWindows()) return;
         if (!TestEnv.IsAdmin()) return;
 
-        const string logName = "EVXTestCustomLog";
+        string logName = "EVXTestCustomLog" + Guid.NewGuid().ToString("N");
         if (SearchEvents.LogExists(logName)) {
             SearchEvents.RemoveLog(logName);
         }
 
-        bool created = SearchEvents.CreateLog(logName, logName, null, 256, OverflowAction.OverwriteAsNeeded, 1);
-        if (!created) return; // environments without rights skip
-        Assert.True(SearchEvents.LogExists(logName));
+        try {
+            bool created = SearchEvents.CreateLog(logName, logName, null, 256, OverflowAction.OverwriteAsNeeded, 1);
+            if (!created) return; // environments without rights skip
+            Assert.True(SearchEvents.LogExists(logName));
 
-        bool removed = SearchEvents.RemoveLog(logName);
-        Assert.True(removed);
-        Assert.False(SearchEvents.LogExists(logName));
+            bool removed = SearchEvents.RemoveLog(logName);
+            Assert.True(removed);
+            Assert.False(SearchEvents.LogExists(logName));
+        }
+        finally {
+            if (SearchEvents.LogExists(logName)) {
+                SearchEvents.RemoveLog(logName);
+            }
+        }
     }
 }
