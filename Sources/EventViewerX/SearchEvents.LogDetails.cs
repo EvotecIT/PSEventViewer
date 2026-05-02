@@ -9,6 +9,7 @@ namespace EventViewerX;
 /// Helper methods for retrieving event log configuration details.
 /// </summary>
 public partial class SearchEvents : Settings {
+    private const int DiagnosticTimeoutGraceMs = 500;
 
     /// <summary>
     /// Returns details for a single log without enumerating all logs. Time‑bounded to avoid hangs on large/remote channels.
@@ -16,12 +17,23 @@ public partial class SearchEvents : Settings {
     public static EventLogDetails? GetLogDetails(string logName, string? machineName = null, int timeoutMs = 3000) {
         if (string.IsNullOrWhiteSpace(logName)) throw new ArgumentException("logName cannot be null or empty", nameof(logName));
 
+        return GetLogDetailsResult(logName, machineName, timeoutMs).Details;
+    }
+
+    /// <summary>
+    /// Returns details for a single log with diagnostic status when the log cannot be read.
+    /// </summary>
+    public static EventLogDetailsResult GetLogDetailsResult(string logName, string? machineName = null, int timeoutMs = 3000) {
+        if (string.IsNullOrWhiteSpace(logName)) throw new ArgumentException("logName cannot be null or empty", nameof(logName));
+
         try {
-            Task<EventLogDetails?> task = Task.Run(() => SafeGet(logName, machineName, timeoutMs));
-            Task completed = Task.WhenAny(task, Task.Delay(timeoutMs)).GetAwaiter().GetResult();
-            return completed == task ? task.GetAwaiter().GetResult() : null;
-        } catch {
-            return null;
+            Task<EventLogDetailsResult> task = Task.Run(() => SafeGetResult(logName, machineName, timeoutMs));
+            Task completed = Task.WhenAny(task, Task.Delay(OuterTimeoutMs(timeoutMs))).GetAwaiter().GetResult();
+            return completed == task
+                ? task.GetAwaiter().GetResult()
+                : Failure(logName, machineName, EventLogDetailsStatus.Timeout, $"Timed out reading event log details after {timeoutMs} ms.", timeoutMs, "LogDetailsTimeout");
+        } catch (Exception ex) {
+            return Failure(logName, machineName, EventLogDetailsStatus.Error, ex.Message, timeoutMs, ex.GetType().Name);
         }
     }
 
@@ -33,53 +45,63 @@ public partial class SearchEvents : Settings {
         if (session == null) throw new ArgumentNullException(nameof(session));
         if (string.IsNullOrWhiteSpace(logName)) throw new ArgumentException("logName cannot be null or empty", nameof(logName));
 
+        return GetLogDetailsResult(logName, session, timeoutMs, machineName).Details;
+    }
+
+    /// <summary>
+    /// Reuses an existing EventLogSession (caller owns it) and returns diagnostic status when the log cannot be read.
+    /// </summary>
+    public static EventLogDetailsResult GetLogDetailsResult(string logName, EventLogSession session, int timeoutMs = 3000, string? machineName = null)
+    {
+        if (session == null) throw new ArgumentNullException(nameof(session));
+        if (string.IsNullOrWhiteSpace(logName)) throw new ArgumentException("logName cannot be null or empty", nameof(logName));
+
         try
         {
-            Task<EventLogDetails?> task = Task.Run(() => SafeGet(logName, session, timeoutMs, machineName));
-            Task completed = Task.WhenAny(task, Task.Delay(timeoutMs)).GetAwaiter().GetResult();
-            return completed == task ? task.GetAwaiter().GetResult() : null;
+            Task<EventLogDetailsResult> task = Task.Run(() => SafeGetResult(logName, session, timeoutMs, machineName));
+            Task completed = Task.WhenAny(task, Task.Delay(OuterTimeoutMs(timeoutMs))).GetAwaiter().GetResult();
+            return completed == task
+                ? task.GetAwaiter().GetResult()
+                : Failure(logName, machineName, EventLogDetailsStatus.Timeout, $"Timed out reading event log details after {timeoutMs} ms.", timeoutMs, "LogDetailsTimeout");
         }
-        catch
+        catch (Exception ex)
         {
-            return null;
+            return Failure(logName, machineName, EventLogDetailsStatus.Error, ex.Message, timeoutMs, ex.GetType().Name);
         }
     }
 
-    private static EventLogDetails? SafeGet(string logName, string? machineName, int timeoutMs) {
-        EventLogSession? session = null;
+    private static EventLogDetailsResult SafeGetResult(string logName, string? machineName, int timeoutMs) {
+        EventLogSessionOpenResult? sessionResult = null;
         try {
-            session = CreateSession(machineName, "LogDetails", logName, timeoutMs);
-            if (session == null) return null;
-
-            EventLogConfiguration? logConfig = null;
-            EventLogInformation? logInfoObj = null;
-
-            try {
-                logConfig = new EventLogConfiguration(logName, session);
-            } catch (EventLogException ex) {
-                _logger.WriteWarning($"Couldn't create EventLogConfiguration for {logName} on {machineName ?? GetFQDN()}: {ex.Message}");
+            sessionResult = CreateSessionResult(machineName, "LogDetails", logName, timeoutMs);
+            if (!sessionResult.Success || sessionResult.Session == null) {
+                return Failure(
+                    logName,
+                    machineName,
+                    EventLogDetailsStatus.SessionUnavailable,
+                    string.IsNullOrWhiteSpace(sessionResult.ErrorMessage)
+                        ? "Event log session could not be opened. Check host reachability, RPC/firewall access, Remote Event Log Management, and permissions."
+                        : sessionResult.ErrorMessage,
+                    timeoutMs,
+                    string.IsNullOrWhiteSpace(sessionResult.ErrorType)
+                        ? sessionResult.Status.ToString()
+                        : sessionResult.ErrorType);
             }
 
-            try {
-                logInfoObj = session.GetLogInformation(logName, PathType.LogName);
-            } catch (Exception ex) {
-                _logger.WriteVerbose($"Couldn't get log information for {logName} on {machineName ?? GetFQDN()}: {ex.Message}");
-            }
-
-            if (logConfig == null) return null;
-            return new EventLogDetails(_logger, machineName ?? GetFQDN(), logConfig, logInfoObj);
+            return SafeGetResult(logName, sessionResult.Session, timeoutMs, machineName);
         }
         finally {
-            session?.Dispose();
+            sessionResult?.Dispose();
         }
     }
 
-    private static EventLogDetails? SafeGet(string logName, EventLogSession session, int timeoutMs, string? machineName)
+    private static EventLogDetailsResult SafeGetResult(string logName, EventLogSession session, int timeoutMs, string? machineName)
     {
         try
         {
             EventLogConfiguration? logConfig = null;
             EventLogInformation? logInfoObj = null;
+            string hostName = machineName ?? GetFQDN();
 
             try
             {
@@ -87,7 +109,13 @@ public partial class SearchEvents : Settings {
             }
             catch (EventLogException ex)
             {
-                _logger.WriteWarning($"Couldn't create EventLogConfiguration for {logName} on {(machineName ?? GetFQDN())}: {ex.Message}");
+                _logger.WriteWarning($"Couldn't create EventLogConfiguration for {logName} on {hostName}: {ex.Message}");
+                return Failure(logName, machineName, EventLogDetailsStatus.LogConfigurationUnavailable, ex.Message, timeoutMs, ex.GetType().Name);
+            }
+            catch (Exception ex)
+            {
+                _logger.WriteWarning($"Couldn't create EventLogConfiguration for {logName} on {hostName}: {ex.Message}");
+                return Failure(logName, machineName, EventLogDetailsStatus.LogConfigurationUnavailable, ex.Message, timeoutMs, ex.GetType().Name);
             }
 
             try
@@ -96,17 +124,57 @@ public partial class SearchEvents : Settings {
             }
             catch (Exception ex)
             {
-                _logger.WriteVerbose($"Couldn't get log information for {logName} on {(machineName ?? GetFQDN())}: {ex.Message}");
+                _logger.WriteVerbose($"Couldn't get log information for {logName} on {hostName}: {ex.Message}");
             }
 
-            if (logConfig == null) return null;
-            return new EventLogDetails(_logger, machineName ?? GetFQDN(), logConfig, logInfoObj);
+            var details = new EventLogDetails(_logger, hostName, logConfig, logInfoObj);
+            if (logInfoObj == null)
+            {
+                return new EventLogDetailsResult
+                {
+                    LogName = logName,
+                    MachineName = hostName,
+                    Status = EventLogDetailsStatus.LogInformationUnavailable,
+                    Details = details,
+                    ErrorMessage = "Event log configuration was collected, but runtime log information was unavailable.",
+                    TimeoutMs = timeoutMs
+                };
+            }
+
+            return new EventLogDetailsResult
+            {
+                LogName = logName,
+                MachineName = hostName,
+                Status = EventLogDetailsStatus.Success,
+                Details = details,
+                TimeoutMs = timeoutMs
+            };
         }
-        finally
+        catch (Exception ex)
         {
-            // session lifetime owned by caller
+            return Failure(logName, machineName, EventLogDetailsStatus.Error, ex.Message, timeoutMs, ex.GetType().Name);
         }
     }
+
+    private static EventLogDetailsResult Failure(
+        string logName,
+        string? machineName,
+        EventLogDetailsStatus status,
+        string errorMessage,
+        int timeoutMs,
+        string? errorType = null) =>
+        new()
+        {
+            LogName = logName,
+            MachineName = machineName,
+            Status = status,
+            ErrorMessage = errorMessage,
+            ErrorType = errorType ?? string.Empty,
+            TimeoutMs = timeoutMs
+        };
+
+    private static int OuterTimeoutMs(int timeoutMs) =>
+        Math.Max(timeoutMs, 1) + DiagnosticTimeoutGraceMs;
 
     /// <summary>
     /// Enumerates event logs on the specified machine and returns their configuration details.
