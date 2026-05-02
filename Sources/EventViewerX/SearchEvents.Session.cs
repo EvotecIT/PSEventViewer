@@ -24,25 +24,52 @@ public partial class SearchEvents : Settings
     /// </summary>
     internal static EventLogSession? CreateSession(string? machineName, string? purpose, string? logName, int? timeoutMs = null)
     {
+        return CreateSessionResult(machineName, purpose, logName, timeoutMs).Session;
+    }
+
+    internal static EventLogSessionOpenResult CreateSessionResult(string? machineName, string? purpose, string? logName, int? timeoutMs = null)
+    {
         int budget = Math.Max(1000, timeoutMs ?? DefaultSessionTimeoutMs);
+        string operation = purpose ?? "Session";
+        string channel = logName ?? string.Empty;
 
         // Local is fast; avoid ping/RPC probes (many CI agents block 135)
         if (IsLocalMachine(machineName))
         {
-            try { return new EventLogSession(); }
+            try
+            {
+                return SessionSuccess(machineName, GetFQDN(), operation, channel, budget, new EventLogSession());
+            }
             catch (Exception ex)
             {
-                _logger.WriteWarning($"{purpose ?? "Session"}: failed to open local session for '{logName}': {ex.Message}");
-                return null;
+                _logger.WriteWarning($"{operation}: failed to open local session for '{channel}': {ex.Message}");
+                return SessionFailure(
+                    machineName,
+                    GetFQDN(),
+                    operation,
+                    channel,
+                    EventLogSessionOpenStatus.LocalSessionUnavailable,
+                    $"Failed to open local Event Log session for '{channel}': {ex.Message}",
+                    budget,
+                    ex.GetType().Name);
             }
         }
 
         var normalizedHost = machineName?.Trim() ?? string.Empty;
         var targetHost = string.IsNullOrWhiteSpace(normalizedHost) ? GetFQDN() : normalizedHost;
-        if (IsHostNegativeCached(normalizedHost))
+        if (TryGetHostNegativeCacheExpiry(normalizedHost, out DateTime cachedUntilUtc))
         {
-            _logger.WriteVerbose($"{purpose ?? "Session"}: skipping {normalizedHost} (cached unreachable)");
-            return null;
+            _logger.WriteVerbose($"{operation}: skipping {normalizedHost} (cached unreachable)");
+            return SessionFailure(
+                machineName,
+                targetHost,
+                operation,
+                channel,
+                EventLogSessionOpenStatus.NegativeCache,
+                $"Host '{targetHost}' is temporarily cached as unreachable until {cachedUntilUtc:u}.",
+                budget,
+                nameof(EventLogSessionOpenStatus.NegativeCache),
+                cachedUntilUtc);
         }
 
         // Quick reachability check (ping) to fail fast on dead hosts
@@ -52,23 +79,44 @@ public partial class SearchEvents : Settings
             var reply = ping.Send(targetHost, Math.Min(DefaultPingTimeoutMs, budget));
             if (reply == null || reply.Status != System.Net.NetworkInformation.IPStatus.Success)
             {
-                _logger.WriteWarning($"{purpose ?? "Session"}: ping failed for '{targetHost}' when opening '{logName}'. Skipping.");
+                string pingStatus = reply?.Status.ToString() ?? "NoReply";
+                _logger.WriteWarning($"{operation}: ping failed for '{targetHost}' when opening '{channel}'. Skipping.");
                 MarkHostUnreachable(targetHost);
-                return null;
+                TryGetHostNegativeCacheExpiry(targetHost, out DateTime pingCachedUntilUtc);
+                return SessionFailure(
+                    machineName,
+                    targetHost,
+                    operation,
+                    channel,
+                    EventLogSessionOpenStatus.PingFailed,
+                    $"Ping probe failed for '{targetHost}' with status '{pingStatus}'.",
+                    budget,
+                    nameof(EventLogSessionOpenStatus.PingFailed),
+                    pingCachedUntilUtc);
             }
         }
         catch (Exception ex)
         {
             string reason = ex.InnerException?.Message ?? ex.Message;
-            _logger.WriteVerbose($"{purpose ?? "Session"}: ping probe failed for '{machineName}': {reason}. Continuing to session attempt.");
+            _logger.WriteVerbose($"{operation}: ping probe failed for '{machineName}': {reason}. Continuing to session attempt.");
         }
 
         // RPC (135) preflight to avoid EventLogSession hangs on dead/filtered hosts
         if (!RpcProbe(normalizedHost, Math.Min(DefaultRpcProbeTimeoutMs, budget)))
         {
-            _logger.WriteVerbose($"{purpose ?? "Session"}: RPC preflight failed for '{machineName}'");
+            _logger.WriteVerbose($"{operation}: RPC preflight failed for '{machineName}'");
             MarkHostUnreachable(normalizedHost);
-            return null;
+            TryGetHostNegativeCacheExpiry(normalizedHost, out DateTime rpcCachedUntilUtc);
+            return SessionFailure(
+                machineName,
+                targetHost,
+                operation,
+                channel,
+                EventLogSessionOpenStatus.RpcUnavailable,
+                $"RPC preflight to '{targetHost}' on port {Settings.RpcProbePort} failed.",
+                budget,
+                nameof(EventLogSessionOpenStatus.RpcUnavailable),
+                rpcCachedUntilUtc);
         }
 
         try
@@ -78,7 +126,7 @@ public partial class SearchEvents : Settings
             var completed = Task.WhenAny(task, Task.Delay(budget, cts.Token)).GetAwaiter().GetResult();
             if (completed != task)
             {
-                _logger.WriteWarning($"{purpose ?? "Session"}: timeout opening session to '{machineName}' for '{logName}' after {budget} ms");
+                _logger.WriteWarning($"{operation}: timeout opening session to '{machineName}' for '{channel}' after {budget} ms");
                 MarkHostUnreachable(normalizedHost);
 
                 // Ensure the late session (if it eventually opens) gets disposed.
@@ -89,23 +137,53 @@ public partial class SearchEvents : Settings
                         t.Result.Dispose();
                     }
                 }, TaskContinuationOptions.OnlyOnRanToCompletion | TaskContinuationOptions.ExecuteSynchronously);
-                return null;
+                TryGetHostNegativeCacheExpiry(normalizedHost, out DateTime timeoutCachedUntilUtc);
+                return SessionFailure(
+                    machineName,
+                    targetHost,
+                    operation,
+                    channel,
+                    EventLogSessionOpenStatus.Timeout,
+                    $"Timed out opening Event Log session to '{targetHost}' for '{channel}' after {budget} ms.",
+                    budget,
+                    nameof(EventLogSessionOpenStatus.Timeout),
+                    timeoutCachedUntilUtc);
             }
             // Success: clear any stale negative entry
             ClearNegativeCache(normalizedHost);
-            return task.GetAwaiter().GetResult();
+            return SessionSuccess(machineName, targetHost, operation, channel, budget, task.GetAwaiter().GetResult());
         }
         catch (EventLogException ex)
         {
-            _logger.WriteWarning($"{purpose ?? "Session"}: failed opening session to '{machineName}' for '{logName}': {ex.Message}");
+            _logger.WriteWarning($"{operation}: failed opening session to '{machineName}' for '{channel}': {ex.Message}");
             MarkHostUnreachable(normalizedHost);
-            return null;
+            TryGetHostNegativeCacheExpiry(normalizedHost, out DateTime exceptionCachedUntilUtc);
+            return SessionFailure(
+                machineName,
+                targetHost,
+                operation,
+                channel,
+                EventLogSessionOpenStatus.EventLogSessionUnavailable,
+                ex.Message,
+                budget,
+                ex.GetType().Name,
+                exceptionCachedUntilUtc);
         }
         catch (Exception ex)
         {
-            _logger.WriteWarning($"{purpose ?? "Session"}: unexpected error opening session to '{machineName}' for '{logName}': {ex.Message}");
+            _logger.WriteWarning($"{operation}: unexpected error opening session to '{machineName}' for '{channel}': {ex.Message}");
             MarkHostUnreachable(normalizedHost);
-            return null;
+            TryGetHostNegativeCacheExpiry(normalizedHost, out DateTime errorCachedUntilUtc);
+            return SessionFailure(
+                machineName,
+                targetHost,
+                operation,
+                channel,
+                EventLogSessionOpenStatus.Error,
+                ex.Message,
+                budget,
+                ex.GetType().Name,
+                errorCachedUntilUtc);
         }
     }
 
@@ -115,6 +193,14 @@ public partial class SearchEvents : Settings
     public static EventLogSession? OpenSession(string? machineName, int? timeoutMs = null, string? purpose = null, string? logName = null)
     {
         return CreateSession(machineName, purpose, logName, timeoutMs);
+    }
+
+    /// <summary>
+    /// Opens an Event Log session and returns diagnostic details when the session cannot be created.
+    /// </summary>
+    public static EventLogSessionOpenResult OpenSessionResult(string? machineName, int? timeoutMs = null, string? purpose = null, string? logName = null)
+    {
+        return CreateSessionResult(machineName, purpose, logName, timeoutMs);
     }
 
     /// <summary>
@@ -157,19 +243,35 @@ public partial class SearchEvents : Settings
     {
         try
         {
+            return TryGetHostNegativeCacheExpiry(host, out _);
+        }
+        catch (Exception ex)
+        {
+            _logger.WriteVerbose($"Negative cache check failed for '{host}': {ex.Message}");
+            return false;
+        }
+    }
+
+    private static bool TryGetHostNegativeCacheExpiry(string host, out DateTime until)
+    {
+        until = default;
+        try
+        {
             if (string.IsNullOrWhiteSpace(host)) return false;
             string lower = host.ToLowerInvariant();
-            if (_unreachable.TryGetValue(lower, out var until))
+            if (_unreachable.TryGetValue(lower, out until))
             {
                 if (until > DateTime.UtcNow) return true;
                 // Older frameworks don't expose TryRemove(KeyValuePair<,>), fall back to key+out.
                 _unreachable.TryRemove(lower, out _);
             }
+            until = default;
             return false;
         }
         catch (Exception ex)
         {
             _logger.WriteVerbose($"Negative cache check failed for '{host}': {ex.Message}");
+            until = default;
             return false;
         }
     }
@@ -210,4 +312,45 @@ public partial class SearchEvents : Settings
         var cmp = StringComparison.OrdinalIgnoreCase;
         return name == "." || name == "localhost" || name.Equals(Environment.MachineName, cmp) || name.Equals(GetFQDN(), cmp);
     }
+
+    private static EventLogSessionOpenResult SessionSuccess(
+        string? machineName,
+        string targetHost,
+        string purpose,
+        string logName,
+        int timeoutMs,
+        EventLogSession session) =>
+        new()
+        {
+            MachineName = machineName,
+            TargetHost = targetHost,
+            Purpose = purpose,
+            LogName = logName,
+            Status = EventLogSessionOpenStatus.Success,
+            Session = session,
+            TimeoutMs = timeoutMs
+        };
+
+    private static EventLogSessionOpenResult SessionFailure(
+        string? machineName,
+        string targetHost,
+        string purpose,
+        string logName,
+        EventLogSessionOpenStatus status,
+        string errorMessage,
+        int timeoutMs,
+        string? errorType = null,
+        DateTime? cachedUntilUtc = null) =>
+        new()
+        {
+            MachineName = machineName,
+            TargetHost = targetHost,
+            Purpose = purpose,
+            LogName = logName,
+            Status = status,
+            ErrorMessage = errorMessage,
+            ErrorType = errorType ?? status.ToString(),
+            TimeoutMs = timeoutMs,
+            CachedUntilUtc = cachedUntilUtc
+        };
 }
