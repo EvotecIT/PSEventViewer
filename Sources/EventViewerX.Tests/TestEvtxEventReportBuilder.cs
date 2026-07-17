@@ -21,7 +21,10 @@ public class TestEvtxEventReportBuilder {
     [Fact]
     public void TryBuild_ShouldReturnNotFoundForMissingFile() {
         var ok = EvtxEventReportBuilder.TryBuild(
-            request: new EvtxQueryRequest { FilePath = "C:/this/file/does/not/exist.evtx" },
+            request: new EvtxQueryRequest {
+                FilePath = "C:/this/file/does/not/exist.evtx",
+                MaxEvents = int.MaxValue
+            },
             includeMessage: false,
             maxMessageChars: 1024,
             report: out _,

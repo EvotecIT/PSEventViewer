@@ -31,7 +31,9 @@ public partial class SearchEvents : Settings
         string? purpose,
         string? logName,
         int? timeoutMs = null,
-        Func<EventLogSession>? localSessionFactory = null) {
+        Func<EventLogSession>? localSessionFactory = null,
+        Func<string, int, bool>? rpcProbeOverride = null,
+        Func<string, EventLogSession>? remoteSessionFactory = null) {
         int budget = timeoutMs ?? DefaultSessionTimeoutMs;
         if (budget <= 0) {
             throw new ArgumentOutOfRangeException(nameof(timeoutMs), "Session timeout must be positive.");
@@ -104,7 +106,7 @@ public partial class SearchEvents : Settings
                 budget,
                 nameof(EventLogSessionOpenStatus.Timeout));
         }
-        if (!RpcProbe(normalizedHost, rpcBudget)) {
+        if (!(rpcProbeOverride?.Invoke(normalizedHost, rpcBudget) ?? RpcProbe(normalizedHost, rpcBudget))) {
             _logger.WriteVerbose($"{operation}: RPC preflight failed for '{machineName}'");
             MarkHostUnreachable(normalizedHost);
             TryGetHostNegativeCacheExpiry(normalizedHost, out DateTime rpcCachedUntilUtc);
@@ -120,8 +122,7 @@ public partial class SearchEvents : Settings
                 rpcCachedUntilUtc);
         }
 
-        try
-        {
+        try {
             int sessionBudget = RemainingSessionBudget(budget, stopwatch);
             if (sessionBudget <= 0) {
                 return SessionFailure(
@@ -135,44 +136,30 @@ public partial class SearchEvents : Settings
                     nameof(EventLogSessionOpenStatus.Timeout));
             }
 
-            using var cts = new System.Threading.CancellationTokenSource(sessionBudget);
-            var task = Task.Run(() => new EventLogSession(machineName), cts.Token);
-            var completed = Task.WhenAny(task, Task.Delay(sessionBudget, cts.Token)).GetAwaiter().GetResult();
-            if (completed != task)
-            {
-                _logger.WriteWarning($"{operation}: timeout opening session to '{machineName}' for '{channel}' after {budget} ms");
-                MarkHostUnreachable(normalizedHost);
-
-                // Dispose a late successful session and observe a late fault.
-                task.ContinueWith(t =>
-                {
-                    if (t.Status == TaskStatus.RanToCompletion && t.Result != null)
-                    {
-                        t.Result.Dispose();
-                    }
-                    else if (t.IsFaulted)
-                    {
-                        _ = t.Exception;
-                    }
-                }, TaskContinuationOptions.ExecuteSynchronously);
-                TryGetHostNegativeCacheExpiry(normalizedHost, out DateTime timeoutCachedUntilUtc);
-                return SessionFailure(
-                    machineName,
-                    targetHost,
-                    operation,
-                    channel,
-                    EventLogSessionOpenStatus.Timeout,
-                    $"Timed out opening Event Log session to '{targetHost}' for '{channel}' after {budget} ms.",
-                    budget,
-                    nameof(EventLogSessionOpenStatus.Timeout),
-                    timeoutCachedUntilUtc);
-            }
+            Func<string, EventLogSession> sessionFactory = remoteSessionFactory ?? (static host => new EventLogSession(host));
+            EventLogSession session = ExecuteWithTimeout(
+                () => sessionFactory(machineName!),
+                sessionBudget,
+                $"Timed out opening Event Log session to '{targetHost}' for '{channel}' after {budget} ms.",
+                static lateSession => lateSession.Dispose());
             // Success: clear any stale negative entry
             ClearNegativeCache(normalizedHost);
-            return SessionSuccess(machineName, targetHost, operation, channel, budget, task.GetAwaiter().GetResult());
-        }
-        catch (UnauthorizedAccessException ex)
-        {
+            return SessionSuccess(machineName, targetHost, operation, channel, budget, session);
+        } catch (TimeoutException ex) {
+            _logger.WriteWarning($"{operation}: {ex.Message}");
+            MarkHostUnreachable(normalizedHost);
+            TryGetHostNegativeCacheExpiry(normalizedHost, out DateTime timeoutCachedUntilUtc);
+            return SessionFailure(
+                machineName,
+                targetHost,
+                operation,
+                channel,
+                EventLogSessionOpenStatus.Timeout,
+                ex.Message,
+                budget,
+                ex.GetType().Name,
+                timeoutCachedUntilUtc);
+        } catch (UnauthorizedAccessException ex) {
             _logger.WriteWarning($"{operation}: access denied opening session to '{machineName}' for '{channel}': {ex.Message}");
             return SessionFailure(
                 machineName,
@@ -249,15 +236,19 @@ public partial class SearchEvents : Settings
         _unreachable.Clear();
     }
 
-    private static bool RpcProbe(string host, int timeoutMs)
-    {
-        try
-        {
+    private static bool RpcProbe(string host, int timeoutMs) {
+        try {
             using var tcp = new TcpClient();
-            var connectTask = tcp.ConnectAsync(host, Settings.RpcProbePort);
-            var finished = Task.WhenAny(connectTask, Task.Delay(timeoutMs)).GetAwaiter().GetResult();
-            if (finished != connectTask || !tcp.Connected)
-            {
+            Task connectTask = tcp.ConnectAsync(host, Settings.RpcProbePort);
+            bool connectedWithinTimeout;
+            try {
+                connectedWithinTimeout = connectTask.Wait(timeoutMs);
+            } catch (AggregateException) {
+                connectTask.GetAwaiter().GetResult();
+                return false;
+            }
+
+            if (!connectedWithinTimeout || !tcp.Connected) {
                 _ = connectTask.ContinueWith(
                     t => _ = t.Exception,
                     CancellationToken.None,
@@ -266,9 +257,7 @@ public partial class SearchEvents : Settings
                 return false;
             }
             return true;
-        }
-        catch (Exception ex)
-        {
+        } catch (Exception ex) {
             _logger.WriteVerbose($"Session: RPC probe failed for '{host}': {ex.Message}");
             return false;
         }

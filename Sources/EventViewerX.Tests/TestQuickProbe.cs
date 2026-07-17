@@ -27,6 +27,33 @@ namespace EventViewerX.Tests {
         }
 
         [Fact]
+        public void RemoteSessionCreationClassifiesAStalledOpenAsTimeout() {
+            if (!OperatingSystem.IsWindows()) return;
+
+            const string host = "eventviewerx-stalled-session.invalid";
+            SearchEvents.ClearHostCache(host);
+            var stopwatch = Stopwatch.StartNew();
+            try {
+                using EventLogSessionOpenResult result = SearchEvents.CreateSessionResult(
+                    host,
+                    "QuickProbe",
+                    "Application",
+                    timeoutMs: 100,
+                    rpcProbeOverride: static (_, _) => true,
+                    remoteSessionFactory: static _ => {
+                        Thread.Sleep(500);
+                        return new System.Diagnostics.Eventing.Reader.EventLogSession();
+                    });
+
+                Assert.False(result.Success);
+                Assert.Equal(EventLogSessionOpenStatus.Timeout, result.Status);
+                Assert.True(stopwatch.Elapsed < TimeSpan.FromMilliseconds(400), $"Elapsed {stopwatch.Elapsed.TotalMilliseconds:F0} ms.");
+            } finally {
+                SearchEvents.ClearHostCache(host);
+            }
+        }
+
+        [Fact]
         public void BlankMachineNameReportsTheResolvedLocalMachine() {
             if (!OperatingSystem.IsWindows()) return;
 

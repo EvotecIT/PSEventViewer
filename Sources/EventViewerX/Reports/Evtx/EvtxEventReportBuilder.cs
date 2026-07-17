@@ -36,7 +36,7 @@ public static class EvtxEventReportBuilder {
             return false;
         }
 
-        int estimatedCapacity = request.MaxEvents > 0 ? request.MaxEvents : 0;
+        int estimatedCapacity = request.MaxEvents > 0 ? Math.Min(request.MaxEvents, 256) : 0;
         var rows = estimatedCapacity > 0
             ? new List<EvtxEventReportRow>(estimatedCapacity)
             : new List<EvtxEventReportRow>();

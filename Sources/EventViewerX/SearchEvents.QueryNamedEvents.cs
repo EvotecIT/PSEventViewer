@@ -20,8 +20,8 @@ namespace EventViewerX {
         /// <param name="maxThreads">Maximum parallel threads.</param>
         /// <param name="maxEvents">Global maximum number of matching rule results to return.</param>
         /// <param name="maxEventsScanned">Global maximum number of candidate event records to evaluate before rule filtering.</param>
-        /// <param name="executionInfo">Optional progress object populated while the query is enumerated.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
+        /// <param name="executionInfo">Optional progress object populated while the query is enumerated.</param>
         /// <returns>Asynchronous sequence of simplified events.</returns>
         public static async IAsyncEnumerable<EventObjectSlim> FindEventsByNamedEvents(
             List<NamedEvents> typeEventsList,
@@ -32,8 +32,8 @@ namespace EventViewerX {
             int maxThreads = 8,
             int maxEvents = 0,
             int maxEventsScanned = 0,
-            NamedEventsQueryExecutionInfo? executionInfo = null,
-            [EnumeratorCancellation] CancellationToken cancellationToken = default) {
+            [EnumeratorCancellation] CancellationToken cancellationToken = default,
+            NamedEventsQueryExecutionInfo? executionInfo = null) {
 
             if (typeEventsList == null) {
                 throw new ArgumentNullException(nameof(typeEventsList));

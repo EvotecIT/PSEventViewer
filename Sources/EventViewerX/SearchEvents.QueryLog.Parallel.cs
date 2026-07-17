@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Threading;
+using System.Threading.Channels;
 using System.Threading.Tasks;
 
 namespace EventViewerX;
@@ -45,7 +46,12 @@ public partial class SearchEvents : Settings {
         int effectiveBufferCapacity = bufferCapacity > 0 ? bufferCapacity : Math.Max(16, maxThreads * 4);
 
         using var workerCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        using var results = new BlockingCollection<EventObject>(effectiveBufferCapacity);
+        Channel<EventObject> results = Channel.CreateBounded<EventObject>(new BoundedChannelOptions(effectiveBufferCapacity) {
+            AllowSynchronousContinuations = false,
+            FullMode = BoundedChannelFullMode.Wait,
+            SingleReader = true,
+            SingleWriter = false
+        });
         using IEnumerator<QueryWorkItem> workItems = BuildQueryWorkItems(targets, eventIds, eventRecordId, fixedExpressionCount).GetEnumerator();
         var workItemSync = new object();
         var failures = new ConcurrentQueue<Exception>();
@@ -79,7 +85,9 @@ public partial class SearchEvents : Settings {
                                 return;
                             }
 
-                            results.Add(result, workerCancellation.Token);
+                            if (!results.Writer.TryWrite(result)) {
+                                results.Writer.WriteAsync(result, workerCancellation.Token).AsTask().GetAwaiter().GetResult();
+                            }
                             if (maxEvents > 0 && Interlocked.Increment(ref published) >= maxEvents) {
                                 workerCancellation.Cancel();
                                 return;
@@ -101,16 +109,17 @@ public partial class SearchEvents : Settings {
 
         Task workers = Task.WhenAll(tasks);
         _ = workers.ContinueWith(
-            _ => results.CompleteAdding(),
+            _ => results.Writer.TryComplete(),
             CancellationToken.None,
             TaskContinuationOptions.ExecuteSynchronously,
             TaskScheduler.Default);
 
         bool workersObserved = false;
         try {
-            foreach (EventObject result in results.GetConsumingEnumerable(cancellationToken)) {
-                yield return result;
-                await Task.Yield();
+            while (await results.Reader.WaitToReadAsync(cancellationToken).ConfigureAwait(false)) {
+                while (results.Reader.TryRead(out EventObject? result)) {
+                    yield return result!;
+                }
             }
 
             await workers.ConfigureAwait(false);

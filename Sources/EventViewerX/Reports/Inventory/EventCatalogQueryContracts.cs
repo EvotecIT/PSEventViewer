@@ -42,6 +42,16 @@ public enum EventCatalogFailureKind {
     AccessDenied,
 
     /// <summary>
+    /// Event Log session creation exceeded its configured deadline.
+    /// </summary>
+    Timeout,
+
+    /// <summary>
+    /// The target host is unreachable or temporarily negative-cached.
+    /// </summary>
+    HostUnavailable,
+
+    /// <summary>
     /// Unexpected failure.
     /// </summary>
     Exception

@@ -325,6 +325,11 @@ public sealed class NamedEventsTimelineQueryResult {
     public long EventsScanned { get; set; }
 
     /// <summary>
+    /// Effective per-named-event output cap. Null means no per-name cap.
+    /// </summary>
+    public int? MaxEventsPerNamedEvent { get; set; }
+
+    /// <summary>
     /// Maximum worker concurrency used by the query.
     /// </summary>
     public int MaxThreads { get; set; }
@@ -358,6 +363,16 @@ public sealed class NamedEventsTimelineQueryResult {
     /// Indicates another raw candidate existed beyond the candidate scan cap.
     /// </summary>
     public bool ScanTruncated { get; set; }
+
+    /// <summary>
+    /// Indicates one or more named-event categories had additional rows beyond the per-name cap.
+    /// </summary>
+    public bool PerNamedEventTruncated { get; set; }
+
+    /// <summary>
+    /// Named-event categories that had additional rows beyond the per-name cap.
+    /// </summary>
+    public IReadOnlyList<string> TruncatedNamedEvents { get; set; } = Array.Empty<string>();
 
     /// <summary>
     /// Indicates correlation groups were truncated by max group cap.

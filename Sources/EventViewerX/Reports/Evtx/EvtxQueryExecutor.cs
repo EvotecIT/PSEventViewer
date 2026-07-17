@@ -83,6 +83,8 @@ public static class EvtxQueryExecutor {
 
             failure = null;
             return true;
+        } catch (OperationCanceledException) {
+            throw;
         } catch (ArgumentException ex) {
             failure = new EvtxQueryFailure {
                 Kind = EvtxQueryFailureKind.InvalidArgument,

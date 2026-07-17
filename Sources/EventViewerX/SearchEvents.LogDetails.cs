@@ -210,33 +210,14 @@ public partial class SearchEvents : Settings {
         }
 
         string hostName = string.IsNullOrWhiteSpace(machineName) ? GetFQDN() : machineName!;
-        EventLogSessionOpenResult? sessionResult = null;
-        EventLogSession? localSession = null;
-        EventLogSession? session;
-        if (string.IsNullOrWhiteSpace(machineName)) {
-            EventLogDetailsResult? localSessionFailure = null;
-            try {
-                localSession = new EventLogSession();
-                session = localSession;
-            } catch (Exception ex) {
-                session = null;
-                localSessionFailure = Failure("*", hostName, EventLogDetailsStatus.SessionUnavailable, ex.Message, timeoutMs, ex.GetType().Name);
-            }
-            if (localSessionFailure != null) {
-                yield return localSessionFailure;
-                yield break;
-            }
-        } else {
-            sessionResult = CreateSessionResult(machineName, "DisplayEventLogResults", "*", timeoutMs);
-            if (!sessionResult.Success || sessionResult.Session == null) {
-                yield return Failure("*", hostName, MapSessionFailureStatus(sessionResult.Status), sessionResult.ErrorMessage, timeoutMs, sessionResult.ErrorType);
-                sessionResult.Dispose();
-                yield break;
-            }
-            session = sessionResult.Session;
+        EventLogSessionOpenResult sessionResult = CreateSessionResult(machineName, "DisplayEventLogResults", "*", timeoutMs);
+        if (!sessionResult.Success || sessionResult.Session == null) {
+            yield return Failure("*", hostName, MapSessionFailureStatus(sessionResult.Status), sessionResult.ErrorMessage, timeoutMs, sessionResult.ErrorType);
+            sessionResult.Dispose();
+            yield break;
         }
 
-        EventLogSession activeSession = session ?? throw new InvalidOperationException("Event Log session was not initialized.");
+        EventLogSession activeSession = sessionResult.Session;
         try {
             bool hasOnlyExactNames = listLog != null && listLog.Length > 0 &&
                                      listLog.All(name => !name.Contains("*") && !name.Contains("?"));
@@ -276,8 +257,7 @@ public partial class SearchEvents : Settings {
                 yield return SafeGetResult(logName, activeSession, timeoutMs, hostName, includeEventTimes);
             }
         } finally {
-            localSession?.Dispose();
-            sessionResult?.Dispose();
+            sessionResult.Dispose();
         }
     }
 

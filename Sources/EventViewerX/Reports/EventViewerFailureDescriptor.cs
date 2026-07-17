@@ -155,6 +155,8 @@ public static class EventViewerFailureDescriptorResolver {
         => kind switch {
             EventCatalogFailureKind.InvalidArgument => InvalidArgument(entity),
             EventCatalogFailureKind.AccessDenied => AccessDenied(entity),
+            EventCatalogFailureKind.Timeout => Timeout(entity),
+            EventCatalogFailureKind.HostUnavailable => HostUnavailable(entity),
             EventCatalogFailureKind.Exception => QueryFailed(entity),
             _ => QueryFailed(entity)
         };

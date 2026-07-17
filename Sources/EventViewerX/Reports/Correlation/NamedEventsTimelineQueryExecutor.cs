@@ -95,6 +95,7 @@ public static partial class NamedEventsTimelineQueryExecutor {
 
         var rows = new List<EventRowAccumulator>(Math.Min(maxEvents, 256));
         var perNamedEventCount = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        var truncatedNamedEvents = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var filteredOut = 0;
         var filteredUncorrelated = 0;
         var outputTruncated = false;
@@ -118,6 +119,7 @@ public static partial class NamedEventsTimelineQueryExecutor {
                 if (maxEventsPerNamedEvent.HasValue) {
                     var current = perNamedEventCount.TryGetValue(namedEventName, out var count) ? count : 0;
                     if (current >= maxEventsPerNamedEvent.Value) {
+                        truncatedNamedEvents.Add(namedEventName);
                         filteredOut++;
                         continue;
                     }
@@ -151,6 +153,8 @@ public static partial class NamedEventsTimelineQueryExecutor {
                 rows.Add(row);
                 perNamedEventCount[namedEventName] = perNamedEventCount.TryGetValue(namedEventName, out var existingCount) ? existingCount + 1 : 1;
             }
+        } catch (OperationCanceledException) {
+            throw;
         } catch (ArgumentException ex) {
             return (null, new NamedEventsTimelineQueryFailure {
                 Kind = NamedEventsTimelineQueryFailureKind.InvalidArgument,
@@ -289,13 +293,18 @@ public static partial class NamedEventsTimelineQueryExecutor {
             MaxEvents = maxEvents,
             MaxEventsScanned = request.MaxEventsScanned,
             EventsScanned = queryInfo.EventsScanned,
+            MaxEventsPerNamedEvent = maxEventsPerNamedEvent,
             MaxThreads = maxThreads,
             CorrelationKeys = normalizedCorrelationKeys,
             IncludeUncorrelated = includeUncorrelated,
             BucketMinutes = bucketMinutes,
-            Truncated = outputTruncated || queryInfo.ScanLimitReached,
+            Truncated = outputTruncated || queryInfo.ScanLimitReached || truncatedNamedEvents.Count > 0,
             OutputTruncated = outputTruncated,
             ScanTruncated = queryInfo.ScanLimitReached,
+            PerNamedEventTruncated = truncatedNamedEvents.Count > 0,
+            TruncatedNamedEvents = truncatedNamedEvents
+                .OrderBy(static value => value, StringComparer.OrdinalIgnoreCase)
+                .ToArray(),
             GroupsTruncated = groupsTruncated,
             GroupsTotal = groupsTotal,
             FilteredOut = filteredOut,

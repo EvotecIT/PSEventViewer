@@ -27,25 +27,23 @@ public static class EventCatalogQueryExecutor {
         if (!TryValidateRequest(request, out result, out failure)) {
             return false;
         }
+        cancellationToken.ThrowIfCancellationRequested();
 
         try {
-            using var session = SearchEvents.OpenSession(
+            using EventLogSessionOpenResult sessionResult = SearchEvents.OpenSessionResult(
                 machineName: request.MachineName,
                 timeoutMs: request.SessionTimeoutMs,
                 purpose: "EventCatalogChannels",
                 logName: "*");
 
-            if (session is null) {
+            if (!sessionResult.Success || sessionResult.Session is null) {
                 result = new EventChannelListResult();
-                failure = new EventCatalogFailure {
-                    Kind = EventCatalogFailureKind.Exception,
-                    Message = "Failed to open event log session."
-                };
+                failure = MapSessionFailure(sessionResult);
                 return false;
             }
 
             var rows = BuildNameRows(
-                source: session.GetLogNames(),
+                source: sessionResult.Session.GetLogNames(),
                 request: request,
                 cancellationToken: cancellationToken,
                 rowFactory: static name => new EventChannelRow { Name = name },
@@ -58,6 +56,8 @@ public static class EventCatalogQueryExecutor {
             };
             failure = null;
             return true;
+        } catch (OperationCanceledException) {
+            throw;
         } catch (UnauthorizedAccessException ex) {
             result = new EventChannelListResult();
             failure = new EventCatalogFailure {
@@ -99,25 +99,23 @@ public static class EventCatalogQueryExecutor {
         if (!TryValidateRequest(request, out result, out failure)) {
             return false;
         }
+        cancellationToken.ThrowIfCancellationRequested();
 
         try {
-            using var session = SearchEvents.OpenSession(
+            using EventLogSessionOpenResult sessionResult = SearchEvents.OpenSessionResult(
                 machineName: request.MachineName,
                 timeoutMs: request.SessionTimeoutMs,
                 purpose: "EventCatalogProviders",
                 logName: "*");
 
-            if (session is null) {
+            if (!sessionResult.Success || sessionResult.Session is null) {
                 result = new EventProviderListResult();
-                failure = new EventCatalogFailure {
-                    Kind = EventCatalogFailureKind.Exception,
-                    Message = "Failed to open event log session."
-                };
+                failure = MapSessionFailure(sessionResult);
                 return false;
             }
 
             var rows = BuildNameRows(
-                source: session.GetProviderNames(),
+                source: sessionResult.Session.GetProviderNames(),
                 request: request,
                 cancellationToken: cancellationToken,
                 rowFactory: static name => new EventProviderRow { Name = name },
@@ -130,6 +128,8 @@ public static class EventCatalogQueryExecutor {
             };
             failure = null;
             return true;
+        } catch (OperationCanceledException) {
+            throw;
         } catch (UnauthorizedAccessException ex) {
             result = new EventProviderListResult();
             failure = new EventCatalogFailure {
@@ -152,6 +152,22 @@ public static class EventCatalogQueryExecutor {
             };
             return false;
         }
+    }
+
+    private static EventCatalogFailure MapSessionFailure(EventLogSessionOpenResult sessionResult) {
+        EventCatalogFailureKind kind = sessionResult.Status switch {
+            EventLogSessionOpenStatus.AccessDenied => EventCatalogFailureKind.AccessDenied,
+            EventLogSessionOpenStatus.Timeout => EventCatalogFailureKind.Timeout,
+            EventLogSessionOpenStatus.NegativeCache => EventCatalogFailureKind.HostUnavailable,
+            EventLogSessionOpenStatus.RpcUnavailable => EventCatalogFailureKind.HostUnavailable,
+            _ => EventCatalogFailureKind.Exception
+        };
+        return new EventCatalogFailure {
+            Kind = kind,
+            Message = string.IsNullOrWhiteSpace(sessionResult.ErrorMessage)
+                ? $"Failed to open Event Log session to '{sessionResult.TargetHost}'."
+                : sessionResult.ErrorMessage
+        };
     }
 
     private static bool TryValidateRequest<T>(

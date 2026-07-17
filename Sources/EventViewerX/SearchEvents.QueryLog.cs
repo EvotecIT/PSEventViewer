@@ -193,10 +193,28 @@ public partial class SearchEvents : Settings {
         string queriedMachine = string.IsNullOrEmpty(machineName) ? GetFQDN() : machineName!;
         try {
             using (var reader = CreateEventLogReader(query, machineName, effectiveTimeout)) {
+                using CancellationTokenRegistration cancellationRegistration = cancellationToken.Register(
+                    static state => {
+                        try {
+                            ((EventLogReader)state!).CancelReading();
+                        } catch (ObjectDisposedException) {
+                        } catch (EventLogException) {
+                        } catch (InvalidOperationException) {
+                        }
+                    },
+                    reader);
                 int eventCount = 0;
                 while (true) {
                     cancellationToken.ThrowIfCancellationRequested();
-                    EventRecord? next = ReadEventWithTimeout(reader, effectiveTimeout, $"Reading '{logName}' on '{queriedMachine}'");
+                    EventRecord? next;
+                    try {
+                        next = ReadEventWithTimeout(reader, effectiveTimeout, $"Reading '{logName}' on '{queriedMachine}'");
+                    } catch (EventLogException ex) when (cancellationToken.IsCancellationRequested) {
+                        throw new OperationCanceledException("Event Log reading was cancelled.", ex, cancellationToken);
+                    } catch (InvalidOperationException ex) when (cancellationToken.IsCancellationRequested) {
+                        throw new OperationCanceledException("Event Log reading was cancelled.", ex, cancellationToken);
+                    }
+                    cancellationToken.ThrowIfCancellationRequested();
                     if (next == null) {
                         break;
                     }

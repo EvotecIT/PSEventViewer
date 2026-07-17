@@ -7,8 +7,15 @@ if ($PrimaryModule.Count -ne 1) {
     throw 'More than one PSD1 files detected. Failing tests.'
 }
 $PSDInformation = Import-PowerShellDataFile -Path $PrimaryModule.FullName
+$PesterMinimumVersion = [version] '5.0.0'
+$PesterModule = Get-Module -ListAvailable -Name Pester | Sort-Object -Property Version -Descending | Select-Object -First 1
+if (-not $PesterModule -or $PesterModule.Version -lt $PesterMinimumVersion) {
+    Write-Warning "$ModuleName - Installing Pester $PesterMinimumVersion or newer from PSGallery"
+    Install-Module -Name Pester -MinimumVersion $PesterMinimumVersion -Force -SkipPublisherCheck
+}
+Import-Module -Name Pester -MinimumVersion $PesterMinimumVersion -Force
+
 $RequiredModules = @(
-    'Pester'
     'PSWriteColor'
     if ($PSDInformation.RequiredModules) {
         $PSDInformation.RequiredModules

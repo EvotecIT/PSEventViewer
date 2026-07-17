@@ -116,6 +116,24 @@ public class TestEventViewerFailureDescriptorResolver {
     }
 
     [Fact]
+    public void Resolve_CatalogTimeout_IsRecoverableTimeout() {
+        var descriptor = EventViewerFailureDescriptorResolver.Resolve(EventCatalogFailureKind.Timeout);
+
+        Assert.Equal("timeout", descriptor.ErrorCode);
+        Assert.Equal("timeout", descriptor.Category);
+        Assert.True(descriptor.Recoverable);
+    }
+
+    [Fact]
+    public void Resolve_CatalogHostUnavailable_IsRecoverable() {
+        var descriptor = EventViewerFailureDescriptorResolver.Resolve(EventCatalogFailureKind.HostUnavailable);
+
+        Assert.Equal("host_unavailable", descriptor.ErrorCode);
+        Assert.Equal("host_unavailable", descriptor.Category);
+        Assert.True(descriptor.Recoverable);
+    }
+
+    [Fact]
     public void Resolve_UsesProvidedEntityWhenSpecified() {
         var descriptor = EventViewerFailureDescriptorResolver.Resolve(
             EvtxQueryFailureKind.InvalidArgument,
