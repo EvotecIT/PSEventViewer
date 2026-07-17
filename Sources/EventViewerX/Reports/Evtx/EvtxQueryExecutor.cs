@@ -19,7 +19,7 @@ public static class EvtxQueryExecutor {
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns><see langword="true"/> when query succeeds; otherwise <see langword="false"/>.</returns>
     public static bool TryForEachEvent(
-        EvtxQueryRequest request,
+        EvtxQueryRequest? request,
         Func<EventObject, bool> eventHandler,
         out EvtxQueryFailure? failure,
         CancellationToken cancellationToken = default) {
@@ -31,11 +31,12 @@ public static class EvtxQueryExecutor {
     /// Streams EVTX events and reports whether the query was capped or stopped by the callback.
     /// </summary>
     public static bool TryForEachEventWithInfo(
-        EvtxQueryRequest request,
+        EvtxQueryRequest? request,
         Func<EventObject, bool> eventHandler,
         out EvtxQueryExecutionInfo executionInfo,
         out EvtxQueryFailure? failure,
-        CancellationToken cancellationToken = default) {
+        CancellationToken cancellationToken = default,
+        EventReadMode? readModeOverride = null) {
 
         executionInfo = new EvtxQueryExecutionInfo();
 
@@ -50,25 +51,26 @@ public static class EvtxQueryExecutor {
         if (!TryValidateRequest(request, out failure)) {
             return false;
         }
+        EvtxQueryRequest validatedRequest = request!;
 
         try {
-            var eventIds = request.EventIds is null ? null : new List<int>(request.EventIds);
-            int readLimit = request.MaxEvents > 0 && request.MaxEvents < int.MaxValue
-                ? request.MaxEvents + 1
-                : request.MaxEvents;
+            var eventIds = validatedRequest.EventIds is null ? null : new List<int>(validatedRequest.EventIds);
+            int readLimit = validatedRequest.MaxEvents > 0 && validatedRequest.MaxEvents < int.MaxValue
+                ? validatedRequest.MaxEvents + 1
+                : validatedRequest.MaxEvents;
             foreach (var ev in SearchEvents.QueryLogFile(
-                         filePath: request.FilePath,
+                         filePath: validatedRequest.FilePath,
                          eventIds: eventIds,
-                         providerName: request.ProviderName,
-                         startTime: request.StartTimeUtc,
-                         endTime: request.EndTimeUtc,
+                         providerName: validatedRequest.ProviderName,
+                         startTime: validatedRequest.StartTimeUtc,
+                         endTime: validatedRequest.EndTimeUtc,
                          maxEvents: readLimit,
-                         oldest: request.OldestFirst,
+                         oldest: validatedRequest.OldestFirst,
                          cancellationToken: cancellationToken,
-                         readMode: request.ReadMode)) {
+                         readMode: readModeOverride ?? validatedRequest.ReadMode)) {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                if (request.MaxEvents > 0 && executionInfo.EventsDelivered >= request.MaxEvents) {
+                if (validatedRequest.MaxEvents > 0 && executionInfo.EventsDelivered >= validatedRequest.MaxEvents) {
                     executionInfo.Truncated = true;
                     break;
                 }
@@ -127,7 +129,7 @@ public static class EvtxQueryExecutor {
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns><see langword="true"/> when query succeeds; otherwise <see langword="false"/>.</returns>
     public static bool TryRead(
-        EvtxQueryRequest request,
+        EvtxQueryRequest? request,
         out EvtxQueryResult result,
         out EvtxQueryFailure? failure,
         CancellationToken cancellationToken = default) {
@@ -152,7 +154,7 @@ public static class EvtxQueryExecutor {
         return true;
     }
 
-    private static bool TryValidateRequest(EvtxQueryRequest request, out EvtxQueryFailure? failure) {
+    private static bool TryValidateRequest(EvtxQueryRequest? request, out EvtxQueryFailure? failure) {
         if (request is null) {
             failure = new EvtxQueryFailure {
                 Kind = EvtxQueryFailureKind.InvalidArgument,

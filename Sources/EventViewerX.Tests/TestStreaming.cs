@@ -43,6 +43,21 @@ namespace EventViewerX.Tests {
         }
 
         [Fact]
+        public void NamedEventsPreservesTheLegacyPositionalCancellationArgument() {
+            IAsyncEnumerable<EventObjectSlim> query = SearchEvents.FindEventsByNamedEvents(
+                new List<NamedEvents> { NamedEvents.OSStartupSecurity },
+                null,
+                null,
+                null,
+                null,
+                8,
+                0,
+                CancellationToken.None);
+
+            Assert.NotNull(query);
+        }
+
+        [Fact]
         public async Task NamedEventsCandidateScanLimitAlsoBoundsReturnedMatches() {
             if (!OperatingSystem.IsWindows()) return;
             if (!TestEnv.CanReadLog("Security")) return;

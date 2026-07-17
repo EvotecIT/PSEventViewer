@@ -20,7 +20,7 @@ public static class EvtxEventReportBuilder {
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns><see langword="true"/> on success; otherwise <see langword="false"/>.</returns>
     public static bool TryBuild(
-        EvtxQueryRequest request,
+        EvtxQueryRequest? request,
         bool includeMessage,
         int maxMessageChars,
         out EvtxEventReportResult report,
@@ -36,13 +36,14 @@ public static class EvtxEventReportBuilder {
             return false;
         }
 
-        int estimatedCapacity = request.MaxEvents > 0 ? Math.Min(request.MaxEvents, 256) : 0;
+        int requestedMaxEvents = request?.MaxEvents ?? 0;
+        int estimatedCapacity = requestedMaxEvents > 0 ? Math.Min(requestedMaxEvents, 256) : 0;
         var rows = estimatedCapacity > 0
             ? new List<EvtxEventReportRow>(estimatedCapacity)
             : new List<EvtxEventReportRow>();
 
         if (!EvtxQueryExecutor.TryForEachEventWithInfo(
-                request.WithReadMode(includeMessage ? EventReadMode.Full : EventReadMode.StructuredData),
+                request,
                 ev => {
                     rows.Add(new EvtxEventReportRow {
                         TimeCreatedUtc = ev.TimeCreated.ToUniversalTime().ToString("O"),
@@ -65,12 +66,13 @@ public static class EvtxEventReportBuilder {
                 },
                 out EvtxQueryExecutionInfo executionInfo,
                 out failure,
-                cancellationToken)) {
+                cancellationToken,
+                readModeOverride: includeMessage ? EventReadMode.Full : EventReadMode.StructuredData)) {
             report = new EvtxEventReportResult();
             return false;
         }
 
-        var effectivePath = request.FilePath ?? string.Empty;
+        var effectivePath = request!.FilePath ?? string.Empty;
         report = new EvtxEventReportResult {
             Path = effectivePath,
             Count = rows.Count,

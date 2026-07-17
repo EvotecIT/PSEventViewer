@@ -181,23 +181,24 @@ public sealed class SecurityUserLogonsReportBuilder {
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns><see langword="true"/> when query succeeds; otherwise <see langword="false"/>.</returns>
     public static bool TryBuildFromFile(
-        EvtxQueryRequest request,
+        EvtxQueryRequest? request,
         bool includeSamples,
         int sampleSize,
         out SecurityUserLogonsReport report,
         out EvtxQueryFailure? failure,
         CancellationToken cancellationToken = default) {
-        var eventIds = request.EventIds ?? Array.Empty<int>();
+        var eventIds = request?.EventIds ?? Array.Empty<int>();
         var b = new SecurityUserLogonsReportBuilder(includeSamples, sampleSize, eventIds);
         if (!EvtxQueryExecutor.TryForEachEventWithInfo(
-                request.WithReadMode(EventReadMode.StructuredData),
+                request,
                 ev => {
                     b.Add(ev);
                     return true;
                 },
                 out EvtxQueryExecutionInfo executionInfo,
                 out failure,
-                cancellationToken)) {
+                cancellationToken,
+                readModeOverride: EventReadMode.StructuredData)) {
             report = new SecurityUserLogonsReport();
             return false;
         }

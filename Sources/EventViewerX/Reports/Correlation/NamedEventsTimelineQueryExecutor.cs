@@ -116,15 +116,6 @@ public static partial class NamedEventsTimelineQueryExecutor {
                 cancellationToken.ThrowIfCancellationRequested();
 
                 var namedEventName = ResolveNamedEventName(item);
-                if (maxEventsPerNamedEvent.HasValue) {
-                    var current = perNamedEventCount.TryGetValue(namedEventName, out var count) ? count : 0;
-                    if (current >= maxEventsPerNamedEvent.Value) {
-                        truncatedNamedEvents.Add(namedEventName);
-                        filteredOut++;
-                        continue;
-                    }
-                }
-
                 if (!string.IsNullOrWhiteSpace(logName) &&
                     !string.Equals(item.GatheredLogName, logName, StringComparison.OrdinalIgnoreCase)) {
                     filteredOut++;
@@ -143,6 +134,15 @@ public static partial class NamedEventsTimelineQueryExecutor {
                 if (!hasCorrelation && !includeUncorrelated) {
                     filteredUncorrelated++;
                     continue;
+                }
+
+                if (maxEventsPerNamedEvent.HasValue) {
+                    var current = perNamedEventCount.TryGetValue(namedEventName, out var count) ? count : 0;
+                    if (current >= maxEventsPerNamedEvent.Value) {
+                        truncatedNamedEvents.Add(namedEventName);
+                        filteredOut++;
+                        continue;
+                    }
                 }
 
                 if (rows.Count >= maxEvents) {

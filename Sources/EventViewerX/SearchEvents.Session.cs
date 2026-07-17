@@ -138,7 +138,7 @@ public partial class SearchEvents : Settings
 
             Func<string, EventLogSession> sessionFactory = remoteSessionFactory ?? (static host => new EventLogSession(host));
             EventLogSession session = ExecuteWithTimeout(
-                () => sessionFactory(machineName!),
+                () => sessionFactory(normalizedHost),
                 sessionBudget,
                 $"Timed out opening Event Log session to '{targetHost}' for '{channel}' after {budget} ms.",
                 static lateSession => lateSession.Dispose());

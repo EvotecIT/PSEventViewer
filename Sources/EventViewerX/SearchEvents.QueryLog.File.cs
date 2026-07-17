@@ -141,11 +141,14 @@ public partial class SearchEvents : Settings {
             if (fallbackReader == null) {
                 yield break;
             }
+            using CancellationTokenRegistration fallbackCancellation = RegisterReaderCancellation(fallbackReader, cancellationToken);
 
             while (true) {
-                cancellationToken.ThrowIfCancellationRequested();
-
-                var record = fallbackReader.ReadEvent();
+                EventRecord? record = ReadEventWithCancellation(
+                    fallbackReader,
+                    timeoutMs: 0,
+                    $"Reading EVTX file '{absolutePath}'",
+                    cancellationToken);
                 if (record == null) {
                     break;
                 }
@@ -157,19 +160,27 @@ public partial class SearchEvents : Settings {
         }
 
         using (primaryReader) {
+            using CancellationTokenRegistration primaryCancellation = RegisterReaderCancellation(primaryReader, cancellationToken);
             // Some runtimes return a valid reader but yield no events for FilePath queries on specific EVTX files.
             // If this happens, retry with the QueryList fallback.
-            var record = primaryReader.ReadEvent();
+            EventRecord? record = ReadEventWithCancellation(
+                primaryReader,
+                timeoutMs: 0,
+                $"Reading EVTX file '{absolutePath}'",
+                cancellationToken);
             if (record == null) {
                 using var fallbackReader = CreateEventLogReader(fallbackQuery, null);
                 if (fallbackReader == null) {
                     yield break;
                 }
+                using CancellationTokenRegistration fallbackCancellation = RegisterReaderCancellation(fallbackReader, cancellationToken);
 
                 while (true) {
-                    cancellationToken.ThrowIfCancellationRequested();
-
-                    record = fallbackReader.ReadEvent();
+                    record = ReadEventWithCancellation(
+                        fallbackReader,
+                        timeoutMs: 0,
+                        $"Reading EVTX file '{absolutePath}'",
+                        cancellationToken);
                     if (record == null) {
                         break;
                     }
@@ -181,14 +192,13 @@ public partial class SearchEvents : Settings {
             }
 
             while (true) {
-                if (cancellationToken.IsCancellationRequested) {
-                    record.Dispose();
-                    cancellationToken.ThrowIfCancellationRequested();
-                }
-
                 yield return new EventObject(record, absolutePath, readMode);
 
-                record = primaryReader.ReadEvent();
+                record = ReadEventWithCancellation(
+                    primaryReader,
+                    timeoutMs: 0,
+                    $"Reading EVTX file '{absolutePath}'",
+                    cancellationToken);
                 if (record == null) {
                     break;
                 }

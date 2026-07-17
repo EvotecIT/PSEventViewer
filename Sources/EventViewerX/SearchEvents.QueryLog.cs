@@ -50,7 +50,11 @@ public partial class SearchEvents : Settings {
             return operation();
         }
 
-        Task<T> task = Task.Run(operation);
+        Task<T> task = Task.Factory.StartNew(
+            operation,
+            CancellationToken.None,
+            TaskCreationOptions.DenyChildAttach | TaskCreationOptions.LongRunning,
+            TaskScheduler.Default);
         bool completedWithinTimeout;
         try {
             completedWithinTimeout = task.Wait(timeoutMs);
@@ -92,6 +96,37 @@ public partial class SearchEvents : Settings {
             throw new TimeoutException($"{operation} exceeded its {timeoutMs} ms native read window.");
         }
         return record;
+    }
+
+    private static CancellationTokenRegistration RegisterReaderCancellation(EventLogReader reader, CancellationToken cancellationToken) {
+        return cancellationToken.Register(
+            static state => {
+                try {
+                    ((EventLogReader)state!).CancelReading();
+                } catch (ObjectDisposedException) {
+                } catch (EventLogException) {
+                } catch (InvalidOperationException) {
+                }
+            },
+            reader);
+    }
+
+    private static EventRecord? ReadEventWithCancellation(
+        EventLogReader reader,
+        int timeoutMs,
+        string operation,
+        CancellationToken cancellationToken) {
+
+        cancellationToken.ThrowIfCancellationRequested();
+        try {
+            EventRecord? record = ReadEventWithTimeout(reader, timeoutMs, operation);
+            cancellationToken.ThrowIfCancellationRequested();
+            return record;
+        } catch (EventLogException ex) when (cancellationToken.IsCancellationRequested) {
+            throw new OperationCanceledException("Event Log reading was cancelled.", ex, cancellationToken);
+        } catch (InvalidOperationException ex) when (cancellationToken.IsCancellationRequested) {
+            throw new OperationCanceledException("Event Log reading was cancelled.", ex, cancellationToken);
+        }
     }
 
     /// <summary>
@@ -193,28 +228,14 @@ public partial class SearchEvents : Settings {
         string queriedMachine = string.IsNullOrEmpty(machineName) ? GetFQDN() : machineName!;
         try {
             using (var reader = CreateEventLogReader(query, machineName, effectiveTimeout)) {
-                using CancellationTokenRegistration cancellationRegistration = cancellationToken.Register(
-                    static state => {
-                        try {
-                            ((EventLogReader)state!).CancelReading();
-                        } catch (ObjectDisposedException) {
-                        } catch (EventLogException) {
-                        } catch (InvalidOperationException) {
-                        }
-                    },
-                    reader);
+                using CancellationTokenRegistration cancellationRegistration = RegisterReaderCancellation(reader, cancellationToken);
                 int eventCount = 0;
                 while (true) {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    EventRecord? next;
-                    try {
-                        next = ReadEventWithTimeout(reader, effectiveTimeout, $"Reading '{logName}' on '{queriedMachine}'");
-                    } catch (EventLogException ex) when (cancellationToken.IsCancellationRequested) {
-                        throw new OperationCanceledException("Event Log reading was cancelled.", ex, cancellationToken);
-                    } catch (InvalidOperationException ex) when (cancellationToken.IsCancellationRequested) {
-                        throw new OperationCanceledException("Event Log reading was cancelled.", ex, cancellationToken);
-                    }
-                    cancellationToken.ThrowIfCancellationRequested();
+                    EventRecord? next = ReadEventWithCancellation(
+                        reader,
+                        effectiveTimeout,
+                        $"Reading '{logName}' on '{queriedMachine}'",
+                        cancellationToken);
                     if (next == null) {
                         break;
                     }

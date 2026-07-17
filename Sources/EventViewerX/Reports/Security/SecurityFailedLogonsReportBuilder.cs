@@ -153,7 +153,7 @@ public sealed class SecurityFailedLogonsReportBuilder {
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns><see langword="true"/> when query succeeds; otherwise <see langword="false"/>.</returns>
     public static bool TryBuildFromFile(
-        EvtxQueryRequest request,
+        EvtxQueryRequest? request,
         bool includeSamples,
         int sampleSize,
         out SecurityFailedLogonsReport report,
@@ -161,14 +161,15 @@ public sealed class SecurityFailedLogonsReportBuilder {
         CancellationToken cancellationToken = default) {
         var b = new SecurityFailedLogonsReportBuilder(includeSamples, sampleSize);
         if (!EvtxQueryExecutor.TryForEachEventWithInfo(
-                request.WithReadMode(EventReadMode.StructuredData),
+                request,
                 ev => {
                     b.Add(ev);
                     return true;
                 },
                 out EvtxQueryExecutionInfo executionInfo,
                 out failure,
-                cancellationToken)) {
+                cancellationToken,
+                readModeOverride: EventReadMode.StructuredData)) {
             report = new SecurityFailedLogonsReport();
             return false;
         }

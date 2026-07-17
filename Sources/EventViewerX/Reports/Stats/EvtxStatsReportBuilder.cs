@@ -134,20 +134,21 @@ public sealed class EvtxStatsReportBuilder {
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns><see langword="true"/> when query succeeds; otherwise <see langword="false"/>.</returns>
     public static bool TryBuildFromFile(
-        EvtxQueryRequest request,
+        EvtxQueryRequest? request,
         out EvtxStatsReport report,
         out EvtxQueryFailure? failure,
         CancellationToken cancellationToken = default) {
         var builder = new EvtxStatsReportBuilder();
         if (!EvtxQueryExecutor.TryForEachEventWithInfo(
-                request.WithReadMode(EventReadMode.Metadata),
+                request,
                 ev => {
                     builder.Add(ev);
                     return true;
                 },
                 out EvtxQueryExecutionInfo executionInfo,
                 out failure,
-                cancellationToken)) {
+                cancellationToken,
+                readModeOverride: EventReadMode.Metadata)) {
             report = new EvtxStatsReport();
             return false;
         }

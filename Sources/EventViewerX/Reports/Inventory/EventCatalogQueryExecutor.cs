@@ -160,6 +160,7 @@ public static class EventCatalogQueryExecutor {
             EventLogSessionOpenStatus.Timeout => EventCatalogFailureKind.Timeout,
             EventLogSessionOpenStatus.NegativeCache => EventCatalogFailureKind.HostUnavailable,
             EventLogSessionOpenStatus.RpcUnavailable => EventCatalogFailureKind.HostUnavailable,
+            EventLogSessionOpenStatus.EventLogSessionUnavailable => EventCatalogFailureKind.HostUnavailable,
             _ => EventCatalogFailureKind.Exception
         };
         return new EventCatalogFailure {
@@ -207,7 +208,7 @@ public static class EventCatalogQueryExecutor {
         return true;
     }
 
-    private static List<T> BuildNameRows<T>(
+    internal static List<T> BuildNameRows<T>(
         IEnumerable<string> source,
         EventCatalogQueryRequest request,
         CancellationToken cancellationToken,
@@ -229,15 +230,14 @@ public static class EventCatalogQueryExecutor {
 
         names.Sort(StringComparer.OrdinalIgnoreCase);
 
-        var rows = new List<T>();
-        truncated = false;
-        foreach (var name in names) {
+        int resultCount = request.MaxResults > 0
+            ? Math.Min(request.MaxResults, names.Count)
+            : names.Count;
+        truncated = request.MaxResults > 0 && names.Count > request.MaxResults;
+        var rows = new List<T>(Math.Min(resultCount, 256));
+        for (int index = 0; index < resultCount; index++) {
             cancellationToken.ThrowIfCancellationRequested();
-            rows.Add(rowFactory(name));
-            if (request.MaxResults > 0 && rows.Count >= request.MaxResults) {
-                truncated = true;
-                break;
-            }
+            rows.Add(rowFactory(names[index]));
         }
 
         return rows;

@@ -67,4 +67,29 @@ public class TestEventCatalogQueryExecutor {
             SearchEvents.ClearHostCache(host);
         }
     }
+
+    [Fact]
+    public void BuildNameRows_ReportsTruncationOnlyWhenAnotherMatchExists() {
+        var exactRequest = new EventCatalogQueryRequest { MaxResults = 2 };
+        List<string> exactRows = EventCatalogQueryExecutor.BuildNameRows(
+            new[] { "B", "A" },
+            exactRequest,
+            CancellationToken.None,
+            static name => name,
+            out bool exactTruncated);
+
+        Assert.Equal(new[] { "A", "B" }, exactRows);
+        Assert.False(exactTruncated);
+
+        exactRequest.MaxResults = 1;
+        List<string> cappedRows = EventCatalogQueryExecutor.BuildNameRows(
+            new[] { "B", "A" },
+            exactRequest,
+            CancellationToken.None,
+            static name => name,
+            out bool cappedTruncated);
+
+        Assert.Equal(new[] { "A" }, cappedRows);
+        Assert.True(cappedTruncated);
+    }
 }

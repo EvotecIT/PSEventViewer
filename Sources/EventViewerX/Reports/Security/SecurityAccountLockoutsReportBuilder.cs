@@ -132,7 +132,7 @@ public sealed class SecurityAccountLockoutsReportBuilder {
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns><see langword="true"/> when query succeeds; otherwise <see langword="false"/>.</returns>
     public static bool TryBuildFromFile(
-        EvtxQueryRequest request,
+        EvtxQueryRequest? request,
         bool includeSamples,
         int sampleSize,
         out SecurityAccountLockoutsReport report,
@@ -140,14 +140,15 @@ public sealed class SecurityAccountLockoutsReportBuilder {
         CancellationToken cancellationToken = default) {
         var b = new SecurityAccountLockoutsReportBuilder(includeSamples, sampleSize);
         if (!EvtxQueryExecutor.TryForEachEventWithInfo(
-                request.WithReadMode(EventReadMode.StructuredData),
+                request,
                 ev => {
                     b.Add(ev);
                     return true;
                 },
                 out EvtxQueryExecutionInfo executionInfo,
                 out failure,
-                cancellationToken)) {
+                cancellationToken,
+                readModeOverride: EventReadMode.StructuredData)) {
             report = new SecurityAccountLockoutsReport();
             return false;
         }

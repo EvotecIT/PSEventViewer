@@ -1,6 +1,7 @@
 using System;
 using EventViewerX.Reports.Evtx;
 using EventViewerX.Reports.Security;
+using EventViewerX.Reports.Stats;
 using Xunit;
 
 namespace EventViewerX.Tests;
@@ -118,5 +119,30 @@ public class TestEvtxQueryExecutor {
         Assert.False(ok);
         Assert.NotNull(failure);
         Assert.Equal(EvtxQueryFailureKind.NotFound, failure!.Kind);
+    }
+
+    [Fact]
+    public void ReportBuilders_ShouldReturnInvalidArgumentForNullRequests() {
+        AssertInvalid(
+            EvtxEventReportBuilder.TryBuild(null!, false, 0, out _, out EvtxQueryFailure? eventFailure),
+            eventFailure);
+        AssertInvalid(
+            EvtxStatsReportBuilder.TryBuildFromFile(null!, out _, out EvtxQueryFailure? statsFailure),
+            statsFailure);
+        AssertInvalid(
+            SecurityUserLogonsReportBuilder.TryBuildFromFile(null!, false, 0, out _, out EvtxQueryFailure? userFailure),
+            userFailure);
+        AssertInvalid(
+            SecurityFailedLogonsReportBuilder.TryBuildFromFile(null!, false, 0, out _, out EvtxQueryFailure? failedFailure),
+            failedFailure);
+        AssertInvalid(
+            SecurityAccountLockoutsReportBuilder.TryBuildFromFile(null!, false, 0, out _, out EvtxQueryFailure? lockoutFailure),
+            lockoutFailure);
+    }
+
+    private static void AssertInvalid(bool success, EvtxQueryFailure? failure) {
+        Assert.False(success);
+        Assert.NotNull(failure);
+        Assert.Equal(EvtxQueryFailureKind.InvalidArgument, failure!.Kind);
     }
 }
