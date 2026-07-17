@@ -15,6 +15,10 @@
         $XPath = Get-EVXFilter -NamedDataExcludeFilter @{ FieldName = ('Value1','Value2') } -LogName 'xx' -XPathOnly
         $Xpath | Should -Be '*[EventData[Data[@Name=''FieldName''] != ''Value1'' and Data[@Name=''FieldName''] != ''Value2'']]'
     }
+    It 'rejects filters that exceed the Windows Event Log XPath expression budget' {
+        { Get-EVXFilter -NamedDataFilter @{ FieldName = 1..23 } -LogName 'xx' -XPathOnly } |
+            Should -Throw '*at most 22*'
+    }
 }
 
 Describe "Get-EVXFilter using Path and NamendDataFilter" {

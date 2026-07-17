@@ -44,13 +44,13 @@ Describe 'Start-EVXWatcher - PowerShell event dispatch' {
         }
     }
 
-    It 'reuses a named watcher when an equivalent script block creates a new bridge delegate' {
+    It 'reuses a named watcher only with an explicit stable action identity' {
         $Name = 'PSEventViewer.Tests.' + [Guid]::NewGuid().ToString('N')
         $BeforeCount = @(Get-EventSubscriber -Force | Where-Object SourceIdentifier -Like 'PSEventViewer.Watcher.*').Count
         $First = $null
         try {
-            $First = Start-EVXWatcher -Name $Name -MachineName $env:COMPUTERNAME -LogName Application -EventId 1 -Action {}
-            $Second = Start-EVXWatcher -Name $Name -MachineName $env:COMPUTERNAME -LogName Application -EventId 1 -Action {}
+            $First = Start-EVXWatcher -Name $Name -MachineName $env:COMPUTERNAME -LogName Application -EventId 1 -Action {} -ActionIdentity 'tests:stable-action'
+            $Second = Start-EVXWatcher -Name $Name -MachineName $env:COMPUTERNAME -LogName Application -EventId 1 -Action {} -ActionIdentity 'tests:stable-action'
 
             $Second.Id | Should -Be $First.Id
             @(Get-EventSubscriber -Force | Where-Object SourceIdentifier -Like 'PSEventViewer.Watcher.*').Count |
@@ -59,6 +59,35 @@ Describe 'Start-EVXWatcher - PowerShell event dispatch' {
             if ($First) {
                 Stop-EVXWatcher -Id $First.Id -ErrorAction SilentlyContinue
             }
+        }
+    }
+
+    It 'rejects a recreated action delegate when no stable identity is supplied' {
+        $Name = 'PSEventViewer.Tests.' + [Guid]::NewGuid().ToString('N')
+        $First = $null
+        try {
+            $First = Start-EVXWatcher -Name $Name -MachineName $env:COMPUTERNAME -LogName Application -EventId 1 -Action {}
+            { Start-EVXWatcher -Name $Name -MachineName $env:COMPUTERNAME -LogName Application -EventId 1 -Action {} } |
+                Should -Throw
+        } finally {
+            if ($First) {
+                Stop-EVXWatcher -Id $First.Id -ErrorAction SilentlyContinue
+            }
+        }
+    }
+
+    It 'stops watchers and removes bridge subscribers when the module is removed' {
+        $Module = Get-Module PSEventViewer
+        $ModulePath = $Module.Path
+        $Watcher = Start-EVXWatcher -Name ('PSEventViewer.Tests.' + [Guid]::NewGuid().ToString('N')) -MachineName $env:COMPUTERNAME -LogName Application -EventId 1 -Action {}
+
+        try {
+            Remove-Module PSEventViewer -Force
+
+            $Watcher.EndTime | Should -Not -BeNullOrEmpty
+            @(Get-EventSubscriber -Force | Where-Object SourceIdentifier -Like 'PSEventViewer.Watcher.*') | Should -BeNullOrEmpty
+        } finally {
+            Import-Module -Name $ModulePath -Force
         }
     }
 }

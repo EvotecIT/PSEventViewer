@@ -21,6 +21,7 @@ public class OnModuleImportAndRemove : IModuleAssemblyInitializer, IModuleAssemb
     /// </summary>
     /// <param name="module"></param>
     public void OnRemove(PSModuleInfo module) {
+        WatcherManager.StopAll();
         if (IsNetFramework()) {
             AppDomain.CurrentDomain.AssemblyResolve -= MyResolveEventHandler;
         }

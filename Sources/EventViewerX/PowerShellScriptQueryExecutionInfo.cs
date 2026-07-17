@@ -48,13 +48,31 @@ public sealed class PowerShellScriptQueryExecutionInfo {
     /// <summary>Number of bounded end-of-query script results missing declared fragments.</summary>
     public int IncompleteScriptsReturned { get; internal set; }
 
+    /// <summary>Expected remote-target failure that ended this machine query.</summary>
+    public EventLogRemoteQueryFailureKind FailureKind { get; internal set; }
+
+    /// <summary>Diagnostic message associated with <see cref="FailureKind"/>.</summary>
+    public string FailureMessage { get; internal set; } = string.Empty;
+
+    /// <summary>Indicates that this machine query completed without a classified remote-target failure.</summary>
+    public bool Succeeded => FailureKind == EventLogRemoteQueryFailureKind.None;
+
     /// <summary>Indicates that the caller should not treat the query as a complete view of all matching scripts.</summary>
     public bool MayBeIncomplete =>
         ScanLimitReached ||
         OutputLimitReached ||
         EvictedIncompleteScripts > 0 ||
         InvalidFragmentMetadataEvents > 0 ||
-        IncompleteScriptsReturned > 0;
+        IncompleteScriptsReturned > 0 ||
+        !Succeeded;
+
+    /// <summary>Records an expected remote-target failure for this completion record.</summary>
+    /// <param name="failureKind">Typed remote failure.</param>
+    /// <param name="message">Diagnostic message returned by the Event Log boundary.</param>
+    public void RecordFailure(EventLogRemoteQueryFailureKind failureKind, string? message) {
+        FailureKind = failureKind;
+        FailureMessage = message ?? string.Empty;
+    }
 
     internal void Reset(
         string? machineName,
@@ -77,5 +95,7 @@ public sealed class PowerShellScriptQueryExecutionInfo {
         EvictedCachedEvents = 0;
         InvalidFragmentMetadataEvents = 0;
         IncompleteScriptsReturned = 0;
+        FailureKind = EventLogRemoteQueryFailureKind.None;
+        FailureMessage = string.Empty;
     }
 }

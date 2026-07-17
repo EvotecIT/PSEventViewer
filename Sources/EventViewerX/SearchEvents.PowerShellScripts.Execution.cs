@@ -58,7 +58,11 @@ namespace EventViewerX {
                 EventLogSessionOpenResult sessionResult = CreateSessionResult(machineName, "PowerShellScripts", logName, DefaultSessionTimeoutMs);
                 session = sessionResult.Session;
                 if (session == null) {
-                    throw new InvalidOperationException(sessionResult.ErrorMessage);
+                    try {
+                        ThrowSessionFailure(sessionResult);
+                    } finally {
+                        sessionResult.Dispose();
+                    }
                 }
                 query.Session = session;
             }
@@ -178,7 +182,11 @@ namespace EventViewerX {
                 EventLogSessionOpenResult sessionResult = CreateSessionResult(machineName, "PowerShellScripts", logName, DefaultSessionTimeoutMs);
                 session = sessionResult.Session;
                 if (session == null) {
-                    throw new InvalidOperationException(sessionResult.ErrorMessage);
+                    try {
+                        ThrowSessionFailure(sessionResult);
+                    } finally {
+                        sessionResult.Dispose();
+                    }
                 }
                 query.Session = session;
             }

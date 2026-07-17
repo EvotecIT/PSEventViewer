@@ -48,7 +48,9 @@ public abstract class PowerShellScriptQueryCmdletBase : AsyncPSCmdlet {
                 $"outputLimitReached={queryInfo.OutputLimitReached}, " +
                 $"evictedIncompleteScripts={queryInfo.EvictedIncompleteScripts}, " +
                 $"invalidFragmentMetadataEvents={queryInfo.InvalidFragmentMetadataEvents}, " +
-                $"incompleteScriptsReturned={queryInfo.IncompleteScriptsReturned}.");
+                $"incompleteScriptsReturned={queryInfo.IncompleteScriptsReturned}, " +
+                $"failureKind={queryInfo.FailureKind}, " +
+                $"failureMessage='{queryInfo.FailureMessage}'.");
         }
         if (IncludeQueryInfo.IsPresent) {
             WriteObject(queryInfo);

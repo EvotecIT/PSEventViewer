@@ -268,14 +268,24 @@ public abstract class AsyncPSCmdlet : PSCmdlet, IDisposable {
     /// </summary>
     /// <returns>The user-specified or session error action preference.</returns>
     protected ActionPreference GetErrorActionPreference() {
-        var preference = (ActionPreference)SessionState.PSVariable.GetValue("ErrorActionPreference");
+        ActionPreference preference = ParseActionPreference(
+            SessionState.PSVariable.GetValue("ErrorActionPreference"),
+            ActionPreference.Continue);
         if (MyInvocation.BoundParameters.ContainsKey("ErrorAction")) {
-            string? errorActionString = MyInvocation.BoundParameters["ErrorAction"]?.ToString();
-            if (!string.IsNullOrWhiteSpace(errorActionString) && Enum.TryParse(errorActionString, true, out ActionPreference parsed)) {
-                preference = parsed;
-            }
+            preference = ParseActionPreference(MyInvocation.BoundParameters["ErrorAction"], preference);
         }
         return preference;
+    }
+
+    private static ActionPreference ParseActionPreference(object? value, ActionPreference fallback) {
+        if (value is ActionPreference preference) {
+            return preference;
+        }
+
+        string? text = value?.ToString();
+        return !string.IsNullOrWhiteSpace(text) && Enum.TryParse(text, true, out ActionPreference parsed)
+            ? parsed
+            : fallback;
     }
 
     /// <summary>

@@ -10,8 +10,11 @@ Describe 'Get-EVXEvent checkpoint compatibility' {
         $LegacyCheckpoint = @{ 'System|' = [long] $Latest.RecordId } | ConvertTo-Json -Compress
         Set-Content -LiteralPath $CheckpointPath -Value $LegacyCheckpoint -Encoding UTF8
 
-        $Events = @(Get-EVXEvent -LogName System -RecordIdFile $CheckpointPath -MaxEvents 1 -MaxEventsScanned 5 -ReadMode Metadata)
+        $QueryOutput = @(Get-EVXEvent -LogName System -RecordIdFile $CheckpointPath -MaxEvents 1 -MaxEventsScanned 5 -ReadMode Metadata -Verbose 4>&1)
+        $Events = @($QueryOutput | Where-Object { $_ -isnot [System.Management.Automation.VerboseRecord] })
+        $VerboseText = @($QueryOutput | Where-Object { $_ -is [System.Management.Automation.VerboseRecord] } | ForEach-Object Message) -join [Environment]::NewLine
 
         @($Events | Where-Object { $_.RecordId -le $Latest.RecordId }) | Should -BeNullOrEmpty
+        $VerboseText | Should -Match 'EventRecordID&gt;'
     }
 }

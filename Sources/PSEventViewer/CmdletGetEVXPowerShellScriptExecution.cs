@@ -21,20 +21,24 @@ public sealed class CmdletGetEVXPowerShellScriptExecution : PowerShellScriptQuer
         foreach (string? machine in machines) {
             CancelToken.ThrowIfCancellationRequested();
             var queryInfo = new PowerShellScriptQueryExecutionInfo();
-            foreach (PowerShellScriptExecutionInfo execution in SearchEvents.GetPowerShellScriptExecution(
-                         type: Type,
-                         machineName: machine,
-                         eventLogPath: EventLogPath,
-                         dateFrom: DateFrom,
-                         dateTo: DateTo,
-                         maxEvents: MaxEvents,
-                         maxEventsScanned: MaxEventsScanned,
-                         executionInfo: queryInfo,
-                         cancellationToken: CancelToken)) {
-                WriteObject(execution);
+            try {
+                foreach (PowerShellScriptExecutionInfo execution in SearchEvents.GetPowerShellScriptExecution(
+                             type: Type,
+                             machineName: machine,
+                             eventLogPath: EventLogPath,
+                             dateFrom: DateFrom,
+                             dateTo: DateTo,
+                             maxEvents: MaxEvents,
+                             maxEventsScanned: MaxEventsScanned,
+                             executionInfo: queryInfo,
+                             cancellationToken: CancelToken)) {
+                    WriteObject(execution);
+                }
+            } catch (Exception ex) when (EventLogRemoteQueryFailureClassifier.TryClassify(machine, ex, out EventLogRemoteQueryFailureKind failureKind)) {
+                queryInfo.RecordFailure(failureKind, ex.Message);
+            } finally {
+                WriteQueryCompletion(queryInfo);
             }
-
-            WriteQueryCompletion(queryInfo);
         }
 
         return Task.CompletedTask;

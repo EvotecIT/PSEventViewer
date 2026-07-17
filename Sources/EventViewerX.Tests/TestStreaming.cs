@@ -191,6 +191,42 @@ namespace EventViewerX.Tests {
         }
 
         [Fact]
+        public void RemoteFailureClassifierDoesNotHideLocalOrCancellationFailures() {
+            Assert.True(EventLogRemoteQueryFailureClassifier.TryClassify(
+                "server",
+                new TimeoutException("timeout"),
+                out EventLogRemoteQueryFailureKind remoteFailure));
+            Assert.Equal(EventLogRemoteQueryFailureKind.Timeout, remoteFailure);
+
+            Assert.False(EventLogRemoteQueryFailureClassifier.TryClassify(
+                null,
+                new TimeoutException("local timeout"),
+                out EventLogRemoteQueryFailureKind localFailure));
+            Assert.Equal(EventLogRemoteQueryFailureKind.None, localFailure);
+
+            Assert.False(EventLogRemoteQueryFailureClassifier.TryClassify(
+                "server",
+                new OperationCanceledException(),
+                out EventLogRemoteQueryFailureKind cancellationFailure));
+            Assert.Equal(EventLogRemoteQueryFailureKind.None, cancellationFailure);
+        }
+
+        [Fact]
+        public void QueryLogsSequentialContinuesAfterExpectedRemoteFailure() {
+            if (!OperatingSystem.IsWindows()) return;
+            if (!TestEnv.CanReadLog("System")) return;
+
+            List<EventObject> events = SearchEvents.QueryLogsSequential(
+                "System",
+                machineNames: new List<string?> { "203.0.113.1", null },
+                maxEvents: 1,
+                sessionTimeoutMs: 500,
+                readMode: EventReadMode.Metadata).ToList();
+
+            Assert.Single(events);
+        }
+
+        [Fact]
         public async Task QueryLogsParallelRejectsInvalidParallelism() {
             await Assert.ThrowsAsync<ArgumentOutOfRangeException>(async () => {
                 await foreach (var _ in SearchEvents.QueryLogsParallel("System", maxThreads: 0)) {
@@ -231,6 +267,21 @@ namespace EventViewerX.Tests {
             Assert.All(workItems, item => Assert.True(
                 fixedExpressions + (item.EventIds?.Count ?? 0) + (item.EventRecordIds?.Count ?? 0) <= SearchEvents.MaxXPathExpressionCount));
             Assert.All(workItems, item => Assert.True(item.ManagedEventIds!.SetEquals(eventIds)));
+        }
+
+        [Fact]
+        public void QueryWorkItemsReserveXpathCapacityForCheckpointBoundary() {
+            List<SearchEvents.QueryWorkItem> workItems = SearchEvents.BuildQueryWorkItems(
+                new List<string?> { "server" },
+                Enumerable.Range(1, SearchEvents.MaxXPathExpressionCount).ToList(),
+                null,
+                fixedExpressionCount: 0,
+                minimumEventRecordIdExclusiveResolver: _ => 100).ToList();
+
+            Assert.Equal(2, workItems.Count);
+            Assert.All(workItems, item => Assert.Equal(100, item.MinimumEventRecordIdExclusive));
+            Assert.All(workItems, item => Assert.True(
+                (item.EventIds?.Count ?? 0) + 1 <= SearchEvents.MaxXPathExpressionCount));
         }
 
         [Fact]

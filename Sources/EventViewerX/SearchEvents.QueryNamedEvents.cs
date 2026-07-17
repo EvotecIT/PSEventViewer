@@ -22,6 +22,7 @@ namespace EventViewerX {
         /// <param name="cancellationToken">Cancellation token.</param>
         /// <param name="maxEventsScanned">Global maximum number of candidate event records to evaluate before rule filtering.</param>
         /// <param name="executionInfo">Optional progress object populated while the query is enumerated.</param>
+        /// <param name="minimumEventRecordIdExclusiveResolver">Optional per-machine/per-log native checkpoint resolver.</param>
         /// <returns>Asynchronous sequence of simplified events.</returns>
         public static async IAsyncEnumerable<EventObjectSlim> FindEventsByNamedEvents(
             List<NamedEvents> typeEventsList,
@@ -33,7 +34,8 @@ namespace EventViewerX {
             int maxEvents = 0,
             [EnumeratorCancellation] CancellationToken cancellationToken = default,
             int maxEventsScanned = 0,
-            NamedEventsQueryExecutionInfo? executionInfo = null) {
+            NamedEventsQueryExecutionInfo? executionInfo = null,
+            Func<string?, string, long?>? minimumEventRecordIdExclusiveResolver = null) {
 
             if (typeEventsList == null) {
                 throw new ArgumentNullException(nameof(typeEventsList));
@@ -73,7 +75,10 @@ namespace EventViewerX {
                                    maxThreads: maxThreads,
                                    timePeriod: timePeriod,
                                    cancellationToken: cancellationToken,
-                                   readMode: EventReadMode.Full)) {
+                                   readMode: EventReadMode.Full,
+                                   minimumEventRecordIdExclusiveResolver: minimumEventRecordIdExclusiveResolver == null
+                                       ? null
+                                       : machineName => minimumEventRecordIdExclusiveResolver(machineName, entry.Key))) {
                     if (!queryInfo.TryRecordCandidate()) {
                         yield break;
                     }

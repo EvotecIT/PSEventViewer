@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading;
 
@@ -29,7 +30,8 @@ public partial class SearchEvents {
         TimePeriod? timePeriod = null,
         CancellationToken cancellationToken = default,
         int? sessionTimeoutMs = null,
-        EventReadMode readMode = EventReadMode.Full) {
+        EventReadMode readMode = EventReadMode.Full,
+        Func<string?, long?>? minimumEventRecordIdExclusiveResolver = null) {
 
         ValidateQueryArguments(logName, maxEvents, sessionTimeoutMs);
         List<string?> targets = machineNames == null || machineNames.Count == 0
@@ -37,34 +39,41 @@ public partial class SearchEvents {
             : machineNames;
         int fixedExpressionCount = CountFixedQueryExpressions(providerName, keywords, level, startTime, endTime, userId, timePeriod);
         int returned = 0;
+        var failedTargets = new ConcurrentDictionary<string, byte>(StringComparer.OrdinalIgnoreCase);
 
         foreach (string? machineName in targets) {
             if (maxEvents > 0 && returned >= maxEvents) {
                 yield break;
             }
 
-            IEnumerable<QueryWorkItem> workItems = BuildQueryWorkItems(new List<string?> { machineName }, eventIds, eventRecordId, fixedExpressionCount);
+            IEnumerable<QueryWorkItem> workItems = BuildQueryWorkItems(new List<string?> { machineName }, eventIds, eventRecordId, fixedExpressionCount, minimumEventRecordIdExclusiveResolver);
             int remaining = maxEvents > 0 ? maxEvents - returned : 0;
             foreach (EventObject result in MergeQueryWorkItems(
                          workItems,
-                         workItem => FilterQueryWorkItemResults(
-                             workItem,
-                             QueryLogEnumerable(
-                                 logName,
-                                 workItem.EventIds,
-                                 workItem.MachineName,
-                                 providerName,
-                                 keywords,
-                                 level,
-                                 startTime,
-                                 endTime,
-                                 userId,
-                                 maxEvents: 0,
-                                 eventRecordId: workItem.EventRecordIds,
-                                 timePeriod: timePeriod,
-                                 cancellationToken: cancellationToken,
-                                 sessionTimeoutMs: sessionTimeoutMs ?? Settings.QuerySessionTimeoutMs,
-                                 readMode: readMode)).GetEnumerator(),
+                         workItem => ShouldSkipFailedTarget(workItem, failedTargets)
+                             ? System.Linq.Enumerable.Empty<EventObject>().GetEnumerator()
+                             : EnumerateQueryWorkItemSafely(
+                                 workItem,
+                                 FilterQueryWorkItemResults(
+                                     workItem,
+                                     QueryLogEnumerable(
+                                         logName,
+                                         workItem.EventIds,
+                                         workItem.MachineName,
+                                         providerName,
+                                         keywords,
+                                         level,
+                                         startTime,
+                                         endTime,
+                                         userId,
+                                         maxEvents: 0,
+                                         eventRecordId: workItem.EventRecordIds,
+                                         timePeriod: timePeriod,
+                                         cancellationToken: cancellationToken,
+                                         sessionTimeoutMs: sessionTimeoutMs ?? Settings.QuerySessionTimeoutMs,
+                                         readMode: readMode,
+                                         minimumEventRecordIdExclusive: workItem.MinimumEventRecordIdExclusive)).GetEnumerator(),
+                                 failedTargets).GetEnumerator(),
                          remaining,
                          oldest: false,
                          cancellationToken,
@@ -74,6 +83,18 @@ public partial class SearchEvents {
                 if (maxEvents > 0 && returned >= maxEvents) {
                     yield break;
                 }
+            }
+        }
+    }
+
+    private static IEnumerable<EventObject> EnumerateQueryWorkItemSafely(
+        QueryWorkItem workItem,
+        IEnumerator<EventObject> queryResults,
+        ConcurrentDictionary<string, byte> failedTargets) {
+
+        using (queryResults) {
+            while (TryMoveNextQueryWorkItem(queryResults, workItem, failedTargets, out EventObject? result)) {
+                yield return result!;
             }
         }
     }

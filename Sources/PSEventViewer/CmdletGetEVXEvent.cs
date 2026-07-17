@@ -7,6 +7,7 @@ using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
+using System.Net;
 
 namespace PSEventViewer;
 
@@ -351,7 +352,7 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
                 }
             }
         } else if (ParameterSetName == "PathEvents") {
-            foreach (EventObject eventObject in SearchEvents.QueryLogFile(Path, EventId, ProviderName, Keywords, Level, StartTime, EndTime, UserId, GetQueryReadLimit(), EventRecordId, TimePeriod, Oldest, NamedDataFilter, NamedDataExcludeFilter, token, ReadMode)) {
+            foreach (EventObject eventObject in SearchEvents.QueryLogFile(Path, EventId, ProviderName, Keywords, Level, StartTime, EndTime, UserId, GetQueryReadLimit(), EventRecordId, TimePeriod, Oldest, NamedDataFilter, NamedDataExcludeFilter, token, ReadMode, GetCheckpointLowerBound(null, Path))) {
                 token.ThrowIfCancellationRequested();
                 ProcessEventResult(eventObject, results);
                 if (OutputLimitReached) {
@@ -373,7 +374,8 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
                                    maxThreads: namedEventThreads,
                                    maxEvents: namedEventMatchLimit,
                                    maxEventsScanned: MaxEventsScanned,
-                                   cancellationToken: token)) {
+                                   cancellationToken: token,
+                                   minimumEventRecordIdExclusiveResolver: GetCheckpointLowerBound)) {
                     token.ThrowIfCancellationRequested();
                     if (!MessageMatches(eventObject.Event) || !ShouldOutput(eventObject.Event)) {
                         continue;
@@ -392,7 +394,7 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
                     }
                 }
             } else if (ParallelOption == ParallelOption.Disabled) {
-                foreach (EventObject eventObject in SearchEvents.QueryLogsSequential(LogName, EventId, MachineName, ProviderName, Keywords, Level, StartTime, EndTime, UserId, GetQueryReadLimit(), EventRecordId, TimePeriod, token, SessionTimeoutMs, ReadMode)) {
+                foreach (EventObject eventObject in SearchEvents.QueryLogsSequential(LogName, EventId, MachineName, ProviderName, Keywords, Level, StartTime, EndTime, UserId, GetQueryReadLimit(), EventRecordId, TimePeriod, token, SessionTimeoutMs, ReadMode, GetCheckpointResolver(LogName))) {
                     token.ThrowIfCancellationRequested();
                     ProcessEventResult(eventObject, results);
                     if (OutputLimitReached) {
@@ -400,7 +402,7 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
                     }
                 }
             } else {
-                await foreach (EventObject eventObject in SearchEvents.QueryLogsParallel(LogName, EventId, MachineName, ProviderName, Keywords, Level, StartTime, EndTime, UserId, GetQueryReadLimit(), NumberOfThreads, EventRecordId, TimePeriod, token, SessionTimeoutMs, ReadMode, BufferCapacity)) {
+                await foreach (EventObject eventObject in SearchEvents.QueryLogsParallel(LogName, EventId, MachineName, ProviderName, Keywords, Level, StartTime, EndTime, UserId, GetQueryReadLimit(), NumberOfThreads, EventRecordId, TimePeriod, token, SessionTimeoutMs, ReadMode, BufferCapacity, GetCheckpointResolver(LogName))) {
                     token.ThrowIfCancellationRequested();
                     ProcessEventResult(eventObject, results);
                     if (OutputLimitReached) {
@@ -448,6 +450,48 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
             : eventObject.QueriedMachine;
         return $"{_recordIdKey}|{source}|{eventObject.ContainerLog}";
     }
+
+    private Func<string?, long?>? GetCheckpointResolver(string logName) {
+        if (string.IsNullOrWhiteSpace(RecordIdFile)) {
+            return null;
+        }
+        return machineName => GetCheckpointLowerBound(machineName, logName);
+    }
+
+    private long? GetCheckpointLowerBound(string? machineName, string logName) {
+        if (string.IsNullOrWhiteSpace(RecordIdFile)) {
+            return null;
+        }
+
+        bool hasMultipleSources = ParameterSetName == "NamedEvents" || (MachineName?.Count ?? 0) > 1;
+        if (!hasMultipleSources && _recordMap.TryGetValue(_recordIdKey, out long singleCheckpoint)) {
+            return singleCheckpoint;
+        }
+
+        var sourceNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (!string.IsNullOrWhiteSpace(machineName)) {
+            sourceNames.Add(machineName!.Trim());
+        } else {
+            sourceNames.Add(Environment.MachineName);
+            try {
+                sourceNames.Add(Dns.GetHostEntry(Environment.MachineName).HostName);
+            } catch (System.Net.Sockets.SocketException) {
+                // The short local name remains a valid fallback when DNS is unavailable.
+            }
+        }
+
+        foreach (string sourceName in sourceNames) {
+            string sourceKey = $"{_recordIdKey}|{sourceName}|{logName}";
+            if (_recordMap.TryGetValue(sourceKey, out long sourceCheckpoint)) {
+                return sourceCheckpoint;
+            }
+        }
+
+        return _recordMap.TryGetValue(_recordIdKey, out long migratedCheckpoint)
+            ? migratedCheckpoint
+            : null;
+    }
+
     private bool OutputLimitReached => MaxEvents > 0 && _eventsOutput >= MaxEvents;
 
     private int GetQueryReadLimit() {

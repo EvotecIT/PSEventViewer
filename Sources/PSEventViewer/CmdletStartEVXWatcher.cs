@@ -78,6 +78,13 @@ namespace PSEventViewer {
         public string? Name { get; set; }
 
         /// <summary>
+        /// Stable caller-defined identity used to reuse a named watcher across recreated host delegates.
+        /// Omit this parameter to reject reuse when the action delegate is not the same instance.
+        /// </summary>
+        [Parameter]
+        public string? ActionIdentity { get; set; }
+
+        /// <summary>
         /// Duration after which the watcher stops automatically.
         /// </summary>
         [Parameter]
@@ -158,7 +165,7 @@ namespace PSEventViewer {
                     StopOnMatch.IsPresent,
                     StopAfter,
                     TimeOut,
-                    Action.ToString());
+                    string.IsNullOrWhiteSpace(ActionIdentity) ? null : ActionIdentity!.Trim());
                 if (!watcher.Action.Equals(publish)) {
                     RemovePowerShellSubscription();
                 } else {

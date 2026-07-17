@@ -87,16 +87,7 @@ public sealed class CmdletWriteEVXEntry : AsyncPSCmdlet {
     /// Initializes processing and reads error preferences.
     /// </summary>
     protected override Task BeginProcessingAsync() {
-        // Get the error action preference as user requested
-        // It first sets the error action to the default error action preference
-        // If the user has specified the error action, it will set the error action to the user specified error action
-        errorAction = (ActionPreference)this.SessionState.PSVariable.GetValue("ErrorActionPreference");
-        if (this.MyInvocation.BoundParameters.ContainsKey("ErrorAction")) {
-            string? errorActionString = this.MyInvocation.BoundParameters["ErrorAction"]?.ToString();
-            if (!string.IsNullOrEmpty(errorActionString) && Enum.TryParse(errorActionString, true, out ActionPreference actionPreference)) {
-                errorAction = actionPreference;
-            }
-        }
+        errorAction = GetErrorActionPreference();
 
         // Initialize the logger to be able to see verbose, warning, debug, error, progress, and information messages.
         var internalLogger = new InternalLogger();

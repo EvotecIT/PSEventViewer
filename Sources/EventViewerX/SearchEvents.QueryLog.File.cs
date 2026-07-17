@@ -25,12 +25,13 @@ public partial class SearchEvents : Settings {
     /// <param name="namedDataExcludeFilter">Hashtable of EventData name/value filters to exclude.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <param name="readMode">Amount of provider data to materialize for each event.</param>
+    /// <param name="minimumEventRecordIdExclusive">Optional native record-ID lower bound.</param>
     /// <returns>Enumerable sequence of <see cref="EventObject"/> read from the file.</returns>
     /// <remarks>
     /// Unlimited queries that require multiple XPath chunks stream bounded chunk batches; ordering is preserved
     /// within each batch. A positive <paramref name="maxEvents"/> keeps a bounded global merge in the requested direction.
     /// </remarks>
-    public static IEnumerable<EventObject> QueryLogFile(string filePath, List<int>? eventIds = null, string? providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string? userId = null, int maxEvents = 0, List<long>? eventRecordId = null, TimePeriod? timePeriod = null, bool oldest = false, System.Collections.Hashtable? namedDataFilter = null, System.Collections.Hashtable? namedDataExcludeFilter = null, CancellationToken cancellationToken = default, EventReadMode readMode = EventReadMode.Full) {
+    public static IEnumerable<EventObject> QueryLogFile(string filePath, List<int>? eventIds = null, string? providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string? userId = null, int maxEvents = 0, List<long>? eventRecordId = null, TimePeriod? timePeriod = null, bool oldest = false, System.Collections.Hashtable? namedDataFilter = null, System.Collections.Hashtable? namedDataExcludeFilter = null, CancellationToken cancellationToken = default, EventReadMode readMode = EventReadMode.Full, long? minimumEventRecordIdExclusive = null) {
         if (string.IsNullOrWhiteSpace(filePath)) {
             throw new ArgumentException("File path cannot be null or empty.", nameof(filePath));
         }
@@ -60,12 +61,14 @@ public partial class SearchEvents : Settings {
             endTime = periodEnd;
         }
 
-        int fixedExpressionCount = CountFixedQueryExpressions(providerName, keywords, level, startTime, endTime, userId, timePeriod: null);
+        int fixedExpressionCount = CountFixedQueryExpressions(providerName, keywords, level, startTime, endTime, userId, timePeriod: null, namedDataFilter, namedDataExcludeFilter);
+        Func<string?, long?>? minimumResolver = minimumEventRecordIdExclusive.HasValue ? _ => minimumEventRecordIdExclusive : null;
         IEnumerable<QueryWorkItem> workItems = BuildQueryWorkItems(
             new List<string?> { null },
             eventIds,
             eventRecordId,
-            fixedExpressionCount);
+            fixedExpressionCount,
+            minimumResolver);
 
         foreach (EventObject eventObject in MergeQueryWorkItems(
                      workItems,
@@ -85,7 +88,8 @@ public partial class SearchEvents : Settings {
                              namedDataFilter,
                              namedDataExcludeFilter,
                              cancellationToken,
-                             readMode)).GetEnumerator(),
+                             readMode,
+                             workItem.MinimumEventRecordIdExclusive)).GetEnumerator(),
                      maxEvents,
                      oldest,
                      cancellationToken,
@@ -108,7 +112,8 @@ public partial class SearchEvents : Settings {
         System.Collections.Hashtable? namedDataFilter,
         System.Collections.Hashtable? namedDataExcludeFilter,
         CancellationToken cancellationToken,
-        EventReadMode readMode) {
+        EventReadMode readMode,
+        long? minimumEventRecordIdExclusive) {
 
         string xpath = BuildWinEventFilter(
             id: eventIds?.Select(static id => id.ToString()).ToArray(),
@@ -121,7 +126,8 @@ public partial class SearchEvents : Settings {
             userId: !string.IsNullOrEmpty(userId) ? new[] { userId! } : null,
             namedDataFilter: namedDataFilter != null ? new[] { namedDataFilter } : null,
             namedDataExcludeFilter: namedDataExcludeFilter != null ? new[] { namedDataExcludeFilter } : null,
-            xpathOnly: true);
+            xpathOnly: true,
+            minimumEventRecordIdExclusive: minimumEventRecordIdExclusive);
 
         _logger.WriteVerbose($"QueryLogFile: path '{absolutePath}', xpath '{xpath}'");
         var query = new EventLogQuery(absolutePath, PathType.FilePath, xpath) {

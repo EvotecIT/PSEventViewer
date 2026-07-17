@@ -26,6 +26,7 @@ public partial class SearchEvents {
     /// <param name="logName">Log name (used when emitting QueryList XML).</param>
     /// <param name="path">Optional EVTX file path; when set, QueryList uses file://.</param>
     /// <param name="xpathOnly">When true, returns raw XPath instead of QueryList XML.</param>
+    /// <param name="minimumEventRecordIdExclusive">Optional native lower bound used by checkpoint/resume queries.</param>
     /// <returns>XPath fragment or full QueryList XML depending on <paramref name="xpathOnly"/> and <paramref name="path"/>.</returns>
     public static string BuildWinEventFilter(
         string[]? id = null,
@@ -42,7 +43,31 @@ public partial class SearchEvents {
         string[]? excludeId = null,
         string? logName = null,
         string? path = null,
-        bool xpathOnly = false) {
+        bool xpathOnly = false,
+        long? minimumEventRecordIdExclusive = null) {
+        if (minimumEventRecordIdExclusive < 0) {
+            throw new ArgumentOutOfRangeException(nameof(minimumEventRecordIdExclusive), "Minimum event record ID must be greater than or equal to zero.");
+        }
+
+        int expressionCount = CountWinEventFilterExpressions(
+            id,
+            eventRecordId,
+            startTime,
+            endTime,
+            data,
+            providerName,
+            keywords,
+            level,
+            userId,
+            namedDataFilter,
+            namedDataExcludeFilter,
+            excludeId,
+            minimumEventRecordIdExclusive);
+        if (expressionCount > MaxXPathExpressionCount) {
+            throw new ArgumentException(
+                $"The filter contains {expressionCount} XPath expressions; Windows Event Log supports at most {MaxXPathExpressionCount}. Split the query or reduce the filter values.");
+        }
+
         var filter = string.Empty;
         if (id != null && id.Length > 0) {
             string[] validIds = ValidatePositiveNumericValues(id, int.MaxValue, nameof(id));
@@ -51,6 +76,11 @@ public partial class SearchEvents {
         if (eventRecordId != null && eventRecordId.Length > 0) {
             string[] validRecordIds = ValidatePositiveNumericValues(eventRecordId, long.MaxValue, nameof(eventRecordId));
             filter = JoinXPathFilter(InitializeXPathFilter(validRecordIds, "EventRecordID={0}", "*[System[{0}]]"), filter);
+        }
+        if (minimumEventRecordIdExclusive.HasValue) {
+            filter = JoinXPathFilter(
+                $"*[System[EventRecordID>{minimumEventRecordIdExclusive.Value.ToString(CultureInfo.InvariantCulture)}]]",
+                filter);
         }
         if (excludeId != null && excludeId.Length > 0) {
             string[] validExcludedIds = ValidatePositiveNumericValues(excludeId, int.MaxValue, nameof(excludeId));
@@ -151,6 +181,52 @@ public partial class SearchEvents {
         var escapedLog = EscapeXmlValue(logName ?? string.Empty);
         var escapedFilter = EscapeXmlValue(filter);
         return $"<QueryList><Query Id=\"0\" Path=\"{escapedLog}\"><Select Path=\"{escapedLog}\">{escapedFilter}</Select></Query></QueryList>";
+    }
+
+    internal static int CountWinEventFilterExpressions(
+        string[]? id,
+        string[]? eventRecordId,
+        DateTime? startTime,
+        DateTime? endTime,
+        string[]? data,
+        string[]? providerName,
+        long[]? keywords,
+        string[]? level,
+        string[]? userId,
+        Hashtable[]? namedDataFilter,
+        Hashtable[]? namedDataExcludeFilter,
+        string[]? excludeId,
+        long? minimumEventRecordIdExclusive) {
+
+        int count = id?.Length ?? 0;
+        count += eventRecordId?.Length ?? 0;
+        count += excludeId?.Length ?? 0;
+        count += startTime.HasValue ? 1 : 0;
+        count += endTime.HasValue ? 1 : 0;
+        count += data?.Length ?? 0;
+        count += providerName?.Length ?? 0;
+        count += keywords?.Length > 0 ? 1 : 0;
+        count += level?.Length ?? 0;
+        count += userId?.Length ?? 0;
+        count += CountNamedDataExpressions(namedDataFilter);
+        count += CountNamedDataExpressions(namedDataExcludeFilter);
+        count += minimumEventRecordIdExclusive.HasValue ? 1 : 0;
+        return count;
+    }
+
+    internal static int CountNamedDataExpressions(Hashtable[]? filters) {
+        int count = 0;
+        if (filters == null) {
+            return count;
+        }
+
+        foreach (Hashtable table in filters) {
+            foreach (object? key in table.Keys) {
+                List<string> values = AsEnumerable(table[key!]).ToList();
+                count += values.Count > 0 ? values.Count : 1;
+            }
+        }
+        return count;
     }
 
     private static string[] ValidatePositiveNumericValues(string[] values, long maximum, string parameterName) {

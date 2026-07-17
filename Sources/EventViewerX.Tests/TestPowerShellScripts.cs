@@ -178,6 +178,18 @@ namespace EventViewerX.Tests {
         }
 
         [Fact]
+        public void QueryExecutionInfoReportsRemoteFailureAsIncomplete() {
+            var info = new PowerShellScriptQueryExecutionInfo();
+            info.Reset("AD1", null, maxResults: 10, maxEventsScanned: 100);
+            info.RecordFailure(EventLogRemoteQueryFailureKind.HostUnavailable, "RPC unavailable");
+
+            Assert.False(info.Succeeded);
+            Assert.True(info.MayBeIncomplete);
+            Assert.Equal(EventLogRemoteQueryFailureKind.HostUnavailable, info.FailureKind);
+            Assert.Equal("RPC unavailable", info.FailureMessage);
+        }
+
+        [Fact]
         public void GetPowerShellScriptsRejectsInvalidBoundsBeforeOpeningTheLog() {
             Assert.Throws<ArgumentOutOfRangeException>(() => SearchEvents.GetPowerShellScripts(
                 PowerShellEdition.WindowsPowerShell,

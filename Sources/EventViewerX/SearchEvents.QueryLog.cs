@@ -178,7 +178,8 @@ public partial class SearchEvents : Settings {
     /// <param name="cancellationToken">Cancellation token used while streaming events.</param>
     /// <param name="sessionTimeoutMs">Timeout for establishing sessions and reading events.</param>
     /// <param name="readMode">Amount of provider data to materialize for each event.</param>
-    private static IEnumerable<EventObject> QueryLogEnumerable(string logName, List<int>? eventIds = null, string? machineName = null, string? providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string? userId = null, int maxEvents = 0, List<long>? eventRecordId = null, TimePeriod? timePeriod = null, CancellationToken cancellationToken = default, int? sessionTimeoutMs = null, EventReadMode readMode = EventReadMode.Full) {
+    /// <param name="minimumEventRecordIdExclusive">Optional native record-ID lower bound.</param>
+    private static IEnumerable<EventObject> QueryLogEnumerable(string logName, List<int>? eventIds = null, string? machineName = null, string? providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string? userId = null, int maxEvents = 0, List<long>? eventRecordId = null, TimePeriod? timePeriod = null, CancellationToken cancellationToken = default, int? sessionTimeoutMs = null, EventReadMode readMode = EventReadMode.Full, long? minimumEventRecordIdExclusive = null) {
         ValidateQueryArguments(logName, maxEvents, sessionTimeoutMs);
         if (eventIds != null && eventIds.Any(id => id <= 0)) {
             throw new ArgumentException("Event IDs must be positive.", nameof(eventIds));
@@ -198,7 +199,8 @@ public partial class SearchEvents : Settings {
             endTime,
             userId ?? string.Empty,
             timePeriod: timePeriod,
-            eventRecordIds: eventRecordId);
+            eventRecordIds: eventRecordId,
+            minimumEventRecordIdExclusive: minimumEventRecordIdExclusive);
 
         _logger.WriteVerbose($"Querying log '{logName}' on '{machineName} with query: {queryString}");
 
@@ -328,16 +330,18 @@ public partial class SearchEvents : Settings {
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <param name="sessionTimeoutMs">Session open/read timeout (ms); null uses defaults.</param>
     /// <param name="readMode">Amount of provider data to materialize for each event.</param>
+    /// <param name="minimumEventRecordIdExclusive">Optional native record-ID lower bound.</param>
     /// <returns>Enumerable collection of matching events.</returns>
-    public static IEnumerable<EventObject> QueryLog(string logName, List<int>? eventIds = null, string? machineName = null, string? providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string? userId = null, int maxEvents = 0, List<long>? eventRecordId = null, TimePeriod? timePeriod = null, CancellationToken cancellationToken = default, int? sessionTimeoutMs = null, EventReadMode readMode = EventReadMode.Full) {
-        return QueryLogsSequential(logName, eventIds, new List<string?> { machineName }, providerName, keywords, level, startTime, endTime, userId, maxEvents, eventRecordId, timePeriod, cancellationToken, sessionTimeoutMs ?? Settings.QuerySessionTimeoutMs, readMode);
+    public static IEnumerable<EventObject> QueryLog(string logName, List<int>? eventIds = null, string? machineName = null, string? providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string? userId = null, int maxEvents = 0, List<long>? eventRecordId = null, TimePeriod? timePeriod = null, CancellationToken cancellationToken = default, int? sessionTimeoutMs = null, EventReadMode readMode = EventReadMode.Full, long? minimumEventRecordIdExclusive = null) {
+        Func<string?, long?>? resolver = minimumEventRecordIdExclusive.HasValue ? _ => minimumEventRecordIdExclusive : null;
+        return QueryLogsSequential(logName, eventIds, new List<string?> { machineName }, providerName, keywords, level, startTime, endTime, userId, maxEvents, eventRecordId, timePeriod, cancellationToken, sessionTimeoutMs ?? Settings.QuerySessionTimeoutMs, readMode, resolver);
     }
 
     /// <summary>
     /// Queries a Windows event log by known-log enum with optional filters.
     /// </summary>
-    public static IEnumerable<EventObject> QueryLog(KnownLog logName, List<int>? eventIds = null, string? machineName = null, string? providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string? userId = null, int maxEvents = 0, List<long>? eventRecordId = null, TimePeriod? timePeriod = null, CancellationToken cancellationToken = default, int? sessionTimeoutMs = null, EventReadMode readMode = EventReadMode.Full) {
-        return QueryLog(LogNameToString(logName), eventIds, machineName, providerName, keywords, level, startTime, endTime, userId, maxEvents, eventRecordId, timePeriod, cancellationToken, sessionTimeoutMs ?? Settings.QuerySessionTimeoutMs, readMode);
+    public static IEnumerable<EventObject> QueryLog(KnownLog logName, List<int>? eventIds = null, string? machineName = null, string? providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string? userId = null, int maxEvents = 0, List<long>? eventRecordId = null, TimePeriod? timePeriod = null, CancellationToken cancellationToken = default, int? sessionTimeoutMs = null, EventReadMode readMode = EventReadMode.Full, long? minimumEventRecordIdExclusive = null) {
+        return QueryLog(LogNameToString(logName), eventIds, machineName, providerName, keywords, level, startTime, endTime, userId, maxEvents, eventRecordId, timePeriod, cancellationToken, sessionTimeoutMs ?? Settings.QuerySessionTimeoutMs, readMode, minimumEventRecordIdExclusive);
     }
 
     /// <summary>
@@ -345,9 +349,9 @@ public partial class SearchEvents : Settings {
     /// </summary>
     /// <remarks>This compatibility API materializes every result. Prefer the streaming APIs for large logs.</remarks>
     [Obsolete("Use QueryLog for synchronous streaming or QueryLogsParallel for bounded asynchronous streaming.")]
-    public static async Task<IEnumerable<EventObject>> QueryLogAsync(string logName, List<int>? eventIds = null, string? machineName = null, string? providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string? userId = null, int maxEvents = 0, List<long>? eventRecordId = null, TimePeriod? timePeriod = null, CancellationToken cancellationToken = default, int? sessionTimeoutMs = null, EventReadMode readMode = EventReadMode.Full) {
+    public static async Task<IEnumerable<EventObject>> QueryLogAsync(string logName, List<int>? eventIds = null, string? machineName = null, string? providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string? userId = null, int maxEvents = 0, List<long>? eventRecordId = null, TimePeriod? timePeriod = null, CancellationToken cancellationToken = default, int? sessionTimeoutMs = null, EventReadMode readMode = EventReadMode.Full, long? minimumEventRecordIdExclusive = null) {
         int timeout = sessionTimeoutMs ?? Settings.QuerySessionTimeoutMs;
-        return await Task.Run(() => QueryLog(logName, eventIds, machineName, providerName, keywords, level, startTime, endTime, userId, maxEvents, eventRecordId, timePeriod, cancellationToken, timeout, readMode).ToList().AsEnumerable(), cancellationToken);
+        return await Task.Run(() => QueryLog(logName, eventIds, machineName, providerName, keywords, level, startTime, endTime, userId, maxEvents, eventRecordId, timePeriod, cancellationToken, timeout, readMode, minimumEventRecordIdExclusive).ToList().AsEnumerable(), cancellationToken);
     }
 
     /// <summary>
@@ -365,8 +369,9 @@ public partial class SearchEvents : Settings {
     /// <param name="opcodes">The opcodes.</param>
     /// <param name="timePeriod">The time period.</param>
     /// <param name="eventRecordIds">Optional event record identifiers combined with the other filters.</param>
+    /// <param name="minimumEventRecordIdExclusive">Optional native record-ID lower bound.</param>
     /// <returns>XML query string.</returns>
-    private static string BuildQueryString(string logName, List<int>? eventIds = null, string? providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string? userId = null, List<int>? tasks = null, List<int>? opcodes = null, TimePeriod? timePeriod = null, List<long>? eventRecordIds = null) {
+    private static string BuildQueryString(string logName, List<int>? eventIds = null, string? providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string? userId = null, List<int>? tasks = null, List<int>? opcodes = null, TimePeriod? timePeriod = null, List<long>? eventRecordIds = null, long? minimumEventRecordIdExclusive = null) {
         TimeSpan? lastPeriod = null;
         if (timePeriod.HasValue) {
             var times = TimeHelper.GetTimePeriod(timePeriod.Value);
@@ -442,6 +447,13 @@ public partial class SearchEvents : Settings {
                 var recordConditions = validRecordIds.Select(id => $"(EventRecordID={id})");
                 AddCondition(queryString, $"({string.Join(" or ", recordConditions)})");
             }
+        }
+
+        if (minimumEventRecordIdExclusive.HasValue) {
+            if (minimumEventRecordIdExclusive.Value < 0) {
+                throw new ArgumentOutOfRangeException(nameof(minimumEventRecordIdExclusive), "Minimum event record ID must be greater than or equal to zero.");
+            }
+            AddCondition(queryString, $"EventRecordID&gt;{minimumEventRecordIdExclusive.Value.ToString(CultureInfo.InvariantCulture)}");
         }
 
         // Check if any conditions were added to the query

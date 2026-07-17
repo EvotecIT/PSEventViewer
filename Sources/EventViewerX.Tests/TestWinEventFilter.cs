@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Linq;
 using System.Xml.Linq;
 using Xunit;
 
@@ -142,6 +143,28 @@ namespace EventViewerX.Tests {
         public void NullFiltersReturnWildcard() {
             var result = SearchEvents.BuildWinEventFilter(xpathOnly: true);
             Assert.Equal("*", result);
+        }
+
+        [Fact]
+        public void MinimumRecordIdIsEmittedAsNativeExclusiveBoundary() {
+            string result = SearchEvents.BuildWinEventFilter(
+                minimumEventRecordIdExclusive: 123,
+                xpathOnly: true);
+
+            Assert.Equal("*[System[EventRecordID>123]]", result);
+        }
+
+        [Fact]
+        public void FilterRejectsMoreThanTheNativeXpathExpressionBudget() {
+            var namedData = new Hashtable {
+                { "Correlation", Enumerable.Range(1, SearchEvents.MaxXPathExpressionCount + 1).Select(static value => value.ToString()).ToArray() }
+            };
+
+            ArgumentException exception = Assert.Throws<ArgumentException>(() => SearchEvents.BuildWinEventFilter(
+                namedDataFilter: [namedData],
+                xpathOnly: true));
+
+            Assert.Contains(SearchEvents.MaxXPathExpressionCount.ToString(), exception.Message);
         }
     }
 }
