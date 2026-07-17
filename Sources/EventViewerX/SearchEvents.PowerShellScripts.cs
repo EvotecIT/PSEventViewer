@@ -17,6 +17,9 @@ namespace EventViewerX {
         /// <summary>Default maximum number of event snapshots retained across incomplete script groups.</summary>
         public const int DefaultPowerShellScriptEventCacheLimit = 2048;
 
+        /// <summary>Maximum accepted fragment number declared by one PowerShell script-block event.</summary>
+        public const int MaximumPowerShellScriptPartCount = 4096;
+
         private static Dictionary<string, string?> ParseContextInfo(string? context) {
             var result = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
             if (string.IsNullOrEmpty(context)) {
@@ -113,6 +116,7 @@ namespace EventViewerX {
         /// <param name="maxPendingScripts">Maximum incomplete script groups retained while scanning.</param>
         /// <param name="maxCachedEvents">Maximum event snapshots retained across incomplete script groups.</param>
         /// <param name="cancellationToken">Cancellation token used to interrupt native reads.</param>
+        /// <param name="executionInfo">Optional reusable completion record populated while the query runs.</param>
         /// <returns>Recovered script blocks in the order they are read.</returns>
         public static IEnumerable<RestoredPowerShellScript> GetPowerShellScripts(
             PowerShellEdition type,
@@ -126,7 +130,8 @@ namespace EventViewerX {
             int maxEventsScanned = 0,
             int maxPendingScripts = DefaultPowerShellScriptPendingLimit,
             int maxCachedEvents = DefaultPowerShellScriptEventCacheLimit,
-            CancellationToken cancellationToken = default) {
+            CancellationToken cancellationToken = default,
+            PowerShellScriptQueryExecutionInfo? executionInfo = null) {
             return RestorePowerShellScripts(
                 type,
                 machineName,
@@ -139,7 +144,8 @@ namespace EventViewerX {
                 maxEventsScanned,
                 maxPendingScripts,
                 maxCachedEvents,
-                cancellationToken);
+                cancellationToken,
+                executionInfo);
         }
     }
 }

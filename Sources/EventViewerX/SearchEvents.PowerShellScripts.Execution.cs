@@ -20,6 +20,7 @@ namespace EventViewerX {
         /// <param name="maxEvents">Maximum records to return. Zero returns every matching record.</param>
         /// <param name="maxEventsScanned">Maximum native event records to scan. Zero scans the complete query.</param>
         /// <param name="cancellationToken">Cancellation token used to interrupt native reads.</param>
+        /// <param name="executionInfo">Optional reusable completion record populated while the query runs.</param>
         /// <returns>Execution records in reverse chronological order.</returns>
         public static IEnumerable<PowerShellScriptExecutionInfo> GetPowerShellScriptExecution(
             PowerShellEdition type,
@@ -29,10 +30,13 @@ namespace EventViewerX {
             DateTime? dateTo = null,
             int maxEvents = 0,
             int maxEventsScanned = 0,
-            CancellationToken cancellationToken = default) {
+            CancellationToken cancellationToken = default,
+            PowerShellScriptQueryExecutionInfo? executionInfo = null) {
 
             ValidatePowerShellScriptLimits(maxEvents, nameof(maxEvents), maxEventsScanned);
             cancellationToken.ThrowIfCancellationRequested();
+            PowerShellScriptQueryExecutionInfo queryInfo = executionInfo ?? new PowerShellScriptQueryExecutionInfo();
+            queryInfo.Reset(machineName, eventLogPath, maxEvents, maxEventsScanned);
             string logName = type == PowerShellEdition.WindowsPowerShell
                 ? "Microsoft-Windows-PowerShell/Operational"
                 : "PowerShellCore/Operational";
@@ -69,6 +73,7 @@ namespace EventViewerX {
                 while (true) {
                     cancellationToken.ThrowIfCancellationRequested();
                     if (maxEventsScanned > 0 && scanned >= maxEventsScanned) {
+                        queryInfo.ScanLimitReached = true;
                         yield break;
                     }
 
@@ -82,14 +87,20 @@ namespace EventViewerX {
 
                     if (record == null) break;
                     scanned++;
+                    queryInfo.EventsScanned = scanned;
 
                     var eventObject = new EventObject(record, machineName ?? eventLogPath ?? GetFQDN(), EventReadMode.StructuredData);
                     var element = XElement.Parse(eventObject.XMLData);
                     string? contextInfo = ExtractData(element, "ContextInfo");
                     var data = ParseContextInfo(contextInfo);
-                    yield return new PowerShellScriptExecutionInfo(eventObject, data);
                     returned++;
-                    if (maxEvents > 0 && returned >= maxEvents) {
+                    queryInfo.ResultsReturned = returned;
+                    bool outputLimitReached = maxEvents > 0 && returned >= maxEvents;
+                    if (outputLimitReached) {
+                        queryInfo.OutputLimitReached = true;
+                    }
+                    yield return new PowerShellScriptExecutionInfo(eventObject, data);
+                    if (outputLimitReached) {
                         yield break;
                     }
                 }
@@ -114,6 +125,7 @@ namespace EventViewerX {
         /// <param name="maxPendingScripts">Maximum incomplete script groups retained while scanning.</param>
         /// <param name="maxCachedEvents">Maximum event snapshots retained across incomplete script groups.</param>
         /// <param name="cancellationToken">Cancellation token used to interrupt native reads.</param>
+        /// <param name="executionInfo">Optional reusable completion record populated while the query runs.</param>
         /// <returns>Restored script blocks in reverse chronological order.</returns>
         public static IEnumerable<RestoredPowerShellScript> RestorePowerShellScripts(
             PowerShellEdition type,
@@ -127,7 +139,8 @@ namespace EventViewerX {
             int maxEventsScanned = 0,
             int maxPendingScripts = DefaultPowerShellScriptPendingLimit,
             int maxCachedEvents = DefaultPowerShellScriptEventCacheLimit,
-            CancellationToken cancellationToken = default) {
+            CancellationToken cancellationToken = default,
+            PowerShellScriptQueryExecutionInfo? executionInfo = null) {
 
             ValidatePowerShellScriptLimits(maxScripts, nameof(maxScripts), maxEventsScanned);
             cancellationToken.ThrowIfCancellationRequested();
@@ -137,6 +150,9 @@ namespace EventViewerX {
             if (maxCachedEvents <= 0) {
                 throw new ArgumentOutOfRangeException(nameof(maxCachedEvents), "Maximum cached events must be positive.");
             }
+            bool ownsQueryInfo = executionInfo == null;
+            PowerShellScriptQueryExecutionInfo queryInfo = executionInfo ?? new PowerShellScriptQueryExecutionInfo();
+            queryInfo.Reset(machineName, eventLogPath, maxScripts, maxEventsScanned, maxPendingScripts, maxCachedEvents);
 
             string[] textFilters = containsText?
                 .Where(static term => term != null)
@@ -176,6 +192,7 @@ namespace EventViewerX {
                 while (true) {
                     cancellationToken.ThrowIfCancellationRequested();
                     if (maxEventsScanned > 0 && scanned >= maxEventsScanned) {
+                        queryInfo.ScanLimitReached = true;
                         _logger.WriteVerbose($"PowerShellScripts: stopped after reaching the {maxEventsScanned} event scan limit.");
                         break;
                     }
@@ -190,6 +207,7 @@ namespace EventViewerX {
 
                     if (record == null) break;
                     scanned++;
+                    queryInfo.EventsScanned = scanned;
 
                     var eventObject = new EventObject(record, machineName ?? eventLogPath ?? GetFQDN(), EventReadMode.StructuredData);
                     var element = XElement.Parse(eventObject.XMLData);
@@ -202,14 +220,28 @@ namespace EventViewerX {
                     if (scriptId == null) {
                         continue;
                     }
-                    int messageNumber = ParseNonNegativeInt(ExtractData(element, "MessageNumber"));
-                    int messageTotal = ParseNonNegativeInt(ExtractData(element, "MessageTotal"));
+                    int messageNumber = ParseBoundedFragmentNumber(ExtractData(element, "MessageNumber"), out bool invalidMessageNumber);
+                    int messageTotal = ParseBoundedFragmentNumber(ExtractData(element, "MessageTotal"), out bool invalidMessageTotal);
+                    if (invalidMessageNumber || invalidMessageTotal) {
+                        queryInfo.InvalidFragmentMetadataEvents++;
+                    }
+                    if (invalidMessageNumber) {
+                        continue;
+                    }
                     if (cache.TryAdd(scriptId, messageNumber, messageTotal, nonNullScriptText, eventObject, out PowerShellScriptAssembly? completed) &&
                         completed != null &&
                         TryBuildRestoredPowerShellScript(completed, format, textFilters, out RestoredPowerShellScript restored)) {
-                        yield return restored;
+                        if (!restored.IsComplete) {
+                            queryInfo.IncompleteScriptsReturned++;
+                        }
                         returned++;
-                        if (maxScripts > 0 && returned >= maxScripts) {
+                        queryInfo.ResultsReturned = returned;
+                        bool outputLimitReached = maxScripts > 0 && returned >= maxScripts;
+                        if (outputLimitReached) {
+                            queryInfo.OutputLimitReached = true;
+                        }
+                        yield return restored;
+                        if (outputLimitReached) {
                             _logger.WriteVerbose($"PowerShellScripts: stopped after returning the configured maximum of {maxScripts} scripts.");
                             yield break;
                         }
@@ -222,16 +254,26 @@ namespace EventViewerX {
                         continue;
                     }
 
-                    yield return restored;
+                    if (!restored.IsComplete) {
+                        queryInfo.IncompleteScriptsReturned++;
+                    }
                     returned++;
-                    if (maxScripts > 0 && returned >= maxScripts) {
+                    queryInfo.ResultsReturned = returned;
+                    bool outputLimitReached = maxScripts > 0 && returned >= maxScripts;
+                    if (outputLimitReached) {
+                        queryInfo.OutputLimitReached = true;
+                    }
+                    yield return restored;
+                    if (outputLimitReached) {
                         _logger.WriteVerbose($"PowerShellScripts: stopped after returning the configured maximum of {maxScripts} scripts.");
                         yield break;
                     }
                 }
             }
             finally {
-                if (cache.EvictedScriptCount > 0) {
+                queryInfo.EvictedIncompleteScripts = cache.EvictedScriptCount;
+                queryInfo.EvictedCachedEvents = cache.EvictedEventCount;
+                if (ownsQueryInfo && cache.EvictedScriptCount > 0) {
                     _logger.WriteWarning(
                         $"PowerShellScripts: evicted {cache.EvictedScriptCount} incomplete script groups " +
                         $"containing {cache.EvictedEventCount} events after reaching the configured cache bounds.");
@@ -249,10 +291,20 @@ namespace EventViewerX {
             }
         }
 
-        private static int ParseNonNegativeInt(string? value) {
-            return int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out int parsed) && parsed > 0
-                ? parsed
-                : 0;
+        private static int ParseBoundedFragmentNumber(string? value, out bool invalid) {
+            invalid = false;
+            if (string.IsNullOrWhiteSpace(value)) {
+                return 0;
+            }
+
+            if (!int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out int parsed) ||
+                parsed < 0 ||
+                parsed > MaximumPowerShellScriptPartCount) {
+                invalid = true;
+                return 0;
+            }
+
+            return parsed;
         }
 
         private static bool TryBuildRestoredPowerShellScript(
@@ -262,10 +314,8 @@ namespace EventViewerX {
             out RestoredPowerShellScript restored) {
 
             var scriptBuilder = new StringBuilder();
-            for (int partNumber = 1; partNumber <= assembly.ExpectedParts; partNumber++) {
-                if (assembly.Parts.TryGetValue(partNumber, out string? part)) {
-                    scriptBuilder.Append(part);
-                }
+            foreach (KeyValuePair<int, string> part in assembly.Parts.OrderBy(static pair => pair.Key)) {
+                scriptBuilder.Append(part.Value);
             }
 
             string script = scriptBuilder.ToString();

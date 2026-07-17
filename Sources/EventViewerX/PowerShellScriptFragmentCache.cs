@@ -45,6 +45,13 @@ internal sealed class PowerShellScriptFragmentCache {
         EventObject eventObject,
         out PowerShellScriptAssembly? completed) {
 
+        if (messageNumber < 0 || messageNumber > SearchEvents.MaximumPowerShellScriptPartCount) {
+            throw new ArgumentOutOfRangeException(nameof(messageNumber));
+        }
+        if (messageTotal < 0 || messageTotal > SearchEvents.MaximumPowerShellScriptPartCount) {
+            throw new ArgumentOutOfRangeException(nameof(messageTotal));
+        }
+
         if (!_pending.TryGetValue(scriptBlockId, out PendingScript? script)) {
             LinkedListNode<string> orderNode = _pendingOrder.AddLast(scriptBlockId);
             script = new PendingScript(orderNode);

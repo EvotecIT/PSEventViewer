@@ -7,6 +7,7 @@ $query = @{
     MaxEventsScanned  = 50000
     MaxPendingScripts = 512
     MaxCachedEvents   = 2048
+    IncludeQueryInfo  = $true
     Verbose           = $true
 }
 Get-EVXPowerShellScript @query

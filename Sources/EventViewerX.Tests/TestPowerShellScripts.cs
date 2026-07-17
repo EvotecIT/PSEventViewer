@@ -131,6 +131,53 @@ namespace EventViewerX.Tests {
         }
 
         [Fact]
+        public void FragmentCacheRejectsUntrustedOversizedPartDeclarations() {
+            var cache = new PowerShellScriptFragmentCache(maxPendingScripts: 2, maxCachedEvents: 2);
+
+            Assert.Throws<ArgumentOutOfRangeException>(() => cache.TryAdd(
+                "script-1",
+                messageNumber: 1,
+                messageTotal: int.MaxValue,
+                scriptText: "content",
+                CreateEventObject(),
+                out _));
+        }
+
+        [Fact]
+        public void ScriptReconstructionUsesAvailablePartKeysInsteadOfTheDeclaredRange() {
+            var assembly = new PowerShellScriptAssembly(
+                "script-1",
+                metaRecord: null,
+                events: new[] { CreateEventObject() },
+                parts: new Dictionary<int, string> {
+                    [1] = "first",
+                    [SearchEvents.MaximumPowerShellScriptPartCount] = "last"
+                },
+                expectedParts: int.MaxValue,
+                isComplete: false);
+            MethodInfo method = typeof(SearchEvents).GetMethod(
+                "TryBuildRestoredPowerShellScript",
+                BindingFlags.NonPublic | BindingFlags.Static)!;
+            object?[] arguments = { assembly, false, new[] { "not-present" }, null };
+
+            bool matched = Assert.IsType<bool>(method.Invoke(null, arguments));
+
+            Assert.False(matched);
+        }
+
+        [Fact]
+        public void QueryExecutionInfoMakesBoundedOrIncompleteResultsMachineReadable() {
+            var info = new PowerShellScriptQueryExecutionInfo();
+            info.Reset("AD1", null, maxResults: 10, maxEventsScanned: 100);
+            info.EventsScanned = 100;
+            info.ScanLimitReached = true;
+
+            Assert.True(info.MayBeIncomplete);
+            Assert.Equal("AD1", info.MachineName);
+            Assert.Equal(100, info.EventsScanned);
+        }
+
+        [Fact]
         public void GetPowerShellScriptsRejectsInvalidBoundsBeforeOpeningTheLog() {
             Assert.Throws<ArgumentOutOfRangeException>(() => SearchEvents.GetPowerShellScripts(
                 PowerShellEdition.WindowsPowerShell,
@@ -147,7 +194,26 @@ namespace EventViewerX.Tests {
 
             Assert.Throws<OperationCanceledException>(() => SearchEvents.GetPowerShellScripts(
                 PowerShellEdition.WindowsPowerShell,
-                cancellationToken: cancellation.Token).ToList());
+                null,
+                null,
+                null,
+                null,
+                false,
+                null,
+                0,
+                0,
+                SearchEvents.DefaultPowerShellScriptPendingLimit,
+                SearchEvents.DefaultPowerShellScriptEventCacheLimit,
+                cancellation.Token).ToList());
+            Assert.Throws<OperationCanceledException>(() => SearchEvents.GetPowerShellScriptExecution(
+                PowerShellEdition.WindowsPowerShell,
+                null,
+                null,
+                null,
+                null,
+                0,
+                0,
+                cancellation.Token).ToList());
         }
 
         private static EventObject CreateEventObject() {
