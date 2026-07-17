@@ -37,7 +37,7 @@ Describe 'Additional Get-WinEventFilter cases' {
     }
     It '-ExcludeID uses inequality syntax' {
         $XPath = Get-EVXFilter -ExcludeID 1,2 -LogName 'xx' -XPathOnly
-        $XPath | Should -Be '*[System[(EventID!=1) or (EventID!=2)]]'
+        $XPath | Should -Be '*[System[(EventID!=1) and (EventID!=2)]]'
     }
 
     It '-Keywords single value should produce band filter' {

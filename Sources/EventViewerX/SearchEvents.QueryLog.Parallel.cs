@@ -42,54 +42,57 @@ public partial class SearchEvents : Settings {
             ? new List<string?> { null }
             : machineNames;
         int fixedExpressionCount = CountFixedQueryExpressions(providerName, keywords, level, startTime, endTime, userId, timePeriod);
-        List<QueryWorkItem> workItems = BuildQueryWorkItems(targets, eventIds, eventRecordId, fixedExpressionCount);
         int effectiveBufferCapacity = bufferCapacity > 0 ? bufferCapacity : Math.Max(16, maxThreads * 4);
 
         using var workerCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        using var semaphore = new SemaphoreSlim(maxThreads, maxThreads);
         using var results = new BlockingCollection<EventObject>(effectiveBufferCapacity);
+        using IEnumerator<QueryWorkItem> workItems = BuildQueryWorkItems(targets, eventIds, eventRecordId, fixedExpressionCount).GetEnumerator();
+        var workItemSync = new object();
+        var failures = new ConcurrentQueue<Exception>();
         int produced = 0;
         int published = 0;
 
-        var tasks = new List<Task>(workItems.Count);
-        foreach (QueryWorkItem workItem in workItems) {
-            tasks.Add(Task.Run(async () => {
-                bool enteredSemaphore = false;
+        var tasks = new List<Task>(maxThreads);
+        for (int workerIndex = 0; workerIndex < maxThreads; workerIndex++) {
+            tasks.Add(Task.Run(() => {
                 try {
-                    await semaphore.WaitAsync(workerCancellation.Token).ConfigureAwait(false);
-                    enteredSemaphore = true;
-                    foreach (EventObject result in QueryLogEnumerable(
-                                 logName,
-                                 workItem.EventIds,
-                                 workItem.MachineName,
-                                 providerName,
-                                 keywords,
-                                 level,
-                                 startTime,
-                                 endTime,
-                                 userId,
-                                 maxEvents: 0,
-                                 eventRecordId: workItem.EventRecordIds,
-                                 timePeriod: timePeriod,
-                                 cancellationToken: workerCancellation.Token,
-                                 sessionTimeoutMs: sessionTimeoutMs ?? Settings.QuerySessionTimeoutMs,
-                                 readMode: readMode)) {
-                        if (!TryReserveResult(ref produced, maxEvents)) {
-                            break;
+                    while (TryTakeWorkItem(workItems, workItemSync, workerCancellation.Token, out QueryWorkItem workItem)) {
+                        foreach (EventObject result in QueryLogEnumerable(
+                                     logName,
+                                     workItem.EventIds,
+                                     workItem.MachineName,
+                                     providerName,
+                                     keywords,
+                                     level,
+                                     startTime,
+                                     endTime,
+                                     userId,
+                                     maxEvents: 0,
+                                     eventRecordId: workItem.EventRecordIds,
+                                     timePeriod: timePeriod,
+                                     cancellationToken: workerCancellation.Token,
+                                     sessionTimeoutMs: sessionTimeoutMs ?? Settings.QuerySessionTimeoutMs,
+                                     readMode: readMode)) {
+                            if (!TryReserveResult(ref produced, maxEvents)) {
+                                return;
+                            }
+
+                            results.Add(result, workerCancellation.Token);
+                            if (maxEvents > 0 && Interlocked.Increment(ref published) >= maxEvents) {
+                                workerCancellation.Cancel();
+                                return;
+                            }
                         }
 
-                        results.Add(result, workerCancellation.Token);
-                        if (maxEvents > 0 && Interlocked.Increment(ref published) >= maxEvents) {
-                            workerCancellation.Cancel();
+                        if (maxEvents > 0 && Volatile.Read(ref produced) >= maxEvents) {
                             break;
                         }
                     }
-                } catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested && maxEvents > 0 && Volatile.Read(ref published) >= maxEvents) {
-                    // The shared result limit stopped remaining workers.
-                } finally {
-                    if (enteredSemaphore) {
-                        semaphore.Release();
-                    }
+                } catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested && workerCancellation.IsCancellationRequested) {
+                    // The shared result limit or another worker stopped remaining work.
+                } catch (Exception ex) {
+                    failures.Enqueue(ex);
+                    workerCancellation.Cancel();
                 }
             }, CancellationToken.None));
         }
@@ -110,6 +113,9 @@ public partial class SearchEvents : Settings {
 
             await workers.ConfigureAwait(false);
             workersObserved = true;
+            if (failures.TryDequeue(out Exception? failure)) {
+                throw failure;
+            }
         } finally {
             workerCancellation.Cancel();
             if (!workersObserved) {
@@ -268,7 +274,7 @@ public partial class SearchEvents : Settings {
         }
     }
 
-    internal static List<QueryWorkItem> BuildQueryWorkItems(List<string?> machineNames, List<int>? eventIds, List<long>? eventRecordIds, int fixedExpressionCount) {
+    internal static IEnumerable<QueryWorkItem> BuildQueryWorkItems(List<string?> machineNames, List<int>? eventIds, List<long>? eventRecordIds, int fixedExpressionCount) {
         if (fixedExpressionCount < 0 || fixedExpressionCount >= MaxXPathExpressionCount) {
             throw new ArgumentOutOfRangeException(nameof(fixedExpressionCount), $"Fixed query expressions must be between zero and {MaxXPathExpressionCount - 1}.");
         }
@@ -279,21 +285,17 @@ public partial class SearchEvents : Settings {
             throw new ArgumentException("Event record IDs must be positive.", nameof(eventRecordIds));
         }
 
-        var workItems = new List<QueryWorkItem>();
         eventIds = eventIds?.Distinct().ToList();
         eventRecordIds = eventRecordIds?.Distinct().ToList();
         int availableExpressions = MaxXPathExpressionCount - fixedExpressionCount;
         (int eventIdChunkSize, int eventRecordIdChunkSize) = AllocateChunkSizes(eventIds?.Count ?? 0, eventRecordIds?.Count ?? 0, availableExpressions);
-        List<List<int>?> eventIdChunks = BuildChunks(eventIds, eventIdChunkSize);
-        List<List<long>?> eventRecordIdChunks = BuildChunks(eventRecordIds, eventRecordIdChunkSize);
         foreach (string? machineName in machineNames) {
-            foreach (List<int>? eventIdChunk in eventIdChunks) {
-                foreach (List<long>? eventRecordIdChunk in eventRecordIdChunks) {
-                    workItems.Add(new QueryWorkItem(machineName, eventIdChunk, eventRecordIdChunk));
+            foreach (List<int>? eventIdChunk in EnumerateChunks(eventIds, eventIdChunkSize)) {
+                foreach (List<long>? eventRecordIdChunk in EnumerateChunks(eventRecordIds, eventRecordIdChunkSize)) {
+                    yield return new QueryWorkItem(machineName, eventIdChunk, eventRecordIdChunk);
                 }
             }
         }
-        return workItems;
     }
 
     private static (int EventIdChunkSize, int EventRecordIdChunkSize) AllocateChunkSizes(int eventIdCount, int eventRecordIdCount, int availableExpressions) {
@@ -320,11 +322,10 @@ public partial class SearchEvents : Settings {
         return (eventIdChunkSize, eventRecordIdChunkSize);
     }
 
-    private static List<List<T>?> BuildChunks<T>(List<T>? values, int chunkSize) {
-        var chunks = new List<List<T>?>();
+    private static IEnumerable<List<T>?> EnumerateChunks<T>(List<T>? values, int chunkSize) {
         if (values == null || values.Count == 0) {
-            chunks.Add(values);
-            return chunks;
+            yield return values;
+            yield break;
         }
 
         if (chunkSize <= 0) {
@@ -333,9 +334,21 @@ public partial class SearchEvents : Settings {
 
         for (int offset = 0; offset < values.Count; offset += chunkSize) {
             int count = Math.Min(chunkSize, values.Count - offset);
-            chunks.Add(values.GetRange(offset, count));
+            yield return values.GetRange(offset, count);
         }
-        return chunks;
+    }
+
+    private static bool TryTakeWorkItem(IEnumerator<QueryWorkItem> workItems, object syncRoot, CancellationToken cancellationToken, out QueryWorkItem workItem) {
+        lock (syncRoot) {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (workItems.MoveNext()) {
+                workItem = workItems.Current;
+                return true;
+            }
+        }
+
+        workItem = null!;
+        return false;
     }
 
     internal static int CountFixedQueryExpressions(string? providerName, Keywords? keywords, Level? level, DateTime? startTime, DateTime? endTime, string? userId, TimePeriod? timePeriod) {

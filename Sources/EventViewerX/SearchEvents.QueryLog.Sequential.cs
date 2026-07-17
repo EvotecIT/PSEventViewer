@@ -5,6 +5,8 @@ using System.Threading;
 namespace EventViewerX;
 
 public partial class SearchEvents {
+    internal const int MaxSequentialOpenQueries = 8;
+
     /// <summary>
     /// Streams events from one or more machines in target order using one global result limit.
     /// </summary>
@@ -37,20 +39,30 @@ public partial class SearchEvents {
                 yield break;
             }
 
-            List<QueryWorkItem> workItems = BuildQueryWorkItems(new List<string?> { machineName }, eventIds, eventRecordId, fixedExpressionCount);
+            IEnumerable<QueryWorkItem> workItems = BuildQueryWorkItems(new List<string?> { machineName }, eventIds, eventRecordId, fixedExpressionCount);
+            int remaining = maxEvents > 0 ? maxEvents - returned : 0;
             foreach (EventObject result in MergeQueryWorkItems(
                          workItems,
-                         logName,
-                         providerName,
-                         keywords,
-                         level,
-                         startTime,
-                         endTime,
-                         userId,
-                         timePeriod,
+                         workItem => QueryLogEnumerable(
+                             logName,
+                             workItem.EventIds,
+                             workItem.MachineName,
+                             providerName,
+                             keywords,
+                             level,
+                             startTime,
+                             endTime,
+                             userId,
+                             maxEvents: 0,
+                             eventRecordId: workItem.EventRecordIds,
+                             timePeriod: timePeriod,
+                             cancellationToken: cancellationToken,
+                             sessionTimeoutMs: sessionTimeoutMs ?? Settings.QuerySessionTimeoutMs,
+                             readMode: readMode).GetEnumerator(),
+                         remaining,
+                         oldest: false,
                          cancellationToken,
-                         sessionTimeoutMs ?? Settings.QuerySessionTimeoutMs,
-                         readMode)) {
+                         MaxSequentialOpenQueries)) {
                 yield return result;
                 returned++;
                 if (maxEvents > 0 && returned >= maxEvents) {
@@ -61,40 +73,82 @@ public partial class SearchEvents {
     }
 
     private static IEnumerable<EventObject> MergeQueryWorkItems(
-        List<QueryWorkItem> workItems,
-        string logName,
-        string? providerName,
-        Keywords? keywords,
-        Level? level,
-        DateTime? startTime,
-        DateTime? endTime,
-        string? userId,
-        TimePeriod? timePeriod,
+        IEnumerable<QueryWorkItem> workItems,
+        Func<QueryWorkItem, IEnumerator<EventObject>> createEnumerator,
+        int maxEvents,
+        bool oldest,
         CancellationToken cancellationToken,
-        int sessionTimeoutMs,
-        EventReadMode readMode) {
+        int maxOpenQueries) {
+
+        if (maxOpenQueries <= 0) {
+            throw new ArgumentOutOfRangeException(nameof(maxOpenQueries));
+        }
+
+        using IEnumerator<QueryWorkItem> source = workItems.GetEnumerator();
+        if (!source.MoveNext()) {
+            yield break;
+        }
+
+        QueryWorkItem first = source.Current;
+        if (!source.MoveNext()) {
+            using IEnumerator<EventObject> single = createEnumerator(first);
+            int returned = 0;
+            while (single.MoveNext()) {
+                cancellationToken.ThrowIfCancellationRequested();
+                yield return single.Current;
+                returned++;
+                if (maxEvents > 0 && returned >= maxEvents) {
+                    yield break;
+                }
+            }
+            yield break;
+        }
+
+        var candidates = new List<EventObject>();
+        var batch = new List<QueryWorkItem>(maxOpenQueries) { first, source.Current };
+        while (true) {
+            while (batch.Count < maxOpenQueries && source.MoveNext()) {
+                batch.Add(source.Current);
+            }
+
+            foreach (EventObject result in MergeQueryBatch(batch, createEnumerator, maxEvents, oldest, cancellationToken)) {
+                candidates.Add(result);
+            }
+
+            if (maxEvents > 0) {
+                SortAndTrim(candidates, maxEvents, oldest);
+            }
+
+            if (!source.MoveNext()) {
+                break;
+            }
+
+            batch.Clear();
+            batch.Add(source.Current);
+        }
+
+        candidates.Sort((left, right) => CompareEvents(left, right, oldest));
+        int count = maxEvents > 0 ? Math.Min(maxEvents, candidates.Count) : candidates.Count;
+        for (int index = 0; index < count; index++) {
+            cancellationToken.ThrowIfCancellationRequested();
+            yield return candidates[index];
+        }
+    }
+
+    private static IEnumerable<EventObject> MergeQueryBatch(
+        IReadOnlyList<QueryWorkItem> workItems,
+        Func<QueryWorkItem, IEnumerator<EventObject>> createEnumerator,
+        int maxEvents,
+        bool oldest,
+        CancellationToken cancellationToken) {
 
         var cursors = new List<QueryCursor>(workItems.Count);
-        var queue = new SortedSet<QueryCursor>(QueryCursorComparer.Instance);
+        var queue = new SortedSet<QueryCursor>(new QueryCursorComparer(oldest));
+        int returned = 0;
         try {
             for (int index = 0; index < workItems.Count; index++) {
                 QueryWorkItem workItem = workItems[index];
-                IEnumerator<EventObject> enumerator = QueryLogEnumerable(
-                    logName,
-                    workItem.EventIds,
-                    workItem.MachineName,
-                    providerName,
-                    keywords,
-                    level,
-                    startTime,
-                    endTime,
-                    userId,
-                    maxEvents: 0,
-                    eventRecordId: workItem.EventRecordIds,
-                    timePeriod: timePeriod,
-                    cancellationToken: cancellationToken,
-                    sessionTimeoutMs: sessionTimeoutMs,
-                    readMode: readMode).GetEnumerator();
+                IEnumerator<EventObject> enumerator = createEnumerator(workItem);
                 var cursor = new QueryCursor(index, enumerator);
                 cursors.Add(cursor);
                 if (cursor.MoveNext()) {
@@ -107,6 +161,10 @@ public partial class SearchEvents {
                 QueryCursor cursor = queue.Min!;
                 queue.Remove(cursor);
                 yield return cursor.Current;
+                returned++;
+                if (maxEvents > 0 && returned >= maxEvents) {
+                    yield break;
+                }
                 if (cursor.MoveNext()) {
                     queue.Add(cursor);
                 }
@@ -116,6 +174,32 @@ public partial class SearchEvents {
                 cursor.Dispose();
             }
         }
+    }
+
+    private static void SortAndTrim(List<EventObject> candidates, int maxEvents, bool oldest) {
+        candidates.Sort((left, right) => CompareEvents(left, right, oldest));
+        if (candidates.Count > maxEvents) {
+            candidates.RemoveRange(maxEvents, candidates.Count - maxEvents);
+        }
+    }
+
+    private static int CompareEvents(EventObject left, EventObject right, bool oldest) {
+        int recordComparison = oldest
+            ? Nullable.Compare(left.RecordId, right.RecordId)
+            : Nullable.Compare(right.RecordId, left.RecordId);
+        if (recordComparison != 0) {
+            return recordComparison;
+        }
+
+        int timeComparison = oldest
+            ? left.TimeCreated.CompareTo(right.TimeCreated)
+            : right.TimeCreated.CompareTo(left.TimeCreated);
+        if (timeComparison != 0) {
+            return timeComparison;
+        }
+
+        int idComparison = left.Id.CompareTo(right.Id);
+        return oldest ? idComparison : -idComparison;
     }
 
     private sealed class QueryCursor : IDisposable {
@@ -148,7 +232,11 @@ public partial class SearchEvents {
     }
 
     private sealed class QueryCursorComparer : IComparer<QueryCursor> {
-        internal static QueryCursorComparer Instance { get; } = new();
+        private readonly bool _oldest;
+
+        internal QueryCursorComparer(bool oldest) {
+            _oldest = oldest;
+        }
 
         public int Compare(QueryCursor? left, QueryCursor? right) {
             if (ReferenceEquals(left, right)) {
@@ -161,12 +249,11 @@ public partial class SearchEvents {
                 return -1;
             }
 
-            int recordComparison = Nullable.Compare(right.Current.RecordId, left.Current.RecordId);
+            int recordComparison = CompareEvents(left.Current, right.Current, _oldest);
             if (recordComparison != 0) {
                 return recordComparison;
             }
-            int timeComparison = right.Current.TimeCreated.CompareTo(left.Current.TimeCreated);
-            return timeComparison != 0 ? timeComparison : left.Index.CompareTo(right.Index);
+            return left.Index.CompareTo(right.Index);
         }
     }
 }

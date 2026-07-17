@@ -50,64 +50,78 @@ public partial class SearchEvents : Settings {
             throw new ArgumentException("Event record IDs must be positive.", nameof(eventRecordId));
         }
 
-        // Check if we have any filters that require an XML query
-        bool hasFilters = namedDataFilter != null || namedDataExcludeFilter != null || eventIds != null ||
-                         !string.IsNullOrEmpty(providerName) || keywords != null || level != null || startTime != null ||
-                         endTime != null || userId != null || eventRecordId != null;
-
-        string xpath;
-        EventLogQuery query;
-
-        // Use XPath only; path is supplied via EventLogQuery FilePath
-        if (hasFilters) {
-            var namedDataFilterArray = namedDataFilter != null ? new[] { namedDataFilter! } : null;
-            var namedDataExcludeFilterArray = namedDataExcludeFilter != null ? new[] { namedDataExcludeFilter! } : null;
-            var idArray = eventIds?.Select(i => i.ToString()).ToArray();
-            var eventRecordIdArray = eventRecordId?.Select(i => i.ToString()).ToArray();
-            var providerNameArray = !string.IsNullOrEmpty(providerName) ? new[] { providerName! } : null;
-            var keywordsArray = keywords != null ? new[] { (long)keywords.Value } : null;
-            var levelArray = level != null ? new[] { level.Value.ToString() } : null;
-            var userIdArray = !string.IsNullOrEmpty(userId) ? new[] { userId! } : null;
-
-            xpath = BuildWinEventFilter(
-                id: idArray,
-                eventRecordId: eventRecordIdArray,
-                startTime: startTime,
-                endTime: endTime,
-                providerName: providerNameArray,
-                keywords: keywordsArray,
-                level: levelArray,
-                userId: userIdArray,
-                namedDataFilter: namedDataFilterArray,
-                namedDataExcludeFilter: namedDataExcludeFilterArray,
-                xpathOnly: true
-            );
-
-            if (string.IsNullOrWhiteSpace(xpath)) {
-                xpath = "*";
-            }
-
-            _logger.WriteVerbose($"QueryLogFile: path '{absolutePath}', exists: True, xpath '{xpath}', mode: complex");
-
-            query = new EventLogQuery(absolutePath, PathType.FilePath, xpath) {
-                ReverseDirection = !oldest,
-                TolerateQueryErrors = false
-            };
-        } else {
-            xpath = BuildWinEventFilter(xpathOnly: true);
-
-            if (string.IsNullOrWhiteSpace(xpath)) {
-                xpath = "*";
-            }
-
-            _logger.WriteVerbose($"QueryLogFile: path '{absolutePath}', exists: True, xpath '{xpath}', mode: simple");
-
-            query = new EventLogQuery(absolutePath, PathType.FilePath, xpath) {
-                ReverseDirection = !oldest,
-                TolerateQueryErrors = false
-            };
+        if (timePeriod.HasValue) {
+            (DateTime? periodStart, DateTime? periodEnd, TimeSpan? lastPeriod) = TimeHelper.GetTimePeriod(timePeriod.Value);
+            startTime = lastPeriod.HasValue ? DateTime.Now.Subtract(lastPeriod.Value) : periodStart;
+            endTime = periodEnd;
         }
 
+        int fixedExpressionCount = CountFixedQueryExpressions(providerName, keywords, level, startTime, endTime, userId, timePeriod: null);
+        IEnumerable<QueryWorkItem> workItems = BuildQueryWorkItems(
+            new List<string?> { null },
+            eventIds,
+            eventRecordId,
+            fixedExpressionCount);
+
+        foreach (EventObject eventObject in MergeQueryWorkItems(
+                     workItems,
+                     workItem => QueryLogFileChunk(
+                         absolutePath,
+                         workItem.EventIds,
+                         providerName,
+                         keywords,
+                         level,
+                         startTime,
+                         endTime,
+                         userId,
+                         workItem.EventRecordIds,
+                         oldest,
+                         namedDataFilter,
+                         namedDataExcludeFilter,
+                         cancellationToken,
+                         readMode).GetEnumerator(),
+                     maxEvents,
+                     oldest,
+                     cancellationToken,
+                     MaxSequentialOpenQueries)) {
+            yield return eventObject;
+        }
+    }
+
+    private static IEnumerable<EventObject> QueryLogFileChunk(
+        string absolutePath,
+        List<int>? eventIds,
+        string? providerName,
+        Keywords? keywords,
+        Level? level,
+        DateTime? startTime,
+        DateTime? endTime,
+        string? userId,
+        List<long>? eventRecordId,
+        bool oldest,
+        System.Collections.Hashtable? namedDataFilter,
+        System.Collections.Hashtable? namedDataExcludeFilter,
+        CancellationToken cancellationToken,
+        EventReadMode readMode) {
+
+        string xpath = BuildWinEventFilter(
+            id: eventIds?.Select(static id => id.ToString()).ToArray(),
+            eventRecordId: eventRecordId?.Select(static id => id.ToString()).ToArray(),
+            startTime: startTime,
+            endTime: endTime,
+            providerName: !string.IsNullOrEmpty(providerName) ? new[] { providerName! } : null,
+            keywords: keywords.HasValue ? new[] { (long)keywords.Value } : null,
+            level: level.HasValue ? new[] { level.Value.ToString() } : null,
+            userId: !string.IsNullOrEmpty(userId) ? new[] { userId! } : null,
+            namedDataFilter: namedDataFilter != null ? new[] { namedDataFilter } : null,
+            namedDataExcludeFilter: namedDataExcludeFilter != null ? new[] { namedDataExcludeFilter } : null,
+            xpathOnly: true);
+
+        _logger.WriteVerbose($"QueryLogFile: path '{absolutePath}', xpath '{xpath}'");
+        var query = new EventLogQuery(absolutePath, PathType.FilePath, xpath) {
+            ReverseDirection = !oldest,
+            TolerateQueryErrors = false
+        };
         var fallbackQuery = CreateFileFallbackQuery(absolutePath, xpath, oldest);
         EventLogReader? primaryReader;
         try {
@@ -122,7 +136,6 @@ public partial class SearchEvents : Settings {
                 yield break;
             }
 
-            int eventCount = 0;
             while (true) {
                 cancellationToken.ThrowIfCancellationRequested();
 
@@ -131,19 +144,13 @@ public partial class SearchEvents : Settings {
                     break;
                 }
 
-                yield return new EventObject(record, filePath, readMode);
-                eventCount++;
-                if (maxEvents > 0 && eventCount >= maxEvents) {
-                    break;
-                }
+                yield return new EventObject(record, absolutePath, readMode);
             }
 
             yield break;
         }
 
         using (primaryReader) {
-            int eventCount = 0;
-
             // Some runtimes return a valid reader but yield no events for FilePath queries on specific EVTX files.
             // If this happens, retry with the QueryList fallback.
             var record = primaryReader.ReadEvent();
@@ -161,11 +168,7 @@ public partial class SearchEvents : Settings {
                         break;
                     }
 
-                    yield return new EventObject(record, filePath, readMode);
-                    eventCount++;
-                    if (maxEvents > 0 && eventCount >= maxEvents) {
-                        break;
-                    }
+                    yield return new EventObject(record, absolutePath, readMode);
                 }
 
                 yield break;
@@ -177,11 +180,7 @@ public partial class SearchEvents : Settings {
                     cancellationToken.ThrowIfCancellationRequested();
                 }
 
-                yield return new EventObject(record, filePath, readMode);
-                eventCount++;
-                if (maxEvents > 0 && eventCount >= maxEvents) {
-                    break;
-                }
+                yield return new EventObject(record, absolutePath, readMode);
 
                 record = primaryReader.ReadEvent();
                 if (record == null) {
@@ -194,7 +193,8 @@ public partial class SearchEvents : Settings {
     private static EventLogQuery CreateFileFallbackQuery(string absolutePath, string xpath, bool oldest) {
         string escapedPath = EscapeXmlValue(absolutePath);
         string escapedXPath = EscapeXmlValue(xpath);
-        string queryString = $"<QueryList><Query Id='0' Path='{escapedPath}'><Select Path='{escapedPath}'>{escapedXPath}</Select></Query></QueryList>";
+        string filePath = $"file://{escapedPath}";
+        string queryString = $"<QueryList><Query Id='0' Path='{filePath}'><Select Path='{filePath}'>{escapedXPath}</Select></Query></QueryList>";
         return new EventLogQuery(null, PathType.LogName, queryString) {
             ReverseDirection = !oldest,
             TolerateQueryErrors = false

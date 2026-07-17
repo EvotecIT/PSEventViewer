@@ -3,9 +3,9 @@ using EventViewerX;
 
 namespace EventViewerX.Tests {
     public class TestSearchingEvents {
-        [Fact]
+        [LiveFact]
+        [Trait("Category", "Live")]
         public void QuerySecurityEvents4932and4933() {
-            if (!OperatingSystem.IsWindows()) return;
             var fields = new List<string>() { "DestinationDRA", "SourceDRA", "NamingContext", "Options", "SessionID", "EndUSN", "StatusCode", "StartUSN" };
             foreach (var eventObject in SearchEvents.QueryLog(KnownLog.Security, [4932, 4933], "AD1")) {
                 Assert.True(eventObject.Id == 4932 || eventObject.Id == 4933);

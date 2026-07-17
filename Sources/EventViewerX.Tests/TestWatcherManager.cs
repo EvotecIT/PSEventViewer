@@ -7,6 +7,7 @@ using System.Runtime.Serialization;
 using Xunit;
 
 namespace EventViewerX.Tests {
+    [Collection("WatcherManager")]
     public class TestWatcherManager {
         [Fact]
         public void StartWatcherReturnsExistingInstance() {

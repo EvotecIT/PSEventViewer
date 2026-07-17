@@ -6,7 +6,7 @@
         <AssemblyName>EventViewerX</AssemblyName>
         <AssemblyTitle>EventViewerX</AssemblyTitle>
         <VersionPrefix>4.0.0</VersionPrefix>
-        <PackageReadmeFile>README.MD</PackageReadmeFile>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
         <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
         <Company>Evotec</Company>
@@ -28,7 +28,7 @@
     </ItemGroup>
 
     <ItemGroup>
-        <None Include="..\..\README.MD" Pack="true" PackagePath="\" />
+        <None Include="..\..\README.md" Pack="true" PackagePath="\" />
     </ItemGroup>
 
     <ItemGroup Condition="'$(TargetFramework)' == 'net472'">

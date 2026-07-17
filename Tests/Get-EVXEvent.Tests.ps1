@@ -91,7 +91,7 @@ Describe 'Get-EVXEvent - Read events with NamedDataFilter' {
     }
 
     It 'Using -Path should not fail' {
-        Get-EVXEvent -Path $FilePath -Oldest -MaxEvents 1 -DisableParallel -ErrorVariable err
+        Get-EVXEvent -Path $FilePath -Oldest -MaxEvents 1 -ErrorVariable err
         $err | Should -BeNullOrEmpty
     }
 

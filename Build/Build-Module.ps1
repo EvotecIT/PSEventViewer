@@ -1,5 +1,9 @@
 param(
-    [bool] $SignModule = $true
+    [Alias('ConfigurationGateMode')]
+    [ValidateSet('Manifest', 'Build', 'Publish')]
+    [string] $RunMode = 'Build',
+
+    [bool] $SignModule = $false
 )
 
 $ErrorActionPreference = 'Stop'
@@ -112,4 +116,6 @@ Build-Module -ModuleName 'PSEventViewer' {
     # global options for publishing to github/psgallery
     #New-ConfigurationPublish -Type PowerShellGallery -FilePath 'C:\Support\Important\PowerShellGalleryAPI.txt' -Enabled:$true
     #New-ConfigurationPublish -Type GitHub -FilePath 'C:\Support\Important\GitHubAPI.txt' -UserName 'EvotecIT' -Enabled:$true -GenerateReleaseNotes -OverwriteTagName 'PSEventViewer-<TagModuleVersionWithPreRelease>'
+
+    New-ConfigurationGate -Mode $RunMode
 }

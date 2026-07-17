@@ -75,6 +75,7 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
     /// </summary>
     [Alias("RecordId")]
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
     public List<long>? EventRecordId { get; set; }
 
     /// <summary>
@@ -107,18 +108,21 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
     /// </summary>
     [Alias("Source", "Provider")]
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
     public string? ProviderName { get; set; }
 
     /// <summary>
     /// Keywords used to filter events.
     /// </summary>
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
     public Keywords? Keywords { get; set; }
 
     /// <summary>
     /// Event level (e.g. Error, Warning) used for filtering.
     /// </summary>
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
     public Level? Level { get; set; }
 
     /// <summary>
@@ -144,12 +148,14 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
     /// </summary>
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
     public TimePeriod? TimePeriod { get; set; }
 
     /// <summary>
     /// User identifier used to filter events.
     /// </summary>
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
     public string? UserId { get; set; }
 
     /// <summary>
@@ -213,7 +219,6 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
     /// </summary>
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
     public ParallelOption ParallelOption { get; set; } = ParallelOption.Parallel;
 
     /// <summary>
@@ -245,7 +250,6 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
     /// <summary>
     /// Disables parallel processing of queries.
     /// </summary>
-    [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
     public SwitchParameter DisableParallel { get; set; }
@@ -346,7 +350,8 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
             if (ParameterSetName == "NamedEvents") {
                 // let's find the events prepared for search
                 List<NamedEvents> typeList = Type.ToList();
-                await foreach (EventObjectSlim eventObject in SearchEvents.FindEventsByNamedEvents(typeList, MachineName, StartTime, EndTime, TimePeriod, maxThreads: NumberOfThreads, maxEvents: GetQueryReadLimit(), cancellationToken: token)) {
+                int namedEventThreads = ParallelOption == ParallelOption.Disabled ? 1 : NumberOfThreads;
+                await foreach (EventObjectSlim eventObject in SearchEvents.FindEventsByNamedEvents(typeList, MachineName, StartTime, EndTime, TimePeriod, maxThreads: namedEventThreads, maxEvents: GetQueryReadLimit(), cancellationToken: token)) {
                     token.ThrowIfCancellationRequested();
                     if (!MessageMatches(eventObject.Event) || !ShouldOutput(eventObject.Event)) {
                         continue;

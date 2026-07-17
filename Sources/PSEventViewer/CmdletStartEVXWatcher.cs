@@ -2,6 +2,7 @@
 using System.Management.Automation;
 using System.Threading.Tasks;
 using System.Linq;
+using System.Threading;
 
 namespace PSEventViewer {
     /// <summary>
@@ -118,18 +119,54 @@ namespace PSEventViewer {
                 throw new PSArgumentOutOfRangeException(nameof(TimeOut), TimeOut, "TimeOut must be greater than zero when provided.");
             }
 
-            var watcher = WatcherManager.StartWatcher(
-                Name,
-                string.IsNullOrWhiteSpace(MachineName) ? Environment.MachineName : MachineName!,
-                LogName,
-                ids,
-                ParameterSetName == "NamedEvent" ? (NamedEvent?.ToList() ?? new System.Collections.Generic.List<NamedEvents>()) : new System.Collections.Generic.List<NamedEvents>(),
-                e => Action.Invoke(e),
-                Staging.IsPresent,
-                StopOnMatch.IsPresent,
-                StopAfter,
-                TimeOut);
-            WriteObject(watcher);
+            var bridge = new PowerShellWatcherEventBridge();
+            PSEventManager eventManager = Events;
+            string sourceIdentifier = $"PSEventViewer.Watcher.{Guid.NewGuid():N}";
+            PSEventSubscriber subscriber = eventManager.SubscribeEvent(
+                bridge,
+                nameof(PowerShellWatcherEventBridge.EventReceived),
+                sourceIdentifier,
+                PSObject.AsPSObject(Action),
+                PowerShellWatcherEventBridge.ActionScript,
+                supportEvent: true,
+                forwardEvent: false);
+
+            WatcherInfo? watcher = null;
+            EventHandler? stoppedHandler = null;
+            int subscriptionRemoved = 0;
+            void RemovePowerShellSubscription() {
+                if (Interlocked.Exchange(ref subscriptionRemoved, 1) != 0) {
+                    return;
+                }
+
+                if (watcher != null && stoppedHandler != null) {
+                    watcher.Stopped -= stoppedHandler;
+                }
+                eventManager.UnsubscribeEvent(subscriber);
+            }
+
+            try {
+                watcher = WatcherManager.StartWatcher(
+                    Name,
+                    string.IsNullOrWhiteSpace(MachineName) ? Environment.MachineName : MachineName!,
+                    LogName,
+                    ids,
+                    ParameterSetName == "NamedEvent" ? (NamedEvent?.ToList() ?? new System.Collections.Generic.List<NamedEvents>()) : new System.Collections.Generic.List<NamedEvents>(),
+                    bridge.Publish,
+                    Staging.IsPresent,
+                    StopOnMatch.IsPresent,
+                    StopAfter,
+                    TimeOut);
+                stoppedHandler = (_, _) => RemovePowerShellSubscription();
+                watcher.Stopped += stoppedHandler;
+                if (watcher.EndTime.HasValue) {
+                    RemovePowerShellSubscription();
+                }
+                WriteObject(watcher);
+            } catch {
+                RemovePowerShellSubscription();
+                throw;
+            }
             return Task.CompletedTask;
         }
     }

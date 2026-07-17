@@ -36,14 +36,49 @@ public class TestLiveStatsQueryExecutor {
     }
 
     [Fact]
-    public void BuildEffectiveXPath_AppliesUtcRangeToCustomFilter() {
+    public void BuildEffectiveXPath_PreservesCustomSelectorForManagedTimeFiltering() {
         var start = new DateTime(2026, 2, 10, 10, 0, 0, DateTimeKind.Utc);
         var end = start.AddHours(1);
 
         string xpath = LiveStatsQueryExecutor.BuildEffectiveXPath("*[System[EventID=16]]", start, end);
 
-        Assert.Contains("(*[System[EventID=16]]) and", xpath, StringComparison.Ordinal);
+        Assert.Equal("*[System[EventID=16]]", xpath);
+    }
+
+    [Fact]
+    public void BuildEffectiveXPath_AppliesUtcRangeToWildcardSelector() {
+        var start = new DateTime(2026, 2, 10, 10, 0, 0, DateTimeKind.Utc);
+        var end = start.AddHours(1);
+
+        string xpath = LiveStatsQueryExecutor.BuildEffectiveXPath("*", start, end);
+
         Assert.Contains("2026-02-10T10:00:00.0000000Z", xpath, StringComparison.Ordinal);
         Assert.Contains("2026-02-10T11:00:00.0000000Z", xpath, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TryBuild_ExecutesCustomSelectorWithManagedTimeRange() {
+        if (!OperatingSystem.IsWindows()) return;
+        if (!TestEnv.CanReadLog("System")) return;
+        EventObject? latest = SearchEvents.QueryLog(
+            "System",
+            maxEvents: 1,
+            readMode: EventReadMode.Metadata).SingleOrDefault();
+        if (latest == null) return;
+
+        DateTime createdUtc = latest.TimeCreated.ToUniversalTime();
+        bool success = LiveStatsQueryExecutor.TryBuild(
+            new LiveStatsQueryRequest {
+                LogName = "System",
+                XPath = $"*[System[EventID={latest.Id}]]",
+                StartTimeUtc = createdUtc.AddSeconds(-1),
+                EndTimeUtc = createdUtc.AddSeconds(1),
+                MaxEventsScanned = 100
+            },
+            out LiveStatsQueryResult result,
+            out LiveStatsQueryFailure? failure);
+
+        Assert.True(success, failure?.Message);
+        Assert.True(result.MatchedEvents >= 1);
     }
 }

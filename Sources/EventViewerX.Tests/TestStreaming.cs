@@ -135,11 +135,26 @@ namespace EventViewerX.Tests {
                 new List<string?> { null },
                 eventIds,
                 recordIds,
-                fixedExpressions);
+                fixedExpressions).ToList();
 
             Assert.NotEmpty(workItems);
             Assert.All(workItems, item => Assert.True(
                 fixedExpressions + (item.EventIds?.Count ?? 0) + (item.EventRecordIds?.Count ?? 0) <= SearchEvents.MaxXPathExpressionCount));
+        }
+
+        [Fact]
+        public void QueryWorkItemsAreProducedLazilyInsteadOfMaterializingTheCrossProduct() {
+            var eventIds = Enumerable.Range(1, 5000).ToList();
+            var recordIds = Enumerable.Range(1, 5000).Select(static value => (long)value).ToList();
+
+            IEnumerable<SearchEvents.QueryWorkItem> workItems = SearchEvents.BuildQueryWorkItems(
+                new List<string?> { null, "server" },
+                eventIds,
+                recordIds,
+                fixedExpressionCount: 0);
+
+            Assert.False(workItems is ICollection<SearchEvents.QueryWorkItem>);
+            Assert.Single(workItems.Take(1));
         }
 
         [Fact]

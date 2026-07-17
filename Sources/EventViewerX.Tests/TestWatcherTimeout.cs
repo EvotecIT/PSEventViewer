@@ -4,6 +4,7 @@ using System.Threading;
 using Xunit;
 
 namespace EventViewerX.Tests {
+    [Collection("WatcherManager")]
     public class TestWatcherTimeout {
         [Fact]
         public void WatcherStopsAfterTimeout() {
