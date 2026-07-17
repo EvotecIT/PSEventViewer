@@ -51,8 +51,14 @@ public partial class SearchEvents : Settings {
         }
 
         Task<T> task = Task.Run(operation);
-        Task completed = Task.WhenAny(task, Task.Delay(timeoutMs)).GetAwaiter().GetResult();
-        if (completed == task || task.IsCompleted) {
+        bool completedWithinTimeout;
+        try {
+            completedWithinTimeout = task.Wait(timeoutMs);
+        } catch (AggregateException) {
+            return task.GetAwaiter().GetResult();
+        }
+
+        if (completedWithinTimeout) {
             return task.GetAwaiter().GetResult();
         }
 
