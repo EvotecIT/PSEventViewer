@@ -63,7 +63,7 @@ namespace PSEventViewer {
         /// Maximum number of runspaces used when querying multiple machines.
         /// </summary>
         [Parameter(Mandatory = false)]
-        [ValidateRange(1, 1024)]
+        [ValidateRange(1, SearchEvents.MaximumParallelism)]
         public int MaxRunspaces { get; set; } = 50;
 
         /// <summary>

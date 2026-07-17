@@ -62,12 +62,54 @@ namespace PSEventViewer {
         public string[]? ContainsText { get; set; }
 
         /// <summary>
+        /// Maximum number of reconstructed scripts to return per computer. Zero returns every matching script.
+        /// </summary>
+        [Alias("MaxEvents")]
+        [Parameter]
+        [ValidateRange(0, int.MaxValue)]
+        public int MaxScripts { get; set; }
+
+        /// <summary>
+        /// Maximum number of native event records to scan per computer. Zero scans the complete query.
+        /// </summary>
+        [Parameter]
+        [ValidateRange(0, int.MaxValue)]
+        public int MaxEventsScanned { get; set; }
+
+        /// <summary>
+        /// Maximum number of incomplete script groups retained while scanning.
+        /// </summary>
+        [Parameter]
+        [ValidateRange(1, int.MaxValue)]
+        public int MaxPendingScripts { get; set; } = SearchEvents.DefaultPowerShellScriptPendingLimit;
+
+        /// <summary>
+        /// Maximum number of event snapshots retained across incomplete script groups.
+        /// </summary>
+        [Parameter]
+        [ValidateRange(1, int.MaxValue)]
+        public int MaxCachedEvents { get; set; } = SearchEvents.DefaultPowerShellScriptEventCacheLimit;
+
+        /// <summary>
         /// Retrieves matching scripts from event logs and writes them to the pipeline or disk.
         /// </summary>
         protected override Task ProcessRecordAsync() {
             var machines = MachineName ?? new string?[] { null };
             foreach (var machine in machines) {
-                foreach (var script in SearchEvents.GetPowerShellScripts(Type, machine, EventLogPath, DateFrom, DateTo, Format.IsPresent, ContainsText)) {
+                CancelToken.ThrowIfCancellationRequested();
+                foreach (var script in SearchEvents.GetPowerShellScripts(
+                             type: Type,
+                             machineName: machine,
+                             eventLogPath: EventLogPath,
+                             dateFrom: DateFrom,
+                             dateTo: DateTo,
+                             format: Format.IsPresent,
+                             containsText: ContainsText,
+                             maxScripts: MaxScripts,
+                             maxEventsScanned: MaxEventsScanned,
+                             maxPendingScripts: MaxPendingScripts,
+                             maxCachedEvents: MaxCachedEvents,
+                             cancellationToken: CancelToken)) {
                     if (!string.IsNullOrEmpty(Path)) {
                         string path = script.Save(Path!);
                         WriteObject(path);

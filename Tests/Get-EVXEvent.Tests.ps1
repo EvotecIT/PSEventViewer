@@ -123,6 +123,10 @@ Describe 'Get-EVXEvent - Parameter validation' {
     It 'Fails when NumberOfThreads is less than 1' {
         { Get-EVXEvent -LogName 'Application' -NumberOfThreads 0 } | Should -Throw
     }
+
+    It 'Fails when NumberOfThreads exceeds the reusable concurrency bound' {
+        { Get-EVXEvent -LogName 'Application' -NumberOfThreads 65 } | Should -Throw
+    }
 }
 
 Describe 'Get-EVXEvent - Positional EventId' {

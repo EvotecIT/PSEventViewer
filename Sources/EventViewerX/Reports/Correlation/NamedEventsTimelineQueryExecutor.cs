@@ -15,9 +15,6 @@ public static partial class NamedEventsTimelineQueryExecutor {
     private const int MaxThreadsCap = 8;
     private const int CorrelationIdHashBytes = 8;
     private const int CorrelationTokenMinimumCapacity = 16;
-    private const int CorrelationPairSeparatorChars = 1;
-    private const int CorrelationKeyValueSeparatorChars = 1;
-    private const string EmptyCorrelationValue = "<empty>";
     private const string HexSeparator = "-";
     private static readonly string[] AllowedCorrelationKeysValue = {
         "who",
@@ -591,39 +588,23 @@ public static partial class NamedEventsTimelineQueryExecutor {
             .OrderBy(static value => value, StringComparer.OrdinalIgnoreCase)
             .ToArray();
 
-        var estimatedChars = EstimateCorrelationTokenCapacity(correlation, orderedKeys);
-        var sb = new StringBuilder(estimatedChars);
+        var sb = new StringBuilder(CorrelationTokenMinimumCapacity);
+        sb.Append(orderedKeys.Length.ToString(CultureInfo.InvariantCulture));
+        sb.Append(':');
         for (var i = 0; i < orderedKeys.Length; i++) {
             var key = orderedKeys[i];
             var value = correlation[key];
-            if (sb.Length > 0) {
-                sb.Append('|');
-            }
-
-            sb.Append(key);
-            sb.Append('=');
-            sb.Append(string.IsNullOrWhiteSpace(value) ? EmptyCorrelationValue : value);
+            AppendLengthPrefixedValue(sb, key);
+            AppendLengthPrefixedValue(sb, value);
         }
 
         return sb.ToString();
     }
 
-    private static int EstimateCorrelationTokenCapacity(
-        IReadOnlyDictionary<string, string> correlation,
-        IReadOnlyList<string> orderedKeys) {
-        var estimatedChars = CorrelationTokenMinimumCapacity;
-
-        for (var i = 0; i < orderedKeys.Count; i++) {
-            var key = orderedKeys[i];
-            var value = correlation[key];
-            var valueLength = string.IsNullOrWhiteSpace(value) ? EmptyCorrelationValue.Length : value.Length;
-            estimatedChars += key.Length + CorrelationKeyValueSeparatorChars + valueLength;
-            if (i > 0) {
-                estimatedChars += CorrelationPairSeparatorChars;
-            }
-        }
-
-        return estimatedChars;
+    private static void AppendLengthPrefixedValue(StringBuilder builder, string value) {
+        builder.Append(value.Length.ToString(CultureInfo.InvariantCulture));
+        builder.Append(':');
+        builder.Append(value);
     }
 
     private static string BuildCorrelationId(string token) {

@@ -175,6 +175,16 @@ namespace EventViewerX.Tests {
         }
 
         [Fact]
+        public async Task QueryLogsParallelRejectsConcurrencyAboveTheReusableBound() {
+            await Assert.ThrowsAsync<ArgumentOutOfRangeException>(async () => {
+                await foreach (var _ in SearchEvents.QueryLogsParallel(
+                                   "System",
+                                   maxThreads: SearchEvents.MaximumParallelism + 1)) {
+                }
+            });
+        }
+
+        [Fact]
         public void QueryLogsParallelSharesTheXPathBudgetAcrossFilterDimensions() {
             var eventIds = Enumerable.Range(1, 100).ToList();
             var recordIds = Enumerable.Range(1, 100).Select(static value => (long)value).ToList();

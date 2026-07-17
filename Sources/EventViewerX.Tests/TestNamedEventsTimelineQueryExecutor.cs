@@ -131,6 +131,44 @@ public class TestNamedEventsTimelineQueryExecutor {
         Assert.DoesNotContain("duplicate_event", payload.Keys);
     }
 
+    [Fact]
+    public void BuildCorrelationToken_ShouldNotCollideWhenValuesContainLegacySeparators() {
+        MethodInfo method = typeof(NamedEventsTimelineQueryExecutor).GetMethod(
+            "BuildCorrelationToken",
+            BindingFlags.NonPublic | BindingFlags.Static)!;
+        var left = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) {
+            ["action"] = "read|who=alice",
+            ["who"] = "server"
+        };
+        var right = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) {
+            ["action"] = "read",
+            ["who"] = "alice|who=server"
+        };
+
+        string leftToken = Assert.IsType<string>(method.Invoke(null, new object[] { left }));
+        string rightToken = Assert.IsType<string>(method.Invoke(null, new object[] { right }));
+
+        Assert.NotEqual(leftToken, rightToken);
+    }
+
+    [Fact]
+    public void BuildCorrelationToken_ShouldDistinguishBlankFromLiteralEmptyMarker() {
+        MethodInfo method = typeof(NamedEventsTimelineQueryExecutor).GetMethod(
+            "BuildCorrelationToken",
+            BindingFlags.NonPublic | BindingFlags.Static)!;
+        var blank = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) {
+            ["who"] = string.Empty
+        };
+        var literal = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) {
+            ["who"] = "<empty>"
+        };
+
+        string blankToken = Assert.IsType<string>(method.Invoke(null, new object[] { blank }));
+        string literalToken = Assert.IsType<string>(method.Invoke(null, new object[] { literal }));
+
+        Assert.NotEqual(blankToken, literalToken);
+    }
+
     private sealed class PayloadTestSlim : EventObjectSlim {
         private PayloadTestSlim(EventObject eventObject) : base(eventObject) {
         }

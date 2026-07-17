@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.Eventing.Reader;
+using System.Globalization;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Xml.Linq;
 
 namespace EventViewerX {
@@ -15,13 +17,22 @@ namespace EventViewerX {
         /// <param name="eventLogPath">Optional .evtx file path to read from instead of the live log.</param>
         /// <param name="dateFrom">Lower bound for the query time window.</param>
         /// <param name="dateTo">Upper bound for the query time window.</param>
+        /// <param name="maxEvents">Maximum records to return. Zero returns every matching record.</param>
+        /// <param name="maxEventsScanned">Maximum native event records to scan. Zero scans the complete query.</param>
+        /// <param name="cancellationToken">Cancellation token used to interrupt native reads.</param>
         /// <returns>Execution records in reverse chronological order.</returns>
         public static IEnumerable<PowerShellScriptExecutionInfo> GetPowerShellScriptExecution(
             PowerShellEdition type,
             string? machineName = null,
             string? eventLogPath = null,
             DateTime? dateFrom = null,
-            DateTime? dateTo = null) {
+            DateTime? dateTo = null,
+            int maxEvents = 0,
+            int maxEventsScanned = 0,
+            CancellationToken cancellationToken = default) {
+
+            ValidatePowerShellScriptLimits(maxEvents, nameof(maxEvents), maxEventsScanned);
+            cancellationToken.ThrowIfCancellationRequested();
             string logName = type == PowerShellEdition.WindowsPowerShell
                 ? "Microsoft-Windows-PowerShell/Operational"
                 : "PowerShellCore/Operational";
@@ -38,6 +49,7 @@ namespace EventViewerX {
             EventLogQuery query = string.IsNullOrEmpty(eventLogPath)
                 ? new EventLogQuery(logName, PathType.LogName, queryString)
                 : new EventLogQuery(null, PathType.LogName, queryString);
+            query.ReverseDirection = true;
             if (!string.IsNullOrEmpty(machineName)) {
                 EventLogSessionOpenResult sessionResult = CreateSessionResult(machineName, "PowerShellScripts", logName, DefaultSessionTimeoutMs);
                 session = sessionResult.Session;
@@ -49,24 +61,37 @@ namespace EventViewerX {
 
             try {
                 using EventLogReader reader = CreateEventLogReader(query, machineName, DefaultSessionTimeoutMs);
+                using CancellationTokenRegistration readerCancellation = RegisterReaderCancellation(reader, cancellationToken);
+                int scanned = 0;
+                int returned = 0;
 
                 // Reverse direction keeps newest script blocks first; each native read owns the timeout directly.
                 while (true) {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (maxEventsScanned > 0 && scanned >= maxEventsScanned) {
+                        yield break;
+                    }
+
                     EventRecord? record;
                     try {
-                        record = ReadEventWithTimeout(reader, DefaultSessionTimeoutMs, $"Reading PowerShell script events from '{logName}'");
+                        record = ReadEventWithCancellation(reader, DefaultSessionTimeoutMs, $"Reading PowerShell script events from '{logName}'", cancellationToken);
                     } catch (EventLogException ex) {
                         _logger.WriteWarning($"PowerShellScripts: error reading log on {machineName ?? GetFQDN()}: {ex.Message}");
                         throw;
                     }
 
                     if (record == null) break;
+                    scanned++;
 
                     var eventObject = new EventObject(record, machineName ?? eventLogPath ?? GetFQDN(), EventReadMode.StructuredData);
                     var element = XElement.Parse(eventObject.XMLData);
                     string? contextInfo = ExtractData(element, "ContextInfo");
                     var data = ParseContextInfo(contextInfo);
                     yield return new PowerShellScriptExecutionInfo(eventObject, data);
+                    returned++;
+                    if (maxEvents > 0 && returned >= maxEvents) {
+                        yield break;
+                    }
                 }
             }
             finally {
@@ -84,6 +109,11 @@ namespace EventViewerX {
         /// <param name="dateTo">Upper bound for the query time window.</param>
         /// <param name="format">When true, re-indents the captured script text.</param>
         /// <param name="containsText">Optional text filters applied to reconstructed scripts.</param>
+        /// <param name="maxScripts">Maximum reconstructed scripts to return. Zero returns every matching script.</param>
+        /// <param name="maxEventsScanned">Maximum native records to scan. Zero scans the complete query.</param>
+        /// <param name="maxPendingScripts">Maximum incomplete script groups retained while scanning.</param>
+        /// <param name="maxCachedEvents">Maximum event snapshots retained across incomplete script groups.</param>
+        /// <param name="cancellationToken">Cancellation token used to interrupt native reads.</param>
         /// <returns>Restored script blocks in reverse chronological order.</returns>
         public static IEnumerable<RestoredPowerShellScript> RestorePowerShellScripts(
             PowerShellEdition type,
@@ -92,7 +122,25 @@ namespace EventViewerX {
             DateTime? dateFrom = null,
             DateTime? dateTo = null,
             bool format = false,
-            IEnumerable<string>? containsText = null) {
+            IEnumerable<string>? containsText = null,
+            int maxScripts = 0,
+            int maxEventsScanned = 0,
+            int maxPendingScripts = DefaultPowerShellScriptPendingLimit,
+            int maxCachedEvents = DefaultPowerShellScriptEventCacheLimit,
+            CancellationToken cancellationToken = default) {
+
+            ValidatePowerShellScriptLimits(maxScripts, nameof(maxScripts), maxEventsScanned);
+            cancellationToken.ThrowIfCancellationRequested();
+            if (maxPendingScripts <= 0) {
+                throw new ArgumentOutOfRangeException(nameof(maxPendingScripts), "Maximum pending scripts must be positive.");
+            }
+            if (maxCachedEvents <= 0) {
+                throw new ArgumentOutOfRangeException(nameof(maxCachedEvents), "Maximum cached events must be positive.");
+            }
+
+            string[] textFilters = containsText?
+                .Where(static term => term != null)
+                .ToArray() ?? Array.Empty<string>();
             string logName = type == PowerShellEdition.WindowsPowerShell
                 ? "Microsoft-Windows-PowerShell/Operational"
                 : "PowerShellCore/Operational";
@@ -109,6 +157,7 @@ namespace EventViewerX {
             EventLogQuery query = string.IsNullOrEmpty(eventLogPath)
                 ? new EventLogQuery(logName, PathType.LogName, queryString)
                 : new EventLogQuery(null, PathType.LogName, queryString);
+            query.ReverseDirection = true;
             if (!string.IsNullOrEmpty(machineName)) {
                 EventLogSessionOpenResult sessionResult = CreateSessionResult(machineName, "PowerShellScripts", logName, DefaultSessionTimeoutMs);
                 session = sessionResult.Session;
@@ -118,20 +167,29 @@ namespace EventViewerX {
                 query.Session = session;
             }
 
+            var cache = new PowerShellScriptFragmentCache(maxPendingScripts, maxCachedEvents);
             try {
                 using EventLogReader reader = CreateEventLogReader(query, machineName, DefaultSessionTimeoutMs);
-
-                var cache = new Dictionary<string, ScriptCache>();
+                using CancellationTokenRegistration readerCancellation = RegisterReaderCancellation(reader, cancellationToken);
+                int scanned = 0;
+                int returned = 0;
                 while (true) {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (maxEventsScanned > 0 && scanned >= maxEventsScanned) {
+                        _logger.WriteVerbose($"PowerShellScripts: stopped after reaching the {maxEventsScanned} event scan limit.");
+                        break;
+                    }
+
                     EventRecord? record;
                     try {
-                        record = ReadEventWithTimeout(reader, DefaultSessionTimeoutMs, $"Reading PowerShell script events from '{logName}'");
+                        record = ReadEventWithCancellation(reader, DefaultSessionTimeoutMs, $"Reading PowerShell script events from '{logName}'", cancellationToken);
                     } catch (EventLogException ex) {
                         _logger.WriteWarning($"PowerShellScripts: error reading log on {machineName ?? GetFQDN()}: {ex.Message}");
                         throw;
                     }
 
                     if (record == null) break;
+                    scanned++;
 
                     var eventObject = new EventObject(record, machineName ?? eventLogPath ?? GetFQDN(), EventReadMode.StructuredData);
                     var element = XElement.Parse(eventObject.XMLData);
@@ -144,64 +202,96 @@ namespace EventViewerX {
                     if (scriptId == null) {
                         continue;
                     }
-                    string messageNumber = ExtractData(element, "MessageNumber") ?? "0";
-                    if (!cache.TryGetValue(scriptId, out var inner)) {
-                        inner = new ScriptCache();
-                        cache[scriptId] = inner;
-                    }
-                    inner.Events.Add(eventObject);
-                    if (messageNumber == "0") {
-                        inner.MetaRecord = eventObject;
-                    } else if (int.TryParse(messageNumber, out int num)) {
-                        inner.Parts[num] = nonNullScriptText;
+                    int messageNumber = ParseNonNegativeInt(ExtractData(element, "MessageNumber"));
+                    int messageTotal = ParseNonNegativeInt(ExtractData(element, "MessageTotal"));
+                    if (cache.TryAdd(scriptId, messageNumber, messageTotal, nonNullScriptText, eventObject, out PowerShellScriptAssembly? completed) &&
+                        completed != null &&
+                        TryBuildRestoredPowerShellScript(completed, format, textFilters, out RestoredPowerShellScript restored)) {
+                        yield return restored;
+                        returned++;
+                        if (maxScripts > 0 && returned >= maxScripts) {
+                            _logger.WriteVerbose($"PowerShellScripts: stopped after returning the configured maximum of {maxScripts} scripts.");
+                            yield break;
+                        }
                     }
                 }
 
-                foreach (var kv in cache) {
-                    EventObject metaRecord = kv.Value.MetaRecord ?? kv.Value.Events[0];
-                    var metaElement = XElement.Parse(metaRecord.XMLData);
-                    string totalStr = ExtractData(metaElement, "MessageTotal") ?? "0";
-                    if (!int.TryParse(totalStr, out int total)) total = 0;
-                    var sb = new StringBuilder();
-                    for (int i = 1; i <= total; i++) {
-                        if (kv.Value.Parts.TryGetValue(i, out var part)) {
-                            sb.Append(part);
-                        }
+                foreach (PowerShellScriptAssembly pending in cache.Drain()) {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (!TryBuildRestoredPowerShellScript(pending, format, textFilters, out RestoredPowerShellScript restored)) {
+                        continue;
                     }
-                    string script = sb.ToString();
-                    if (containsText != null && containsText.Any()) {
-                        bool all = true;
-                        foreach (var term in containsText) {
-                            if (term == null) continue;
-                            if (script.IndexOf(term, StringComparison.OrdinalIgnoreCase) < 0) {
-                                all = false;
-                                break;
-                            }
-                        }
-                        if (!all) {
-                            continue;
-                        }
+
+                    yield return restored;
+                    returned++;
+                    if (maxScripts > 0 && returned >= maxScripts) {
+                        _logger.WriteVerbose($"PowerShellScripts: stopped after returning the configured maximum of {maxScripts} scripts.");
+                        yield break;
                     }
-                    if (format) {
-                        script = FormatScript(script);
-                    }
-                    yield return new RestoredPowerShellScript {
-                        ScriptBlockId = kv.Key,
-                        Script = script,
-                        Events = kv.Value.Events.AsReadOnly(),
-                        Data = GetAllData(metaElement)
-                    };
                 }
             }
             finally {
+                if (cache.EvictedScriptCount > 0) {
+                    _logger.WriteWarning(
+                        $"PowerShellScripts: evicted {cache.EvictedScriptCount} incomplete script groups " +
+                        $"containing {cache.EvictedEventCount} events after reaching the configured cache bounds.");
+                }
                 session?.Dispose();
             }
         }
 
-        private sealed class ScriptCache {
-            public EventObject? MetaRecord { get; set; }
-            public List<EventObject> Events { get; } = new List<EventObject>();
-            public Dictionary<int, string> Parts { get; } = new Dictionary<int, string>();
+        private static void ValidatePowerShellScriptLimits(int maxOutput, string maxOutputParameterName, int maxEventsScanned) {
+            if (maxOutput < 0) {
+                throw new ArgumentOutOfRangeException(maxOutputParameterName, "Maximum output events must be greater than or equal to zero.");
+            }
+            if (maxEventsScanned < 0) {
+                throw new ArgumentOutOfRangeException(nameof(maxEventsScanned), "Maximum scanned events must be greater than or equal to zero.");
+            }
+        }
+
+        private static int ParseNonNegativeInt(string? value) {
+            return int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out int parsed) && parsed > 0
+                ? parsed
+                : 0;
+        }
+
+        private static bool TryBuildRestoredPowerShellScript(
+            PowerShellScriptAssembly assembly,
+            bool format,
+            IReadOnlyList<string> containsText,
+            out RestoredPowerShellScript restored) {
+
+            var scriptBuilder = new StringBuilder();
+            for (int partNumber = 1; partNumber <= assembly.ExpectedParts; partNumber++) {
+                if (assembly.Parts.TryGetValue(partNumber, out string? part)) {
+                    scriptBuilder.Append(part);
+                }
+            }
+
+            string script = scriptBuilder.ToString();
+            for (int index = 0; index < containsText.Count; index++) {
+                if (script.IndexOf(containsText[index], StringComparison.OrdinalIgnoreCase) < 0) {
+                    restored = null!;
+                    return false;
+                }
+            }
+
+            if (format) {
+                script = FormatScript(script);
+            }
+
+            EventObject metaRecord = assembly.MetaRecord ?? assembly.Events[0];
+            var metaElement = XElement.Parse(metaRecord.XMLData);
+            restored = new RestoredPowerShellScript {
+                ScriptBlockId = assembly.ScriptBlockId,
+                Script = script,
+                IsComplete = assembly.IsComplete,
+                ExpectedPartCount = assembly.ExpectedParts,
+                AvailablePartCount = assembly.Parts.Count,
+                Events = assembly.Events,
+                Data = GetAllData(metaElement)
+            };
+            return true;
         }
     }
 }

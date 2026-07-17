@@ -10,7 +10,8 @@ namespace EventViewerX;
 
 public partial class SearchEvents : Settings {
     internal const int MaxXPathExpressionCount = 22;
-    private const int MaxParallelism = 1024;
+    /// <summary>Maximum supported query concurrency across the reusable event APIs.</summary>
+    public const int MaximumParallelism = 64;
 
     /// <summary>
     /// Streams events from one or more machines through a bounded parallel query pipeline.
@@ -385,8 +386,8 @@ public partial class SearchEvents : Settings {
         if (maxThreads <= 0) {
             throw new ArgumentOutOfRangeException(nameof(maxThreads), "Maximum threads must be positive.");
         }
-        if (maxThreads > MaxParallelism) {
-            throw new ArgumentOutOfRangeException(nameof(maxThreads), $"Maximum threads cannot exceed {MaxParallelism}.");
+        if (maxThreads > MaximumParallelism) {
+            throw new ArgumentOutOfRangeException(nameof(maxThreads), $"Maximum threads cannot exceed {MaximumParallelism}.");
         }
         if (bufferCapacity < 0) {
             throw new ArgumentOutOfRangeException(nameof(bufferCapacity), "Buffer capacity must be greater than or equal to zero.");

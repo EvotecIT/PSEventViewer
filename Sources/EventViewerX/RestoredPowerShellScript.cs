@@ -15,6 +15,21 @@ public class RestoredPowerShellScript {
     public string Script { get; set; } = string.Empty;
 
     /// <summary>
+    /// Indicates whether every numbered fragment declared by the event stream was available.
+    /// </summary>
+    public bool IsComplete { get; set; }
+
+    /// <summary>
+    /// Number of script fragments declared by the event stream.
+    /// </summary>
+    public int ExpectedPartCount { get; set; }
+
+    /// <summary>
+    /// Number of distinct script fragments that were available for reconstruction.
+    /// </summary>
+    public int AvailablePartCount { get; set; }
+
+    /// <summary>
     /// Managed event snapshots that compose the script.
     /// </summary>
     public IReadOnlyList<EventObject> Events { get; set; } = Array.Empty<EventObject>();

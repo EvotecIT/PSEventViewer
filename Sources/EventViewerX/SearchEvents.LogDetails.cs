@@ -301,8 +301,8 @@ public partial class SearchEvents : Settings {
         if (maxDegreeOfParallelism <= 0) {
             throw new ArgumentOutOfRangeException(nameof(maxDegreeOfParallelism), "Maximum degree of parallelism must be positive.");
         }
-        if (maxDegreeOfParallelism > MaxParallelism) {
-            throw new ArgumentOutOfRangeException(nameof(maxDegreeOfParallelism), $"Maximum degree of parallelism cannot exceed {MaxParallelism}.");
+        if (maxDegreeOfParallelism > MaximumParallelism) {
+            throw new ArgumentOutOfRangeException(nameof(maxDegreeOfParallelism), $"Maximum degree of parallelism cannot exceed {MaximumParallelism}.");
         }
         if (timeoutMs <= 0) {
             throw new ArgumentOutOfRangeException(nameof(timeoutMs), "Timeout must be positive.");

@@ -11,6 +11,12 @@ using System.Threading.Tasks;
 namespace EventViewerX;
 
 public partial class SearchEvents : Settings {
+    /// <summary>Maximum number of abandonment-safe native calls that may own dedicated timeout threads.</summary>
+    internal const int MaximumConcurrentTimedNativeOperations = 16;
+    private static readonly SemaphoreSlim TimedNativeOperationSlots = new(
+        MaximumConcurrentTimedNativeOperations,
+        MaximumConcurrentTimedNativeOperations);
+
     /// <summary>
     /// Initialize the EventSearching class with an internal logger
     /// </summary>
@@ -45,19 +51,44 @@ public partial class SearchEvents : Settings {
             static reader => reader.Dispose());
     }
 
-    private static T ExecuteWithTimeout<T>(Func<T> operation, int timeoutMs, string timeoutMessage, Action<T>? lateResultCleanup = null) {
+    /// <summary>Runs a native operation within the shared dedicated-thread and timeout budget.</summary>
+    internal static T ExecuteWithTimeout<T>(Func<T> operation, int timeoutMs, string timeoutMessage, Action<T>? lateResultCleanup = null) {
         if (timeoutMs <= 0) {
             return operation();
         }
 
-        Task<T> task = Task.Factory.StartNew(
-            operation,
-            CancellationToken.None,
-            TaskCreationOptions.DenyChildAttach | TaskCreationOptions.LongRunning,
-            TaskScheduler.Default);
+        var timeoutBudget = Stopwatch.StartNew();
+        if (!TimedNativeOperationSlots.Wait(timeoutMs)) {
+            throw new TimeoutException(timeoutMessage);
+        }
+
+        int remainingTimeoutMs = timeoutMs - (int)Math.Min(timeoutBudget.ElapsedMilliseconds, timeoutMs);
+        if (remainingTimeoutMs <= 0) {
+            TimedNativeOperationSlots.Release();
+            throw new TimeoutException(timeoutMessage);
+        }
+
+        Task<T> task;
+        try {
+            task = Task.Factory.StartNew(
+                () => {
+                    try {
+                        return operation();
+                    } finally {
+                        TimedNativeOperationSlots.Release();
+                    }
+                },
+                CancellationToken.None,
+                TaskCreationOptions.DenyChildAttach | TaskCreationOptions.LongRunning,
+                TaskScheduler.Default);
+        } catch {
+            TimedNativeOperationSlots.Release();
+            throw;
+        }
+
         bool completedWithinTimeout;
         try {
-            completedWithinTimeout = task.Wait(timeoutMs);
+            completedWithinTimeout = task.Wait(remainingTimeoutMs);
         } catch (AggregateException) {
             return task.GetAwaiter().GetResult();
         }

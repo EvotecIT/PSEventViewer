@@ -1,6 +1,8 @@
 using System.Reflection;
 using System.Collections.Generic;
 using System.Diagnostics.Eventing.Reader;
+using System.Linq;
+using System.Threading;
 using System.Xml.Linq;
 using Xunit;
 
@@ -78,6 +80,78 @@ namespace EventViewerX.Tests {
             var result = (Dictionary<string, string?>)method!.Invoke(null, new object[] { element })!;
             Assert.Equal("1", result["A"]);
             Assert.Equal("2", result["B"]);
+        }
+
+        [Fact]
+        public void FragmentCacheReleasesACompleteScriptImmediately() {
+            var cache = new PowerShellScriptFragmentCache(maxPendingScripts: 4, maxCachedEvents: 8);
+
+            bool firstComplete = cache.TryAdd(
+                "script-1",
+                messageNumber: 2,
+                messageTotal: 2,
+                scriptText: "world",
+                CreateEventObject(),
+                out PowerShellScriptAssembly? first);
+            bool secondComplete = cache.TryAdd(
+                "script-1",
+                messageNumber: 1,
+                messageTotal: 2,
+                scriptText: "hello ",
+                CreateEventObject(),
+                out PowerShellScriptAssembly? completed);
+
+            Assert.False(firstComplete);
+            Assert.Null(first);
+            Assert.True(secondComplete);
+            Assert.NotNull(completed);
+            Assert.Equal("hello ", completed!.Parts[1]);
+            Assert.Equal("world", completed.Parts[2]);
+            Assert.Equal(2, completed.Events.Count);
+            Assert.True(completed.IsComplete);
+            Assert.Equal(0, cache.PendingScriptCount);
+            Assert.Equal(0, cache.CachedEventCount);
+        }
+
+        [Fact]
+        public void FragmentCacheEvictsTheOldestIncompleteScriptAtItsBounds() {
+            var cache = new PowerShellScriptFragmentCache(maxPendingScripts: 2, maxCachedEvents: 2);
+
+            cache.TryAdd("script-1", 1, 2, "one", CreateEventObject(), out _);
+            cache.TryAdd("script-2", 1, 2, "two", CreateEventObject(), out _);
+            cache.TryAdd("script-3", 1, 2, "three", CreateEventObject(), out _);
+
+            Assert.False(cache.Contains("script-1"));
+            Assert.True(cache.Contains("script-2"));
+            Assert.True(cache.Contains("script-3"));
+            Assert.Equal(2, cache.PendingScriptCount);
+            Assert.Equal(2, cache.CachedEventCount);
+            Assert.Equal(1, cache.EvictedScriptCount);
+            Assert.Equal(1, cache.EvictedEventCount);
+        }
+
+        [Fact]
+        public void GetPowerShellScriptsRejectsInvalidBoundsBeforeOpeningTheLog() {
+            Assert.Throws<ArgumentOutOfRangeException>(() => SearchEvents.GetPowerShellScripts(
+                PowerShellEdition.WindowsPowerShell,
+                maxScripts: -1).ToList());
+            Assert.Throws<ArgumentOutOfRangeException>(() => SearchEvents.GetPowerShellScripts(
+                PowerShellEdition.WindowsPowerShell,
+                maxPendingScripts: 0).ToList());
+        }
+
+        [Fact]
+        public void GetPowerShellScriptsHonorsPreCancelledRequestsBeforeOpeningTheLog() {
+            using var cancellation = new CancellationTokenSource();
+            cancellation.Cancel();
+
+            Assert.Throws<OperationCanceledException>(() => SearchEvents.GetPowerShellScripts(
+                PowerShellEdition.WindowsPowerShell,
+                cancellationToken: cancellation.Token).ToList());
+        }
+
+        private static EventObject CreateEventObject() {
+            return (EventObject)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(EventObject));
         }
     }
 }

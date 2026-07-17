@@ -172,7 +172,7 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "ListLog")]
-    [ValidateRange(1, 1024)]
+    [ValidateRange(1, SearchEvents.MaximumParallelism)]
     public int NumberOfThreads { get; set; } = 8;
 
     /// <summary>

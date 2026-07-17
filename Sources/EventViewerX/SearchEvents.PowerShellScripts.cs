@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics.Eventing.Reader;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Xml.Linq;
 
 namespace EventViewerX {
@@ -10,6 +11,11 @@ namespace EventViewerX {
     /// Methods for working with PowerShell script execution events.
     /// </summary>
     public partial class SearchEvents {
+        /// <summary>Default maximum number of incomplete script groups retained during reconstruction.</summary>
+        public const int DefaultPowerShellScriptPendingLimit = 512;
+
+        /// <summary>Default maximum number of event snapshots retained across incomplete script groups.</summary>
+        public const int DefaultPowerShellScriptEventCacheLimit = 2048;
 
         private static Dictionary<string, string?> ParseContextInfo(string? context) {
             var result = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
@@ -102,6 +108,11 @@ namespace EventViewerX {
         /// <param name="dateTo">Optional end time filter.</param>
         /// <param name="format">Whether to re-indent the recovered script text.</param>
         /// <param name="containsText">Optional text filters applied to the script content.</param>
+        /// <param name="maxScripts">Maximum scripts to return. Zero returns every matching script.</param>
+        /// <param name="maxEventsScanned">Maximum native records to scan. Zero scans the complete query.</param>
+        /// <param name="maxPendingScripts">Maximum incomplete script groups retained while scanning.</param>
+        /// <param name="maxCachedEvents">Maximum event snapshots retained across incomplete script groups.</param>
+        /// <param name="cancellationToken">Cancellation token used to interrupt native reads.</param>
         /// <returns>Recovered script blocks in the order they are read.</returns>
         public static IEnumerable<RestoredPowerShellScript> GetPowerShellScripts(
             PowerShellEdition type,
@@ -110,8 +121,25 @@ namespace EventViewerX {
             DateTime? dateFrom = null,
             DateTime? dateTo = null,
             bool format = false,
-            IEnumerable<string>? containsText = null) {
-            return RestorePowerShellScripts(type, machineName, eventLogPath, dateFrom, dateTo, format, containsText);
+            IEnumerable<string>? containsText = null,
+            int maxScripts = 0,
+            int maxEventsScanned = 0,
+            int maxPendingScripts = DefaultPowerShellScriptPendingLimit,
+            int maxCachedEvents = DefaultPowerShellScriptEventCacheLimit,
+            CancellationToken cancellationToken = default) {
+            return RestorePowerShellScripts(
+                type,
+                machineName,
+                eventLogPath,
+                dateFrom,
+                dateTo,
+                format,
+                containsText,
+                maxScripts,
+                maxEventsScanned,
+                maxPendingScripts,
+                maxCachedEvents,
+                cancellationToken);
         }
     }
 }
