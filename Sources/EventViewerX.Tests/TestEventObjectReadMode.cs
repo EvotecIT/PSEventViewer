@@ -49,6 +49,17 @@ public class TestEventObjectReadMode {
         Assert.Equal(1, record.ToXmlCalls);
         Assert.Equal("StructuredValue", snapshot.Data["Field"]);
         Assert.Empty(snapshot.Message);
+        Assert.Empty(snapshot.Attachments);
+    }
+
+    [Fact]
+    public void FullModeDecodesBinaryAttachments() {
+        var record = new TrackingEventRecord();
+
+        var snapshot = new EventObject(record, "testhost", EventReadMode.Full);
+
+        byte[] attachment = Assert.Single(snapshot.Attachments);
+        Assert.Equal(new byte[] { 1, 2, 255 }, attachment);
     }
 
     private sealed class TrackingEventRecord : EventRecord {
@@ -92,7 +103,7 @@ public class TestEventObjectReadMode {
 
         public override string ToXml() {
             ToXmlCalls++;
-            return "<Event><EventData><Data Name='Field'>StructuredValue</Data></EventData></Event>";
+            return "<Event><EventData><Data Name='Field'>StructuredValue</Data><Data Name='Payload' Type='Binary'>0102FF</Data></EventData></Event>";
         }
 
         protected override void Dispose(bool disposing) {

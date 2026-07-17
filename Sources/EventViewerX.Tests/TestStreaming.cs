@@ -31,6 +31,32 @@ namespace EventViewerX.Tests {
             }
             if (!gotAny) return;
         }
+
+        [Fact]
+        public async Task NamedEventsRejectNegativeCandidateScanLimit() {
+            await Assert.ThrowsAsync<ArgumentOutOfRangeException>(async () => {
+                await foreach (var _ in SearchEvents.FindEventsByNamedEvents(
+                                   [NamedEvents.OSStartupSecurity],
+                                   maxEventsScanned: -1)) {
+                }
+            });
+        }
+
+        [Fact]
+        public async Task NamedEventsCandidateScanLimitAlsoBoundsReturnedMatches() {
+            if (!OperatingSystem.IsWindows()) return;
+            if (!TestEnv.CanReadLog("Security")) return;
+
+            int count = 0;
+            await foreach (var _ in SearchEvents.FindEventsByNamedEvents(
+                               [NamedEvents.OSStartupSecurity],
+                               new List<string?> { null },
+                               maxEventsScanned: 1)) {
+                count++;
+            }
+
+            Assert.InRange(count, 0, 1);
+        }
         [Fact]
         public async Task QueryLogsParallelAppliesOneGlobalMaximum() {
             if (!OperatingSystem.IsWindows()) return;
@@ -140,10 +166,11 @@ namespace EventViewerX.Tests {
             Assert.NotEmpty(workItems);
             Assert.All(workItems, item => Assert.True(
                 fixedExpressions + (item.EventIds?.Count ?? 0) + (item.EventRecordIds?.Count ?? 0) <= SearchEvents.MaxXPathExpressionCount));
+            Assert.All(workItems, item => Assert.True(item.ManagedEventIds!.SetEquals(eventIds)));
         }
 
         [Fact]
-        public void QueryWorkItemsAreProducedLazilyInsteadOfMaterializingTheCrossProduct() {
+        public void QueryWorkItemsAvoidCartesianProductForLargeCombinedFilters() {
             var eventIds = Enumerable.Range(1, 5000).ToList();
             var recordIds = Enumerable.Range(1, 5000).Select(static value => (long)value).ToList();
 
@@ -154,7 +181,14 @@ namespace EventViewerX.Tests {
                 fixedExpressionCount: 0);
 
             Assert.False(workItems is ICollection<SearchEvents.QueryWorkItem>);
-            Assert.Single(workItems.Take(1));
+            List<SearchEvents.QueryWorkItem> materialized = workItems.ToList();
+            int chunksPerMachine = (int)Math.Ceiling(recordIds.Count / (double)SearchEvents.MaxXPathExpressionCount);
+            Assert.Equal(chunksPerMachine * 2, materialized.Count);
+            Assert.All(materialized, item => {
+                Assert.Null(item.EventIds);
+                Assert.InRange(item.EventRecordIds!.Count, 1, SearchEvents.MaxXPathExpressionCount);
+                Assert.Equal(eventIds.Count, item.ManagedEventIds!.Count);
+            });
         }
 
         [Fact]

@@ -57,22 +57,24 @@ public partial class SearchEvents : Settings {
             tasks.Add(Task.Run(() => {
                 try {
                     while (TryTakeWorkItem(workItems, workItemSync, workerCancellation.Token, out QueryWorkItem workItem)) {
-                        foreach (EventObject result in QueryLogEnumerable(
-                                     logName,
-                                     workItem.EventIds,
-                                     workItem.MachineName,
-                                     providerName,
-                                     keywords,
-                                     level,
-                                     startTime,
-                                     endTime,
-                                     userId,
-                                     maxEvents: 0,
-                                     eventRecordId: workItem.EventRecordIds,
-                                     timePeriod: timePeriod,
-                                     cancellationToken: workerCancellation.Token,
-                                     sessionTimeoutMs: sessionTimeoutMs ?? Settings.QuerySessionTimeoutMs,
-                                     readMode: readMode)) {
+                        foreach (EventObject result in FilterQueryWorkItemResults(
+                                     workItem,
+                                     QueryLogEnumerable(
+                                         logName,
+                                         workItem.EventIds,
+                                         workItem.MachineName,
+                                         providerName,
+                                         keywords,
+                                         level,
+                                         startTime,
+                                         endTime,
+                                         userId,
+                                         maxEvents: 0,
+                                         eventRecordId: workItem.EventRecordIds,
+                                         timePeriod: timePeriod,
+                                         cancellationToken: workerCancellation.Token,
+                                         sessionTimeoutMs: sessionTimeoutMs ?? Settings.QuerySessionTimeoutMs,
+                                         readMode: readMode))) {
                             if (!TryReserveResult(ref produced, maxEvents)) {
                                 return;
                             }
@@ -288,38 +290,36 @@ public partial class SearchEvents : Settings {
         eventIds = eventIds?.Distinct().ToList();
         eventRecordIds = eventRecordIds?.Distinct().ToList();
         int availableExpressions = MaxXPathExpressionCount - fixedExpressionCount;
-        (int eventIdChunkSize, int eventRecordIdChunkSize) = AllocateChunkSizes(eventIds?.Count ?? 0, eventRecordIds?.Count ?? 0, availableExpressions);
+        bool hasEventIds = eventIds?.Count > 0;
+        bool hasEventRecordIds = eventRecordIds?.Count > 0;
+        // Record IDs are exact and normally the more selective native filter. Keep event IDs managed
+        // when both dimensions are supplied so large lists produce O(record chunks), not a chunk cross-product.
+        HashSet<int>? managedEventIds = hasEventIds && hasEventRecordIds
+            ? new HashSet<int>(eventIds!)
+            : null;
+        List<int>? nativeEventIds = managedEventIds == null ? eventIds : null;
+        int eventIdChunkSize = hasEventIds && !hasEventRecordIds
+            ? Math.Min(eventIds!.Count, availableExpressions)
+            : 0;
+        int eventRecordIdChunkSize = hasEventRecordIds
+            ? Math.Min(eventRecordIds!.Count, availableExpressions)
+            : 0;
+
         foreach (string? machineName in machineNames) {
-            foreach (List<int>? eventIdChunk in EnumerateChunks(eventIds, eventIdChunkSize)) {
+            foreach (List<int>? eventIdChunk in EnumerateChunks(nativeEventIds, eventIdChunkSize)) {
                 foreach (List<long>? eventRecordIdChunk in EnumerateChunks(eventRecordIds, eventRecordIdChunkSize)) {
-                    yield return new QueryWorkItem(machineName, eventIdChunk, eventRecordIdChunk);
+                    yield return new QueryWorkItem(machineName, eventIdChunk, eventRecordIdChunk, managedEventIds);
                 }
             }
         }
     }
 
-    private static (int EventIdChunkSize, int EventRecordIdChunkSize) AllocateChunkSizes(int eventIdCount, int eventRecordIdCount, int availableExpressions) {
-        if (eventIdCount <= 0) {
-            return (0, Math.Min(eventRecordIdCount, availableExpressions));
+    private static IEnumerable<EventObject> FilterQueryWorkItemResults(QueryWorkItem workItem, IEnumerable<EventObject> events) {
+        foreach (EventObject eventObject in events) {
+            if (workItem.ManagedEventIds == null || workItem.ManagedEventIds.Contains(eventObject.Id)) {
+                yield return eventObject;
+            }
         }
-        if (eventRecordIdCount <= 0) {
-            return (Math.Min(eventIdCount, availableExpressions), 0);
-        }
-        if (availableExpressions < 2) {
-            throw new ArgumentOutOfRangeException(nameof(availableExpressions), "At least two XPath expressions are required when both event IDs and event record IDs are supplied.");
-        }
-
-        int eventIdChunkSize = Math.Min(eventIdCount, Math.Max(1, availableExpressions / 2));
-        int eventRecordIdChunkSize = Math.Min(eventRecordIdCount, Math.Max(1, availableExpressions - eventIdChunkSize));
-        int unusedExpressions = availableExpressions - eventIdChunkSize - eventRecordIdChunkSize;
-        if (unusedExpressions > 0) {
-            int eventIdIncrease = Math.Min(unusedExpressions, eventIdCount - eventIdChunkSize);
-            eventIdChunkSize += eventIdIncrease;
-            unusedExpressions -= eventIdIncrease;
-            eventRecordIdChunkSize += Math.Min(unusedExpressions, eventRecordIdCount - eventRecordIdChunkSize);
-        }
-
-        return (eventIdChunkSize, eventRecordIdChunkSize);
     }
 
     private static IEnumerable<List<T>?> EnumerateChunks<T>(List<T>? values, int chunkSize) {
@@ -385,14 +385,16 @@ public partial class SearchEvents : Settings {
     }
 
     internal sealed class QueryWorkItem {
-        internal QueryWorkItem(string? machineName, List<int>? eventIds, List<long>? eventRecordIds) {
+        internal QueryWorkItem(string? machineName, List<int>? eventIds, List<long>? eventRecordIds, HashSet<int>? managedEventIds = null) {
             MachineName = machineName;
             EventIds = eventIds;
             EventRecordIds = eventRecordIds;
+            ManagedEventIds = managedEventIds;
         }
 
         internal string? MachineName { get; }
         internal List<int>? EventIds { get; }
         internal List<long>? EventRecordIds { get; }
+        internal HashSet<int>? ManagedEventIds { get; }
     }
 }

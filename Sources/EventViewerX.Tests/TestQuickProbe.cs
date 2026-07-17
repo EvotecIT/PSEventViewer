@@ -5,6 +5,20 @@ using Xunit;
 namespace EventViewerX.Tests {
     public class TestQuickProbe {
         [Fact]
+        public void SessionCreationPreservesSubSecondProbeBudget() {
+            if (!OperatingSystem.IsWindows()) return;
+
+            using EventLogSessionOpenResult result = SearchEvents.CreateSessionResult(
+                null,
+                "QuickProbe",
+                "Application",
+                timeoutMs: 250);
+
+            Assert.True(result.Success);
+            Assert.Equal(250, result.TimeoutMs);
+        }
+
+        [Fact]
         public void BlankMachineNameReportsTheResolvedLocalMachine() {
             if (!OperatingSystem.IsWindows()) return;
 

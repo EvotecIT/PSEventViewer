@@ -200,7 +200,11 @@ public partial class EventObject {
 
             if (readMode == EventReadMode.StructuredData || readMode == EventReadMode.Full) {
                 XMLData = SafeToXml(eventRecord);
-                ParseXmlPayload(XMLData, out Dictionary<string, string> data, out List<byte[]> attachments);
+                ParseXmlPayload(
+                    XMLData,
+                    out Dictionary<string, string> data,
+                    out List<byte[]> attachments,
+                    includeAttachments: readMode == EventReadMode.Full);
                 Data = data;
                 NicIdentifiers = ExtractNicIdentifiers();
                 Attachments = attachments;

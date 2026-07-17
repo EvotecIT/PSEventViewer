@@ -133,3 +133,17 @@ Describe 'Get-EVXEvent - Positional EventId' {
         $events[0].ID | Should -Be 1200
     }
 }
+
+Describe 'Get-EVXEvent - EVTX record filtering' {
+    It 'forwards EventRecordId to the file query engine' {
+        $FilePath = [System.IO.Path]::Combine($PSScriptRoot, 'Logs', 'Active Directory Web Services.evtx')
+        $Latest = @(Get-EVXEvent -Path $FilePath -MaxEvents 1 -ReadMode Metadata)[0]
+
+        $Matching = @(Get-EVXEvent -Path $FilePath -EventRecordId $Latest.RecordId -ReadMode Metadata)
+        $Missing = @(Get-EVXEvent -Path $FilePath -EventRecordId ($Latest.RecordId + 1000000) -ReadMode Metadata)
+
+        $Matching | Should -HaveCount 1
+        $Matching[0].RecordId | Should -Be $Latest.RecordId
+        $Missing | Should -HaveCount 0
+    }
+}

@@ -88,15 +88,17 @@ namespace EventViewerX {
         }
 
         /// <summary>
-        /// Parses structured event data and binary attachments in one XML pass.
+        /// Parses structured event data and, when requested, binary attachments in one XML pass.
         /// </summary>
         /// <param name="xmlData">The XML data.</param>
         /// <param name="data">Parsed named event data.</param>
         /// <param name="attachments">Decoded binary attachments.</param>
+        /// <param name="includeAttachments">Whether binary payloads should be decoded and retained.</param>
         private static void ParseXmlPayload(
             string xmlData,
             out Dictionary<string, string> data,
-            out List<byte[]> attachments) {
+            out List<byte[]> attachments,
+            bool includeAttachments) {
 
             data = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             attachments = new List<byte[]>();
@@ -143,7 +145,7 @@ namespace EventViewerX {
 
                     bool isBinaryElement = string.Equals(dataElement.Name.LocalName, "Binary", StringComparison.OrdinalIgnoreCase);
                     bool isBinaryData = string.Equals(dataElement.Attribute("Type")?.Value, "Binary", StringComparison.OrdinalIgnoreCase);
-                    if ((isBinaryElement || isBinaryData) && TryDecodeBinary(value, out byte[] bytes)) {
+                    if (includeAttachments && (isBinaryElement || isBinaryData) && TryDecodeBinary(value, out byte[] bytes)) {
                         attachments.Add(bytes);
                     }
                 }
@@ -151,7 +153,7 @@ namespace EventViewerX {
         }
 
         private T ParseXML<T>(string xmlData) where T : IDictionary<string, string>, new() {
-            ParseXmlPayload(xmlData, out Dictionary<string, string> parsed, out _);
+            ParseXmlPayload(xmlData, out Dictionary<string, string> parsed, out _, includeAttachments: false);
             if (typeof(T) == typeof(Dictionary<string, string>)) {
                 return (T)(object)parsed;
             }

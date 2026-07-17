@@ -293,6 +293,12 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
         _recordIdKey = !string.IsNullOrEmpty(RecordIdKey)
             ? RecordIdKey!
             : BuildDefaultCheckpointKey();
+        if (string.IsNullOrEmpty(RecordIdKey)) {
+            string legacyKey = BuildLegacyCheckpointKey();
+            if (!_recordMap.ContainsKey(_recordIdKey) && _recordMap.TryGetValue(legacyKey, out long legacyRecordId)) {
+                _recordMap[_recordIdKey] = legacyRecordId;
+            }
+        }
         return Task.CompletedTask;
     }
 
@@ -302,6 +308,12 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
             "PathEvents" => "Path:" + Path,
             _ => "Log:" + (LogName ?? string.Empty)
         };
+        string machines = string.Join(",", MachineName ?? new List<string?>());
+        return $"{queryIdentity}|{machines}";
+    }
+
+    private string BuildLegacyCheckpointKey() {
+        string queryIdentity = LogName ?? Path ?? "unknown";
         string machines = string.Join(",", MachineName ?? new List<string?>());
         return $"{queryIdentity}|{machines}";
     }
@@ -339,7 +351,7 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
                 }
             }
         } else if (ParameterSetName == "PathEvents") {
-            foreach (EventObject eventObject in SearchEvents.QueryLogFile(Path, EventId, ProviderName, Keywords, Level, StartTime, EndTime, UserId, GetQueryReadLimit(), null, TimePeriod, Oldest, NamedDataFilter, NamedDataExcludeFilter, token, ReadMode)) {
+            foreach (EventObject eventObject in SearchEvents.QueryLogFile(Path, EventId, ProviderName, Keywords, Level, StartTime, EndTime, UserId, GetQueryReadLimit(), EventRecordId, TimePeriod, Oldest, NamedDataFilter, NamedDataExcludeFilter, token, ReadMode)) {
                 token.ThrowIfCancellationRequested();
                 ProcessEventResult(eventObject, results);
                 if (OutputLimitReached) {
@@ -351,7 +363,17 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
                 // let's find the events prepared for search
                 List<NamedEvents> typeList = Type.ToList();
                 int namedEventThreads = ParallelOption == ParallelOption.Disabled ? 1 : NumberOfThreads;
-                await foreach (EventObjectSlim eventObject in SearchEvents.FindEventsByNamedEvents(typeList, MachineName, StartTime, EndTime, TimePeriod, maxThreads: namedEventThreads, maxEvents: GetQueryReadLimit(), cancellationToken: token)) {
+                int namedEventMatchLimit = HasManagedPostReadFilter ? 0 : MaxEvents;
+                await foreach (EventObjectSlim eventObject in SearchEvents.FindEventsByNamedEvents(
+                                   typeList,
+                                   MachineName,
+                                   StartTime,
+                                   EndTime,
+                                   TimePeriod,
+                                   maxThreads: namedEventThreads,
+                                   maxEvents: namedEventMatchLimit,
+                                   maxEventsScanned: MaxEventsScanned,
+                                   cancellationToken: token)) {
                     token.ThrowIfCancellationRequested();
                     if (!MessageMatches(eventObject.Event) || !ShouldOutput(eventObject.Event)) {
                         continue;
@@ -399,7 +421,11 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
 
         string checkpointKey = GetCheckpointKey(eventObject);
         long recordId = eventObject.RecordId.Value;
-        if (_recordMap.TryGetValue(checkpointKey, out long previousRecordId) && recordId <= previousRecordId) {
+        bool hasCheckpoint = _recordMap.TryGetValue(checkpointKey, out long previousRecordId);
+        if (!hasCheckpoint && !string.Equals(checkpointKey, _recordIdKey, StringComparison.OrdinalIgnoreCase)) {
+            hasCheckpoint = _recordMap.TryGetValue(_recordIdKey, out previousRecordId);
+        }
+        if (hasCheckpoint && recordId <= previousRecordId) {
             return false;
         }
         if (!_highestRecordIds.TryGetValue(checkpointKey, out long highestRecordId) || recordId > highestRecordId) {
@@ -422,8 +448,7 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
     private bool OutputLimitReached => MaxEvents > 0 && _eventsOutput >= MaxEvents;
 
     private int GetQueryReadLimit() {
-        bool hasPostReadFilter = MessageRegex != null || !string.IsNullOrEmpty(RecordIdFile);
-        if (hasPostReadFilter || MaxEvents <= 0) {
+        if (HasManagedPostReadFilter || MaxEvents <= 0) {
             return MaxEventsScanned;
         }
         if (MaxEventsScanned <= 0) {
@@ -431,6 +456,8 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
         }
         return Math.Min(MaxEvents, MaxEventsScanned);
     }
+
+    private bool HasManagedPostReadFilter => MessageRegex != null || !string.IsNullOrEmpty(RecordIdFile);
 
     private void ProcessEventResult(EventObject eventObject, List<object>? results) {
         if (!MessageMatches(eventObject) || !ShouldOutput(eventObject)) {

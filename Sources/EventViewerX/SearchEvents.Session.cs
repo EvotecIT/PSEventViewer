@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Diagnostics.Eventing.Reader;
 using System.Collections.Concurrent;
 using System.Net.Sockets;
@@ -28,9 +29,13 @@ public partial class SearchEvents : Settings
 
     internal static EventLogSessionOpenResult CreateSessionResult(string? machineName, string? purpose, string? logName, int? timeoutMs = null)
     {
-        int budget = Math.Max(1000, timeoutMs ?? DefaultSessionTimeoutMs);
+        int budget = timeoutMs ?? DefaultSessionTimeoutMs;
+        if (budget <= 0) {
+            throw new ArgumentOutOfRangeException(nameof(timeoutMs), "Session timeout must be positive.");
+        }
         string operation = purpose ?? "Session";
         string channel = logName ?? string.Empty;
+        var stopwatch = Stopwatch.StartNew();
 
         // Local is fast; avoid ping/RPC probes (many CI agents block 135)
         if (IsLocalMachine(machineName))
@@ -72,28 +77,55 @@ public partial class SearchEvents : Settings
         }
 
         // RPC (135) preflight to avoid EventLogSession hangs on dead/filtered hosts
-        if (!RpcProbe(normalizedHost, Math.Min(DefaultRpcProbeTimeoutMs, budget)))
-        {
-            _logger.WriteVerbose($"{operation}: RPC preflight failed for '{machineName}'");
-            MarkHostUnreachable(normalizedHost);
-            TryGetHostNegativeCacheExpiry(normalizedHost, out DateTime rpcCachedUntilUtc);
+        int rpcBudget = Math.Min(DefaultRpcProbeTimeoutMs, RemainingSessionBudget(budget, stopwatch));
+        if (rpcBudget <= 0) {
             return SessionFailure(
                 machineName,
                 targetHost,
                 operation,
                 channel,
-                EventLogSessionOpenStatus.RpcUnavailable,
-                $"RPC preflight to '{targetHost}' on port {Settings.RpcProbePort} failed.",
+                EventLogSessionOpenStatus.Timeout,
+                $"Timed out opening Event Log session to '{targetHost}' for '{channel}' after {budget} ms.",
                 budget,
-                nameof(EventLogSessionOpenStatus.RpcUnavailable),
+                nameof(EventLogSessionOpenStatus.Timeout));
+        }
+        if (!RpcProbe(normalizedHost, rpcBudget)) {
+            _logger.WriteVerbose($"{operation}: RPC preflight failed for '{machineName}'");
+            MarkHostUnreachable(normalizedHost);
+            TryGetHostNegativeCacheExpiry(normalizedHost, out DateTime rpcCachedUntilUtc);
+            bool exhaustedBudget = RemainingSessionBudget(budget, stopwatch) <= 0;
+            return SessionFailure(
+                machineName,
+                targetHost,
+                operation,
+                channel,
+                exhaustedBudget ? EventLogSessionOpenStatus.Timeout : EventLogSessionOpenStatus.RpcUnavailable,
+                exhaustedBudget
+                    ? $"Timed out opening Event Log session to '{targetHost}' for '{channel}' after {budget} ms."
+                    : $"RPC preflight to '{targetHost}' on port {Settings.RpcProbePort} failed.",
+                budget,
+                exhaustedBudget ? nameof(EventLogSessionOpenStatus.Timeout) : nameof(EventLogSessionOpenStatus.RpcUnavailable),
                 rpcCachedUntilUtc);
         }
 
         try
         {
-            using var cts = new System.Threading.CancellationTokenSource(budget);
+            int sessionBudget = RemainingSessionBudget(budget, stopwatch);
+            if (sessionBudget <= 0) {
+                return SessionFailure(
+                    machineName,
+                    targetHost,
+                    operation,
+                    channel,
+                    EventLogSessionOpenStatus.Timeout,
+                    $"Timed out opening Event Log session to '{targetHost}' for '{channel}' after {budget} ms.",
+                    budget,
+                    nameof(EventLogSessionOpenStatus.Timeout));
+            }
+
+            using var cts = new System.Threading.CancellationTokenSource(sessionBudget);
             var task = Task.Run(() => new EventLogSession(machineName), cts.Token);
-            var completed = Task.WhenAny(task, Task.Delay(budget, cts.Token)).GetAwaiter().GetResult();
+            var completed = Task.WhenAny(task, Task.Delay(sessionBudget, cts.Token)).GetAwaiter().GetResult();
             if (completed != task)
             {
                 _logger.WriteWarning($"{operation}: timeout opening session to '{machineName}' for '{channel}' after {budget} ms");
@@ -166,6 +198,11 @@ public partial class SearchEvents : Settings
                 budget,
                 ex.GetType().Name);
         }
+    }
+
+    private static int RemainingSessionBudget(int budget, Stopwatch stopwatch) {
+        long remaining = budget - stopwatch.ElapsedMilliseconds;
+        return remaining > 0 ? (int)Math.Min(int.MaxValue, remaining) : 0;
     }
 
     /// <summary>

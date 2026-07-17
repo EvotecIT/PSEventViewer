@@ -44,6 +44,28 @@ namespace EventViewerX.Tests {
         }
 
         [Fact]
+        public void QueryLogFileCombinesEventAndRecordIdFilters() {
+            if (!OperatingSystem.IsWindows()) return;
+            string path = Path.Combine("..", "..", "..", "..", "..", "Tests", "Logs", "Active Directory Web Services.evtx");
+            EventObject? latest = SearchEvents.QueryLogFile(path, maxEvents: 1, readMode: EventReadMode.Metadata).SingleOrDefault();
+            if (latest?.RecordId is not long recordId) return;
+
+            EventObject matching = Assert.Single(SearchEvents.QueryLogFile(
+                path,
+                eventIds: new() { latest.Id },
+                eventRecordId: new() { recordId },
+                readMode: EventReadMode.Metadata));
+            List<EventObject> mismatched = SearchEvents.QueryLogFile(
+                path,
+                eventIds: new() { latest.Id == int.MaxValue ? latest.Id - 1 : latest.Id + 1 },
+                eventRecordId: new() { recordId },
+                readMode: EventReadMode.Metadata).ToList();
+
+            Assert.Equal(recordId, matching.RecordId);
+            Assert.Empty(mismatched);
+        }
+
+        [Fact]
         public void QueryLogFileAppliesRelativeTimePeriods() {
             if (!OperatingSystem.IsWindows()) return;
             string path = Path.Combine("..", "..", "..", "..", "..", "Tests", "Logs", "Active Directory Web Services.evtx");
