@@ -79,14 +79,31 @@ Describe 'Start-EVXWatcher - PowerShell event dispatch' {
     It 'stops watchers and removes bridge subscribers when the module is removed' {
         $Module = Get-Module PSEventViewer
         $ModulePath = $Module.Path
+        $ExternalIds = [Collections.Generic.List[int]]::new()
+        $ExternalIds.Add(1)
+        $ExternalNamedEvents = [Collections.Generic.List[EventViewerX.NamedEvents]]::new()
+        $ExternalAction = [Action[EventViewerX.EventObject]] { param($EventObject) }
+        $ExternalWatcher = [EventViewerX.WatcherManager]::StartWatcher(
+            ('EventViewerX.External.' + [Guid]::NewGuid().ToString('N')),
+            $env:COMPUTERNAME,
+            'Application',
+            $ExternalIds,
+            $ExternalNamedEvents,
+            $ExternalAction,
+            $false,
+            $false,
+            0,
+            $null)
         $Watcher = Start-EVXWatcher -Name ('PSEventViewer.Tests.' + [Guid]::NewGuid().ToString('N')) -MachineName $env:COMPUTERNAME -LogName Application -EventId 1 -Action {}
 
         try {
             Remove-Module PSEventViewer -Force
 
             $Watcher.EndTime | Should -Not -BeNullOrEmpty
+            $ExternalWatcher.EndTime | Should -BeNullOrEmpty
             @(Get-EventSubscriber -Force | Where-Object SourceIdentifier -Like 'PSEventViewer.Watcher.*') | Should -BeNullOrEmpty
         } finally {
+            [EventViewerX.WatcherManager]::StopWatcher($ExternalWatcher.Id) | Out-Null
             Import-Module -Name $ModulePath -Force
         }
     }

@@ -209,6 +209,12 @@ namespace EventViewerX.Tests {
                 new OperationCanceledException(),
                 out EventLogRemoteQueryFailureKind cancellationFailure));
             Assert.Equal(EventLogRemoteQueryFailureKind.None, cancellationFailure);
+
+            Assert.False(EventLogRemoteQueryFailureClassifier.TryClassify(
+                "server",
+                new InvalidOperationException("projection bug"),
+                out EventLogRemoteQueryFailureKind unexpectedFailure));
+            Assert.Equal(EventLogRemoteQueryFailureKind.None, unexpectedFailure);
         }
 
         [Fact]
@@ -353,6 +359,28 @@ namespace EventViewerX.Tests {
         }
 
         [Fact]
+        public void GlobalMergeUsesTimeBeforeUnrelatedRecordIds() {
+            var workItems = new[] {
+                new SearchEvents.QueryWorkItem("server-a", null, new List<long> { 100 }),
+                new SearchEvents.QueryWorkItem("server-b", null, new List<long> { 1 })
+            };
+
+            EventObject selected = Assert.Single(SearchEvents.MergeQueryWorkItems(
+                workItems,
+                workItem => CreateSingleResultQuery(
+                    workItem.EventRecordIds![0],
+                    workItem.MachineName == "server-a" ? new DateTime(2026, 1, 1) : new DateTime(2026, 1, 2),
+                    static () => { },
+                    static () => { }).GetEnumerator(),
+                maxEvents: 1,
+                oldest: false,
+                cancellationToken: CancellationToken.None,
+                maxOpenQueries: 2));
+
+            Assert.Equal(1L, selected.RecordId);
+        }
+
+        [Fact]
         public void QueryLogMergesChunksBeforeApplyingTheGlobalMaximum() {
             if (!OperatingSystem.IsWindows()) return;
             if (!TestEnv.CanReadLog("System")) return;
@@ -378,6 +406,59 @@ namespace EventViewerX.Tests {
             Assert.True(result.RecordId >= latest.RecordId);
         }
 
+        [Fact]
+        public async Task QueryLogsParallelMergesChunksBeforeApplyingTheGlobalMaximum() {
+            if (!OperatingSystem.IsWindows()) return;
+            if (!TestEnv.CanReadLog("System")) return;
+
+            List<EventObject> recent = SearchEvents.QueryLog(
+                "System",
+                maxEvents: 100,
+                readMode: EventReadMode.Metadata).ToList();
+            EventObject? latest = recent.FirstOrDefault();
+            EventObject? olderWithDifferentId = recent.Skip(1).FirstOrDefault(item => item.Id != latest?.Id);
+            if (latest?.RecordId == null || olderWithDifferentId == null) return;
+
+            var eventIds = new List<int> { olderWithDifferentId.Id };
+            eventIds.AddRange(Enumerable.Range(100000, SearchEvents.MaxXPathExpressionCount - 1));
+            eventIds.Add(latest.Id);
+
+            var results = new List<EventObject>();
+            await foreach (EventObject result in SearchEvents.QueryLogsParallel(
+                               "System",
+                               eventIds: eventIds,
+                               maxEvents: 1,
+                               readMode: EventReadMode.Metadata)) {
+                results.Add(result);
+            }
+
+            EventObject selected = Assert.Single(results);
+            Assert.Equal(latest.Id, selected.Id);
+            Assert.True(selected.RecordId >= latest.RecordId);
+        }
+
+        [Fact]
+        public void QueryLogPreservesSingleRemoteFailureVisibility() {
+            Assert.ThrowsAny<Exception>(() => SearchEvents.QueryLog(
+                "System",
+                machineName: "203.0.113.1",
+                maxEvents: 1,
+                sessionTimeoutMs: 500,
+                readMode: EventReadMode.Metadata).ToList());
+        }
+
+        [Fact]
+        public async Task QueryLogsParallelPreservesSingleRemoteFailureVisibility() {
+            await Assert.ThrowsAnyAsync<Exception>(async () => {
+                await foreach (EventObject _ in SearchEvents.QueryLogsParallel(
+                                   "System",
+                                   machineNames: new List<string?> { "203.0.113.1" },
+                                   sessionTimeoutMs: 500,
+                                   readMode: EventReadMode.Metadata)) {
+                }
+            });
+        }
+
         private static async Task ReadOneEvent(List<string?> targets) {
             await foreach (var _ in SearchEvents.QueryLogsParallel(
                                "System",
@@ -390,10 +471,14 @@ namespace EventViewerX.Tests {
         }
 
         private static IEnumerable<EventObject> CreateSingleResultQuery(long recordId, Action opened, Action exhausted) {
+            return CreateSingleResultQuery(recordId, new DateTime(recordId, DateTimeKind.Utc), opened, exhausted);
+        }
+
+        private static IEnumerable<EventObject> CreateSingleResultQuery(long recordId, DateTime timeCreated, Action opened, Action exhausted) {
             opened();
             var eventObject = (EventObject)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(EventObject));
             SetSnapshotProperty(eventObject, nameof(EventObject.RecordId), (long?)recordId);
-            SetSnapshotProperty(eventObject, nameof(EventObject.TimeCreated), new DateTime(recordId, DateTimeKind.Utc));
+            SetSnapshotProperty(eventObject, nameof(EventObject.TimeCreated), timeCreated);
             SetSnapshotProperty(eventObject, nameof(EventObject.Id), (int)recordId);
             yield return eventObject;
             exhausted();

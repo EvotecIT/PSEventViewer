@@ -81,14 +81,10 @@ public sealed class CmdletWriteEVXEntry : AsyncPSCmdlet {
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
     public string[]? AdditionalFields { get; set; }
 
-    private ActionPreference errorAction;
-
     /// <summary>
     /// Initializes processing and reads error preferences.
     /// </summary>
     protected override Task BeginProcessingAsync() {
-        errorAction = GetErrorActionPreference();
-
         // Initialize the logger to be able to see verbose, warning, debug, error, progress, and information messages.
         var internalLogger = new InternalLogger();
         var internalLoggerPowerShell = new InternalLoggerPowerShell(internalLogger, this.WriteVerbose, this.WriteWarning, this.WriteDebug, this.WriteError, this.WriteProgress, this.WriteInformation);
@@ -103,12 +99,7 @@ public sealed class CmdletWriteEVXEntry : AsyncPSCmdlet {
         try {
             SearchEvents.WriteEvent(ProviderName, LogName, Message, EventLogEntryType, Category, EventId, MachineName, AdditionalFields);
         } catch (Exception ex) {
-            if (errorAction == ActionPreference.Stop) {
-                var errorRecord = new ErrorRecord(ex, "WriteEventFailed", ErrorCategory.WriteError, this);
-                ThrowTerminatingError(errorRecord);
-            } else {
-                WriteWarning($"Failed to write event: {ex.Message}");
-            }
+            WriteError(new ErrorRecord(ex, "WriteEventFailed", ErrorCategory.WriteError, this));
         }
 
         return Task.CompletedTask;

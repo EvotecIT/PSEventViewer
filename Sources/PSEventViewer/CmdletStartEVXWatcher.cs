@@ -141,6 +141,7 @@ namespace PSEventViewer {
             WatcherInfo? watcher = null;
             Action<EventObject> publish = bridge.Publish;
             EventHandler? stoppedHandler = null;
+            bool createdPowerShellWatcher = false;
             int subscriptionRemoved = 0;
             void RemovePowerShellSubscription() {
                 if (Interlocked.Exchange(ref subscriptionRemoved, 1) != 0) {
@@ -166,18 +167,28 @@ namespace PSEventViewer {
                     StopAfter,
                     TimeOut,
                     string.IsNullOrWhiteSpace(ActionIdentity) ? null : ActionIdentity!.Trim());
-                if (!watcher.Action.Equals(publish)) {
+                createdPowerShellWatcher = watcher.Action.Equals(publish);
+                if (!createdPowerShellWatcher) {
                     RemovePowerShellSubscription();
                 } else {
-                    stoppedHandler = (_, _) => RemovePowerShellSubscription();
+                    PowerShellWatcherRegistry.Register(watcher.Id);
+                    stoppedHandler = (_, _) => {
+                        PowerShellWatcherRegistry.Unregister(watcher.Id);
+                        RemovePowerShellSubscription();
+                    };
                     watcher.Stopped += stoppedHandler;
                     if (watcher.EndTime.HasValue) {
+                        PowerShellWatcherRegistry.Unregister(watcher.Id);
                         RemovePowerShellSubscription();
                     }
                 }
                 WriteObject(watcher);
             } catch {
                 RemovePowerShellSubscription();
+                if (createdPowerShellWatcher && watcher != null) {
+                    PowerShellWatcherRegistry.Unregister(watcher.Id);
+                    WatcherManager.StopWatcher(watcher.Id);
+                }
                 throw;
             }
             return Task.CompletedTask;

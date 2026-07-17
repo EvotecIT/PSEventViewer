@@ -23,6 +23,7 @@ namespace EventViewerX {
         /// <param name="maxEventsScanned">Global maximum number of candidate event records to evaluate before rule filtering.</param>
         /// <param name="executionInfo">Optional progress object populated while the query is enumerated.</param>
         /// <param name="minimumEventRecordIdExclusiveResolver">Optional per-machine/per-log native checkpoint resolver.</param>
+        /// <param name="candidateObserver">Optional observer invoked for every native candidate before named-event projection.</param>
         /// <returns>Asynchronous sequence of simplified events.</returns>
         public static async IAsyncEnumerable<EventObjectSlim> FindEventsByNamedEvents(
             List<NamedEvents> typeEventsList,
@@ -35,7 +36,8 @@ namespace EventViewerX {
             [EnumeratorCancellation] CancellationToken cancellationToken = default,
             int maxEventsScanned = 0,
             NamedEventsQueryExecutionInfo? executionInfo = null,
-            Func<string?, string, long?>? minimumEventRecordIdExclusiveResolver = null) {
+            Func<string?, string, long?>? minimumEventRecordIdExclusiveResolver = null,
+            Action<EventObject>? candidateObserver = null) {
 
             if (typeEventsList == null) {
                 throw new ArgumentNullException(nameof(typeEventsList));
@@ -82,6 +84,8 @@ namespace EventViewerX {
                     if (!queryInfo.TryRecordCandidate()) {
                         yield break;
                     }
+
+                    candidateObserver?.Invoke(foundEvent);
 
                     EventObjectSlim? targetEvent = BuildTargetEvents(foundEvent, typeEventsList);
                     if (targetEvent == null) {

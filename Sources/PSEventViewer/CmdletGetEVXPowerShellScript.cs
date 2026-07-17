@@ -1,5 +1,5 @@
 using EventViewerX;
-using System;
+using System.Collections.Generic;
 using System.Management.Automation;
 using System.Threading.Tasks;
 
@@ -44,21 +44,23 @@ public sealed class CmdletGetEVXPowerShellScript : PowerShellScriptQueryCmdletBa
         foreach (string? machine in machines) {
             CancelToken.ThrowIfCancellationRequested();
             var queryInfo = new PowerShellScriptQueryExecutionInfo();
+            using IEnumerator<RestoredPowerShellScript> scripts = SearchEvents.GetPowerShellScripts(
+                type: Type,
+                machineName: machine,
+                eventLogPath: EventLogPath,
+                dateFrom: DateFrom,
+                dateTo: DateTo,
+                format: Format.IsPresent,
+                containsText: ContainsText,
+                maxScripts: MaxScripts,
+                maxEventsScanned: MaxEventsScanned,
+                maxPendingScripts: MaxPendingScripts,
+                maxCachedEvents: MaxCachedEvents,
+                cancellationToken: CancelToken,
+                executionInfo: queryInfo).GetEnumerator();
             try {
-                foreach (RestoredPowerShellScript script in SearchEvents.GetPowerShellScripts(
-                             type: Type,
-                             machineName: machine,
-                             eventLogPath: EventLogPath,
-                             dateFrom: DateFrom,
-                             dateTo: DateTo,
-                             format: Format.IsPresent,
-                             containsText: ContainsText,
-                             maxScripts: MaxScripts,
-                             maxEventsScanned: MaxEventsScanned,
-                             maxPendingScripts: MaxPendingScripts,
-                             maxCachedEvents: MaxCachedEvents,
-                             cancellationToken: CancelToken,
-                             executionInfo: queryInfo)) {
+                while (TryMoveNextRemote(scripts, machine, queryInfo)) {
+                    RestoredPowerShellScript script = scripts.Current;
                     if (!string.IsNullOrEmpty(Path)) {
                         string path = script.Save(Path!);
                         WriteObject(path);
@@ -66,8 +68,6 @@ public sealed class CmdletGetEVXPowerShellScript : PowerShellScriptQueryCmdletBa
                         WriteObject(script);
                     }
                 }
-            } catch (Exception ex) when (EventLogRemoteQueryFailureClassifier.TryClassify(machine, ex, out EventLogRemoteQueryFailureKind failureKind)) {
-                queryInfo.RecordFailure(failureKind, ex.Message);
             } finally {
                 WriteQueryCompletion(queryInfo);
             }

@@ -223,7 +223,8 @@ public partial class SearchEvents {
         foreach (Hashtable table in filters) {
             foreach (object? key in table.Keys) {
                 List<string> values = AsEnumerable(table[key!]).ToList();
-                count += values.Count > 0 ? values.Count : 1;
+                // A valued named-data predicate contains both the @Name comparison and the value comparison.
+                count += values.Count > 0 ? values.Count * 2 : 1;
             }
         }
         return count;

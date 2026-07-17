@@ -52,7 +52,6 @@ public sealed class CmdletRemoveEVXSource : AsyncPSCmdlet {
     /// Removes the specified event source from the system.
     /// </summary>
     protected override Task ProcessRecordAsync() {
-        var errorAction = GetErrorActionPreference();
         try {
             string target = string.IsNullOrEmpty(MachineName)
                 ? SourceName
@@ -72,12 +71,8 @@ public sealed class CmdletRemoveEVXSource : AsyncPSCmdlet {
 
             WriteObject(removed);
         } catch (Exception ex) {
-            WriteWarning($"Remove-EVXSource - Error removing source {SourceName}: {ex.Message}");
-            if (errorAction == ActionPreference.Stop) {
-                ThrowTerminatingError(new ErrorRecord(ex, "RemoveEVXSourceFailed", ErrorCategory.InvalidOperation, SourceName));
-            } else {
-                WriteObject(false);
-            }
+            WriteError(new ErrorRecord(ex, "RemoveEVXSourceFailed", ErrorCategory.InvalidOperation, SourceName));
+            WriteObject(false);
         }
         return Task.CompletedTask;
     }

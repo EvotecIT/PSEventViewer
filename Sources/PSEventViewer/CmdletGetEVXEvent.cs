@@ -342,6 +342,8 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
             ParallelOption = ParallelOption.Disabled;
         }
 
+        PrepareCheckpointBounds(token);
+
         if (ParameterSetName == "ListLog") {
             foreach (EventLogDetails log in SearchEvents.DisplayEventLogsParallel(ListLog, MachineName, NumberOfThreads, token)) {
                 token.ThrowIfCancellationRequested();
@@ -375,9 +377,10 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
                                    maxEvents: namedEventMatchLimit,
                                    maxEventsScanned: MaxEventsScanned,
                                    cancellationToken: token,
-                                   minimumEventRecordIdExclusiveResolver: GetCheckpointLowerBound)) {
+                                   minimumEventRecordIdExclusiveResolver: GetCheckpointLowerBound,
+                                   candidateObserver: candidate => TrackCheckpointProgress(candidate))) {
                     token.ThrowIfCancellationRequested();
-                    if (!MessageMatches(eventObject.Event) || !ShouldOutput(eventObject.Event)) {
+                    if (!TrackCheckpointProgress(eventObject.Event) || !MessageMatches(eventObject.Event)) {
                         continue;
                     }
                     object output = Expand
@@ -419,7 +422,7 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
 
     }
 
-    private bool ShouldOutput(EventObject eventObject) {
+    private bool TrackCheckpointProgress(EventObject eventObject) {
         if (!eventObject.RecordId.HasValue) {
             return true;
         }
@@ -463,11 +466,33 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
             return null;
         }
 
+        return TryGetCheckpoint(machineName, logName, out _, out long checkpoint)
+            ? checkpoint
+            : null;
+    }
+
+    private bool TryGetCheckpoint(string? machineName, string logName, out string checkpointKey, out long checkpoint) {
+        checkpointKey = _recordIdKey;
+        checkpoint = 0;
+
         bool hasMultipleSources = ParameterSetName == "NamedEvents" || (MachineName?.Count ?? 0) > 1;
-        if (!hasMultipleSources && _recordMap.TryGetValue(_recordIdKey, out long singleCheckpoint)) {
-            return singleCheckpoint;
+        if (!hasMultipleSources) {
+            return _recordMap.TryGetValue(_recordIdKey, out checkpoint);
         }
 
+        HashSet<string> sourceNames = GetCheckpointSourceNames(machineName);
+        foreach (string sourceName in sourceNames) {
+            string sourceKey = $"{_recordIdKey}|{sourceName}|{logName}";
+            if (_recordMap.TryGetValue(sourceKey, out checkpoint)) {
+                checkpointKey = sourceKey;
+                return true;
+            }
+        }
+
+        return _recordMap.TryGetValue(_recordIdKey, out checkpoint);
+    }
+
+    private static HashSet<string> GetCheckpointSourceNames(string? machineName) {
         var sourceNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         if (!string.IsNullOrWhiteSpace(machineName)) {
             sourceNames.Add(machineName!.Trim());
@@ -479,17 +504,75 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
                 // The short local name remains a valid fallback when DNS is unavailable.
             }
         }
+        return sourceNames;
+    }
 
-        foreach (string sourceName in sourceNames) {
-            string sourceKey = $"{_recordIdKey}|{sourceName}|{logName}";
-            if (_recordMap.TryGetValue(sourceKey, out long sourceCheckpoint)) {
-                return sourceCheckpoint;
-            }
+    private void PrepareCheckpointBounds(CancellationToken cancellationToken) {
+        if (string.IsNullOrWhiteSpace(RecordIdFile) || _recordMap.Count == 0 || ParameterSetName == "ListLog") {
+            return;
         }
 
-        return _recordMap.TryGetValue(_recordIdKey, out long migratedCheckpoint)
-            ? migratedCheckpoint
-            : null;
+        if (ParameterSetName == "PathEvents") {
+            if (TryGetCheckpoint(null, Path, out string checkpointKey, out long checkpoint)) {
+                EventObject? newest = SearchEvents.QueryLogFile(
+                    Path,
+                    maxEvents: 1,
+                    cancellationToken: cancellationToken,
+                    readMode: EventReadMode.Metadata).FirstOrDefault();
+                ResetCheckpointWhenLogRestarted(checkpointKey, checkpoint, newest?.RecordId, Path);
+            }
+            return;
+        }
+
+        IEnumerable<string> logs = ParameterSetName == "NamedEvents"
+            ? EventObjectSlim.GetEventInfoForNamedEvents(Type.ToList()).Keys
+            : new[] { LogName };
+        IEnumerable<string?> machines = MachineName == null || MachineName.Count == 0
+            ? new string?[] { null }
+            : MachineName;
+
+        foreach (string log in logs) {
+            foreach (string? machine in machines) {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!TryGetCheckpoint(machine, log, out string checkpointKey, out long checkpoint)) {
+                    continue;
+                }
+
+                try {
+                    EventObject? newest = SearchEvents.QueryLog(
+                        log,
+                        machineName: machine,
+                        maxEvents: 1,
+                        cancellationToken: cancellationToken,
+                        sessionTimeoutMs: ParameterSetName == "GenericEvents" ? SessionTimeoutMs : null,
+                        readMode: EventReadMode.Metadata).FirstOrDefault();
+                    ResetCheckpointWhenLogRestarted(
+                        checkpointKey,
+                        checkpoint,
+                        newest?.RecordId,
+                        string.IsNullOrWhiteSpace(machine) ? log : $"{log} on {machine}");
+                } catch (Exception ex) when (EventLogRemoteQueryFailureClassifier.TryClassify(machine, ex, out _)) {
+                    WriteVerbose($"Checkpoint generation probe skipped unavailable target '{machine}': {ex.Message}");
+                }
+            }
+        }
+    }
+
+    private void ResetCheckpointWhenLogRestarted(
+        string checkpointKey,
+        long checkpoint,
+        long? newestRecordId,
+        string target) {
+
+        if (!newestRecordId.HasValue || newestRecordId.Value >= checkpoint) {
+            return;
+        }
+
+        _recordMap.Remove(checkpointKey);
+        _highestRecordIds.Remove(checkpointKey);
+        WriteWarning(
+            $"Checkpoint '{checkpointKey}' was {checkpoint}, but the newest record in '{target}' is {newestRecordId.Value}. " +
+            "The log was cleared or replaced; restarting this source from its current records.");
     }
 
     private bool OutputLimitReached => MaxEvents > 0 && _eventsOutput >= MaxEvents;
@@ -507,7 +590,7 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
     private bool HasManagedPostReadFilter => MessageRegex != null || !string.IsNullOrEmpty(RecordIdFile);
 
     private void ProcessEventResult(EventObject eventObject, List<object>? results) {
-        if (!MessageMatches(eventObject) || !ShouldOutput(eventObject)) {
+        if (!TrackCheckpointProgress(eventObject) || !MessageMatches(eventObject)) {
             return;
         }
 

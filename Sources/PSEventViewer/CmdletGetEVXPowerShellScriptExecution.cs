@@ -1,5 +1,5 @@
 using EventViewerX;
-using System;
+using System.Collections.Generic;
 using System.Management.Automation;
 using System.Threading.Tasks;
 
@@ -21,21 +21,20 @@ public sealed class CmdletGetEVXPowerShellScriptExecution : PowerShellScriptQuer
         foreach (string? machine in machines) {
             CancelToken.ThrowIfCancellationRequested();
             var queryInfo = new PowerShellScriptQueryExecutionInfo();
+            using IEnumerator<PowerShellScriptExecutionInfo> executions = SearchEvents.GetPowerShellScriptExecution(
+                type: Type,
+                machineName: machine,
+                eventLogPath: EventLogPath,
+                dateFrom: DateFrom,
+                dateTo: DateTo,
+                maxEvents: MaxEvents,
+                maxEventsScanned: MaxEventsScanned,
+                executionInfo: queryInfo,
+                cancellationToken: CancelToken).GetEnumerator();
             try {
-                foreach (PowerShellScriptExecutionInfo execution in SearchEvents.GetPowerShellScriptExecution(
-                             type: Type,
-                             machineName: machine,
-                             eventLogPath: EventLogPath,
-                             dateFrom: DateFrom,
-                             dateTo: DateTo,
-                             maxEvents: MaxEvents,
-                             maxEventsScanned: MaxEventsScanned,
-                             executionInfo: queryInfo,
-                             cancellationToken: CancelToken)) {
-                    WriteObject(execution);
+                while (TryMoveNextRemote(executions, machine, queryInfo)) {
+                    WriteObject(executions.Current);
                 }
-            } catch (Exception ex) when (EventLogRemoteQueryFailureClassifier.TryClassify(machine, ex, out EventLogRemoteQueryFailureKind failureKind)) {
-                queryInfo.RecordFailure(failureKind, ex.Message);
             } finally {
                 WriteQueryCompletion(queryInfo);
             }

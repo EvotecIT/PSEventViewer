@@ -166,5 +166,21 @@ namespace EventViewerX.Tests {
 
             Assert.Contains(SearchEvents.MaxXPathExpressionCount.ToString(), exception.Message);
         }
+
+        [Fact]
+        public void NamedDataBudgetCountsBothNameAndValueComparisons() {
+            var withinBudget = new Hashtable {
+                { "Correlation", Enumerable.Range(1, SearchEvents.MaxXPathExpressionCount / 2).Select(static value => value.ToString()).ToArray() }
+            };
+            var overBudget = new Hashtable {
+                { "Correlation", Enumerable.Range(1, SearchEvents.MaxXPathExpressionCount / 2 + 1).Select(static value => value.ToString()).ToArray() }
+            };
+
+            string xpath = SearchEvents.BuildWinEventFilter(namedDataFilter: [withinBudget], xpathOnly: true);
+            Assert.NotEmpty(xpath);
+            Assert.Throws<ArgumentException>(() => SearchEvents.BuildWinEventFilter(
+                namedDataFilter: [overBudget],
+                xpathOnly: true));
+        }
     }
 }

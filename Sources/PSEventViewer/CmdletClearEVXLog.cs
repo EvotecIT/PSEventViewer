@@ -42,7 +42,6 @@ public sealed class CmdletClearEVXLog : AsyncPSCmdlet {
 
     /// <summary>Performs log clearing.</summary>
     protected override Task ProcessRecordAsync() {
-        var errorAction = GetErrorActionPreference();
         try {
             if (ShouldProcess($"{LogName} on {MachineName ?? "localhost"}", "Clear event log")) {
                 bool result = SearchEvents.ClearLog(LogName, MachineName, RetentionDays);
@@ -51,12 +50,8 @@ public sealed class CmdletClearEVXLog : AsyncPSCmdlet {
                 WriteObject(false);
             }
         } catch (Exception ex) {
-            WriteWarning($"Clear-EVXLog - Error clearing log {LogName}: {ex.Message}");
-            if (errorAction == ActionPreference.Stop) {
-                ThrowTerminatingError(new ErrorRecord(ex, "ClearEVXLogFailed", ErrorCategory.InvalidOperation, LogName));
-            } else {
-                WriteObject(false);
-            }
+            WriteError(new ErrorRecord(ex, "ClearEVXLogFailed", ErrorCategory.InvalidOperation, LogName));
+            WriteObject(false);
         }
         return Task.CompletedTask;
     }

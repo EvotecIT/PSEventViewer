@@ -9,7 +9,7 @@ public partial class SearchEvents {
     internal const int MaxSequentialOpenQueries = 8;
 
     /// <summary>
-    /// Streams events from one or more machines in target order using one global result limit.
+    /// Streams events from one or more machines using one global result limit.
     /// </summary>
     /// <remarks>
     /// Unlimited queries that require multiple XPath chunks stream bounded chunk batches; ordering is preserved
@@ -31,60 +31,90 @@ public partial class SearchEvents {
         CancellationToken cancellationToken = default,
         int? sessionTimeoutMs = null,
         EventReadMode readMode = EventReadMode.Full,
-        Func<string?, long?>? minimumEventRecordIdExclusiveResolver = null) {
+        Func<string?, long?>? minimumEventRecordIdExclusiveResolver = null,
+        int maxOpenQueries = MaxSequentialOpenQueries) {
 
         ValidateQueryArguments(logName, maxEvents, sessionTimeoutMs);
         List<string?> targets = machineNames == null || machineNames.Count == 0
             ? new List<string?> { null }
             : machineNames;
         int fixedExpressionCount = CountFixedQueryExpressions(providerName, keywords, level, startTime, endTime, userId, timePeriod);
-        int returned = 0;
+        bool isolateRemoteFailures = targets.Count > 1;
         var failedTargets = new ConcurrentDictionary<string, byte>(StringComparer.OrdinalIgnoreCase);
+        IEnumerable<QueryWorkItem> workItems = BuildQueryWorkItems(
+            targets,
+            eventIds,
+            eventRecordId,
+            fixedExpressionCount,
+            minimumEventRecordIdExclusiveResolver);
 
-        foreach (string? machineName in targets) {
-            if (maxEvents > 0 && returned >= maxEvents) {
-                yield break;
-            }
-
-            IEnumerable<QueryWorkItem> workItems = BuildQueryWorkItems(new List<string?> { machineName }, eventIds, eventRecordId, fixedExpressionCount, minimumEventRecordIdExclusiveResolver);
-            int remaining = maxEvents > 0 ? maxEvents - returned : 0;
-            foreach (EventObject result in MergeQueryWorkItems(
-                         workItems,
-                         workItem => ShouldSkipFailedTarget(workItem, failedTargets)
-                             ? System.Linq.Enumerable.Empty<EventObject>().GetEnumerator()
-                             : EnumerateQueryWorkItemSafely(
-                                 workItem,
-                                 FilterQueryWorkItemResults(
-                                     workItem,
-                                     QueryLogEnumerable(
-                                         logName,
-                                         workItem.EventIds,
-                                         workItem.MachineName,
-                                         providerName,
-                                         keywords,
-                                         level,
-                                         startTime,
-                                         endTime,
-                                         userId,
-                                         maxEvents: 0,
-                                         eventRecordId: workItem.EventRecordIds,
-                                         timePeriod: timePeriod,
-                                         cancellationToken: cancellationToken,
-                                         sessionTimeoutMs: sessionTimeoutMs ?? Settings.QuerySessionTimeoutMs,
-                                         readMode: readMode,
-                                         minimumEventRecordIdExclusive: workItem.MinimumEventRecordIdExclusive)).GetEnumerator(),
-                                 failedTargets).GetEnumerator(),
-                         remaining,
-                         oldest: false,
+        foreach (EventObject result in MergeQueryWorkItems(
+                     workItems,
+                     workItem => CreateSequentialQueryEnumerator(
+                         workItem,
+                         logName,
+                         providerName,
+                         keywords,
+                         level,
+                         startTime,
+                         endTime,
+                         userId,
+                         timePeriod,
                          cancellationToken,
-                         MaxSequentialOpenQueries)) {
-                yield return result;
-                returned++;
-                if (maxEvents > 0 && returned >= maxEvents) {
-                    yield break;
-                }
-            }
+                         sessionTimeoutMs,
+                         readMode,
+                         isolateRemoteFailures,
+                         failedTargets),
+                     maxEvents,
+                     oldest: false,
+                     cancellationToken,
+                     maxOpenQueries)) {
+            yield return result;
         }
+    }
+
+    private static IEnumerator<EventObject> CreateSequentialQueryEnumerator(
+        QueryWorkItem workItem,
+        string logName,
+        string? providerName,
+        Keywords? keywords,
+        Level? level,
+        DateTime? startTime,
+        DateTime? endTime,
+        string? userId,
+        TimePeriod? timePeriod,
+        CancellationToken cancellationToken,
+        int? sessionTimeoutMs,
+        EventReadMode readMode,
+        bool isolateRemoteFailures,
+        ConcurrentDictionary<string, byte> failedTargets) {
+
+        if (isolateRemoteFailures && ShouldSkipFailedTarget(workItem, failedTargets)) {
+            return System.Linq.Enumerable.Empty<EventObject>().GetEnumerator();
+        }
+
+        IEnumerator<EventObject> queryResults = FilterQueryWorkItemResults(
+            workItem,
+            QueryLogEnumerable(
+                logName,
+                workItem.EventIds,
+                workItem.MachineName,
+                providerName,
+                keywords,
+                level,
+                startTime,
+                endTime,
+                userId,
+                maxEvents: 0,
+                eventRecordId: workItem.EventRecordIds,
+                timePeriod: timePeriod,
+                cancellationToken: cancellationToken,
+                sessionTimeoutMs: sessionTimeoutMs ?? Settings.QuerySessionTimeoutMs,
+                readMode: readMode,
+                minimumEventRecordIdExclusive: workItem.MinimumEventRecordIdExclusive)).GetEnumerator();
+        return isolateRemoteFailures
+            ? EnumerateQueryWorkItemSafely(workItem, queryResults, failedTargets).GetEnumerator()
+            : queryResults;
     }
 
     private static IEnumerable<EventObject> EnumerateQueryWorkItemSafely(
@@ -233,18 +263,19 @@ public partial class SearchEvents {
     }
 
     private static int CompareEvents(EventObject left, EventObject right, bool oldest) {
-        int recordComparison = oldest
-            ? Nullable.Compare(left.RecordId, right.RecordId)
-            : Nullable.Compare(right.RecordId, left.RecordId);
-        if (recordComparison != 0) {
-            return recordComparison;
-        }
-
         int timeComparison = oldest
             ? left.TimeCreated.CompareTo(right.TimeCreated)
             : right.TimeCreated.CompareTo(left.TimeCreated);
         if (timeComparison != 0) {
             return timeComparison;
+        }
+
+        // Record IDs are useful tie-breakers within a log, but cannot establish order across machines or logs.
+        int recordComparison = oldest
+            ? Nullable.Compare(left.RecordId, right.RecordId)
+            : Nullable.Compare(right.RecordId, left.RecordId);
+        if (recordComparison != 0) {
+            return recordComparison;
         }
 
         int idComparison = left.Id.CompareTo(right.Id);

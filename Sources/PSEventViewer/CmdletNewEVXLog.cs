@@ -76,7 +76,6 @@ public sealed class CmdletNewEVXLog : AsyncPSCmdlet {
     /// Creates the event log with the specified options.
     /// </summary>
     protected override Task ProcessRecordAsync() {
-        var errorAction = GetErrorActionPreference();
         if (string.IsNullOrEmpty(ProviderName)) {
             ProviderName = LogName;
         }
@@ -90,12 +89,8 @@ public sealed class CmdletNewEVXLog : AsyncPSCmdlet {
                 WriteObject(false);
             }
         } catch (Exception ex) {
-            WriteWarning($"New-EVXLog - Error creating log {LogName}: {ex.Message}");
-            if (errorAction == ActionPreference.Stop) {
-                ThrowTerminatingError(new ErrorRecord(ex, "NewEVXLogFailed", ErrorCategory.InvalidOperation, LogName));
-            } else {
-                WriteObject(false);
-            }
+            WriteError(new ErrorRecord(ex, "NewEVXLogFailed", ErrorCategory.InvalidOperation, LogName));
+            WriteObject(false);
         }
 
         return Task.CompletedTask;

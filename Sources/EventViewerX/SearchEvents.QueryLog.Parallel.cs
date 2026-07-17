@@ -18,7 +18,8 @@ public partial class SearchEvents : Settings {
     /// </summary>
     /// <remarks>
     /// <paramref name="maxEvents"/> is a global limit across all machines and filter chunks.
-    /// Result order is intentionally unspecified when more than one query runs concurrently.
+    /// A positive limit uses a bounded global newest-first merge so producer arrival cannot change the selected set.
+    /// Unlimited result order is intentionally unspecified when more than one query runs concurrently.
     /// </remarks>
     public static async IAsyncEnumerable<EventObject> QueryLogsParallel(
         string logName,
@@ -45,6 +46,7 @@ public partial class SearchEvents : Settings {
             ? new List<string?> { null }
             : machineNames;
         int fixedExpressionCount = CountFixedQueryExpressions(providerName, keywords, level, startTime, endTime, userId, timePeriod);
+        bool isolateRemoteFailures = targets.Count > 1;
         int effectiveBufferCapacity = bufferCapacity > 0 ? bufferCapacity : Math.Max(16, maxThreads * 4);
 
         using var workerCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -58,15 +60,13 @@ public partial class SearchEvents : Settings {
         var workItemSync = new object();
         var failures = new ConcurrentQueue<Exception>();
         var failedTargets = new ConcurrentDictionary<string, byte>(StringComparer.OrdinalIgnoreCase);
-        int produced = 0;
-        int published = 0;
 
         var tasks = new List<Task>(maxThreads);
         for (int workerIndex = 0; workerIndex < maxThreads; workerIndex++) {
             tasks.Add(Task.Run(() => {
                 try {
                     while (TryTakeWorkItem(workItems, workItemSync, workerCancellation.Token, out QueryWorkItem workItem)) {
-                        if (ShouldSkipFailedTarget(workItem, failedTargets)) {
+                        if (isolateRemoteFailures && ShouldSkipFailedTarget(workItem, failedTargets)) {
                             continue;
                         }
 
@@ -89,26 +89,19 @@ public partial class SearchEvents : Settings {
                                 sessionTimeoutMs: sessionTimeoutMs ?? Settings.QuerySessionTimeoutMs,
                                 readMode: readMode,
                                 minimumEventRecordIdExclusive: workItem.MinimumEventRecordIdExclusive)).GetEnumerator();
-                        while (TryMoveNextQueryWorkItem(queryResults, workItem, failedTargets, out EventObject? result)) {
-                            if (!TryReserveResult(ref produced, maxEvents)) {
-                                return;
-                            }
-
+                        int workItemResults = 0;
+                        while (TryMoveNextParallelResult(queryResults, workItem, failedTargets, isolateRemoteFailures, out EventObject? result)) {
                             if (!results.Writer.TryWrite(result!)) {
                                 results.Writer.WriteAsync(result!, workerCancellation.Token).AsTask().GetAwaiter().GetResult();
                             }
-                            if (maxEvents > 0 && Interlocked.Increment(ref published) >= maxEvents) {
-                                workerCancellation.Cancel();
-                                return;
+                            workItemResults++;
+                            if (maxEvents > 0 && workItemResults >= maxEvents) {
+                                break;
                             }
-                        }
-
-                        if (maxEvents > 0 && Volatile.Read(ref produced) >= maxEvents) {
-                            break;
                         }
                     }
                 } catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested && workerCancellation.IsCancellationRequested) {
-                    // The shared result limit or another worker stopped remaining work.
+                    // Another worker failed or the consumer stopped before full enumeration.
                 } catch (Exception ex) {
                     failures.Enqueue(ex);
                     workerCancellation.Cancel();
@@ -124,10 +117,22 @@ public partial class SearchEvents : Settings {
             TaskScheduler.Default);
 
         bool workersObserved = false;
+        List<EventObject>? candidates = maxEvents > 0
+            ? new List<EventObject>(Math.Min(maxEvents, 256))
+            : null;
         try {
             while (await results.Reader.WaitToReadAsync(cancellationToken).ConfigureAwait(false)) {
                 while (results.Reader.TryRead(out EventObject? result)) {
-                    yield return result!;
+                    if (candidates == null) {
+                        yield return result!;
+                        continue;
+                    }
+
+                    candidates.Add(result!);
+                    long trimThreshold = Math.Min((long)maxEvents * 2, (long)maxEvents + 1024);
+                    if (candidates.Count >= trimThreshold) {
+                        SortAndTrim(candidates, maxEvents, oldest: false);
+                    }
                 }
             }
 
@@ -135,6 +140,15 @@ public partial class SearchEvents : Settings {
             workersObserved = true;
             if (failures.TryDequeue(out Exception? failure)) {
                 throw failure;
+            }
+
+            if (candidates != null) {
+                candidates.Sort((left, right) => CompareEvents(left, right, oldest: false));
+                int count = Math.Min(maxEvents, candidates.Count);
+                for (int index = 0; index < count; index++) {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    yield return candidates[index];
+                }
             }
         } finally {
             workerCancellation.Cancel();
@@ -154,6 +168,26 @@ public partial class SearchEvents : Settings {
 
         string? target = NormalizeRemoteTarget(workItem.MachineName);
         return target != null && failedTargets.ContainsKey(target);
+    }
+
+    private static bool TryMoveNextParallelResult(
+        IEnumerator<EventObject> queryResults,
+        QueryWorkItem workItem,
+        ConcurrentDictionary<string, byte> failedTargets,
+        bool isolateRemoteFailures,
+        out EventObject? result) {
+
+        if (isolateRemoteFailures) {
+            return TryMoveNextQueryWorkItem(queryResults, workItem, failedTargets, out result);
+        }
+
+        if (!queryResults.MoveNext()) {
+            result = null;
+            return false;
+        }
+
+        result = queryResults.Current;
+        return true;
     }
 
     internal static bool TryMoveNextQueryWorkItem(
@@ -319,20 +353,6 @@ public partial class SearchEvents : Settings {
         Func<string?, long?>? minimumEventRecordIdExclusiveResolver = null) {
 
         return QueryLogsParallelForEach(LogNameToString(logName), eventIds, machineNames, providerName, keywords, level, startTime, endTime, userId, maxEvents, maxThreads, eventRecordId, cancellationToken, sessionTimeoutMs, readMode, bufferCapacity, minimumEventRecordIdExclusiveResolver);
-    }
-
-    private static bool TryReserveResult(ref int produced, int maxEvents) {
-        while (true) {
-            int current = Volatile.Read(ref produced);
-            if (maxEvents > 0 && current >= maxEvents) {
-                return false;
-            }
-
-            int next = current + 1;
-            if (Interlocked.CompareExchange(ref produced, next, current) == current) {
-                return true;
-            }
-        }
     }
 
     internal static IEnumerable<QueryWorkItem> BuildQueryWorkItems(

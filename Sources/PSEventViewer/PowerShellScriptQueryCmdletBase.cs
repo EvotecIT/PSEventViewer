@@ -1,5 +1,6 @@
 using EventViewerX;
 using System;
+using System.Collections.Generic;
 using System.Management.Automation;
 
 namespace PSEventViewer;
@@ -54,6 +55,20 @@ public abstract class PowerShellScriptQueryCmdletBase : AsyncPSCmdlet {
         }
         if (IncludeQueryInfo.IsPresent) {
             WriteObject(queryInfo);
+        }
+    }
+
+    /// <summary>Moves a script-log iterator while isolating only expected failures from the current remote target.</summary>
+    protected static bool TryMoveNextRemote<T>(
+        IEnumerator<T> enumerator,
+        string? machine,
+        PowerShellScriptQueryExecutionInfo queryInfo) {
+
+        try {
+            return enumerator.MoveNext();
+        } catch (Exception ex) when (EventLogRemoteQueryFailureClassifier.TryClassify(machine, ex, out EventLogRemoteQueryFailureKind failureKind)) {
+            queryInfo.RecordFailure(failureKind, ex.Message);
+            return false;
         }
     }
 }

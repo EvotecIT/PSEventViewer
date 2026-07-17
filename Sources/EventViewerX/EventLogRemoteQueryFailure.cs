@@ -51,7 +51,6 @@ public static class EventLogRemoteQueryFailureClassifier {
             UnauthorizedAccessException => EventLogRemoteQueryFailureKind.AccessDenied,
             TimeoutException => EventLogRemoteQueryFailureKind.Timeout,
             EventLogException => EventLogRemoteQueryFailureKind.EventLogError,
-            InvalidOperationException => EventLogRemoteQueryFailureKind.HostUnavailable,
             _ => EventLogRemoteQueryFailureKind.None
         };
         return failureKind != EventLogRemoteQueryFailureKind.None;

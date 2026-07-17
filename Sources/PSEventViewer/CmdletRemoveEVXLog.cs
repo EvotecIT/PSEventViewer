@@ -44,7 +44,6 @@ public sealed class CmdletRemoveEVXLog : AsyncPSCmdlet {
     /// Removes the specified log.
     /// </summary>
     protected override Task ProcessRecordAsync() {
-        var errorAction = GetErrorActionPreference();
         try {
             if (ShouldProcess($"{LogName} on {MachineName ?? "localhost"}", "Remove event log")) {
                 bool result = SearchEvents.RemoveLog(LogName, MachineName);
@@ -53,12 +52,8 @@ public sealed class CmdletRemoveEVXLog : AsyncPSCmdlet {
                 WriteObject(false);
             }
         } catch (Exception ex) {
-            WriteWarning($"Remove-EVXLog - Error removing log {LogName}: {ex.Message}");
-            if (errorAction == ActionPreference.Stop) {
-                ThrowTerminatingError(new ErrorRecord(ex, "RemoveEVXLogFailed", ErrorCategory.InvalidOperation, LogName));
-            } else {
-                WriteObject(false);
-            }
+            WriteError(new ErrorRecord(ex, "RemoveEVXLogFailed", ErrorCategory.InvalidOperation, LogName));
+            WriteObject(false);
         }
         return Task.CompletedTask;
     }

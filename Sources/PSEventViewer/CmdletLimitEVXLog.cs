@@ -78,7 +78,6 @@ public sealed class CmdletLimitEVXLog : AsyncPSCmdlet {
 
     /// <summary>Executes the log limiting.</summary>
     protected override Task ProcessRecordAsync() {
-        var errorAction = GetErrorActionPreference();
         try {
             if (ShouldProcess($"{LogName} on {MachineName ?? "localhost"}", "Limit event log")) {
                 string sourceLog = string.IsNullOrEmpty(SourceLogName) ? LogName : SourceLogName!;
@@ -88,12 +87,8 @@ public sealed class CmdletLimitEVXLog : AsyncPSCmdlet {
                 WriteObject(false);
             }
         } catch (Exception ex) {
-            WriteWarning($"Limit-EVXLog - Error limiting log {LogName}: {ex.Message}");
-            if (errorAction == ActionPreference.Stop) {
-                ThrowTerminatingError(new ErrorRecord(ex, "LimitEVXLogFailed", ErrorCategory.InvalidOperation, LogName));
-            } else {
-                WriteObject(false);
-            }
+            WriteError(new ErrorRecord(ex, "LimitEVXLogFailed", ErrorCategory.InvalidOperation, LogName));
+            WriteObject(false);
         }
         return Task.CompletedTask;
     }
