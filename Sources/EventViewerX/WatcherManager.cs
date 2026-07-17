@@ -45,6 +45,7 @@ namespace EventViewerX {
         public IReadOnlyList<NamedEvents> NamedEvents { get; }
         /// <summary>Callback invoked when a matching event arrives.</summary>
         public Action<EventObject> Action { get; }
+        internal string? ActionIdentity { get; set; }
         /// <summary>Whether staging event ID 350 is included in the subscription.</summary>
         public bool Staging { get; }
         /// <summary>Stops the watcher after the first match when <c>true</c>.</summary>
@@ -178,8 +179,9 @@ namespace EventViewerX {
         /// <param name="stopOnMatch">Stop after first match when true.</param>
         /// <param name="stopAfter">Stop after this many matches when &gt; 0.</param>
         /// <param name="timeout">Optional timeout after which the watcher stops.</param>
+        /// <param name="actionIdentity">Optional stable callback identity used by hosts that recreate equivalent delegate instances.</param>
         /// <returns>A <see cref="WatcherInfo"/> describing the running watcher.</returns>
-        public static WatcherInfo StartWatcher(string? name, string machineName, string logName, List<int> eventIds, List<NamedEvents> namedEvents, Action<EventObject> action, bool staging, bool stopOnMatch, int stopAfter, TimeSpan? timeout) {
+        public static WatcherInfo StartWatcher(string? name, string machineName, string logName, List<int> eventIds, List<NamedEvents> namedEvents, Action<EventObject> action, bool staging, bool stopOnMatch, int stopAfter, TimeSpan? timeout, string? actionIdentity = null) {
             if (string.IsNullOrWhiteSpace(machineName)) {
                 machineName = Environment.MachineName;
             } else {
@@ -216,7 +218,7 @@ namespace EventViewerX {
             lock (_syncRoot) {
                 if (!string.IsNullOrEmpty(name)) {
                     if (_watchersByName.TryGetValue(name!, out var existingByName) && existingByName.EndTime == null) {
-                        if (HasEquivalentConfiguration(existingByName, machineName, logName, eventIds, namedEvents, action, staging, stopOnMatch, stopAfter, timeout)) {
+                        if (HasEquivalentConfiguration(existingByName, machineName, logName, eventIds, namedEvents, action, staging, stopOnMatch, stopAfter, timeout, actionIdentity)) {
                             return existingByName;
                         }
 
@@ -237,7 +239,9 @@ namespace EventViewerX {
                     }
                 }
 
-                info = new WatcherInfo(name ?? string.Empty, machineName, logName, eventIds, namedEvents, action, staging, stopOnMatch, stopAfter, timeout);
+                info = new WatcherInfo(name ?? string.Empty, machineName, logName, eventIds, namedEvents, action, staging, stopOnMatch, stopAfter, timeout) {
+                    ActionIdentity = actionIdentity
+                };
                 info.Stopped += RemoveStoppedWatcher;
                 _watchers.TryAdd(info.Id, info);
                 if (!string.IsNullOrEmpty(name)) {
@@ -267,13 +271,17 @@ namespace EventViewerX {
             bool staging,
             bool stopOnMatch,
             int stopAfter,
-            TimeSpan? timeout) {
+            TimeSpan? timeout,
+            string? actionIdentity) {
 
+            bool actionMatches = existing.ActionIdentity != null || actionIdentity != null
+                ? string.Equals(existing.ActionIdentity, actionIdentity, StringComparison.Ordinal)
+                : existing.Action.Equals(action);
             return string.Equals(existing.MachineName, machineName, StringComparison.OrdinalIgnoreCase) &&
                    string.Equals(existing.LogName, logName, StringComparison.OrdinalIgnoreCase) &&
                    existing.EventIds.SequenceEqual(eventIds) &&
                    existing.NamedEvents.SequenceEqual(namedEvents) &&
-                   existing.Action.Equals(action) &&
+                   actionMatches &&
                    existing.Staging == staging &&
                    existing.StopOnMatch == stopOnMatch &&
                    existing.StopAfter == stopAfter &&

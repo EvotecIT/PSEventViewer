@@ -132,6 +132,7 @@ namespace PSEventViewer {
                 forwardEvent: false);
 
             WatcherInfo? watcher = null;
+            Action<EventObject> publish = bridge.Publish;
             EventHandler? stoppedHandler = null;
             int subscriptionRemoved = 0;
             void RemovePowerShellSubscription() {
@@ -152,15 +153,20 @@ namespace PSEventViewer {
                     LogName,
                     ids,
                     ParameterSetName == "NamedEvent" ? (NamedEvent?.ToList() ?? new System.Collections.Generic.List<NamedEvents>()) : new System.Collections.Generic.List<NamedEvents>(),
-                    bridge.Publish,
+                    publish,
                     Staging.IsPresent,
                     StopOnMatch.IsPresent,
                     StopAfter,
-                    TimeOut);
-                stoppedHandler = (_, _) => RemovePowerShellSubscription();
-                watcher.Stopped += stoppedHandler;
-                if (watcher.EndTime.HasValue) {
+                    TimeOut,
+                    Action.ToString());
+                if (!watcher.Action.Equals(publish)) {
                     RemovePowerShellSubscription();
+                } else {
+                    stoppedHandler = (_, _) => RemovePowerShellSubscription();
+                    watcher.Stopped += stoppedHandler;
+                    if (watcher.EndTime.HasValue) {
+                        RemovePowerShellSubscription();
+                    }
                 }
                 WriteObject(watcher);
             } catch {

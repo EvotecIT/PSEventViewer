@@ -29,6 +29,53 @@ namespace EventViewerX.Tests {
         }
 
         [Fact]
+        public void StartWatcherUsesStableActionIdentityForRecreatedHostDelegates() {
+            WatcherManager.StopAll();
+            Action<EventObject> firstAction = _ => { };
+            var existing = new WatcherInfo(
+                "unit-stable-action", Environment.MachineName, "Application", new List<int> { 1 }, new List<NamedEvents>(), firstAction, false, false, 0, null) {
+                ActionIdentity = "script:stable"
+            };
+            var watchersField = typeof(WatcherManager).GetField("_watchers", BindingFlags.NonPublic | BindingFlags.Static);
+            var namesField = typeof(WatcherManager).GetField("_watchersByName", BindingFlags.NonPublic | BindingFlags.Static);
+            var watchers = Assert.IsType<ConcurrentDictionary<Guid, WatcherInfo>>(watchersField!.GetValue(null));
+            var names = Assert.IsType<ConcurrentDictionary<string, WatcherInfo>>(namesField!.GetValue(null));
+            watchers[existing.Id] = existing;
+            names[existing.Name] = existing;
+
+            try {
+                WatcherInfo reused = WatcherManager.StartWatcher(
+                    existing.Name,
+                    existing.MachineName,
+                    existing.LogName,
+                    new List<int> { 1 },
+                    new List<NamedEvents>(),
+                    _ => { },
+                    false,
+                    false,
+                    0,
+                    null,
+                    actionIdentity: "script:stable");
+
+                Assert.Same(existing, reused);
+                Assert.Throws<InvalidOperationException>(() => WatcherManager.StartWatcher(
+                    existing.Name,
+                    existing.MachineName,
+                    existing.LogName,
+                    new List<int> { 1 },
+                    new List<NamedEvents>(),
+                    _ => { },
+                    false,
+                    false,
+                    0,
+                    null,
+                    actionIdentity: "script:different"));
+            } finally {
+                WatcherManager.StopAll();
+            }
+        }
+
+        [Fact]
         public void StartWatcherRejectsSameNameWithDifferentConfiguration() {
             WatcherManager.StopAll();
             Action<EventObject> action = _ => { };

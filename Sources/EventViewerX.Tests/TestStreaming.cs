@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Xunit;
@@ -164,6 +165,29 @@ namespace EventViewerX.Tests {
             }
 
             Assert.Equal(16, count);
+        }
+
+        [Fact]
+        public void QueryLogsParallelIsolatesRecoverableRemoteTargetFailures() {
+            var failedTargets = new ConcurrentDictionary<string, byte>(StringComparer.OrdinalIgnoreCase);
+            var remoteWorkItem = new SearchEvents.QueryWorkItem(" server ", null, null);
+            EventObject placeholder = (EventObject)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(EventObject));
+            using IEnumerator<EventObject> remoteResults = new[] { placeholder }
+                .Select<EventObject, EventObject>(_ => throw new TimeoutException("remote timeout"))
+                .GetEnumerator();
+
+            Assert.False(SearchEvents.TryMoveNextQueryWorkItem(remoteResults, remoteWorkItem, failedTargets, out EventObject? result));
+            Assert.Null(result);
+            Assert.True(SearchEvents.ShouldSkipFailedTarget(new SearchEvents.QueryWorkItem("SERVER", null, null), failedTargets));
+
+            using IEnumerator<EventObject> localResults = new[] { placeholder }
+                .Select<EventObject, EventObject>(_ => throw new TimeoutException("local timeout"))
+                .GetEnumerator();
+            Assert.Throws<TimeoutException>(() => SearchEvents.TryMoveNextQueryWorkItem(
+                localResults,
+                new SearchEvents.QueryWorkItem(null, null, null),
+                failedTargets,
+                out _));
         }
 
         [Fact]

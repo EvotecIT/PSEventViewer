@@ -43,4 +43,22 @@ Describe 'Start-EVXWatcher - PowerShell event dispatch' {
             }
         }
     }
+
+    It 'reuses a named watcher when an equivalent script block creates a new bridge delegate' {
+        $Name = 'PSEventViewer.Tests.' + [Guid]::NewGuid().ToString('N')
+        $BeforeCount = @(Get-EventSubscriber -Force | Where-Object SourceIdentifier -Like 'PSEventViewer.Watcher.*').Count
+        $First = $null
+        try {
+            $First = Start-EVXWatcher -Name $Name -MachineName $env:COMPUTERNAME -LogName Application -EventId 1 -Action {}
+            $Second = Start-EVXWatcher -Name $Name -MachineName $env:COMPUTERNAME -LogName Application -EventId 1 -Action {}
+
+            $Second.Id | Should -Be $First.Id
+            @(Get-EventSubscriber -Force | Where-Object SourceIdentifier -Like 'PSEventViewer.Watcher.*').Count |
+                Should -Be ($BeforeCount + 1)
+        } finally {
+            if ($First) {
+                Stop-EVXWatcher -Id $First.Id -ErrorAction SilentlyContinue
+            }
+        }
+    }
 }

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics.Eventing.Reader;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Channels;
@@ -56,6 +57,7 @@ public partial class SearchEvents : Settings {
         using IEnumerator<QueryWorkItem> workItems = BuildQueryWorkItems(targets, eventIds, eventRecordId, fixedExpressionCount).GetEnumerator();
         var workItemSync = new object();
         var failures = new ConcurrentQueue<Exception>();
+        var failedTargets = new ConcurrentDictionary<string, byte>(StringComparer.OrdinalIgnoreCase);
         int produced = 0;
         int published = 0;
 
@@ -64,30 +66,35 @@ public partial class SearchEvents : Settings {
             tasks.Add(Task.Run(() => {
                 try {
                     while (TryTakeWorkItem(workItems, workItemSync, workerCancellation.Token, out QueryWorkItem workItem)) {
-                        foreach (EventObject result in FilterQueryWorkItemResults(
-                                     workItem,
-                                     QueryLogEnumerable(
-                                         logName,
-                                         workItem.EventIds,
-                                         workItem.MachineName,
-                                         providerName,
-                                         keywords,
-                                         level,
-                                         startTime,
-                                         endTime,
-                                         userId,
-                                         maxEvents: 0,
-                                         eventRecordId: workItem.EventRecordIds,
-                                         timePeriod: timePeriod,
-                                         cancellationToken: workerCancellation.Token,
-                                         sessionTimeoutMs: sessionTimeoutMs ?? Settings.QuerySessionTimeoutMs,
-                                         readMode: readMode))) {
+                        if (ShouldSkipFailedTarget(workItem, failedTargets)) {
+                            continue;
+                        }
+
+                        using IEnumerator<EventObject> queryResults = FilterQueryWorkItemResults(
+                            workItem,
+                            QueryLogEnumerable(
+                                logName,
+                                workItem.EventIds,
+                                workItem.MachineName,
+                                providerName,
+                                keywords,
+                                level,
+                                startTime,
+                                endTime,
+                                userId,
+                                maxEvents: 0,
+                                eventRecordId: workItem.EventRecordIds,
+                                timePeriod: timePeriod,
+                                cancellationToken: workerCancellation.Token,
+                                sessionTimeoutMs: sessionTimeoutMs ?? Settings.QuerySessionTimeoutMs,
+                                readMode: readMode)).GetEnumerator();
+                        while (TryMoveNextQueryWorkItem(queryResults, workItem, failedTargets, out EventObject? result)) {
                             if (!TryReserveResult(ref produced, maxEvents)) {
                                 return;
                             }
 
-                            if (!results.Writer.TryWrite(result)) {
-                                results.Writer.WriteAsync(result, workerCancellation.Token).AsTask().GetAwaiter().GetResult();
+                            if (!results.Writer.TryWrite(result!)) {
+                                results.Writer.WriteAsync(result!, workerCancellation.Token).AsTask().GetAwaiter().GetResult();
                             }
                             if (maxEvents > 0 && Interlocked.Increment(ref published) >= maxEvents) {
                                 workerCancellation.Cancel();
@@ -138,6 +145,47 @@ public partial class SearchEvents : Settings {
                 }
             }
         }
+    }
+
+    internal static bool ShouldSkipFailedTarget(
+        QueryWorkItem workItem,
+        ConcurrentDictionary<string, byte> failedTargets) {
+
+        string? target = NormalizeRemoteTarget(workItem.MachineName);
+        return target != null && failedTargets.ContainsKey(target);
+    }
+
+    internal static bool TryMoveNextQueryWorkItem(
+        IEnumerator<EventObject> queryResults,
+        QueryWorkItem workItem,
+        ConcurrentDictionary<string, byte> failedTargets,
+        out EventObject? result) {
+
+        try {
+            if (!queryResults.MoveNext()) {
+                result = null;
+                return false;
+            }
+
+            result = queryResults.Current;
+            return true;
+        } catch (Exception ex) when (IsRecoverableRemoteQueryFailure(workItem, ex)) {
+            string target = NormalizeRemoteTarget(workItem.MachineName)!;
+            if (failedTargets.TryAdd(target, 0)) {
+                _logger.WriteWarning($"Skipping event-log target '{target}' after {ex.GetType().Name}: {ex.Message}");
+            }
+            result = null;
+            return false;
+        }
+    }
+
+    private static bool IsRecoverableRemoteQueryFailure(QueryWorkItem workItem, Exception exception) {
+        return NormalizeRemoteTarget(workItem.MachineName) != null &&
+               exception is EventLogException or UnauthorizedAccessException or TimeoutException or InvalidOperationException;
+    }
+
+    private static string? NormalizeRemoteTarget(string? machineName) {
+        return string.IsNullOrWhiteSpace(machineName) ? null : machineName!.Trim();
     }
 
     /// <summary>Materializes the bounded parallel query results.</summary>
