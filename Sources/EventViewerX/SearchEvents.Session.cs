@@ -22,13 +22,16 @@ public partial class SearchEvents : Settings
     /// Creates an EventLogSession with a timeout and a quick reachability check to avoid long hangs.
     /// Returns null and logs a warning on timeout or failure.
     /// </summary>
-    internal static EventLogSession? CreateSession(string? machineName, string? purpose, string? logName, int? timeoutMs = null)
-    {
+    internal static EventLogSession? CreateSession(string? machineName, string? purpose, string? logName, int? timeoutMs = null) {
         return CreateSessionResult(machineName, purpose, logName, timeoutMs).Session;
     }
 
-    internal static EventLogSessionOpenResult CreateSessionResult(string? machineName, string? purpose, string? logName, int? timeoutMs = null)
-    {
+    internal static EventLogSessionOpenResult CreateSessionResult(
+        string? machineName,
+        string? purpose,
+        string? logName,
+        int? timeoutMs = null,
+        Func<EventLogSession>? localSessionFactory = null) {
         int budget = timeoutMs ?? DefaultSessionTimeoutMs;
         if (budget <= 0) {
             throw new ArgumentOutOfRangeException(nameof(timeoutMs), "Session timeout must be positive.");
@@ -38,14 +41,26 @@ public partial class SearchEvents : Settings
         var stopwatch = Stopwatch.StartNew();
 
         // Local is fast; avoid ping/RPC probes (many CI agents block 135)
-        if (IsLocalMachine(machineName))
-        {
-            try
-            {
-                return SessionSuccess(machineName, GetFQDN(), operation, channel, budget, new EventLogSession());
-            }
-            catch (Exception ex)
-            {
+        if (IsLocalMachine(machineName)) {
+            try {
+                EventLogSession session = ExecuteWithTimeout(
+                    localSessionFactory ?? (static () => new EventLogSession()),
+                    budget,
+                    $"Timed out opening the local Event Log session for '{channel}' after {budget} ms.",
+                    static lateSession => lateSession.Dispose());
+                return SessionSuccess(machineName, GetFQDN(), operation, channel, budget, session);
+            } catch (TimeoutException ex) {
+                _logger.WriteWarning($"{operation}: {ex.Message}");
+                return SessionFailure(
+                    machineName,
+                    GetFQDN(),
+                    operation,
+                    channel,
+                    EventLogSessionOpenStatus.Timeout,
+                    ex.Message,
+                    budget,
+                    ex.GetType().Name);
+            } catch (Exception ex) {
                 _logger.WriteWarning($"{operation}: failed to open local session for '{channel}': {ex.Message}");
                 return SessionFailure(
                     machineName,
@@ -93,18 +108,15 @@ public partial class SearchEvents : Settings
             _logger.WriteVerbose($"{operation}: RPC preflight failed for '{machineName}'");
             MarkHostUnreachable(normalizedHost);
             TryGetHostNegativeCacheExpiry(normalizedHost, out DateTime rpcCachedUntilUtc);
-            bool exhaustedBudget = RemainingSessionBudget(budget, stopwatch) <= 0;
             return SessionFailure(
                 machineName,
                 targetHost,
                 operation,
                 channel,
-                exhaustedBudget ? EventLogSessionOpenStatus.Timeout : EventLogSessionOpenStatus.RpcUnavailable,
-                exhaustedBudget
-                    ? $"Timed out opening Event Log session to '{targetHost}' for '{channel}' after {budget} ms."
-                    : $"RPC preflight to '{targetHost}' on port {Settings.RpcProbePort} failed.",
+                EventLogSessionOpenStatus.RpcUnavailable,
+                $"RPC preflight to '{targetHost}' on port {Settings.RpcProbePort} failed within the {budget} ms session budget.",
                 budget,
-                exhaustedBudget ? nameof(EventLogSessionOpenStatus.Timeout) : nameof(EventLogSessionOpenStatus.RpcUnavailable),
+                nameof(EventLogSessionOpenStatus.RpcUnavailable),
                 rpcCachedUntilUtc);
         }
 

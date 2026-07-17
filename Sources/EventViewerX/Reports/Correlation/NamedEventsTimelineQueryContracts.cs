@@ -48,6 +48,11 @@ public sealed class NamedEventsTimelineQueryRequest {
     public int MaxEvents { get; set; } = 500;
 
     /// <summary>
+    /// Maximum raw event candidates evaluated before named-event and correlation filtering. Zero disables the scan cap.
+    /// </summary>
+    public int MaxEventsScanned { get; set; } = 5000;
+
+    /// <summary>
     /// Maximum query concurrency.
     /// </summary>
     public int MaxThreads { get; set; } = 4;
@@ -308,6 +313,11 @@ public sealed class NamedEventsTimelineQueryResult {
     /// Maximum events cap used by the query.
     /// </summary>
     public int MaxEvents { get; set; }
+
+    /// <summary>
+    /// Maximum raw candidate scan cap used by the query. Zero means unlimited.
+    /// </summary>
+    public int MaxEventsScanned { get; set; }
 
     /// <summary>
     /// Maximum worker concurrency used by the query.

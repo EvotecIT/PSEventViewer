@@ -10,6 +10,10 @@ public partial class SearchEvents {
     /// <summary>
     /// Streams events from one or more machines in target order using one global result limit.
     /// </summary>
+    /// <remarks>
+    /// Unlimited queries that require multiple XPath chunks stream bounded chunk batches; ordering is preserved
+    /// within each batch. A positive <paramref name="maxEvents"/> keeps a bounded global newest-first merge.
+    /// </remarks>
     public static IEnumerable<EventObject> QueryLogsSequential(
         string logName,
         List<int>? eventIds = null,
@@ -74,7 +78,7 @@ public partial class SearchEvents {
         }
     }
 
-    private static IEnumerable<EventObject> MergeQueryWorkItems(
+    internal static IEnumerable<EventObject> MergeQueryWorkItems(
         IEnumerable<QueryWorkItem> workItems,
         Func<QueryWorkItem, IEnumerator<EventObject>> createEnumerator,
         int maxEvents,
@@ -106,8 +110,32 @@ public partial class SearchEvents {
             yield break;
         }
 
-        var candidates = new List<EventObject>();
         var batch = new List<QueryWorkItem>(maxOpenQueries) { first, source.Current };
+        if (maxEvents <= 0) {
+            while (true) {
+                while (batch.Count < maxOpenQueries && source.MoveNext()) {
+                    batch.Add(source.Current);
+                }
+
+                foreach (EventObject result in MergeQueryBatch(
+                             batch,
+                             createEnumerator,
+                             maxEvents: 0,
+                             oldest: oldest,
+                             cancellationToken: cancellationToken)) {
+                    yield return result;
+                }
+
+                if (!source.MoveNext()) {
+                    yield break;
+                }
+
+                batch.Clear();
+                batch.Add(source.Current);
+            }
+        }
+
+        var candidates = new List<EventObject>(maxEvents);
         while (true) {
             while (batch.Count < maxOpenQueries && source.MoveNext()) {
                 batch.Add(source.Current);
@@ -117,9 +145,7 @@ public partial class SearchEvents {
                 candidates.Add(result);
             }
 
-            if (maxEvents > 0) {
-                SortAndTrim(candidates, maxEvents, oldest);
-            }
+            SortAndTrim(candidates, maxEvents, oldest);
 
             if (!source.MoveNext()) {
                 break;

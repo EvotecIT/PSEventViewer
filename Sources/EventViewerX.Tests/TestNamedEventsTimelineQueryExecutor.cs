@@ -75,6 +75,20 @@ public class TestNamedEventsTimelineQueryExecutor {
     }
 
     [Fact]
+    public async Task TryBuildAsync_ShouldFailWhenCandidateScanLimitIsNegative() {
+        var (result, failure) = await NamedEventsTimelineQueryExecutor.TryBuildAsync(
+            new NamedEventsTimelineQueryRequest {
+                NamedEvents = new[] { NamedEvents.ADUserLogon },
+                MaxEventsScanned = -1
+            });
+
+        Assert.Null(result);
+        Assert.NotNull(failure);
+        Assert.Equal(NamedEventsTimelineQueryFailureKind.InvalidArgument, failure!.Kind);
+        Assert.Contains("maxEventsScanned", failure.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void TryParseUtcValue_ShouldTreatUnspecifiedTimestampAsUtc() {
         var parsed = NamedEventsTimelineQueryExecutor.TryParseUtcValue("2026-02-20T12:34:56", out var utc);
 

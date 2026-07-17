@@ -192,6 +192,34 @@ namespace EventViewerX.Tests {
         }
 
         [Fact]
+        public void UnlimitedChunkMergeStreamsBeforeOpeningEveryQuery() {
+            List<SearchEvents.QueryWorkItem> workItems = Enumerable.Range(0, 3)
+                .Select(index => new SearchEvents.QueryWorkItem(
+                    machineName: null,
+                    eventIds: null,
+                    eventRecordIds: new List<long> { 100 - index }))
+                .ToList();
+            int opened = 0;
+            int exhausted = 0;
+
+            using IEnumerator<EventObject> results = SearchEvents.MergeQueryWorkItems(
+                workItems,
+                workItem => CreateSingleResultQuery(
+                    workItem.EventRecordIds![0],
+                    () => opened++,
+                    () => exhausted++).GetEnumerator(),
+                maxEvents: 0,
+                oldest: false,
+                cancellationToken: CancellationToken.None,
+                maxOpenQueries: 2).GetEnumerator();
+
+            Assert.True(results.MoveNext());
+            Assert.Equal(100L, results.Current.RecordId);
+            Assert.Equal(2, opened);
+            Assert.Equal(0, exhausted);
+        }
+
+        [Fact]
         public void QueryLogMergesChunksBeforeApplyingTheGlobalMaximum() {
             if (!OperatingSystem.IsWindows()) return;
             if (!TestEnv.CanReadLog("System")) return;
@@ -226,6 +254,22 @@ namespace EventViewerX.Tests {
                                bufferCapacity: 1)) {
                 break;
             }
+        }
+
+        private static IEnumerable<EventObject> CreateSingleResultQuery(long recordId, Action opened, Action exhausted) {
+            opened();
+            var eventObject = (EventObject)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(EventObject));
+            SetSnapshotProperty(eventObject, nameof(EventObject.RecordId), (long?)recordId);
+            SetSnapshotProperty(eventObject, nameof(EventObject.TimeCreated), new DateTime(recordId, DateTimeKind.Utc));
+            SetSnapshotProperty(eventObject, nameof(EventObject.Id), (int)recordId);
+            yield return eventObject;
+            exhausted();
+        }
+
+        private static void SetSnapshotProperty<T>(EventObject eventObject, string propertyName, T value) {
+            typeof(EventObject)
+                .GetField($"<{propertyName}>k__BackingField", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
+                .SetValue(eventObject, value);
         }
     }
 }

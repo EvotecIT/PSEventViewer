@@ -43,7 +43,17 @@ foreach ($Module in $PSDInformation.RequiredModules) {
 Write-Color
 
 Import-Module $PSScriptRoot\*.psd1 -Force
-$result = Invoke-Pester -Script $PSScriptRoot\Tests -Verbose -PassThru
+$invokePesterSplat = @{
+    PassThru = $true
+    Verbose  = $true
+}
+$invokePesterCommand = Get-Command -Name Invoke-Pester
+if ($invokePesterCommand.Parameters.ContainsKey('Path')) {
+    $invokePesterSplat['Path'] = Join-Path -Path $PSScriptRoot -ChildPath 'Tests'
+} else {
+    $invokePesterSplat['Script'] = Join-Path -Path $PSScriptRoot -ChildPath 'Tests'
+}
+$result = Invoke-Pester @invokePesterSplat
 
 if ($result.FailedCount -gt 0) {
     throw "$($result.FailedCount) tests failed."

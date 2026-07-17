@@ -26,6 +26,10 @@ public partial class SearchEvents : Settings {
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <param name="readMode">Amount of provider data to materialize for each event.</param>
     /// <returns>Enumerable sequence of <see cref="EventObject"/> read from the file.</returns>
+    /// <remarks>
+    /// Unlimited queries that require multiple XPath chunks stream bounded chunk batches; ordering is preserved
+    /// within each batch. A positive <paramref name="maxEvents"/> keeps a bounded global merge in the requested direction.
+    /// </remarks>
     public static IEnumerable<EventObject> QueryLogFile(string filePath, List<int>? eventIds = null, string? providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string? userId = null, int maxEvents = 0, List<long>? eventRecordId = null, TimePeriod? timePeriod = null, bool oldest = false, System.Collections.Hashtable? namedDataFilter = null, System.Collections.Hashtable? namedDataExcludeFilter = null, CancellationToken cancellationToken = default, EventReadMode readMode = EventReadMode.Full) {
         if (string.IsNullOrWhiteSpace(filePath)) {
             throw new ArgumentException("File path cannot be null or empty.", nameof(filePath));

@@ -108,6 +108,7 @@ public static partial class NamedEventsTimelineQueryExecutor {
                                timePeriod: request.TimePeriod,
                                maxThreads: maxThreads,
                                maxEvents: 0,
+                               maxEventsScanned: request.MaxEventsScanned,
                                cancellationToken: cancellationToken)) {
                 cancellationToken.ThrowIfCancellationRequested();
 
@@ -284,6 +285,7 @@ public static partial class NamedEventsTimelineQueryExecutor {
             StartTimeUtc = request.StartTimeUtc,
             EndTimeUtc = request.EndTimeUtc,
             MaxEvents = maxEvents,
+            MaxEventsScanned = request.MaxEventsScanned,
             MaxThreads = maxThreads,
             CorrelationKeys = normalizedCorrelationKeys,
             IncludeUncorrelated = includeUncorrelated,
@@ -349,6 +351,14 @@ public static partial class NamedEventsTimelineQueryExecutor {
             failure = new NamedEventsTimelineQueryFailure {
                 Kind = NamedEventsTimelineQueryFailureKind.InvalidArgument,
                 Message = "maxEvents must be greater than 0."
+            };
+            return false;
+        }
+
+        if (request.MaxEventsScanned < 0) {
+            failure = new NamedEventsTimelineQueryFailure {
+                Kind = NamedEventsTimelineQueryFailureKind.InvalidArgument,
+                Message = "maxEventsScanned must be greater than or equal to 0."
             };
             return false;
         }

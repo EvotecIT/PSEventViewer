@@ -378,10 +378,13 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
                     if (!MessageMatches(eventObject.Event) || !ShouldOutput(eventObject.Event)) {
                         continue;
                     }
+                    object output = Expand
+                        ? GetExpandedObject(eventObject, eventObject.Event)
+                        : eventObject;
                     if (AsArray) {
-                        results!.Add(eventObject);
+                        results!.Add(output);
                     } else {
-                        WriteObject(eventObject);
+                        WriteObject(output);
                     }
                     _eventsOutput++;
                     if (OutputLimitReached) {
@@ -479,10 +482,21 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
     /// <param name="eventObject">The event object.</param>
     /// <returns>PSObject with expanded properties.</returns>
     private PSObject GetExpandedObject(EventObject eventObject) {
-        PSObject outputObj = new(eventObject); // => it's the preferred way to create a wrapper pso when you already know it's not a pso
-                                               // PSObject outputObj = PSObject.AsPSObject(eventObject); => this is the preferred way to convert from PSO to PSObject
+        return GetExpandedObject(eventObject, eventObject);
+    }
+
+    /// <summary>
+    /// Creates an expanded PSObject around the selected output projection using structured data from its source event.
+    /// </summary>
+    /// <param name="output">Object that remains the PowerShell base object.</param>
+    /// <param name="eventObject">Source event whose structured data is expanded.</param>
+    /// <returns>PSObject with non-conflicting structured data properties.</returns>
+    private static PSObject GetExpandedObject(object output, EventObject eventObject) {
+        PSObject outputObj = new(output);
         foreach (var property in eventObject.Data.OrderBy(static d => d.Key, StringComparer.OrdinalIgnoreCase)) {
-            outputObj.Properties.Add(new PSNoteProperty(property.Key, property.Value));
+            if (outputObj.Properties[property.Key] == null) {
+                outputObj.Properties.Add(new PSNoteProperty(property.Key, property.Value));
+            }
         }
         return outputObj;
     }

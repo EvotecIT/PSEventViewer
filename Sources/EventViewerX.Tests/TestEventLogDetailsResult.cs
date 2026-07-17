@@ -35,7 +35,11 @@ public class TestEventLogDetailsResult {
 
         using var session = new EventLogSession();
 
-        EventLogDetailsResult result = SearchEvents.GetLogDetailsResult("Application", session, machineName: Environment.MachineName);
+        EventLogDetailsResult result = SearchEvents.GetLogDetailsResult(
+            "Application",
+            session,
+            timeoutMs: 10000,
+            machineName: Environment.MachineName);
 
         Assert.True(result.Success);
         Assert.Equal(EventLogDetailsStatus.Success, result.Status);

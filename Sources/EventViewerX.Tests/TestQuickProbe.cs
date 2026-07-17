@@ -1,21 +1,29 @@
 using System;
+using System.Diagnostics;
 using System.Threading;
 using Xunit;
 
 namespace EventViewerX.Tests {
     public class TestQuickProbe {
         [Fact]
-        public void SessionCreationPreservesSubSecondProbeBudget() {
+        public void LocalSessionCreationHonorsSubSecondProbeBudget() {
             if (!OperatingSystem.IsWindows()) return;
 
+            var stopwatch = Stopwatch.StartNew();
             using EventLogSessionOpenResult result = SearchEvents.CreateSessionResult(
                 null,
                 "QuickProbe",
                 "Application",
-                timeoutMs: 250);
+                timeoutMs: 100,
+                localSessionFactory: () => {
+                    Thread.Sleep(500);
+                    return new System.Diagnostics.Eventing.Reader.EventLogSession();
+                });
 
-            Assert.True(result.Success);
-            Assert.Equal(250, result.TimeoutMs);
+            Assert.False(result.Success);
+            Assert.Equal(EventLogSessionOpenStatus.Timeout, result.Status);
+            Assert.Equal(100, result.TimeoutMs);
+            Assert.True(stopwatch.Elapsed < TimeSpan.FromMilliseconds(400), $"Elapsed {stopwatch.Elapsed.TotalMilliseconds:F0} ms.");
         }
 
         [Fact]
