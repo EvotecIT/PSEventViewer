@@ -11,29 +11,37 @@ namespace EventViewerX;
 /// </summary>
 public class EventObjectSlim {
     /// <summary>
-    /// Reference to the detailed event object.
+    /// Gets the detailed event snapshot used to build this rule result.
     /// </summary>
-    public EventObject _eventObject = null!;
+    public EventObject Event { get; private set; } = null!;
+
+    /// <summary>
+    /// Compatibility alias for <see cref="Event"/>.
+    /// </summary>
+    public EventObject _eventObject {
+        get => Event;
+        protected set => Event = value;
+    }
 
     /// <summary>
     /// Identifier of the event.
     /// </summary>
-    public int EventID; // = _eventObject.Id;
+    public int EventID { get; private set; }
 
     /// <summary>
     /// Record identifier of the event.
     /// </summary>
-    public long? RecordID; // = _eventObject.RecordId;
+    public long? RecordID { get; private set; }
 
     /// <summary>
     /// Source machine from which the event was gathered.
     /// </summary>
-    public string GatheredFrom = string.Empty; // = _eventObject.MachineName;
+    public string GatheredFrom { get; private set; } = string.Empty;
 
     /// <summary>
     /// Log name where the event originated.
     /// </summary>
-    public string GatheredLogName = string.Empty; // = _eventObject.LogName;
+    public string GatheredLogName { get; private set; } = string.Empty;
 
     /// <summary>
     /// Name of the rule type handling the event.
@@ -60,17 +68,31 @@ public class EventObjectSlim {
     }
 
     private static readonly Dictionary<NamedEvents, Type> _reflectionRuleTypes = new();
-    private static readonly Dictionary<(int EventId, string LogName), List<Type>> _reflectionHandlers = new();
+    private static readonly Dictionary<(int EventId, string LogName), List<Type>> _reflectionHandlers = new(EventHandlerKeyComparer.Instance);
 
     private static readonly Dictionary<NamedEvents, Type> _explicitRuleTypes = new();
-    private static readonly Dictionary<(int EventId, string LogName), List<Type>> _explicitHandlers = new();
+    private static readonly Dictionary<(int EventId, string LogName), List<Type>> _explicitHandlers = new(EventHandlerKeyComparer.Instance);
 
     // AOT-friendly path: explicit, delegate-based rule registration.
     private static readonly Dictionary<NamedEvents, RuleFactoryRegistration> _ruleFactories = new();
-    private static readonly Dictionary<(int EventId, string LogName), List<RuleFactoryRegistration>> _factoryHandlers = new();
+    private static readonly Dictionary<(int EventId, string LogName), List<RuleFactoryRegistration>> _factoryHandlers = new(EventHandlerKeyComparer.Instance);
+
+    private sealed class EventHandlerKeyComparer : IEqualityComparer<(int EventId, string LogName)> {
+        internal static EventHandlerKeyComparer Instance { get; } = new();
+
+        public bool Equals((int EventId, string LogName) x, (int EventId, string LogName) y) {
+            return x.EventId == y.EventId && string.Equals(x.LogName, y.LogName, StringComparison.OrdinalIgnoreCase);
+        }
+
+        public int GetHashCode((int EventId, string LogName) value) {
+            unchecked {
+                return (value.EventId * 397) ^ StringComparer.OrdinalIgnoreCase.GetHashCode(value.LogName ?? string.Empty);
+            }
+        }
+    }
 
     private static readonly object _initLock = new();
-    private static bool _initialized = false;
+    private static volatile bool _initialized;
     private static EventRuleDiscoveryMode _discoveryMode = EventRuleDiscoveryMode.Auto;
 
     private static readonly Dictionary<int, string> uacFlags = new() {
@@ -144,31 +166,37 @@ public class EventObjectSlim {
             throw new ArgumentException("eventIds must contain at least one positive event id.", nameof(eventIds));
         }
 
-        var reg = new RuleFactoryRegistration(namedEvent, normalizedLog, ids, factory, canHandle, ruleType);
-        _ruleFactories[namedEvent] = reg;
-
-        if (ruleType is not null) {
-            _explicitRuleTypes[namedEvent] = ruleType;
-        }
-
-        foreach (var eventId in ids) {
-            var factoryKey = (eventId, normalizedLog);
-            if (!_factoryHandlers.TryGetValue(factoryKey, out var factoryList)) {
-                factoryList = new List<RuleFactoryRegistration>();
-                _factoryHandlers[factoryKey] = factoryList;
+        lock (_initLock) {
+            if (_initialized) {
+                throw new InvalidOperationException("Rule factories must be registered before the first EventObjectSlim query.");
             }
-            if (!factoryList.Contains(reg)) {
-                factoryList.Add(reg);
-            }
+
+            var reg = new RuleFactoryRegistration(namedEvent, normalizedLog, ids, factory, canHandle, ruleType);
+            _ruleFactories[namedEvent] = reg;
 
             if (ruleType is not null) {
-                var legacyKey = (eventId, normalizedLog);
-                if (!_explicitHandlers.TryGetValue(legacyKey, out var legacyList)) {
-                    legacyList = new List<Type>();
-                    _explicitHandlers[legacyKey] = legacyList;
+                _explicitRuleTypes[namedEvent] = ruleType;
+            }
+
+            foreach (var eventId in ids) {
+                var factoryKey = (eventId, normalizedLog);
+                if (!_factoryHandlers.TryGetValue(factoryKey, out var factoryList)) {
+                    factoryList = new List<RuleFactoryRegistration>();
+                    _factoryHandlers[factoryKey] = factoryList;
                 }
-                if (!legacyList.Contains(ruleType)) {
-                    legacyList.Add(ruleType);
+                if (!factoryList.Contains(reg)) {
+                    factoryList.Add(reg);
+                }
+
+                if (ruleType is not null) {
+                    var legacyKey = (eventId, normalizedLog);
+                    if (!_explicitHandlers.TryGetValue(legacyKey, out var legacyList)) {
+                        legacyList = new List<Type>();
+                        _explicitHandlers[legacyKey] = legacyList;
+                    }
+                    if (!legacyList.Contains(ruleType)) {
+                        legacyList.Add(ruleType);
+                    }
                 }
             }
         }
@@ -251,10 +279,10 @@ public class EventObjectSlim {
         EnsureInitialized();
 
         if (mode == EventRuleDiscoveryMode.ExplicitOnly) {
-            return _explicitHandlers.TryGetValue(key, out var explicitHandlers) ? explicitHandlers : new List<Type>();
+            return _explicitHandlers.TryGetValue(key, out var explicitHandlers) ? new List<Type>(explicitHandlers) : new List<Type>();
         }
         if (mode == EventRuleDiscoveryMode.Reflection) {
-            return _reflectionHandlers.TryGetValue(key, out var reflectionHandlers) ? reflectionHandlers : new List<Type>();
+            return _reflectionHandlers.TryGetValue(key, out var reflectionHandlers) ? new List<Type>(reflectionHandlers) : new List<Type>();
         }
 
         var combined = new List<Type>();
@@ -374,7 +402,7 @@ public class EventObjectSlim {
         var mode = _discoveryMode;
         EnsureInitialized();
 
-        var eventInfoDict = new Dictionary<string, HashSet<int>>();
+        var eventInfoDict = new Dictionary<string, HashSet<int>>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var namedEvent in namedEvents) {
             if (mode != EventRuleDiscoveryMode.Reflection && _ruleFactories.TryGetValue(namedEvent, out var reg)) {
@@ -443,11 +471,11 @@ public class EventObjectSlim {
     /// </summary>
     /// <param name="eventObject">Full event wrapper to down-sample.</param>
     public EventObjectSlim(EventObject eventObject) {
-        _eventObject = eventObject;
-        EventID = _eventObject.Id;
-        RecordID = _eventObject.RecordId;
-        GatheredFrom = _eventObject.QueriedMachine;
-        GatheredLogName = _eventObject.ContainerLog;
+        Event = eventObject ?? throw new ArgumentNullException(nameof(eventObject));
+        EventID = Event.Id;
+        RecordID = Event.RecordId;
+        GatheredFrom = Event.QueriedMachine;
+        GatheredLogName = Event.ContainerLog;
     }
 
     internal static string ConvertToObjectAffected(EventObject eventObject) {

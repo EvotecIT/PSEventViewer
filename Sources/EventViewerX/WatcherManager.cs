@@ -10,21 +10,27 @@ namespace EventViewerX {
     /// Represents information about a running watcher instance.
     /// </summary>
     public class WatcherInfo : IDisposable {
-        internal WatcherInfo(string name, string machineName, string logName, List<int> eventIds, List<NamedEvents> namedEvents, Action<EventObject> action, int numberOfThreads, bool staging, bool stopOnMatch, int stopAfter, TimeSpan? timeout) {
+        internal WatcherInfo(string name, string machineName, string logName, List<int> eventIds, List<NamedEvents> namedEvents, Action<EventObject> action, bool staging, bool stopOnMatch, int stopAfter, TimeSpan? timeout) {
             Name = name;
             MachineName = machineName;
             LogName = logName;
-            EventIds = eventIds;
-            NamedEvents = namedEvents;
+            EventIds = eventIds.ToArray();
+            NamedEvents = namedEvents.ToArray();
             Action = action;
+            Staging = staging;
             StopOnMatch = stopOnMatch;
             StopAfter = stopAfter;
             Timeout = timeout;
             _staging = staging;
-            Watcher = new WatchEvents(new InternalLogger(false)) { NumberOfThreads = numberOfThreads };
+            Watcher = new WatchEvents(new InternalLogger(false));
         }
 
         private readonly bool _staging;
+        private readonly object _stopSync = new();
+        private bool _started;
+        private bool _stopped;
+        private bool _cancellationDisposed;
+        private int _stopScheduled;
         /// <summary>Unique identifier assigned to the watcher instance.</summary>
         public Guid Id { get; } = Guid.NewGuid();
         /// <summary>User-friendly name used to find and deduplicate watchers.</summary>
@@ -34,11 +40,13 @@ namespace EventViewerX {
         /// <summary>Event log name being monitored.</summary>
         public string LogName { get; }
         /// <summary>Event IDs the watcher listens for.</summary>
-        public List<int> EventIds { get; }
+        public IReadOnlyList<int> EventIds { get; }
         /// <summary>NamedEvents packs that were expanded into <see cref="EventIds"/>.</summary>
-        public List<NamedEvents> NamedEvents { get; }
+        public IReadOnlyList<NamedEvents> NamedEvents { get; }
         /// <summary>Callback invoked when a matching event arrives.</summary>
         public Action<EventObject> Action { get; }
+        /// <summary>Whether staging event ID 350 is included in the subscription.</summary>
+        public bool Staging { get; }
         /// <summary>Stops the watcher after the first match when <c>true</c>.</summary>
         public bool StopOnMatch { get; }
         /// <summary>Optional cap on number of matching events before stopping.</summary>
@@ -59,19 +67,27 @@ namespace EventViewerX {
 
         /// <summary>Begins monitoring and starts the optional timeout timer.</summary>
         public void Start() {
-            Watcher.Watch(MachineName, LogName, EventIds, OnEvent, Cancellation.Token, _staging, Environment.UserName);
-            if (Timeout.HasValue) {
-                var delayMs = (int)Timeout.Value.TotalMilliseconds;
-                TimeoutTask = Task.Run(async () => {
-                    try {
-                        await Task.Delay(delayMs, Cancellation.Token);
-                    } catch (TaskCanceledException) {
-                    } finally {
-                        if (EndTime == null) {
-                            Stop();
-                        }
-                    }
-                });
+            lock (_stopSync) {
+                if (_stopped) {
+                    throw new ObjectDisposedException(nameof(WatcherInfo));
+                }
+                if (_started) {
+                    return;
+                }
+
+                Watcher.Watch(MachineName, LogName, new List<int>(EventIds), OnEvent, Cancellation.Token, _staging, Environment.UserName);
+                _started = true;
+                if (Timeout.HasValue) {
+                    TimeoutTask = StopAfterTimeoutAsync(Timeout.Value, Cancellation.Token);
+                }
+            }
+        }
+
+        private async Task StopAfterTimeoutAsync(TimeSpan timeout, CancellationToken cancellationToken) {
+            try {
+                await Task.Delay(timeout, cancellationToken).ConfigureAwait(false);
+                Stop();
+            } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
             }
         }
 
@@ -87,9 +103,9 @@ namespace EventViewerX {
             }
 
             if (StopOnMatch) {
-                Stop();
+                ScheduleStop();
             } else if (StopAfter > 0 && Watcher.EventsFound >= StopAfter) {
-                Stop();
+                ScheduleStop();
             }
 
             if (exCaught != null) {
@@ -100,17 +116,44 @@ namespace EventViewerX {
         /// <summary>Raised when the user-supplied <see cref="Action"/> throws.</summary>
         public event EventHandler<Exception>? ActionException;
 
+        /// <summary>Raised after the watcher has released its native resources.</summary>
+        public event EventHandler? Stopped;
+
+        private void ScheduleStop() {
+            if (Interlocked.Exchange(ref _stopScheduled, 1) == 0) {
+                _ = Task.Run(Stop);
+            }
+        }
+
         /// <summary>Stops the watcher, disposes resources, and records end time.</summary>
         public void Stop() {
-            Cancellation.Cancel();
-            Watcher.Dispose();
-            EndTime = DateTime.UtcNow;
+            bool stoppedNow = false;
+            lock (_stopSync) {
+                if (_stopped) {
+                    return;
+                }
+                _stopped = true;
+                Cancellation.Cancel();
+                Watcher.Dispose();
+                Cancellation.Dispose();
+                _cancellationDisposed = true;
+                EndTime = DateTime.UtcNow;
+                stoppedNow = true;
+            }
+            if (stoppedNow) {
+                Stopped?.Invoke(this, EventArgs.Empty);
+            }
         }
 
         /// <summary>Stops the watcher and disposes internal cancellation token.</summary>
         public void Dispose() {
             Stop();
-            Cancellation.Dispose();
+            lock (_stopSync) {
+                if (!_cancellationDisposed) {
+                    Cancellation.Dispose();
+                    _cancellationDisposed = true;
+                }
+            }
         }
     }
 
@@ -121,8 +164,9 @@ namespace EventViewerX {
         private static readonly object _syncRoot = new();
 
         /// <summary>
-        /// Starts (or reuses) a watcher for the given machine/log and returns the tracking object.
-        /// If a running watcher with the same non-empty name exists, that instance is returned instead of creating a duplicate.
+        /// Starts a watcher for the given machine/log and returns the tracking object.
+        /// If a running watcher with the same non-empty name and identical configuration exists, that instance is returned.
+        /// Reusing a name for different behavior is rejected rather than silently returning the wrong watcher.
         /// </summary>
         /// <param name="name">Optional friendly name used for reuse and lookup.</param>
         /// <param name="machineName">Target computer.</param>
@@ -130,24 +174,53 @@ namespace EventViewerX {
         /// <param name="eventIds">Event IDs to watch.</param>
         /// <param name="namedEvents">NamedEvents packs expanded for discovery.</param>
         /// <param name="action">Callback invoked for each matching event.</param>
-        /// <param name="numberOfThreads">Worker threads to use inside the watcher.</param>
         /// <param name="staging">When true, also watches staging events (e.g., 350).</param>
         /// <param name="stopOnMatch">Stop after first match when true.</param>
         /// <param name="stopAfter">Stop after this many matches when &gt; 0.</param>
         /// <param name="timeout">Optional timeout after which the watcher stops.</param>
         /// <returns>A <see cref="WatcherInfo"/> describing the running watcher.</returns>
-        public static WatcherInfo StartWatcher(string? name, string machineName, string logName, List<int> eventIds, List<NamedEvents> namedEvents, Action<EventObject> action, int numberOfThreads, bool staging, bool stopOnMatch, int stopAfter, TimeSpan? timeout) {
+        public static WatcherInfo StartWatcher(string? name, string machineName, string logName, List<int> eventIds, List<NamedEvents> namedEvents, Action<EventObject> action, bool staging, bool stopOnMatch, int stopAfter, TimeSpan? timeout) {
+            if (string.IsNullOrWhiteSpace(machineName)) {
+                machineName = Environment.MachineName;
+            } else {
+                machineName = machineName.Trim();
+            }
+            if (string.IsNullOrWhiteSpace(logName)) {
+                throw new ArgumentException("Log name cannot be null or whitespace.", nameof(logName));
+            }
+            if (eventIds is null) {
+                throw new ArgumentNullException(nameof(eventIds));
+            }
+            if (namedEvents is null) {
+                throw new ArgumentNullException(nameof(namedEvents));
+            }
+            if (action is null) {
+                throw new ArgumentNullException(nameof(action));
+            }
+            if (stopAfter < 0) {
+                throw new ArgumentOutOfRangeException(nameof(stopAfter), "Stop-after count cannot be negative.");
+            }
+            if (timeout.HasValue && timeout.Value <= TimeSpan.Zero) {
+                throw new ArgumentOutOfRangeException(nameof(timeout), "Timeout must be positive when provided.");
+            }
+
+            logName = logName.Trim();
+            name = string.IsNullOrWhiteSpace(name) ? null : name!.Trim();
+            eventIds = eventIds.Where(static id => id > 0).Distinct().OrderBy(static id => id).ToList();
+            if (eventIds.Count == 0) {
+                throw new ArgumentException("At least one positive event ID is required.", nameof(eventIds));
+            }
+            namedEvents = namedEvents.Distinct().OrderBy(static value => value).ToList();
+
             WatcherInfo info;
             lock (_syncRoot) {
-                // If external code injected duplicates directly into the backing store without name mapping, fail fast.
-                if (_watchersByName.IsEmpty && _watchers.Count > 1) {
-                    throw new InvalidOperationException("Multiple watchers already exist without name mapping.");
-                }
-
                 if (!string.IsNullOrEmpty(name)) {
-                    // Fast reuse when a live watcher with the same name exists.
                     if (_watchersByName.TryGetValue(name!, out var existingByName) && existingByName.EndTime == null) {
-                        return existingByName;
+                        if (HasEquivalentConfiguration(existingByName, machineName, logName, eventIds, namedEvents, action, staging, stopOnMatch, stopAfter, timeout)) {
+                            return existingByName;
+                        }
+
+                        throw new InvalidOperationException($"A running watcher named '{name}' already exists with different configuration.");
                     }
 
                     // Detect pre-existing duplicates injected outside the manager.
@@ -164,15 +237,60 @@ namespace EventViewerX {
                     }
                 }
 
-                info = new WatcherInfo(name ?? string.Empty, machineName, logName, eventIds, namedEvents, action, numberOfThreads, staging, stopOnMatch, stopAfter, timeout);
+                info = new WatcherInfo(name ?? string.Empty, machineName, logName, eventIds, namedEvents, action, staging, stopOnMatch, stopAfter, timeout);
+                info.Stopped += RemoveStoppedWatcher;
                 _watchers.TryAdd(info.Id, info);
                 if (!string.IsNullOrEmpty(name)) {
                     _watchersByName[name!] = info;
                 }
+                try {
+                    info.Start();
+                    return info;
+                } catch {
+                    _watchers.TryRemove(info.Id, out _);
+                    if (!string.IsNullOrEmpty(info.Name)) {
+                        _watchersByName.TryRemove(info.Name, out _);
+                    }
+                    info.Dispose();
+                    throw;
+                }
+            }
+        }
+
+        private static bool HasEquivalentConfiguration(
+            WatcherInfo existing,
+            string machineName,
+            string logName,
+            IReadOnlyList<int> eventIds,
+            IReadOnlyList<NamedEvents> namedEvents,
+            Action<EventObject> action,
+            bool staging,
+            bool stopOnMatch,
+            int stopAfter,
+            TimeSpan? timeout) {
+
+            return string.Equals(existing.MachineName, machineName, StringComparison.OrdinalIgnoreCase) &&
+                   string.Equals(existing.LogName, logName, StringComparison.OrdinalIgnoreCase) &&
+                   existing.EventIds.SequenceEqual(eventIds) &&
+                   existing.NamedEvents.SequenceEqual(namedEvents) &&
+                   existing.Action.Equals(action) &&
+                   existing.Staging == staging &&
+                   existing.StopOnMatch == stopOnMatch &&
+                   existing.StopAfter == stopAfter &&
+                   existing.Timeout == timeout;
+        }
+
+        private static void RemoveStoppedWatcher(object? sender, EventArgs args) {
+            if (sender is not WatcherInfo info) {
+                return;
             }
 
-            info.Start();
-            return info;
+            _watchers.TryRemove(info.Id, out _);
+            if (!string.IsNullOrEmpty(info.Name) &&
+                _watchersByName.TryGetValue(info.Name, out WatcherInfo? mapped) &&
+                ReferenceEquals(mapped, info)) {
+                _watchersByName.TryRemove(info.Name, out _);
+            }
         }
 
         /// <summary>Returns all active watchers or those matching a specific name.</summary>

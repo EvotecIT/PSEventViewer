@@ -9,7 +9,6 @@ namespace EventViewerX.Examples {
                 Warning = true,
                 Error = true,
                 Debug = true,
-                NumberOfThreads = 1,
             };
 
             var machineNames = new List<string?> { "AD1", "AD2", "AD3" }; // Add your machine names here
@@ -37,7 +36,7 @@ namespace EventViewerX.Examples {
             int eventCount1 = 0;
             Parallel.ForEach(machineNames, machine => {
                 foreach (var eventObject in SearchEvents.QueryLog("Security", eventIds, machine)) {
-                    eventCount1++;
+                    Interlocked.Increment(ref eventCount1);
                 }
             });
             stopwatch.Stop();
@@ -53,11 +52,11 @@ namespace EventViewerX.Examples {
 
             stopwatch.Restart();
             int eventCount3 = 0;
-            foreach (var eventObject in SearchEvents.QueryLogsParallelForEach("Security", eventIds, machineNames)) {
+            foreach (var eventObject in SearchEvents.QueryLogsSequential("Security", eventIds, machineNames)) {
                 eventCount3++;
             }
             stopwatch.Stop();
-            Console.WriteLine($"QueryBasicParallelForEach method took {stopwatch.ElapsedMilliseconds} ms and returned {eventCount3} events.");
+            Console.WriteLine($"QueryLogsSequential method took {stopwatch.ElapsedMilliseconds} ms and returned {eventCount3} events.");
 
             if (eventCount1 == eventCount2 && eventCount2 == eventCount3) {
                 Console.WriteLine("All methods returned the same number of events.");

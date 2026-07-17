@@ -5,7 +5,8 @@
         <Description>Library to work with Event Logs</Description>
         <AssemblyName>EventViewerX</AssemblyName>
         <AssemblyTitle>EventViewerX</AssemblyTitle>
-        <VersionPrefix>3.3.4</VersionPrefix>
+        <VersionPrefix>4.0.0</VersionPrefix>
+        <PackageReadmeFile>README.MD</PackageReadmeFile>
         <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
         <Company>Evotec</Company>
@@ -24,6 +25,10 @@
 
     <ItemGroup>
         <PackageReference Include="DnsClientX" Version="1.0.4" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <None Include="..\..\README.MD" Pack="true" PackagePath="\" />
     </ItemGroup>
 
     <ItemGroup Condition="'$(TargetFramework)' == 'net472'">

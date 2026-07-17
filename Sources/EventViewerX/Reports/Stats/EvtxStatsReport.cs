@@ -12,6 +12,9 @@ public sealed class EvtxStatsReport {
     /// </summary>
     public int Scanned { get; set; }
 
+    /// <summary>True when at least one additional matching event existed beyond the requested cap.</summary>
+    public bool Truncated { get; set; }
+
     /// <summary>
     /// Minimum event time (UTC) among scanned events.
     /// </summary>

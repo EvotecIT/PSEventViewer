@@ -1,5 +1,3 @@
-using System.Diagnostics.Eventing.Reader;
-
 namespace EventViewerX;
 
 /// <summary>
@@ -17,14 +15,14 @@ public class RestoredPowerShellScript {
     public string Script { get; set; } = string.Empty;
 
     /// <summary>
-    /// Event records that compose the script.
+    /// Managed event snapshots that compose the script.
     /// </summary>
-    public IReadOnlyList<EventRecord> Events { get; set; } = Array.Empty<EventRecord>();
+    public IReadOnlyList<EventObject> Events { get; set; } = Array.Empty<EventObject>();
 
     /// <summary>
-    /// Primary event record for convenience access.
+    /// Primary event snapshot for convenience access.
     /// </summary>
-    public EventRecord? EventRecord => Events.Count > 0 ? Events[0] : null;
+    public EventObject? Event => Events.Count > 0 ? Events[0] : null;
 
     /// <summary>
     /// Parsed data dictionary from the event.
@@ -35,12 +33,12 @@ public class RestoredPowerShellScript {
     /// Saves the script to the specified directory.
     /// </summary>
     public string Save(string directory, bool addComment = true, bool unblock = false) {
-        var primary = EventRecord ?? throw new InvalidOperationException("No event data available to save script.");
+        EventObject primary = Event ?? throw new InvalidOperationException("No event data available to save script.");
         Directory.CreateDirectory(directory);
         string fileName = $"{primary.MachineName}_{ScriptBlockId}.ps1";
         string filePath = Path.Combine(directory, fileName);
         if (addComment) {
-            var header = string.Join(Environment.NewLine,
+            string header = string.Join(Environment.NewLine,
                 "<#",
                 $"RecordID = {primary.RecordId}",
                 $"LogName = {primary.LogName}",

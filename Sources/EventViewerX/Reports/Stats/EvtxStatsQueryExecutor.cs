@@ -35,7 +35,8 @@ public static class EvtxStatsQueryExecutor {
             StartTimeUtc = request.StartTimeUtc,
             EndTimeUtc = request.EndTimeUtc,
             MaxEvents = request.MaxEventsScanned,
-            OldestFirst = request.OldestFirst
+            OldestFirst = request.OldestFirst,
+            ReadMode = EventReadMode.Metadata
         };
 
         if (!EvtxStatsReportBuilder.TryBuildFromFile(evtxRequest, out var report, out failure, cancellationToken)) {
@@ -49,7 +50,7 @@ public static class EvtxStatsQueryExecutor {
             OldestFirst = request.OldestFirst,
             MaxEventsScanned = request.MaxEventsScanned,
             ScannedEvents = report.Scanned,
-            Truncated = request.MaxEventsScanned > 0 && report.Scanned >= request.MaxEventsScanned,
+            Truncated = report.Truncated,
             TimeCreatedUtcMin = report.MinUtc,
             TimeCreatedUtcMax = report.MaxUtc,
             StartTimeUtc = request.StartTimeUtc,

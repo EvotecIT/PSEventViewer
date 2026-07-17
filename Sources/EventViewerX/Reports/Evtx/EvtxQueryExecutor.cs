@@ -24,6 +24,21 @@ public static class EvtxQueryExecutor {
         out EvtxQueryFailure? failure,
         CancellationToken cancellationToken = default) {
 
+        return TryForEachEventWithInfo(request, eventHandler, out _, out failure, cancellationToken);
+    }
+
+    /// <summary>
+    /// Streams EVTX events and reports whether the query was capped or stopped by the callback.
+    /// </summary>
+    public static bool TryForEachEventWithInfo(
+        EvtxQueryRequest request,
+        Func<EventObject, bool> eventHandler,
+        out EvtxQueryExecutionInfo executionInfo,
+        out EvtxQueryFailure? failure,
+        CancellationToken cancellationToken = default) {
+
+        executionInfo = new EvtxQueryExecutionInfo();
+
         if (eventHandler is null) {
             failure = new EvtxQueryFailure {
                 Kind = EvtxQueryFailureKind.InvalidArgument,
@@ -38,19 +53,32 @@ public static class EvtxQueryExecutor {
 
         try {
             var eventIds = request.EventIds is null ? null : new List<int>(request.EventIds);
+            int readLimit = request.MaxEvents > 0 && request.MaxEvents < int.MaxValue
+                ? request.MaxEvents + 1
+                : request.MaxEvents;
             foreach (var ev in SearchEvents.QueryLogFile(
                          filePath: request.FilePath,
                          eventIds: eventIds,
                          providerName: request.ProviderName,
                          startTime: request.StartTimeUtc,
                          endTime: request.EndTimeUtc,
-                         maxEvents: request.MaxEvents,
+                         maxEvents: readLimit,
                          oldest: request.OldestFirst,
-                         cancellationToken: cancellationToken)) {
+                         cancellationToken: cancellationToken,
+                         readMode: request.ReadMode)) {
                 cancellationToken.ThrowIfCancellationRequested();
-                if (!eventHandler(ev)) {
+
+                if (request.MaxEvents > 0 && executionInfo.EventsDelivered >= request.MaxEvents) {
+                    executionInfo.Truncated = true;
                     break;
                 }
+
+                if (!eventHandler(ev)) {
+                    executionInfo.EventsDelivered++;
+                    executionInfo.StoppedByHandler = true;
+                    break;
+                }
+                executionInfo.EventsDelivered++;
             }
 
             failure = null;
@@ -102,12 +130,13 @@ public static class EvtxQueryExecutor {
         out EvtxQueryFailure? failure,
         CancellationToken cancellationToken = default) {
         var list = new List<EventObject>();
-        if (!TryForEachEvent(
+        if (!TryForEachEventWithInfo(
                 request,
                 ev => {
                     list.Add(ev);
                     return true;
                 },
+                out EvtxQueryExecutionInfo executionInfo,
                 out failure,
                 cancellationToken)) {
             result = new EvtxQueryResult();
@@ -115,7 +144,8 @@ public static class EvtxQueryExecutor {
         }
 
         result = new EvtxQueryResult {
-            Events = list
+            Events = list,
+            Truncated = executionInfo.Truncated
         };
         return true;
     }

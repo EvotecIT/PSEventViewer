@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System;
 using System.Collections;
+using System.Globalization;
 using System.Linq;
 
 namespace EventViewerX;
@@ -12,8 +13,8 @@ public partial class SearchEvents {
     /// </summary>
     /// <param name="id">Event IDs to include.</param>
     /// <param name="eventRecordId">Specific record IDs to include.</param>
-    /// <param name="startTime">Earliest timestamp to include (converted to timediff).</param>
-    /// <param name="endTime">Latest timestamp to include (converted to timediff).</param>
+    /// <param name="startTime">Earliest timestamp to include as an absolute UTC boundary.</param>
+    /// <param name="endTime">Latest timestamp to include as an absolute UTC boundary.</param>
     /// <param name="data">EventData string values to match.</param>
     /// <param name="providerName">Provider names to match.</param>
     /// <param name="keywords">Keyword bitmasks to match.</param>
@@ -44,35 +45,29 @@ public partial class SearchEvents {
         bool xpathOnly = false) {
         var filter = string.Empty;
         if (id != null && id.Length > 0) {
-            filter = JoinXPathFilter(InitializeXPathFilter(id, "EventID={0}", "*[System[{0}]]"), filter);
+            string[] validIds = ValidatePositiveNumericValues(id, int.MaxValue, nameof(id));
+            filter = JoinXPathFilter(InitializeXPathFilter(validIds, "EventID={0}", "*[System[{0}]]"), filter);
         }
         if (eventRecordId != null && eventRecordId.Length > 0) {
-            filter = JoinXPathFilter(InitializeXPathFilter(eventRecordId, "EventRecordID={0}", "*[System[{0}]]"), filter);
+            string[] validRecordIds = ValidatePositiveNumericValues(eventRecordId, long.MaxValue, nameof(eventRecordId));
+            filter = JoinXPathFilter(InitializeXPathFilter(validRecordIds, "EventRecordID={0}", "*[System[{0}]]"), filter);
         }
         if (excludeId != null && excludeId.Length > 0) {
-            filter = JoinXPathFilter(InitializeXPathFilter(excludeId, "EventID!={0}", "*[System[{0}]]"), filter);
+            string[] validExcludedIds = ValidatePositiveNumericValues(excludeId, int.MaxValue, nameof(excludeId));
+            filter = JoinXPathFilter(InitializeXPathFilter(validExcludedIds, "EventID!={0}", "*[System[{0}]]", logic: "and"), filter);
         }
 
-        var now = DateTime.Now;
         if (startTime.HasValue) {
-            var diff = Math.Round(now.Subtract(startTime.Value).TotalMilliseconds);
-            if (diff < 0) {
-                diff = 0;
-            }
-            filter = JoinXPathFilter($"*[System[TimeCreated[timediff(@SystemTime) &lt;= {diff}]]]", filter);
+            filter = JoinXPathFilter($"*[System[TimeCreated[@SystemTime>='{FormatEventTimeUtc(startTime.Value)}']]]", filter);
         }
         if (endTime.HasValue) {
-            var diff = Math.Round(now.Subtract(endTime.Value).TotalMilliseconds);
-            if (diff < 0) {
-                diff = 0;
-            }
-            filter = JoinXPathFilter($"*[System[TimeCreated[timediff(@SystemTime) &gt;= {diff}]]]", filter);
+            filter = JoinXPathFilter($"*[System[TimeCreated[@SystemTime<='{FormatEventTimeUtc(endTime.Value)}']]]", filter);
         }
         if (data != null && data.Length > 0) {
-            filter = JoinXPathFilter(InitializeXPathFilter(data, "Data='{0}'", "*[EventData[{0}]]"), filter);
+            filter = JoinXPathFilter(InitializeXPathFilter(data, "Data={0}", "*[EventData[{0}]]", formatStringLiterals: true, parameterName: nameof(data)), filter);
         }
         if (providerName != null && providerName.Length > 0) {
-            filter = JoinXPathFilter(InitializeXPathFilter(providerName, "@Name='{0}'", "*[System[Provider[{0}]]]"), filter);
+            filter = JoinXPathFilter(InitializeXPathFilter(providerName, "@Name={0}", "*[System[Provider[{0}]]]", formatStringLiterals: true, parameterName: nameof(providerName)), filter);
         }
         if (level != null && level.Length > 0) {
             var levels = level.Select(l => ((int)Enum.Parse(typeof(System.Diagnostics.Tracing.EventLevel), l)).ToString());
@@ -89,52 +84,48 @@ public partial class SearchEvents {
             var sids = new List<string>();
             foreach (var item in userId) {
                 if (!userSidCache.TryGetValue(item, out var sidString)) {
-                    try {
-                        var sid = new System.Security.Principal.SecurityIdentifier(item);
-                        sidString = sid.Translate(typeof(System.Security.Principal.SecurityIdentifier)).ToString();
-                    } catch {
-                        var user = new System.Security.Principal.NTAccount(item);
-                        sidString = user.Translate(typeof(System.Security.Principal.SecurityIdentifier)).ToString();
+                    if (!EventStructuredQueryFilterService.TryResolveUserId(item, out sidString)) {
+                        throw new ArgumentException($"User identifier '{item}' is not a valid SID or resolvable account name.", nameof(userId));
                     }
-                    userSidCache[item] = sidString;
+                    userSidCache[item] = sidString!;
                 }
-                sids.Add(sidString);
+                sids.Add(sidString!);
             }
-            filter = JoinXPathFilter(InitializeXPathFilter(sids, "@UserID='{0}'", "*[System[Security[{0}]]]"), filter);
+            filter = JoinXPathFilter(InitializeXPathFilter(sids, "@UserID={0}", "*[System[Security[{0}]]]", formatStringLiterals: true, parameterName: nameof(userId)), filter);
         }
         if (namedDataFilter != null && namedDataFilter.Length > 0) {
             var items = new List<string>();
             foreach (Hashtable table in namedDataFilter) {
                 var keyFilters = new List<string>();
                 foreach (var key in table.Keys) {
-                    var keyName = EscapeXPathValue(key?.ToString() ?? string.Empty);
+                    var keyName = FormatXPathStringLiteral(key?.ToString() ?? string.Empty, nameof(namedDataFilter));
                     var values = AsEnumerable(table[key!]);
                     if (values.Any()) {
-                        keyFilters.Add(InitializeXPathFilter(values, $"Data[@Name='{keyName}'] = '{{0}}'", "{0}", "or", true));
+                        keyFilters.Add(InitializeXPathFilter(values, $"Data[@Name={keyName}] = {{0}}", "{0}", "or", true, formatStringLiterals: true, parameterName: nameof(namedDataFilter)));
                     } else {
-                        keyFilters.Add($"Data[@Name='{keyName}']");
+                        keyFilters.Add($"Data[@Name={keyName}]");
                     }
                 }
-                items.Add(InitializeXPathFilter(keyFilters, "{0}", "{0}", escapeItems: false));
+                items.Add(InitializeXPathFilter(keyFilters, "{0}", "{0}"));
             }
-            filter = JoinXPathFilter(InitializeXPathFilter(items, "{0}", "*[EventData[{0}]]", escapeItems: false), filter);
+            filter = JoinXPathFilter(InitializeXPathFilter(items, "{0}", "*[EventData[{0}]]"), filter);
         }
         if (namedDataExcludeFilter != null && namedDataExcludeFilter.Length > 0) {
             var items = new List<string>();
             foreach (Hashtable table in namedDataExcludeFilter) {
                 var keyFilters = new List<string>();
                 foreach (var key in table.Keys) {
-                    var keyName = EscapeXPathValue(key?.ToString() ?? string.Empty);
+                    var keyName = FormatXPathStringLiteral(key?.ToString() ?? string.Empty, nameof(namedDataExcludeFilter));
                     var values = AsEnumerable(table[key!]);
                     if (values.Any()) {
-                        keyFilters.Add(InitializeXPathFilter(values, $"Data[@Name='{keyName}'] != '{{0}}'", "{0}", "and", true));
+                        keyFilters.Add(InitializeXPathFilter(values, $"Data[@Name={keyName}] != {{0}}", "{0}", "and", true, formatStringLiterals: true, parameterName: nameof(namedDataExcludeFilter)));
                     } else {
-                        keyFilters.Add($"Data[@Name='{keyName}']");
+                        keyFilters.Add($"Data[@Name={keyName}]");
                     }
                 }
-                items.Add(InitializeXPathFilter(keyFilters, "{0}", "{0}", escapeItems: false));
+                items.Add(InitializeXPathFilter(keyFilters, "{0}", "{0}"));
             }
-            filter = JoinXPathFilter(InitializeXPathFilter(items, "{0}", "*[EventData[{0}]]", escapeItems: false), filter);
+            filter = JoinXPathFilter(InitializeXPathFilter(items, "{0}", "*[EventData[{0}]]"), filter);
         }
 
         if (!xpathOnly && !string.IsNullOrEmpty(filter)) {
@@ -153,11 +144,26 @@ public partial class SearchEvents {
         }
 
         if (!string.IsNullOrEmpty(path)) {
-            var selectFilter = string.IsNullOrEmpty(filter) ? "*" : filter;
-            var escapedPath = EscapeXPathValue(path!);
+            var selectFilter = EscapeXmlValue(string.IsNullOrEmpty(filter) ? "*" : filter);
+            var escapedPath = EscapeXmlValue(path!);
             return $"<QueryList><Query Id=\"0\" Path=\"file://{escapedPath}\"><Select>{selectFilter}</Select></Query></QueryList>";
         }
-        var escapedLog = EscapeXPathValue(logName ?? string.Empty);
-        return $"<QueryList><Query Id=\"0\" Path=\"{escapedLog}\"><Select Path=\"{escapedLog}\">{filter}</Select></Query></QueryList>";
+        var escapedLog = EscapeXmlValue(logName ?? string.Empty);
+        var escapedFilter = EscapeXmlValue(filter);
+        return $"<QueryList><Query Id=\"0\" Path=\"{escapedLog}\"><Select Path=\"{escapedLog}\">{escapedFilter}</Select></Query></QueryList>";
+    }
+
+    private static string[] ValidatePositiveNumericValues(string[] values, long maximum, string parameterName) {
+        var normalized = new string[values.Length];
+        for (int index = 0; index < values.Length; index++) {
+            string? value = values[index];
+            if (!long.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out long parsed) || parsed <= 0 || parsed > maximum) {
+                throw new ArgumentException($"All {parameterName} values must be positive integers no greater than {maximum}.", parameterName);
+            }
+
+            normalized[index] = parsed.ToString(CultureInfo.InvariantCulture);
+        }
+
+        return normalized;
     }
 }

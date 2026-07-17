@@ -74,8 +74,8 @@ public sealed class EventViewerFailureDescriptor {
 /// <remarks>
 /// Recoverability policy:
 /// <list type="bullet">
-/// <item><description><c>invalid_argument</c>, <c>access_denied</c>, <c>not_found</c> => non-recoverable.</description></item>
-/// <item><description><c>timeout</c>, <c>io_error</c>, <c>query_failed</c> => recoverable.</description></item>
+/// <item><description><c>invalid_argument</c>, <c>invalid_query</c>, <c>access_denied</c>, <c>not_found</c> => non-recoverable.</description></item>
+/// <item><description><c>timeout</c>, <c>host_unavailable</c>, <c>io_error</c>, <c>query_failed</c> => recoverable.</description></item>
 /// </list>
 /// Unknown enum values are mapped to <c>query_failed</c>.
 /// Consumer guidance: retry or adjust scope for recoverable descriptors; for non-recoverable descriptors, prompt for corrected inputs/permissions before retrying.
@@ -87,9 +87,11 @@ public static class EventViewerFailureDescriptorResolver {
     public const string DefaultEntity = "event_log_query";
 
     private static readonly EventViewerFailureDescriptor InvalidArgumentDefault = new("invalid_argument", "invalid_argument", DefaultEntity, recoverable: false);
+    private static readonly EventViewerFailureDescriptor InvalidQueryDefault = new("invalid_query", "invalid_query", DefaultEntity, recoverable: false);
     private static readonly EventViewerFailureDescriptor AccessDeniedDefault = new("access_denied", "access_denied", DefaultEntity, recoverable: false);
     private static readonly EventViewerFailureDescriptor NotFoundDefault = new("not_found", "not_found", DefaultEntity, recoverable: false);
     private static readonly EventViewerFailureDescriptor TimeoutDefault = new("timeout", "timeout", DefaultEntity, recoverable: true);
+    private static readonly EventViewerFailureDescriptor HostUnavailableDefault = new("host_unavailable", "host_unavailable", DefaultEntity, recoverable: true);
     private static readonly EventViewerFailureDescriptor IoErrorDefault = new("io_error", "io_error", DefaultEntity, recoverable: true);
     private static readonly EventViewerFailureDescriptor QueryFailedDefault = new("query_failed", "query_failed", DefaultEntity, recoverable: true);
 
@@ -120,8 +122,11 @@ public static class EventViewerFailureDescriptorResolver {
     public static EventViewerFailureDescriptor Resolve(LiveEventQueryFailureKind kind, string entity = DefaultEntity)
         => kind switch {
             LiveEventQueryFailureKind.InvalidArgument => InvalidArgument(entity),
+            LiveEventQueryFailureKind.InvalidQuery => InvalidQuery(entity),
+            LiveEventQueryFailureKind.LogNotFound => NotFound(entity),
             LiveEventQueryFailureKind.AccessDenied => AccessDenied(entity),
             LiveEventQueryFailureKind.Timeout => Timeout(entity),
+            LiveEventQueryFailureKind.HostUnavailable => HostUnavailable(entity),
             LiveEventQueryFailureKind.Exception => QueryFailed(entity),
             _ => QueryFailed(entity)
         };
@@ -133,8 +138,11 @@ public static class EventViewerFailureDescriptorResolver {
     public static EventViewerFailureDescriptor Resolve(LiveStatsQueryFailureKind kind, string entity = DefaultEntity)
         => kind switch {
             LiveStatsQueryFailureKind.InvalidArgument => InvalidArgument(entity),
+            LiveStatsQueryFailureKind.InvalidQuery => InvalidQuery(entity),
+            LiveStatsQueryFailureKind.LogNotFound => NotFound(entity),
             LiveStatsQueryFailureKind.AccessDenied => AccessDenied(entity),
             LiveStatsQueryFailureKind.Timeout => Timeout(entity),
+            LiveStatsQueryFailureKind.HostUnavailable => HostUnavailable(entity),
             LiveStatsQueryFailureKind.Exception => QueryFailed(entity),
             _ => QueryFailed(entity)
         };
@@ -152,9 +160,11 @@ public static class EventViewerFailureDescriptorResolver {
         };
 
     private static EventViewerFailureDescriptor InvalidArgument(string entity) => Create(InvalidArgumentDefault, entity);
+    private static EventViewerFailureDescriptor InvalidQuery(string entity) => Create(InvalidQueryDefault, entity);
     private static EventViewerFailureDescriptor AccessDenied(string entity) => Create(AccessDeniedDefault, entity);
     private static EventViewerFailureDescriptor NotFound(string entity) => Create(NotFoundDefault, entity);
     private static EventViewerFailureDescriptor Timeout(string entity) => Create(TimeoutDefault, entity);
+    private static EventViewerFailureDescriptor HostUnavailable(string entity) => Create(HostUnavailableDefault, entity);
     private static EventViewerFailureDescriptor IoError(string entity) => Create(IoErrorDefault, entity);
     private static EventViewerFailureDescriptor QueryFailed(string entity) => Create(QueryFailedDefault, entity);
 

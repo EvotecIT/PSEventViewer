@@ -1,8 +1,25 @@
 namespace EventViewerX;
 
 public partial class SearchEvents {
-    private static string EscapeXPathValue(string value) {
+    private static string EscapeXmlValue(string value) {
         return System.Security.SecurityElement.Escape(value);
+    }
+
+    private static string FormatXPathStringLiteral(string value, string parameterName) {
+        if (value.IndexOf('\'') < 0) {
+            return $"'{value}'";
+        }
+        if (value.IndexOf('"') < 0) {
+            return $"\"{value}\"";
+        }
+
+        throw new ArgumentException(
+            "XPath string values containing both single and double quote characters are not supported by the Windows Event Log XPath subset.",
+            parameterName);
+    }
+
+    private static string FormatXmlEncodedXPathStringLiteral(string value, string parameterName) {
+        return EscapeXmlValue(FormatXPathStringLiteral(value, parameterName));
     }
     private static string JoinXPathFilter(string newFilter, string existingFilter = "", string logic = "and", bool noParenthesis = false) {
         if (!string.IsNullOrEmpty(existingFilter)) {
@@ -13,13 +30,16 @@ public partial class SearchEvents {
         return newFilter;
     }
 
-    private static string InitializeXPathFilter(IEnumerable<object?> items, string forEachFormatString, string finalizeFormatString, string logic = "or", bool noParenthesis = false, bool escapeItems = true) {
+    private static string InitializeXPathFilter(IEnumerable<object?> items, string forEachFormatString, string finalizeFormatString, string logic = "or", bool noParenthesis = false, bool formatStringLiterals = false, string parameterName = "value") {
         var filter = string.Empty;
         foreach (var item in items) {
             if (item == null) {
                 continue;
             }
-            var value = escapeItems ? EscapeXPathValue(item.ToString()!) : item.ToString();
+            string rawValue = item.ToString()!;
+            var value = formatStringLiterals
+                ? FormatXPathStringLiteral(rawValue, parameterName)
+                : rawValue;
             var formatted = forEachFormatString.Replace("{0}", $"{value}");
             filter = JoinXPathFilter(formatted, filter, logic, noParenthesis);
         }
@@ -41,6 +61,6 @@ public partial class SearchEvents {
     /// <summary>
     /// Cache for translated user identifiers to avoid repeated lookups
     /// </summary>
-    private static readonly ConcurrentDictionary<string, string> userSidCache = new ConcurrentDictionary<string, string>();
+    private static readonly ConcurrentDictionary<string, string> userSidCache = new ConcurrentDictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
 }

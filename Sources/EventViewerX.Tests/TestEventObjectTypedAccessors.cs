@@ -319,8 +319,7 @@ public class TestEventObjectTypedAccessors
         SetField(record, "_log", "Security");
         SetField(record, "_id", 4625);
 
-        var eo = (EventObject)FormatterServices.GetUninitializedObject(typeof(EventObject));
-        SetField(eo, "_eventRecord", record);
+        var eo = new EventObject(record, "testhost", EventReadMode.Metadata);
         eo.MessageSubject = "An account failed to log on.";
         eo.ContainerLog = "Security";
         eo.XMLData = "<Event></Event>";

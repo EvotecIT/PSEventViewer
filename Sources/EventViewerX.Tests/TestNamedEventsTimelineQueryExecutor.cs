@@ -1,4 +1,5 @@
 using EventViewerX.Reports.Correlation;
+using System.Reflection;
 using Xunit;
 
 namespace EventViewerX.Tests;
@@ -96,5 +97,31 @@ public class TestNamedEventsTimelineQueryExecutor {
         var parsed = NamedEventsTimelineQueryExecutor.TryParseUtcValue("not-a-timestamp", out _);
 
         Assert.False(parsed);
+    }
+
+    [Fact]
+    public void ExtractPayload_ShouldExcludeBaseMetadataAndEventSnapshots() {
+        MethodInfo method = typeof(NamedEventsTimelineQueryExecutor).GetMethod(
+            "ExtractPayload",
+            BindingFlags.NonPublic | BindingFlags.Static)!;
+        var item = (PayloadTestSlim)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(PayloadTestSlim));
+
+        var payload = Assert.IsType<Dictionary<string, object?>>(method.Invoke(null, new object[] { item }));
+
+        Assert.Equal("alice", payload["who"]);
+        Assert.DoesNotContain("event", payload.Keys);
+        Assert.DoesNotContain("_event_object", payload.Keys);
+        Assert.DoesNotContain("event_id", payload.Keys);
+        Assert.DoesNotContain("record_id", payload.Keys);
+        Assert.DoesNotContain("type", payload.Keys);
+        Assert.DoesNotContain("duplicate_event", payload.Keys);
+    }
+
+    private sealed class PayloadTestSlim : EventObjectSlim {
+        private PayloadTestSlim(EventObject eventObject) : base(eventObject) {
+        }
+
+        public string Who => "alice";
+        public EventObject? DuplicateEvent => null;
     }
 }

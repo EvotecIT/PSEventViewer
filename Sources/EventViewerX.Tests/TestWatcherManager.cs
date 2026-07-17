@@ -12,10 +12,11 @@ namespace EventViewerX.Tests {
         public void StartWatcherReturnsExistingInstance() {
             // ensure a clean slate so name-based reuse isn't impacted by previous tests
             WatcherManager.StopAll();
+            Action<EventObject> action = _ => { };
             var first = WatcherManager.StartWatcher(
-                "unit", Environment.MachineName, "Application", new List<int>(), new List<NamedEvents>(), _ => { }, 1, false, false, 0, null);
+                "unit", Environment.MachineName, "Application", new List<int> { 1 }, new List<NamedEvents>(), action, false, false, 0, null);
             var second = WatcherManager.StartWatcher(
-                "unit", Environment.MachineName, "Application", new List<int>(), new List<NamedEvents>(), _ => { }, 1, false, false, 0, null);
+                "unit", Environment.MachineName, "Application", new List<int> { 1 }, new List<NamedEvents>(), action, false, false, 0, null);
             if (first.EndTime == null) {
                 Assert.Same(first, second);
             } else {
@@ -27,17 +28,40 @@ namespace EventViewerX.Tests {
         }
 
         [Fact]
+        public void StartWatcherRejectsSameNameWithDifferentConfiguration() {
+            WatcherManager.StopAll();
+            Action<EventObject> action = _ => { };
+            var existing = new WatcherInfo(
+                "unit-mismatch", Environment.MachineName, "Application", new List<int> { 1 }, new List<NamedEvents>(), action, false, false, 0, null);
+            var watchersField = typeof(WatcherManager).GetField("_watchers", BindingFlags.NonPublic | BindingFlags.Static);
+            var namesField = typeof(WatcherManager).GetField("_watchersByName", BindingFlags.NonPublic | BindingFlags.Static);
+            var watchers = Assert.IsType<ConcurrentDictionary<Guid, WatcherInfo>>(watchersField!.GetValue(null));
+            var names = Assert.IsType<ConcurrentDictionary<string, WatcherInfo>>(namesField!.GetValue(null));
+            watchers[existing.Id] = existing;
+            names[existing.Name] = existing;
+
+            try {
+                var exception = Assert.Throws<InvalidOperationException>(() => WatcherManager.StartWatcher(
+                    "unit-mismatch", Environment.MachineName, "Application", new List<int> { 2 }, new List<NamedEvents>(), action, false, false, 0, null));
+
+                Assert.Contains("different configuration", exception.Message, StringComparison.OrdinalIgnoreCase);
+            } finally {
+                WatcherManager.StopAll();
+            }
+        }
+
+        [Fact]
         public void StartWatcherThrowsWhenDuplicatesExist() {
             var field = typeof(WatcherManager).GetField("_watchers", BindingFlags.NonPublic | BindingFlags.Static);
             Assert.NotNull(field);
             var dict = (ConcurrentDictionary<Guid, WatcherInfo>)field!.GetValue(null)!;
-            var watcher1 = new WatcherInfo("dup", Environment.MachineName, "Application", new List<int>(), new List<NamedEvents>(), _ => { }, 1, false, false, 0, null);
-            var watcher2 = new WatcherInfo("dup", Environment.MachineName, "Application", new List<int>(), new List<NamedEvents>(), _ => { }, 1, false, false, 0, null);
+            var watcher1 = new WatcherInfo("dup", Environment.MachineName, "Application", new List<int> { 1 }, new List<NamedEvents>(), _ => { }, false, false, 0, null);
+            var watcher2 = new WatcherInfo("dup", Environment.MachineName, "Application", new List<int> { 1 }, new List<NamedEvents>(), _ => { }, false, false, 0, null);
             dict.TryAdd(Guid.NewGuid(), watcher1);
             dict.TryAdd(Guid.NewGuid(), watcher2);
 
             var ex = Assert.Throws<InvalidOperationException>(() =>
-                WatcherManager.StartWatcher("dup", Environment.MachineName, "Application", new List<int>(), new List<NamedEvents>(), _ => { }, 1, false, false, 0, null));
+                WatcherManager.StartWatcher("dup", Environment.MachineName, "Application", new List<int> { 1 }, new List<NamedEvents>(), _ => { }, false, false, 0, null));
             Assert.Contains("Multiple watchers", ex.Message);
             WatcherManager.StopAll();
         }
@@ -49,7 +73,7 @@ namespace EventViewerX.Tests {
                 new object[] {
                     "test", Environment.MachineName, "Application", new List<int> { 1 },
                     new List<NamedEvents>(), new Action<EventObject>(_ => throw new InvalidOperationException("fail")),
-                    1, false, false, 0, null
+                    false, false, 0, null
                 }, null)!;
 
             Exception? captured = null;
@@ -73,10 +97,11 @@ namespace EventViewerX.Tests {
         public void StartWatcherIsThreadSafe() {
             WatcherManager.StopAll();
             var tasks = new List<Task<WatcherInfo>>();
+            Action<EventObject> action = _ => { };
             for (int i = 0; i < 5; i++) {
                 tasks.Add(Task.Run(() => WatcherManager.StartWatcher(
-                    "sync", Environment.MachineName, "Application", new List<int>(),
-                    new List<NamedEvents>(), _ => { }, 1, false, false, 0, null)));
+                    "sync", Environment.MachineName, "Application", new List<int> { 1 },
+                    new List<NamedEvents>(), action, false, false, 0, null)));
             }
             Task.WaitAll(tasks.ToArray());
             var first = tasks[0].Result;

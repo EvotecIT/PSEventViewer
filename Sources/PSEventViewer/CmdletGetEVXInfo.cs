@@ -63,6 +63,7 @@ namespace PSEventViewer {
         /// Maximum number of runspaces used when querying multiple machines.
         /// </summary>
         [Parameter(Mandatory = false)]
+        [ValidateRange(1, 1024)]
         public int MaxRunspaces { get; set; } = 50;
 
         /// <summary>
@@ -79,17 +80,34 @@ namespace PSEventViewer {
             // Create fresh instances for each invocation to prevent state retention
             var internalLogger = new InternalLogger(false);
             var logger = new InternalLoggerPowerShell(internalLogger, WriteVerbose, WriteWarning, WriteDebug, WriteError, WriteProgress, WriteInformation);
+            SetEventViewerLogger(internalLogger);
             var searchEvents = new SearchEvents(internalLogger);
 
             List<string?> machines = Machine ?? new List<string?>();
             if (RunAgainstDC.IsPresent) {
                 try {
-                    var forest = System.DirectoryServices.ActiveDirectory.Forest.GetCurrentForest();
-                    machines = forest.Domains.Cast<System.DirectoryServices.ActiveDirectory.Domain>()
-                        .SelectMany(d => d.DomainControllers.Cast<System.DirectoryServices.ActiveDirectory.DomainController>())
-                        .Select(dc => (string?)dc.Name).Distinct().ToList();
-                } catch {
-                    // ignored
+                    using var forest = System.DirectoryServices.ActiveDirectory.Forest.GetCurrentForest();
+                    var discovered = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    foreach (System.DirectoryServices.ActiveDirectory.Domain domain in forest.Domains) {
+                        try {
+                            foreach (System.DirectoryServices.ActiveDirectory.DomainController domainController in domain.DomainControllers) {
+                                try {
+                                    discovered.Add(domainController.Name);
+                                } finally {
+                                    domainController.Dispose();
+                                }
+                            }
+                        } finally {
+                            domain.Dispose();
+                        }
+                    }
+                    machines = discovered.Select(static name => (string?)name).ToList();
+                    if (machines.Count == 0) {
+                        throw new InvalidOperationException($"No domain controllers were discovered in forest '{forest.Name}'.");
+                    }
+                } catch (Exception ex) {
+                    WriteError(new ErrorRecord(ex, "EVXInfo.DomainControllerDiscoveryFailed", ErrorCategory.ResourceUnavailable, null));
+                    return Task.CompletedTask;
                 }
             }
 

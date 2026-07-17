@@ -160,12 +160,13 @@ public sealed class SecurityFailedLogonsReportBuilder {
         out EvtxQueryFailure? failure,
         CancellationToken cancellationToken = default) {
         var b = new SecurityFailedLogonsReportBuilder(includeSamples, sampleSize);
-        if (!EvtxQueryExecutor.TryForEachEvent(
-                request,
+        if (!EvtxQueryExecutor.TryForEachEventWithInfo(
+                request.WithReadMode(EventReadMode.StructuredData),
                 ev => {
                     b.Add(ev);
                     return true;
                 },
+                out EvtxQueryExecutionInfo executionInfo,
                 out failure,
                 cancellationToken)) {
             report = new SecurityFailedLogonsReport();
@@ -173,6 +174,7 @@ public sealed class SecurityFailedLogonsReportBuilder {
         }
 
         report = b.Build();
+        report.Truncated = executionInfo.Truncated;
         return true;
     }
 

@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics.Eventing.Reader;
 using System.Linq;
-using System.Threading.Tasks;
 using System.Text;
 using System.Xml.Linq;
 
@@ -40,36 +39,34 @@ namespace EventViewerX {
                 ? new EventLogQuery(logName, PathType.LogName, queryString)
                 : new EventLogQuery(null, PathType.LogName, queryString);
             if (!string.IsNullOrEmpty(machineName)) {
-                session = CreateSession(machineName, "PowerShellScripts", logName, DefaultSessionTimeoutMs);
-                if (session == null) yield break;
+                EventLogSessionOpenResult sessionResult = CreateSessionResult(machineName, "PowerShellScripts", logName, DefaultSessionTimeoutMs);
+                session = sessionResult.Session;
+                if (session == null) {
+                    throw new InvalidOperationException(sessionResult.ErrorMessage);
+                }
                 query.Session = session;
             }
 
             try {
-                using EventLogReader? reader = CreateEventLogReader(query, machineName, DefaultSessionTimeoutMs);
-                if (reader == null) {
-                    yield break;
-                }
+                using EventLogReader reader = CreateEventLogReader(query, machineName, DefaultSessionTimeoutMs);
 
-                // Reverse direction keeps newest script blocks first; each read is bounded to avoid hung remote logs.
+                // Reverse direction keeps newest script blocks first; each native read owns the timeout directly.
                 while (true) {
-                    EventRecord? record = null;
+                    EventRecord? record;
                     try {
-                        var readTask = Task.Run(() => reader.ReadEvent(TimeSpan.FromMilliseconds(750)));
-                        var completed = Task.WhenAny(readTask, Task.Delay(DefaultSessionTimeoutMs)).GetAwaiter().GetResult();
-                        if (completed != readTask) break;
-                        record = readTask.GetAwaiter().GetResult();
+                        record = ReadEventWithTimeout(reader, DefaultSessionTimeoutMs, $"Reading PowerShell script events from '{logName}'");
                     } catch (EventLogException ex) {
                         _logger.WriteWarning($"PowerShellScripts: error reading log on {machineName ?? GetFQDN()}: {ex.Message}");
-                        break;
+                        throw;
                     }
 
                     if (record == null) break;
 
-                    var element = XElement.Parse(record.ToXml());
+                    var eventObject = new EventObject(record, machineName ?? eventLogPath ?? GetFQDN(), EventReadMode.StructuredData);
+                    var element = XElement.Parse(eventObject.XMLData);
                     string? contextInfo = ExtractData(element, "ContextInfo");
                     var data = ParseContextInfo(contextInfo);
-                    yield return new PowerShellScriptExecutionInfo(record, data);
+                    yield return new PowerShellScriptExecutionInfo(eventObject, data);
                 }
             }
             finally {
@@ -113,33 +110,31 @@ namespace EventViewerX {
                 ? new EventLogQuery(logName, PathType.LogName, queryString)
                 : new EventLogQuery(null, PathType.LogName, queryString);
             if (!string.IsNullOrEmpty(machineName)) {
-                session = CreateSession(machineName, "PowerShellScripts", logName, DefaultSessionTimeoutMs);
-                if (session == null) yield break;
+                EventLogSessionOpenResult sessionResult = CreateSessionResult(machineName, "PowerShellScripts", logName, DefaultSessionTimeoutMs);
+                session = sessionResult.Session;
+                if (session == null) {
+                    throw new InvalidOperationException(sessionResult.ErrorMessage);
+                }
                 query.Session = session;
             }
 
             try {
-                using EventLogReader? reader = CreateEventLogReader(query, machineName, DefaultSessionTimeoutMs);
-                if (reader == null) {
-                    yield break;
-                }
+                using EventLogReader reader = CreateEventLogReader(query, machineName, DefaultSessionTimeoutMs);
 
                 var cache = new Dictionary<string, ScriptCache>();
                 while (true) {
-                    EventRecord? record = null;
+                    EventRecord? record;
                     try {
-                        var readTask = Task.Run(() => reader.ReadEvent(TimeSpan.FromMilliseconds(750)));
-                        var completed = Task.WhenAny(readTask, Task.Delay(DefaultSessionTimeoutMs)).GetAwaiter().GetResult();
-                        if (completed != readTask) break;
-                        record = readTask.GetAwaiter().GetResult();
+                        record = ReadEventWithTimeout(reader, DefaultSessionTimeoutMs, $"Reading PowerShell script events from '{logName}'");
                     } catch (EventLogException ex) {
                         _logger.WriteWarning($"PowerShellScripts: error reading log on {machineName ?? GetFQDN()}: {ex.Message}");
-                        break;
+                        throw;
                     }
 
                     if (record == null) break;
 
-                    var element = XElement.Parse(record.ToXml());
+                    var eventObject = new EventObject(record, machineName ?? eventLogPath ?? GetFQDN(), EventReadMode.StructuredData);
+                    var element = XElement.Parse(eventObject.XMLData);
                     string? scriptText = ExtractData(element, "ScriptBlockText");
                     if (string.IsNullOrEmpty(scriptText) || scriptText == "0") {
                         continue;
@@ -154,17 +149,17 @@ namespace EventViewerX {
                         inner = new ScriptCache();
                         cache[scriptId] = inner;
                     }
-                    inner.Events.Add(record!);
+                    inner.Events.Add(eventObject);
                     if (messageNumber == "0") {
-                        inner.MetaRecord = record;
+                        inner.MetaRecord = eventObject;
                     } else if (int.TryParse(messageNumber, out int num)) {
                         inner.Parts[num] = nonNullScriptText;
                     }
                 }
 
                 foreach (var kv in cache) {
-                    var metaRecord = kv.Value.MetaRecord ?? kv.Value.Events[0];
-                    var metaElement = XElement.Parse(metaRecord.ToXml());
+                    EventObject metaRecord = kv.Value.MetaRecord ?? kv.Value.Events[0];
+                    var metaElement = XElement.Parse(metaRecord.XMLData);
                     string totalStr = ExtractData(metaElement, "MessageTotal") ?? "0";
                     if (!int.TryParse(totalStr, out int total)) total = 0;
                     var sb = new StringBuilder();
@@ -204,8 +199,8 @@ namespace EventViewerX {
         }
 
         private sealed class ScriptCache {
-            public EventRecord? MetaRecord { get; set; }
-            public List<EventRecord> Events { get; } = new List<EventRecord>();
+            public EventObject? MetaRecord { get; set; }
+            public List<EventObject> Events { get; } = new List<EventObject>();
             public Dictionary<int, string> Parts { get; } = new Dictionary<int, string>();
         }
     }

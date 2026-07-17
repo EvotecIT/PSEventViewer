@@ -6,7 +6,7 @@ using System.Linq;
 namespace PSEventViewer {
     /// <summary>
     /// <para type="synopsis">Starts real-time monitoring of Windows Event Logs with customizable filters and actions.</para>
-    /// <para type="description">Supports explicit event IDs or NamedEvents, optional staging events, auto-stop conditions, multithreaded processing, and executes a script block for each match.</para>
+    /// <para type="description">Supports explicit event IDs or NamedEvents, provider-side filtering, optional staging events, auto-stop conditions, and a callback for each match.</para>
     /// </summary>
     /// <example>
     ///   <summary>Watch security log for logon failures</summary>
@@ -34,27 +34,28 @@ namespace PSEventViewer {
     public sealed class CmdletStartEVXWatcher : AsyncPSCmdlet {
 
         /// <summary>
-        /// Name of the computer to monitor events on.
+        /// Optional computer to monitor. The local computer is used by default.
         /// </summary>
-        [Parameter(Mandatory = true, Position = 0)]
-        public string MachineName { get; set; } = null!;
+        [Parameter]
+        public string? MachineName { get; set; }
 
         /// <summary>
         /// Name of the log to watch on the specified machine.
         /// </summary>
-        [Parameter(Mandatory = true, Position = 1)]
+        [Parameter(Mandatory = true, Position = 0)]
         public string LogName { get; set; } = null!;
 
         /// <summary>
         /// Array of event identifiers to monitor.
         /// </summary>
-        [Parameter(Mandatory = true, Position = 2, ParameterSetName = "EventId")]
+        [Parameter(Mandatory = true, Position = 1, ParameterSetName = "EventId")]
+        [ValidateRange(1, int.MaxValue)]
         public int[] EventId { get; set; } = Array.Empty<int>();
 
         /// <summary>
         /// Array of predefined event groups to monitor.
         /// </summary>
-        [Parameter(Mandatory = true, Position = 2, ParameterSetName = "NamedEvent")]
+        [Parameter(Mandatory = true, Position = 1, ParameterSetName = "NamedEvent")]
         public NamedEvents[] NamedEvent { get; set; } = Array.Empty<NamedEvents>();
 
         /// <summary>
@@ -66,7 +67,7 @@ namespace PSEventViewer {
         /// <summary>
         /// Script block executed when matching events are detected.
         /// </summary>
-        [Parameter(Mandatory = true, Position = 3)]
+        [Parameter(Mandatory = true, Position = 2)]
         public ScriptBlock Action { get; set; } = null!;
 
         /// <summary>
@@ -91,14 +92,8 @@ namespace PSEventViewer {
         /// Stops watching after processing the specified number of events.
         /// </summary>
         [Parameter]
+        [ValidateRange(0, int.MaxValue)]
         public int StopAfter { get; set; }
-
-        /// <summary>
-        /// Number of threads used for event processing.
-        /// </summary>
-        [Parameter(Mandatory = false)]
-        [ValidateRange(1, 1024)]
-        public int NumberOfThreads { get; set; } = 8;
 
         /// <summary>
         /// Starts the watcher based on provided filters and returns its information.
@@ -116,14 +111,20 @@ namespace PSEventViewer {
                 }
             }
 
+            if (ids.Count == 0) {
+                throw new PSArgumentException($"No event IDs were resolved for log '{LogName}'.");
+            }
+            if (TimeOut.HasValue && TimeOut.Value <= TimeSpan.Zero) {
+                throw new PSArgumentOutOfRangeException(nameof(TimeOut), TimeOut, "TimeOut must be greater than zero when provided.");
+            }
+
             var watcher = WatcherManager.StartWatcher(
                 Name,
-                MachineName,
+                string.IsNullOrWhiteSpace(MachineName) ? Environment.MachineName : MachineName!,
                 LogName,
                 ids,
                 ParameterSetName == "NamedEvent" ? (NamedEvent?.ToList() ?? new System.Collections.Generic.List<NamedEvents>()) : new System.Collections.Generic.List<NamedEvents>(),
                 e => Action.Invoke(e),
-                NumberOfThreads,
                 Staging.IsPresent,
                 StopOnMatch.IsPresent,
                 StopAfter,

@@ -78,6 +78,12 @@ public enum LiveStatsQueryFailureKind {
     /// </summary>
     InvalidArgument,
 
+    /// <summary>The supplied XPath expression is invalid.</summary>
+    InvalidQuery,
+
+    /// <summary>The requested event log channel does not exist.</summary>
+    LogNotFound,
+
     /// <summary>
     /// Access to event logs was denied.
     /// </summary>
@@ -87,6 +93,9 @@ public enum LiveStatsQueryFailureKind {
     /// Event log session or read timed out.
     /// </summary>
     Timeout,
+
+    /// <summary>The target host or Event Log RPC endpoint is unavailable.</summary>
+    HostUnavailable,
 
     /// <summary>
     /// Unexpected failure.
@@ -158,6 +167,11 @@ public sealed class TopComputerRow {
 /// Query result for live stats reads.
 /// </summary>
 public sealed class LiveStatsQueryResult {
+    /// <summary>
+    /// Effective machine queried. The local machine name is used when no remote target was supplied.
+    /// </summary>
+    public string MachineName { get; set; } = string.Empty;
+
     /// <summary>
     /// Queried log name.
     /// </summary>

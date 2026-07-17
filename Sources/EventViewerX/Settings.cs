@@ -1,11 +1,25 @@
+using System.Threading;
+
 namespace EventViewerX;
 
 /// <summary>
 /// Provides logging verbosity switches and default timeouts used throughout EventViewerX.
 /// </summary>
 public class Settings {
-    /// <summary>Shared logger used across the library; adjust verbosity via the instance properties.</summary>
-    public static InternalLogger _logger = new InternalLogger();
+    private static readonly AsyncLocal<InternalLogger?> ContextLogger = new();
+    private static readonly InternalLogger DefaultLogger = new();
+
+    /// <summary>
+    /// Logger for the current asynchronous execution context.
+    /// </summary>
+    /// <remarks>
+    /// The value flows to child tasks without allowing concurrent PowerShell runspaces or callers to overwrite
+    /// one another's logging callbacks.
+    /// </remarks>
+    public static InternalLogger _logger {
+        get => ContextLogger.Value ?? DefaultLogger;
+        set => ContextLogger.Value = value ?? throw new ArgumentNullException(nameof(value));
+    }
 
     /// <summary>TTL (seconds) for negative host reachability cache; adjust for slower/faster networks.</summary>
     public static int NegativeCacheTtlSeconds { get; set; } = 15;
@@ -18,12 +32,6 @@ public class Settings {
 
     /// <summary>Timeout (ms) for RPC probe before attempting a session.</summary>
     public static int RpcProbeTimeoutMs { get; set; } = 2500;
-
-    /// <summary>Timeout (ms) for ICMP ping reachability check.</summary>
-    public static int PingTimeoutMs { get; set; } = 1000;
-
-    /// <summary>Warm-up budget (ms) for listing log names before queries.</summary>
-    public static int ListLogWarmupMs { get; set; } = 3000;
 
     /// <summary>
     /// Stall timeout (ms) while reading events from a log. Values less than or equal to zero disable the stall timeout (unbounded reads).
@@ -60,8 +68,5 @@ public class Settings {
         get => _logger.IsDebug;
         set => _logger.IsDebug = value;
     }
-
-    /// <summary>Default degree of parallelism used by operations that support threading.</summary>
-    public int NumberOfThreads = 8;
 
 }

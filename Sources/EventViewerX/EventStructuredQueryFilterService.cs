@@ -517,7 +517,7 @@ public static class EventStructuredQueryFilterService {
         return !TryParseSignedIntegerLiteral(trimmed, out _);
     }
 
-    private static bool TryResolveUserId(string value, out string? normalized) {
+    internal static bool TryResolveUserId(string value, out string? normalized) {
         normalized = null;
 
         try {

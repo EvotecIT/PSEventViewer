@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Xml.Linq;
 using Xunit;
 
 namespace EventViewerX.Tests {
@@ -22,7 +23,7 @@ namespace EventViewerX.Tests {
         public void NamedDataFilterEscapesSpecialCharacters() {
             var ht = new Hashtable { { "Field", "O'Reilly & Co" } };
             var result = SearchEvents.BuildWinEventFilter(namedDataFilter: [ht], logName: "xx", xpathOnly: true);
-            Assert.Equal("*[EventData[Data[@Name='Field'] = 'O&apos;Reilly &amp; Co']]", result);
+            Assert.Equal("*[EventData[Data[@Name='Field'] = \"O'Reilly & Co\"]]", result);
         }
 
         [Fact]
@@ -68,33 +69,73 @@ namespace EventViewerX.Tests {
         }
 
         [Fact]
+        public void MultipleExcludedIdsAreJoinedWithAnd() {
+            var result = SearchEvents.BuildWinEventFilter(excludeId: ["1", "2"], xpathOnly: true);
+
+            Assert.Equal("*[System[(EventID!=1) and (EventID!=2)]]", result);
+        }
+
+        [Fact]
         public void DateRangeFilterXpathOnly() {
-            var start = DateTime.Now.AddHours(-1);
-            var end = DateTime.Now.AddMinutes(-30);
+            var start = new DateTime(2026, 7, 17, 10, 0, 0, DateTimeKind.Utc);
+            var end = new DateTime(2026, 7, 17, 10, 30, 0, DateTimeKind.Utc);
             var result = SearchEvents.BuildWinEventFilter(startTime: start, endTime: end, logName: "x", xpathOnly: true);
-            Assert.Contains("TimeCreated[timediff(@SystemTime) &lt;=", result);
-            Assert.Contains("TimeCreated[timediff(@SystemTime) &gt;=", result);
+            Assert.Contains("TimeCreated[@SystemTime>='2026-07-17T10:00:00.0000000Z']", result);
+            Assert.Contains("TimeCreated[@SystemTime<='2026-07-17T10:30:00.0000000Z']", result);
             Assert.DoesNotContain("<QueryList>", result);
         }
 
         [Fact]
-        public void FutureStartTimeIsClamped() {
-            var start = DateTime.Now.AddMinutes(10);
+        public void FutureStartTimeRemainsAnAbsoluteBoundary() {
+            var start = new DateTime(2030, 1, 2, 3, 4, 5, DateTimeKind.Utc);
             var result = SearchEvents.BuildWinEventFilter(startTime: start, logName: "x", xpathOnly: true);
-            Assert.Contains("timediff(@SystemTime) &lt;= 0", result);
+            Assert.Contains("@SystemTime>='2030-01-02T03:04:05.0000000Z'", result);
+            Assert.DoesNotContain("timediff", result);
         }
 
         [Fact]
-        public void FutureEndTimeIsClamped() {
-            var end = DateTime.Now.AddMinutes(5);
+        public void FutureEndTimeRemainsAnAbsoluteBoundary() {
+            var end = new DateTime(2030, 1, 2, 3, 4, 5, DateTimeKind.Utc);
             var result = SearchEvents.BuildWinEventFilter(endTime: end, logName: "x", xpathOnly: true);
-            Assert.Contains("timediff(@SystemTime) &gt;= 0", result);
+            Assert.Contains("@SystemTime<='2030-01-02T03:04:05.0000000Z'", result);
+            Assert.DoesNotContain("timediff", result);
+        }
+
+        [Theory]
+        [InlineData("0")]
+        [InlineData("-1")]
+        [InlineData("1 or EventID=2")]
+        [InlineData("")]
+        public void InvalidEventIdIsRejectedBeforeBuildingXpath(string value) {
+            Assert.Throws<ArgumentException>(() => SearchEvents.BuildWinEventFilter(id: [value], xpathOnly: true));
         }
 
         [Fact]
         public void ProviderNameEscapesSpecialCharactersWinFilter() {
             var result = SearchEvents.BuildWinEventFilter(providerName: ["O'Reilly & Co"], logName: "x", xpathOnly: true);
-            Assert.Equal("*[System[Provider[@Name='O&apos;Reilly &amp; Co']]]", result);
+            Assert.Equal("*[System[Provider[@Name=\"O'Reilly & Co\"]]]", result);
+        }
+
+        [Fact]
+        public void QueryListXmlEncodesRawXpathAndPreservesItsMeaning() {
+            var result = SearchEvents.BuildWinEventFilter(
+                providerName: ["O'Reilly & Co"],
+                startTime: new DateTime(2026, 7, 17, 10, 0, 0, DateTimeKind.Utc),
+                logName: "Company & Product/Log");
+
+            XDocument document = XDocument.Parse(result);
+            XElement select = document.Root!.Element("Query")!.Element("Select")!;
+
+            Assert.Equal("Company & Product/Log", select.Attribute("Path")!.Value);
+            Assert.Contains("Provider[@Name=\"O'Reilly & Co\"]", select.Value);
+            Assert.Contains("@SystemTime>='2026-07-17T10:00:00.0000000Z'", select.Value);
+        }
+
+        [Fact]
+        public void ValuesContainingBothQuoteKindsAreRejected() {
+            Assert.Throws<ArgumentException>(() => SearchEvents.BuildWinEventFilter(
+                providerName: ["Provider 'quoted' as \"other\""],
+                xpathOnly: true));
         }
 
         [Fact]

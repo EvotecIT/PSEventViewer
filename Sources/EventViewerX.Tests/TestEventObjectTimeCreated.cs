@@ -13,32 +13,9 @@ public class TestEventObjectTimeCreated
     public void TimeCreated_NullFallsBackToMinValue()
     {
         var record = new NullTimeEventRecord();
-        var eo = (EventObject)FormatterServices.GetUninitializedObject(typeof(EventObject));
-
-        SetField(eo, "_eventRecord", record);
-        eo.ContainerLog = string.Empty;
-        eo.XMLData = string.Empty;
-        eo.GatheredFrom = "local";
-        eo.GatheredLogName = string.Empty;
-        eo.MessageSubject = string.Empty;
-        SetProperty(eo, nameof(EventObject.MessageData), new Dictionary<string, string>());
-        SetProperty(eo, nameof(EventObject.Data), new Dictionary<string, string>());
-        SetProperty(eo, nameof(EventObject.Attachments), Array.Empty<byte[]>());
-        SetProperty(eo, nameof(EventObject.NicIdentifiers), new List<string>());
+        var eo = new EventObject(record, "local", EventReadMode.Metadata);
 
         Assert.Equal(DateTime.MinValue, eo.TimeCreated);
-    }
-
-    private static void SetField(object target, string name, object value)
-    {
-        var f = target.GetType().GetField(name, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public);
-        f!.SetValue(target, value);
-    }
-
-    private static void SetProperty(object target, string name, object value)
-    {
-        var p = target.GetType().GetProperty(name, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public);
-        p!.SetValue(target, value);
     }
 
     private sealed class NullTimeEventRecord : EventRecord

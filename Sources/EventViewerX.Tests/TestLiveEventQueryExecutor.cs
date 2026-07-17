@@ -5,6 +5,11 @@ namespace EventViewerX.Tests;
 
 public class TestLiveEventQueryExecutor {
     [Fact]
+    public void Request_DefaultsToBoundedMaterialization() {
+        Assert.Equal(1000, new LiveEventQueryRequest().MaxEvents);
+    }
+
+    [Fact]
     public void TryRead_ShouldFailForMissingLogName() {
         var ok = LiveEventQueryExecutor.TryRead(
             request: new LiveEventQueryRequest {

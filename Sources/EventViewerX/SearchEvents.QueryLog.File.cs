@@ -24,8 +24,15 @@ public partial class SearchEvents : Settings {
     /// <param name="namedDataFilter">Hashtable of EventData name/value filters to include.</param>
     /// <param name="namedDataExcludeFilter">Hashtable of EventData name/value filters to exclude.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
+    /// <param name="readMode">Amount of provider data to materialize for each event.</param>
     /// <returns>Enumerable sequence of <see cref="EventObject"/> read from the file.</returns>
-    public static IEnumerable<EventObject> QueryLogFile(string filePath, List<int>? eventIds = null, string? providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string? userId = null, int maxEvents = 0, List<long>? eventRecordId = null, TimePeriod? timePeriod = null, bool oldest = false, System.Collections.Hashtable? namedDataFilter = null, System.Collections.Hashtable? namedDataExcludeFilter = null, CancellationToken cancellationToken = default) {
+    public static IEnumerable<EventObject> QueryLogFile(string filePath, List<int>? eventIds = null, string? providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string? userId = null, int maxEvents = 0, List<long>? eventRecordId = null, TimePeriod? timePeriod = null, bool oldest = false, System.Collections.Hashtable? namedDataFilter = null, System.Collections.Hashtable? namedDataExcludeFilter = null, CancellationToken cancellationToken = default, EventReadMode readMode = EventReadMode.Full) {
+        if (string.IsNullOrWhiteSpace(filePath)) {
+            throw new ArgumentException("File path cannot be null or empty.", nameof(filePath));
+        }
+        if (maxEvents < 0) {
+            throw new ArgumentOutOfRangeException(nameof(maxEvents), "Maximum events must be greater than or equal to zero.");
+        }
         // Sanitize and resolve path; allow UNC and relative.
         string sanitizedPath = filePath.Trim().Trim('"', '\'');
         string absolutePath = Path.GetFullPath(sanitizedPath);
@@ -84,7 +91,7 @@ public partial class SearchEvents : Settings {
 
             query = new EventLogQuery(absolutePath, PathType.FilePath, xpath) {
                 ReverseDirection = !oldest,
-                TolerateQueryErrors = true
+                TolerateQueryErrors = false
             };
         } else {
             xpath = BuildWinEventFilter(xpathOnly: true);
@@ -97,12 +104,17 @@ public partial class SearchEvents : Settings {
 
             query = new EventLogQuery(absolutePath, PathType.FilePath, xpath) {
                 ReverseDirection = !oldest,
-                TolerateQueryErrors = true
+                TolerateQueryErrors = false
             };
         }
 
-        var fallbackQuery = CreateFileQueryWithFallback(absolutePath, xpath, oldest);
-        var primaryReader = CreateEventLogReader(query, null);
+        var fallbackQuery = CreateFileFallbackQuery(absolutePath, xpath, oldest);
+        EventLogReader? primaryReader;
+        try {
+            primaryReader = CreateEventLogReader(query, null);
+        } catch (EventLogException) {
+            primaryReader = null;
+        }
 
         if (primaryReader == null) {
             using var fallbackReader = CreateEventLogReader(fallbackQuery, null);
@@ -119,7 +131,7 @@ public partial class SearchEvents : Settings {
                     break;
                 }
 
-                yield return new EventObject(record, filePath);
+                yield return new EventObject(record, filePath, readMode);
                 eventCount++;
                 if (maxEvents > 0 && eventCount >= maxEvents) {
                     break;
@@ -149,7 +161,7 @@ public partial class SearchEvents : Settings {
                         break;
                     }
 
-                    yield return new EventObject(record, filePath);
+                    yield return new EventObject(record, filePath, readMode);
                     eventCount++;
                     if (maxEvents > 0 && eventCount >= maxEvents) {
                         break;
@@ -160,9 +172,12 @@ public partial class SearchEvents : Settings {
             }
 
             while (true) {
-                cancellationToken.ThrowIfCancellationRequested();
+                if (cancellationToken.IsCancellationRequested) {
+                    record.Dispose();
+                    cancellationToken.ThrowIfCancellationRequested();
+                }
 
-                yield return new EventObject(record, filePath);
+                yield return new EventObject(record, filePath, readMode);
                 eventCount++;
                 if (maxEvents > 0 && eventCount >= maxEvents) {
                     break;
@@ -176,19 +191,13 @@ public partial class SearchEvents : Settings {
         }
     }
 
-    private static EventLogQuery CreateFileQueryWithFallback(string absolutePath, string xpath, bool oldest) {
-        try {
-            return new EventLogQuery(absolutePath, PathType.FilePath, xpath) {
-                ReverseDirection = !oldest,
-                TolerateQueryErrors = true
-            };
-        } catch (System.Diagnostics.Eventing.Reader.EventLogNotFoundException) {
-            // Fall back to QueryList XML with embedded path (works on some systems/PS builds)
-            string queryString = BuildWinEventFilter(path: absolutePath, xpathOnly: false);
-            return new EventLogQuery(null, PathType.LogName, queryString) {
-                ReverseDirection = !oldest,
-                TolerateQueryErrors = true
-            };
-        }
+    private static EventLogQuery CreateFileFallbackQuery(string absolutePath, string xpath, bool oldest) {
+        string escapedPath = EscapeXmlValue(absolutePath);
+        string escapedXPath = EscapeXmlValue(xpath);
+        string queryString = $"<QueryList><Query Id='0' Path='{escapedPath}'><Select Path='{escapedPath}'>{escapedXPath}</Select></Query></QueryList>";
+        return new EventLogQuery(null, PathType.LogName, queryString) {
+            ReverseDirection = !oldest,
+            TolerateQueryErrors = false
+        };
     }
 }

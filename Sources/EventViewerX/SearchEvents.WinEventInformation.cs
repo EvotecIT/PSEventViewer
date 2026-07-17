@@ -25,8 +25,17 @@ namespace EventViewerX {
             }
 
             if (logNames != null && logNames.Length > 0) {
-                foreach (var log in DisplayEventLogsParallel(logNames, machines, maxDegreeOfParallelism)) {
-                    yield return ConvertLogDetails(log);
+                foreach (EventLogDetailsResult result in DisplayEventLogResultsParallel(
+                             logNames,
+                             machines,
+                             maxDegreeOfParallelism,
+                             Settings.SessionTimeoutMs,
+                             includeEventTimes: true)) {
+                    if (result.Details != null) {
+                        yield return ConvertLogDetails(result.Details);
+                    } else {
+                        _logger.WriteWarning($"Couldn't read event log information for {result.LogName} on {result.MachineName}: {result.ErrorMessage}");
+                    }
                 }
             }
 
@@ -68,6 +77,8 @@ namespace EventViewerX {
                 OldestRecordNumber = details.OldestRecordNumber,
                 SecurityDescriptor = details.SecurityDescriptor ?? string.Empty,
                 IsClassicLog = details.IsClassicLog,
+                EventOldest = details.OldestEvent,
+                EventNewest = details.NewestEvent,
                 Source = details.MachineName ?? string.Empty
             };
 
@@ -91,11 +102,10 @@ namespace EventViewerX {
                     info.SecurityDescriptorGroup = sd.Group?.ToString() ?? string.Empty;
                     info.SecurityDescriptorDiscretionaryAcl = sd.DiscretionaryAcl?.ToString() ?? string.Empty;
                     info.SecurityDescriptorSystemAcl = sd.SystemAcl?.ToString() ?? string.Empty;
-                } catch {
+                } catch (Exception ex) {
+                    _logger.WriteVerbose($"Couldn't parse the security descriptor for {details.LogName} on {details.MachineName}: {ex.Message}");
                 }
             }
-            info.EventOldest = GetEventTime(details.LogName ?? string.Empty, details.MachineName ?? string.Empty, false);
-            info.EventNewest = GetEventTime(details.LogName ?? string.Empty, details.MachineName ?? string.Empty, true);
             return info;
         }
 
@@ -103,25 +113,28 @@ namespace EventViewerX {
             FileInfo fi = new(path);
             DateTime? newest = null;
             DateTime? oldest = null;
-            long? newId = null;
             long? oldId = null;
+            long? recordCount = null;
             string machine = string.Empty;
             try {
+                using (var session = new EventLogSession()) {
+                    EventLogInformation logInformation = session.GetLogInformation(path, PathType.FilePath);
+                    recordCount = logInformation.RecordCount;
+                    oldId = logInformation.OldestRecordNumber;
+                }
                 var queryOld = new EventLogQuery(path, PathType.FilePath);
                 using (var reader = new EventLogReader(queryOld)) {
-                    var rec = reader.ReadEvent();
+                    using var rec = reader.ReadEvent();
                     if (rec != null) {
                         oldest = rec.TimeCreated;
-                        oldId = rec.RecordId;
                         machine = rec.MachineName;
                     }
                 }
                 var queryNew = new EventLogQuery(path, PathType.FilePath) { ReverseDirection = true };
                 using (var reader = new EventLogReader(queryNew)) {
-                    var rec = reader.ReadEvent();
+                    using var rec = reader.ReadEvent();
                     if (rec != null) {
                         newest = rec.TimeCreated;
-                        newId = rec.RecordId;
                         if (!string.IsNullOrEmpty(machine)) {
                             if (rec.MachineName != machine) {
                                 machine = string.Join(", ", new[] { machine, rec.MachineName }.Distinct());
@@ -133,10 +146,6 @@ namespace EventViewerX {
                 }
             } catch (Exception ex) {
                 _logger.WriteWarning($"Failed reading event log file {path}: {ex.Message}");
-            }
-            long? recordCount = null;
-            if (newId.HasValue && oldId.HasValue) {
-                recordCount = newId.Value - oldId.Value;
             }
             var info = new WinEventInformation {
                 EventNewest = newest,
@@ -181,32 +190,6 @@ namespace EventViewerX {
             info.MaximumSizeMB = ConvertSize(fi.Length);
 
             return info;
-        }
-
-        private static DateTime? GetEventTime(string logName, string machine, bool newest) {
-            EventLogSession? session = null;
-            try {
-                var query = new EventLogQuery(logName, PathType.LogName) { ReverseDirection = newest };
-                if (!string.IsNullOrEmpty(machine)) {
-                    session = CreateSession(machine, "WinEventInformation", logName, DefaultSessionTimeoutMs);
-                    if (session == null) return null;
-                    query.Session = session;
-                }
-
-                using var reader = new EventLogReader(query);
-                var readTask = Task.Run(() => reader.ReadEvent(TimeSpan.FromMilliseconds(750)));
-                var completed = Task.WhenAny(readTask, Task.Delay(DefaultSessionTimeoutMs)).GetAwaiter().GetResult();
-                if (completed != readTask) {
-                    return null;
-                }
-                var rec = readTask.GetAwaiter().GetResult();
-                return rec?.TimeCreated;
-            } catch {
-                return null;
-            }
-            finally {
-                session?.Dispose();
-            }
         }
 
         private static double ConvertSize(long valueBytes) {

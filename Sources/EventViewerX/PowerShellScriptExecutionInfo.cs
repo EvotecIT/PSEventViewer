@@ -1,5 +1,3 @@
-using System.Diagnostics.Eventing.Reader;
-
 namespace EventViewerX;
 
 /// <summary>
@@ -21,18 +19,18 @@ public class PowerShellScriptExecutionInfo {
     }
 
     /// <summary>
-    /// Underlying event record containing script execution details.
+    /// Gets the managed event snapshot containing script execution details.
     /// </summary>
-    public EventRecord EventRecord { get; }
+    public EventObject Event { get; }
 
     /// <summary>
-    /// Parsed data values extracted from the event.
+    /// Gets parsed data values extracted from the event.
     /// </summary>
-    public IDictionary<string, string?> Data { get; }
+    public IReadOnlyDictionary<string, string?> Data { get; }
 
-    internal PowerShellScriptExecutionInfo(EventRecord record, IDictionary<string, string?> data) {
-        EventRecord = record;
-        Data = data;
+    internal PowerShellScriptExecutionInfo(EventObject eventObject, IDictionary<string, string?> data) {
+        Event = eventObject ?? throw new ArgumentNullException(nameof(eventObject));
+        Data = new Dictionary<string, string?>(data ?? throw new ArgumentNullException(nameof(data)));
         Index = Interlocked.Increment(ref _executionCount);
     }
 }

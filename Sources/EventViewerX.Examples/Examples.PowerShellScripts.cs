@@ -4,7 +4,7 @@ namespace EventViewerX.Examples {
     internal partial class Examples {
         public static void QueryPowerShellScripts() {
             foreach (var script in SearchEvents.GetPowerShellScripts(PowerShellEdition.WindowsPowerShell, format: true)) {
-                var timeCreated = script.EventRecord?.TimeCreated ?? DateTime.MinValue;
+                var timeCreated = script.Event?.TimeCreated ?? DateTime.MinValue;
                 Console.WriteLine($"[{timeCreated}] {script.ScriptBlockId}");
                 Console.WriteLine(script.Script);
                 // Save reconstructed script to disk

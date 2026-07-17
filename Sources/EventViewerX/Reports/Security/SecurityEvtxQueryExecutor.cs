@@ -46,7 +46,7 @@ public static class SecurityEvtxQueryExecutor {
             MaxEventsScanned = request.MaxEventsScanned,
             ScannedEvents = report.Scanned,
             MatchedEvents = report.Matched,
-            Truncated = request.MaxEventsScanned > 0 && report.Scanned >= request.MaxEventsScanned,
+            Truncated = report.Truncated,
             TimeCreatedUtcMin = report.MinUtc,
             TimeCreatedUtcMax = report.MaxUtc,
             Top = request.Top,
@@ -100,7 +100,7 @@ public static class SecurityEvtxQueryExecutor {
             MaxEventsScanned = request.MaxEventsScanned,
             ScannedEvents = report.Scanned,
             MatchedEvents = report.Matched,
-            Truncated = request.MaxEventsScanned > 0 && report.Scanned >= request.MaxEventsScanned,
+            Truncated = report.Truncated,
             TimeCreatedUtcMin = report.MinUtc,
             TimeCreatedUtcMax = report.MaxUtc,
             Top = request.Top,
@@ -158,7 +158,7 @@ public static class SecurityEvtxQueryExecutor {
             MaxEventsScanned = request.MaxEventsScanned,
             ScannedEvents = report.Scanned,
             MatchedEvents = report.Matched,
-            Truncated = request.MaxEventsScanned > 0 && report.Scanned >= request.MaxEventsScanned,
+            Truncated = report.Truncated,
             TimeCreatedUtcMin = report.MinUtc,
             TimeCreatedUtcMax = report.MaxUtc,
             Top = request.Top,
@@ -185,7 +185,8 @@ public static class SecurityEvtxQueryExecutor {
             StartTimeUtc = request.StartTimeUtc,
             EndTimeUtc = request.EndTimeUtc,
             MaxEvents = request.MaxEventsScanned,
-            OldestFirst = true
+            OldestFirst = true,
+            ReadMode = EventReadMode.StructuredData
         };
     }
 

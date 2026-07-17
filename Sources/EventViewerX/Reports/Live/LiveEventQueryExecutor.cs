@@ -73,16 +73,26 @@ public static class LiveEventQueryExecutor {
 
         try {
             var rows = new List<LiveEventRow>();
+            bool truncated = false;
+            int readLimit = request.MaxEvents > 0 && request.MaxEvents < int.MaxValue
+                ? request.MaxEvents + 1
+                : request.MaxEvents;
 
             foreach (var ev in SearchEvents.QueryLogXPath(
                          logName: request.LogName,
                          xpath: xpath,
                          machineName: request.MachineName,
-                         maxEvents: request.MaxEvents,
+                         maxEvents: readLimit,
                          oldest: request.OldestFirst,
                          cancellationToken: cancellationToken,
-                         sessionTimeoutMs: request.SessionTimeoutMs)) {
+                         sessionTimeoutMs: request.SessionTimeoutMs,
+                         readMode: request.IncludeMessage ? EventReadMode.Message : EventReadMode.Metadata)) {
                 cancellationToken.ThrowIfCancellationRequested();
+
+                if (request.MaxEvents > 0 && rows.Count >= request.MaxEvents) {
+                    truncated = true;
+                    break;
+                }
 
                 rows.Add(new LiveEventRow {
                     TimeCreatedUtc = ev.TimeCreated.ToUniversalTime().ToString("O"),
@@ -104,10 +114,13 @@ public static class LiveEventQueryExecutor {
             }
 
             result = new LiveEventQueryResult {
+                MachineName = string.IsNullOrWhiteSpace(request.MachineName)
+                    ? Environment.MachineName
+                    : request.MachineName!.Trim(),
                 LogName = request.LogName,
                 XPath = xpath,
                 Count = rows.Count,
-                Truncated = request.MaxEvents > 0 && rows.Count >= request.MaxEvents,
+                Truncated = truncated,
                 Events = rows
             };
             failure = null;
@@ -128,10 +141,28 @@ public static class LiveEventQueryExecutor {
                 Message = ex.Message
             };
             return false;
+        } catch (EventLogSessionException ex) {
+            result = new LiveEventQueryResult();
+            failure = new LiveEventQueryFailure {
+                Kind = LiveEventQueryFailureKind.HostUnavailable,
+                Message = ex.Message
+            };
+            return false;
+        } catch (EventLogNotFoundException ex) {
+            result = new LiveEventQueryResult();
+            failure = new LiveEventQueryFailure {
+                Kind = LiveEventQueryFailureKind.LogNotFound,
+                Message = ex.Message
+            };
+            return false;
         } catch (EventLogException ex) {
             result = new LiveEventQueryResult();
             failure = new LiveEventQueryFailure {
-                Kind = QueryFailureHelpers.IsTimeoutLike(ex.Message) ? LiveEventQueryFailureKind.Timeout : LiveEventQueryFailureKind.Exception,
+                Kind = QueryFailureHelpers.IsInvalidEventQuery(ex)
+                    ? LiveEventQueryFailureKind.InvalidQuery
+                    : QueryFailureHelpers.IsTimeoutLike(ex.Message)
+                        ? LiveEventQueryFailureKind.Timeout
+                        : LiveEventQueryFailureKind.Exception,
                 Message = ex.Message
             };
             return false;
@@ -151,4 +182,5 @@ public static class LiveEventQueryExecutor {
             return false;
         }
     }
+
 }

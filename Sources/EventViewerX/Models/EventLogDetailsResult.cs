@@ -8,6 +8,10 @@ public enum EventLogDetailsStatus {
     Success,
     /// <summary>The query exceeded the caller-provided timeout.</summary>
     Timeout,
+    /// <summary>The caller does not have permission to inspect the target log service.</summary>
+    AccessDenied,
+    /// <summary>The target host or Event Log RPC endpoint is unavailable.</summary>
+    HostUnavailable,
     /// <summary>An EventLogSession could not be opened for the target host.</summary>
     SessionUnavailable,
     /// <summary>The target event log channel could not be opened or does not exist.</summary>

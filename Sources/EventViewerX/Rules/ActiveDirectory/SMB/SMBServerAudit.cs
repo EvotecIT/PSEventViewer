@@ -52,9 +52,16 @@ public class SMBServerAudit : EventRuleBase {
         Action = _eventObject.MessageSubject;
         ClientAddress = _eventObject.GetValueFromDataDictionary("ClientName");
         When = _eventObject.TimeCreated;
-        ClientDNSName = Task.Run(() => QueryDnsAsync(ClientAddress)).Result ?? string.Empty;
     }
 
+    /// <summary>
+    /// Resolves and stores the client reverse-DNS name on demand.
+    /// </summary>
+    /// <returns>The resolved DNS name, or an empty string when no result is available.</returns>
+    public async Task<string> ResolveClientDnsNameAsync() {
+        ClientDNSName = await QueryDnsAsync(ClientAddress).ConfigureAwait(false) ?? string.Empty;
+        return ClientDNSName;
+    }
 
     private static async Task<string?> QueryDnsAsync(string clientAddress) {
         if (string.IsNullOrEmpty(clientAddress)) {
@@ -63,7 +70,7 @@ public class SMBServerAudit : EventRuleBase {
 
         try {
             Settings._logger.WriteVerbose($"Querying DNS for address: {clientAddress}");
-            var result = await ClientX.QueryDns(clientAddress, DnsRecordType.PTR);
+            var result = await ClientX.QueryDns(clientAddress, DnsRecordType.PTR).ConfigureAwait(false);
             var resolvedNames = string.Join(", ", result.AnswersMinimal.Select(answer => answer.Data));
             Settings._logger.WriteVerbose($"Resolved names: {resolvedNames}");
             return resolvedNames;

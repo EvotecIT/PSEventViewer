@@ -1,17 +1,14 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
-
-using System.Collections.Concurrent;
-using System.Threading;
-using System.Threading.Tasks;
 using System.Runtime.CompilerServices;
+using System.Threading;
+
 namespace EventViewerX {
     /// <summary>
     /// Methods for querying events by predefined named event types.
     /// </summary>
     public partial class SearchEvents : Settings {
-
         /// <summary>
         /// Searches logs for events matching the provided named event types.
         /// </summary>
@@ -21,48 +18,57 @@ namespace EventViewerX {
         /// <param name="endTime">Optional end time.</param>
         /// <param name="timePeriod">Predefined time period.</param>
         /// <param name="maxThreads">Maximum parallel threads.</param>
-        /// <param name="maxEvents">Maximum events to return.</param>
+        /// <param name="maxEvents">Global maximum number of matching rule results to return.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
         /// <returns>Asynchronous sequence of simplified events.</returns>
-        public static async IAsyncEnumerable<EventObjectSlim> FindEventsByNamedEvents(List<NamedEvents> typeEventsList, List<string?>? machineNames = null, DateTime? startTime = null, DateTime? endTime = null, TimePeriod? timePeriod = null, int maxThreads = 8, int maxEvents = 0, [EnumeratorCancellation] CancellationToken cancellationToken = default) {
-            var eventInfoDict = EventObjectSlim.GetEventInfoForNamedEvents(typeEventsList);
+        public static async IAsyncEnumerable<EventObjectSlim> FindEventsByNamedEvents(
+            List<NamedEvents> typeEventsList,
+            List<string?>? machineNames = null,
+            DateTime? startTime = null,
+            DateTime? endTime = null,
+            TimePeriod? timePeriod = null,
+            int maxThreads = 8,
+            int maxEvents = 0,
+            [EnumeratorCancellation] CancellationToken cancellationToken = default) {
 
-            var semaphore = new SemaphoreSlim(maxThreads);
-            var results = new BlockingCollection<EventObjectSlim>();
-            var tasks = new List<Task>();
+            if (typeEventsList == null) {
+                throw new ArgumentNullException(nameof(typeEventsList));
+            }
+            if (maxThreads <= 0) {
+                throw new ArgumentOutOfRangeException(nameof(maxThreads), "Maximum threads must be positive.");
+            }
+            if (maxEvents < 0) {
+                throw new ArgumentOutOfRangeException(nameof(maxEvents), "Maximum events must be greater than or equal to zero.");
+            }
 
-            foreach (var kvp in eventInfoDict) {
-                var logName = kvp.Key;
-                var eventIds = kvp.Value.ToList();
+            Dictionary<string, HashSet<int>> eventInfo = EventObjectSlim.GetEventInfoForNamedEvents(typeEventsList);
+            int emitted = 0;
 
-                tasks.Add(Task.Run(async () => {
-                    await semaphore.WaitAsync(cancellationToken);
-                    try {
-                        await foreach (var foundEvent in SearchEvents.QueryLogsParallel(logName, eventIds, machineNames, startTime: startTime, endTime: endTime, timePeriod: timePeriod, maxThreads: maxThreads, maxEvents: maxEvents, cancellationToken: cancellationToken)) {
-                            var targetEvent = BuildTargetEvents(foundEvent, typeEventsList);
-                            if (targetEvent != null) {
-                                results.Add(targetEvent, cancellationToken);
-                            }
-                        }
-                    } finally {
-                        semaphore.Release();
+            // Query one channel at a time. QueryLogsParallel already owns bounded machine/filter parallelism;
+            // adding a second producer layer here multiplies concurrency and defeats its backpressure.
+            foreach (KeyValuePair<string, HashSet<int>> entry in eventInfo) {
+                await foreach (EventObject foundEvent in QueryLogsParallel(
+                                   entry.Key,
+                                   entry.Value.ToList(),
+                                   machineNames,
+                                   startTime: startTime,
+                                   endTime: endTime,
+                                   maxThreads: maxThreads,
+                                   timePeriod: timePeriod,
+                                   cancellationToken: cancellationToken,
+                                   readMode: EventReadMode.Full)) {
+                    EventObjectSlim? targetEvent = BuildTargetEvents(foundEvent, typeEventsList);
+                    if (targetEvent == null) {
+                        continue;
                     }
-                }, cancellationToken));
+
+                    yield return targetEvent;
+                    emitted++;
+                    if (maxEvents > 0 && emitted >= maxEvents) {
+                        yield break;
+                    }
+                }
             }
-
-            var whenAllTask = Task.WhenAll(tasks);
-            _ = whenAllTask.ContinueWith(
-                _ => results.CompleteAdding(),
-                cancellationToken,
-                TaskContinuationOptions.ExecuteSynchronously,
-                TaskScheduler.Default);
-
-            foreach (var result in results.GetConsumingEnumerable(cancellationToken)) {
-                yield return result;
-                await Task.Yield();
-            }
-
-            await whenAllTask;
         }
     }
 }

@@ -12,6 +12,7 @@ namespace PSEventViewer;
 /// An abstract base class for asynchronous PowerShell cmdlets.
 /// </summary>
 public abstract class AsyncPSCmdlet : PSCmdlet, IDisposable {
+    private const int PipelineBufferCapacity = 64;
     /// <summary>
     /// Defines the types of pipelines used in the cmdlet.
     /// </summary>
@@ -31,6 +32,7 @@ public abstract class AsyncPSCmdlet : PSCmdlet, IDisposable {
     /// Cancels the processing of the cmdlet.
     /// </summary>
     private CancellationTokenSource _cancelSource = new();
+    private InternalLogger? _eventViewerLogger;
 
     private BlockingCollection<(object?, PipelineType)>? _currentOutPipe;
     private BlockingCollection<object?>? _currentReplyPipe;
@@ -97,12 +99,15 @@ public abstract class AsyncPSCmdlet : PSCmdlet, IDisposable {
     /// </summary>
     /// <param name="task">The task to run asynchronously.</param>
     private void RunBlockInAsync(Func<Task> task) {
-        using BlockingCollection<(object?, PipelineType)> outPipe = new();
-        using BlockingCollection<object?> replyPipe = new();
+        using BlockingCollection<(object?, PipelineType)> outPipe = new(PipelineBufferCapacity);
+        using BlockingCollection<object?> replyPipe = new(1);
         Task blockTask = Task.Run(async () => {
             try {
                 _currentOutPipe = outPipe;
                 _currentReplyPipe = replyPipe;
+                if (_eventViewerLogger != null) {
+                    Settings._logger = _eventViewerLogger;
+                }
                 await task();
             } finally {
                 _currentOutPipe = null;
@@ -161,14 +166,22 @@ public abstract class AsyncPSCmdlet : PSCmdlet, IDisposable {
     }
 
     /// <summary>
+    /// Keeps the EventViewerX logger attached across PowerShell lifecycle phases, which run in separate execution contexts.
+    /// </summary>
+    /// <param name="logger">Logger connected to this cmdlet's PowerShell streams.</param>
+    protected void SetEventViewerLogger(InternalLogger logger) {
+        _eventViewerLogger = logger ?? throw new ArgumentNullException(nameof(logger));
+        Settings._logger = logger;
+    }
+
+    /// <summary>
     /// Determines whether the cmdlet should continue processing.
     /// </summary>
     /// <param name="target">The target of the operation.</param>
     /// <param name="action">The action to be performed.</param>
     /// <returns>True if the cmdlet should continue processing; otherwise, false.</returns>
     public new bool ShouldProcess(string target, string action) {
-        ThrowIfStopped();
-        _currentOutPipe?.Add(((target, action), PipelineType.ShouldProcess));
+        AddToOutputPipe(((target, action), PipelineType.ShouldProcess));
         return (bool)_currentReplyPipe?.Take(CancelToken)!;
     }
 
@@ -184,8 +197,7 @@ public abstract class AsyncPSCmdlet : PSCmdlet, IDisposable {
     /// <param name="sendToPipeline">The object to send to the pipeline.</param>
     /// <param name="enumerateCollection">If true, enumerates the collection.</param>
     public new void WriteObject(object? sendToPipeline, bool enumerateCollection) {
-        ThrowIfStopped();
-        _currentOutPipe?.Add(
+        AddToOutputPipe(
             (sendToPipeline, enumerateCollection ? PipelineType.OutputEnumerate : PipelineType.Output));
     }
 
@@ -194,8 +206,7 @@ public abstract class AsyncPSCmdlet : PSCmdlet, IDisposable {
     /// </summary>
     /// <param name="errorRecord">The error record to write.</param>
     public new void WriteError(ErrorRecord errorRecord) {
-        ThrowIfStopped();
-        _currentOutPipe?.Add((errorRecord, PipelineType.Error));
+        AddToOutputPipe((errorRecord, PipelineType.Error));
     }
 
     /// <summary>
@@ -203,8 +214,7 @@ public abstract class AsyncPSCmdlet : PSCmdlet, IDisposable {
     /// </summary>
     /// <param name="message">The warning message to write.</param>
     public new void WriteWarning(string message) {
-        ThrowIfStopped();
-        _currentOutPipe?.Add((message, PipelineType.Warning));
+        AddToOutputPipe((message, PipelineType.Warning));
     }
 
     /// <summary>
@@ -212,8 +222,7 @@ public abstract class AsyncPSCmdlet : PSCmdlet, IDisposable {
     /// </summary>
     /// <param name="message">The verbose message to write.</param>
     public new void WriteVerbose(string message) {
-        ThrowIfStopped();
-        _currentOutPipe?.Add((message, PipelineType.Verbose));
+        AddToOutputPipe((message, PipelineType.Verbose));
     }
 
     /// <summary>
@@ -221,8 +230,7 @@ public abstract class AsyncPSCmdlet : PSCmdlet, IDisposable {
     /// </summary>
     /// <param name="message">The debug message to write.</param>
     public new void WriteDebug(string message) {
-        ThrowIfStopped();
-        _currentOutPipe?.Add((message, PipelineType.Debug));
+        AddToOutputPipe((message, PipelineType.Debug));
     }
 
     /// <summary>
@@ -230,8 +238,7 @@ public abstract class AsyncPSCmdlet : PSCmdlet, IDisposable {
     /// </summary>
     /// <param name="informationRecord">The information record to write.</param>
     public new void WriteInformation(InformationRecord informationRecord) {
-        ThrowIfStopped();
-        _currentOutPipe?.Add((informationRecord, PipelineType.Information));
+        AddToOutputPipe((informationRecord, PipelineType.Information));
     }
 
     /// <summary>
@@ -239,8 +246,12 @@ public abstract class AsyncPSCmdlet : PSCmdlet, IDisposable {
     /// </summary>
     /// <param name="progressRecord">The progress record to write.</param>
     public new void WriteProgress(ProgressRecord progressRecord) {
+        AddToOutputPipe((progressRecord, PipelineType.Progress));
+    }
+
+    private void AddToOutputPipe((object?, PipelineType) entry) {
         ThrowIfStopped();
-        _currentOutPipe?.Add((progressRecord, PipelineType.Progress));
+        _currentOutPipe?.Add(entry, CancelToken);
     }
 
     /// <summary>

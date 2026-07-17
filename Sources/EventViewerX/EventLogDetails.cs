@@ -51,11 +51,11 @@ public class EventLogDetails {
     /// <summary>Current file size in bytes.</summary>
     public long? FileSize { get; set; }
     /// <summary>Maximum configured file size in bytes.</summary>
-    public long? FileSizeMaximum;
+    public long? FileSizeMaximum { get; set; }
     /// <summary>Current file size in megabytes.</summary>
-    public double? FileSizeCurrentMB;
+    public double? FileSizeCurrentMB { get; set; }
     /// <summary>Maximum file size in megabytes.</summary>
-    public double? FileSizeMaximumMB;
+    public double? FileSizeMaximumMB { get; set; }
     /// <summary>Total number of records.</summary>
     public long? RecordCount { get; set; }
     /// <summary>Oldest record number.</summary>
@@ -66,9 +66,9 @@ public class EventLogDetails {
     public bool IsClassicLog { get; set; }
 
     /// <summary>Newest event timestamp.</summary>
-    public DateTime? NewestEvent;
+    public DateTime? NewestEvent { get; set; }
     /// <summary>Oldest event timestamp.</summary>
-    public DateTime? OldestEvent;
+    public DateTime? OldestEvent { get; set; }
     /// <summary>Additional log attributes.</summary>
     public int? Attributes { get; set; }
 

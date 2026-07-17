@@ -23,9 +23,9 @@ public sealed class LiveEventQueryRequest {
     public string? MachineName { get; set; }
 
     /// <summary>
-    /// Maximum events to return. Use 0 for unlimited.
+    /// Maximum events to return. Defaults to 1,000; set 0 explicitly for unlimited materialization.
     /// </summary>
-    public int MaxEvents { get; set; }
+    public int MaxEvents { get; set; } = 1000;
 
     /// <summary>
     /// Read direction. When true, reads oldest to newest.
@@ -57,6 +57,12 @@ public enum LiveEventQueryFailureKind {
     /// </summary>
     InvalidArgument,
 
+    /// <summary>The supplied XPath expression is invalid.</summary>
+    InvalidQuery,
+
+    /// <summary>The requested event log channel does not exist.</summary>
+    LogNotFound,
+
     /// <summary>
     /// Access to event logs was denied.
     /// </summary>
@@ -66,6 +72,9 @@ public enum LiveEventQueryFailureKind {
     /// Event log session or read timed out.
     /// </summary>
     Timeout,
+
+    /// <summary>The target host or Event Log RPC endpoint is unavailable.</summary>
+    HostUnavailable,
 
     /// <summary>
     /// Unexpected failure.
@@ -162,6 +171,11 @@ public sealed class LiveEventRow {
 /// Query result for live event reads.
 /// </summary>
 public sealed class LiveEventQueryResult {
+    /// <summary>
+    /// Effective machine queried. The local machine name is used when no remote target was supplied.
+    /// </summary>
+    public string MachineName { get; set; } = string.Empty;
+
     /// <summary>
     /// Queried log name.
     /// </summary>

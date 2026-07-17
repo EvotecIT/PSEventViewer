@@ -41,8 +41,8 @@ public static class EvtxEventReportBuilder {
             ? new List<EvtxEventReportRow>(estimatedCapacity)
             : new List<EvtxEventReportRow>();
 
-        if (!EvtxQueryExecutor.TryForEachEvent(
-                request,
+        if (!EvtxQueryExecutor.TryForEachEventWithInfo(
+                request.WithReadMode(includeMessage ? EventReadMode.Full : EventReadMode.StructuredData),
                 ev => {
                     rows.Add(new EvtxEventReportRow {
                         TimeCreatedUtc = ev.TimeCreated.ToUniversalTime().ToString("O"),
@@ -63,6 +63,7 @@ public static class EvtxEventReportBuilder {
                     });
                     return true;
                 },
+                out EvtxQueryExecutionInfo executionInfo,
                 out failure,
                 cancellationToken)) {
             report = new EvtxEventReportResult();
@@ -73,7 +74,7 @@ public static class EvtxEventReportBuilder {
         report = new EvtxEventReportResult {
             Path = effectivePath,
             Count = rows.Count,
-            Truncated = request.MaxEvents > 0 && rows.Count >= request.MaxEvents,
+            Truncated = executionInfo.Truncated,
             Events = rows
         };
         failure = null;

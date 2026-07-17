@@ -1,10 +1,16 @@
+param(
+    [bool] $SignModule = $true
+)
+
+$ErrorActionPreference = 'Stop'
+
 Import-Module PSPublishModule -Force
 
 Build-Module -ModuleName 'PSEventViewer' {
     # Usual defaults as per standard module
     $Manifest = [ordered] @{
         # Version number of this module.
-        ModuleVersion        = '3.4.X'
+        ModuleVersion        = '4.0.X'
         # Supported PSEditions
         CompatiblePSEditions = @('Desktop', 'Core')
         # ID used to uniquely identify this module
@@ -77,14 +83,14 @@ Build-Module -ModuleName 'PSEventViewer' {
     # when creating PSD1 use special style without comments and with only required parameters
     New-ConfigurationFormat -ApplyTo 'DefaultPSD1', 'OnMergePSD1' -PSD1Style 'Minimal'
     # configuration for documentation, at the same time it enables documentation processing
-    New-ConfigurationDocumentation -Enable:$false -StartClean -UpdateWhenNew -PathReadme 'Docs\Readme.md' -Path 'Docs'
+    New-ConfigurationDocumentation -Enable:$false -PathReadme 'Docs\Readme.md' -Path 'Docs'
 
     $newConfigurationBuildSplat = @{
         Enable                            = $true
-        SignModule                        = $true
+        SignModule                        = $SignModule
         MergeModuleOnBuild                = $true
         MergeFunctionsFromApprovedModules = $true
-        CertificateThumbprint             = '483292C9E317AA13B07BB7A96AE9D1A5ED9E7703'
+        CertificateThumbprint             = '92E95FB58EFFA6A4A75E77A33CDD6BFE6DD30F1A'
         ResolveBinaryConflicts            = $true
         ResolveBinaryConflictsName        = 'PSEventViewer'
         NETProjectName                    = 'PSEventViewer'
@@ -96,7 +102,6 @@ Build-Module -ModuleName 'PSEventViewer' {
         DotSourceLibraries                = $true
         DotSourceClasses                  = $true
         DeleteTargetModuleBeforeBuild     = $true
-        RefreshPSD1Only                   = $true
     }
 
     New-ConfigurationBuild @newConfigurationBuildSplat

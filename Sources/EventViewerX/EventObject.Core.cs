@@ -1,295 +1,275 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.Eventing.Reader;
+using System.Linq;
 using System.Security.Principal;
 
-namespace EventViewerX {
-    /// <summary>
-    /// Detailed representation of a Windows event record.
-    /// </summary>
-    public partial class EventObject {
-        /// <summary>
-    /// Time and date when the event was created
-    /// </summary>
-    public DateTime TimeCreated => _eventRecord.TimeCreated ?? DateTime.MinValue;
+namespace EventViewerX;
 
-        /// <summary>
-        /// Event ID
-        /// </summary>
-        public int Id => _eventRecord.Id;
+/// <summary>
+/// Managed snapshot of a Windows event record.
+/// </summary>
+/// <remarks>
+/// The constructor takes ownership of the supplied <see cref="EventRecord"/> and disposes it after
+/// copying the requested data. This keeps large and long-running queries from retaining native event handles.
+/// </remarks>
+public partial class EventObject {
+    private readonly string _message;
 
-        /// <summary>
-        /// Record ID
-        /// </summary>
-        public long? RecordId => _eventRecord.RecordId;
+    /// <summary>Time and date when the event was created.</summary>
+    public DateTime TimeCreated { get; }
 
-        /// <summary>
-        /// Log name where the event was logged
-        /// </summary>
-        public string LogName => _eventRecord.LogName;
+    /// <summary>Event identifier.</summary>
+    public int Id { get; }
 
-    /// <summary>
-    /// Log name where the event was queried from
-    /// </summary>
+    /// <summary>Record identifier.</summary>
+    public long? RecordId { get; }
+
+    /// <summary>Log name reported by the event.</summary>
+    public string LogName { get; }
+
+    /// <summary>Log name that contained the event.</summary>
     public string ContainerLog { get; set; } = string.Empty;
 
-        /// <summary>
-    /// Computer name where the event was logged
-    /// </summary>
-    public string ComputerName => _eventRecord.MachineName;
+    /// <summary>Computer that created the event.</summary>
+    public string ComputerName => MachineName;
 
-        /// <summary>
-        /// Human readable event level name.
-        /// Falls back to numeric level when the provider omits a display string (e.g., synthetic or test events).
-        /// </summary>
-        private readonly string _levelDisplayName;
+    /// <summary>Display-friendly event level.</summary>
+    public string LevelDisplayName { get; }
 
-    /// <summary>
-    /// Display-friendly level name resolved from the provider metadata; falls back to the numeric level when unavailable.
-    /// </summary>
-    public string LevelDisplayName => _levelDisplayName;
+    /// <summary>Provider that generated the event.</summary>
+    public string ProviderName { get; }
 
-        /// <summary>
-        /// Provider that generated the event.
-        /// </summary>
-        public string ProviderName => _eventRecord.ProviderName;
+    /// <summary>Additional event qualifiers, when present.</summary>
+    public string? Qualifiers { get; }
 
-        /// <summary>
-        /// Additional event qualifiers if present.
-        /// </summary>
-    public string? Qualifiers => _eventRecord.Qualifiers?.ToString();
+    /// <summary>Event opcode.</summary>
+    public short? Opcode { get; }
 
-        /// <summary>
-        /// Opcode of the event record.
-        /// </summary>
-        public short? Opcode => _eventRecord.Opcode;
+    /// <summary>Provider identifier.</summary>
+    public Guid? ProviderId { get; }
 
-        /// <summary>
-        /// Identifier of the event provider.
-        /// </summary>
-        public Guid? ProviderId => _eventRecord.ProviderId;
+    /// <summary>Related activity identifier.</summary>
+    public Guid? RelatedActivityId { get; }
 
-        /// <summary>
-        /// Related activity identifier if any.
-        /// </summary>
-        public Guid? RelatedActivityId => _eventRecord.RelatedActivityId;
+    /// <summary>Activity identifier.</summary>
+    public Guid? ActivityId { get; }
 
-        /// <summary>
-        /// Activity identifier for correlation.
-        /// </summary>
-        public Guid? ActivityId => _eventRecord.ActivityId;
+    /// <summary>Security identifier associated with the event.</summary>
+    public SecurityIdentifier? UserId { get; }
 
-        /// <summary>
-    /// Security identifier associated with the event.
-    /// </summary>
-    public SecurityIdentifier UserId => _eventRecord.UserId;
+    /// <summary>Bookmark that can be used to resume a query.</summary>
+    public EventBookmark? Bookmark { get; }
 
-        /// <summary>
-        /// Event bookmark for resuming queries.
-        /// </summary>
-        public EventBookmark Bookmark => _eventRecord.Bookmark;
+    /// <summary>Provider-formatted event message, when requested by <see cref="ReadMode"/>.</summary>
+    public string Message => _message;
 
-        /// <summary>
-        /// Human-readable event message rendered by the provider when available.
-        /// </summary>
-        public string Message => _message ?? string.Empty;
+    /// <summary>Message split into CRLF/LF-delimited lines.</summary>
+    public IReadOnlyList<string> MessageLines { get; private set; } = Array.Empty<string>();
 
-        /// <summary>
-        /// Message split into lines using CRLF/LF boundaries. Indices are stable for callers that need positional parsing.
-        /// </summary>
-        public IReadOnlyList<string> MessageLines { get; private set; } = Array.Empty<string>();
+    /// <summary>Display name of the task.</summary>
+    public string TaskDisplayName { get; }
 
-        /// <summary>
-        /// Display name of the task.
-        /// </summary>
-        public string TaskDisplayName => _eventRecord.TaskDisplayName;
+    /// <summary>Display name of the opcode.</summary>
+    public string OpcodeDisplayName { get; }
 
-        /// <summary>
-        /// Display name of the opcode.
-        /// </summary>
-        public string OpcodeDisplayName => _eventRecord.OpcodeDisplayName;
+    /// <summary>Keyword display names associated with the event.</summary>
+    public IEnumerable<string> KeywordsDisplayNames { get; }
 
-        /// <summary>
-        /// Keyword display names associated with the event.
-        /// </summary>
-        public IEnumerable<string> KeywordsDisplayNames => _eventRecord.KeywordsDisplayNames;
+    /// <summary>Keyword flags associated with the event.</summary>
+    public long? Keywords { get; }
 
-        /// <summary>
-        /// Keyword flags associated with the event.
-        /// </summary>
-        public long? Keywords => _eventRecord.Keywords;
+    /// <summary>Numeric event level.</summary>
+    public byte? Level { get; }
 
-        /// <summary>
-        /// Numeric level of the event.
-        /// </summary>
-        public byte? Level => _eventRecord.Level;
+    /// <summary>Event version.</summary>
+    public byte? Version { get; }
 
-        /// <summary>
-        /// Version of the event record.
-        /// </summary>
-        public byte? Version => _eventRecord.Version;
+    /// <summary>Task identifier.</summary>
+    public int? Task { get; }
 
-        /// <summary>
-        /// Task identifier if available.
-        /// </summary>
-        public int? Task => _eventRecord.Task;
+    /// <summary>Process identifier.</summary>
+    public int? ProcessId { get; }
 
-        /// <summary>
-        /// Identifier of the process that logged the event.
-        /// </summary>
-        public int? ProcessId => _eventRecord.ProcessId;
+    /// <summary>Thread identifier.</summary>
+    public int? ThreadId { get; }
 
-        /// <summary>
-        /// Identifier of the thread that logged the event.
-        /// </summary>
-        public int? ThreadId => _eventRecord.ThreadId;
+    /// <summary>Computer that created the event.</summary>
+    public string MachineName { get; }
 
-        /// <summary>
-        /// Computer name where the event was logged
-        /// </summary>
-        public string MachineName => _eventRecord.MachineName;
+    /// <summary>Event property values copied from the native record.</summary>
+    public IList<EventProperty> Properties { get; }
 
-        /// <summary>
-        /// Properties available in the event record
-        /// </summary>
-        public IList<EventProperty> Properties => _eventRecord.Properties;
+    /// <summary>Structured event data parsed from XML.</summary>
+    public Dictionary<string, string> Data { get; private set; } = new(StringComparer.OrdinalIgnoreCase);
 
-        /// <summary>
-    /// Data available in XML converted to a dictionary
-    /// </summary>
-    public Dictionary<string, string> Data { get; private set; } = new Dictionary<string, string>();
+    /// <summary>NIC-related identifiers extracted from structured event data.</summary>
+    public List<string> NicIdentifiers { get; private set; } = new();
 
-        /// <summary>
-    /// NIC identifiers extracted from event data
-    /// </summary>
-    public List<string> NicIdentifiers { get; private set; } = new List<string>();
+    /// <summary>Key/value pairs parsed from the formatted message.</summary>
+    public Dictionary<string, string> MessageData { get; private set; } = new(StringComparer.OrdinalIgnoreCase);
 
-        /// <summary>
-    /// Data available in the message converted to a dictionary
-    /// </summary>
-    public Dictionary<string, string> MessageData { get; private set; } = new Dictionary<string, string>();
-
-    /// <summary>
-    /// First line of the formatted message.
-    /// </summary>
+    /// <summary>First non-empty line of the formatted message.</summary>
     public string MessageSubject { get; set; } = string.Empty;
 
-    /// <summary>
-    /// Attachments extracted from the event if present
-    /// </summary>
+    /// <summary>Binary attachments extracted from structured event data.</summary>
     public IReadOnlyList<byte[]> Attachments { get; private set; } = Array.Empty<byte[]>();
 
-    /// <summary>
-    /// Data available in XML format
-    /// </summary>
+    /// <summary>Raw event XML, when requested by <see cref="ReadMode"/>.</summary>
     public string XMLData { get; set; } = string.Empty;
 
-    /// <summary>
-    /// Machine from which the event was queried.
-    /// </summary>
+    /// <summary>Machine name or file path from which the event was queried.</summary>
     public string QueriedMachine { get; set; } = string.Empty;
 
-    /// <summary>
-    /// Source from which the event was gathered (computer name or file path).
-    /// </summary>
+    /// <summary>Computer name or file path from which the event was gathered.</summary>
     public string GatheredFrom { get; set; } = string.Empty;
 
-    /// <summary>
-    /// Log name that contained the event.
-    /// </summary>
+    /// <summary>Log name from which the event was gathered.</summary>
     public string GatheredLogName { get; set; } = string.Empty;
 
-        /// <summary>
-        /// Original event record
-        /// </summary>
-        public readonly EventRecord _eventRecord;
+    /// <summary>Amount of provider data materialized for this snapshot.</summary>
+    public EventReadMode ReadMode { get; }
 
-        private readonly string _message;
-
-        /// <summary>
-        /// Creates a rich event wrapper around a raw <see cref="EventRecord"/> and annotates it with the queried machine name.
-        /// </summary>
-        /// <param name="eventRecord">Underlying Windows event record.</param>
-        /// <param name="queriedMachine">Computer name or file path the event was read from.</param>
-        public EventObject(EventRecord eventRecord, string queriedMachine) {
-            QueriedMachine = queriedMachine;
-            _eventRecord = eventRecord;
-
-            try {
-                _levelDisplayName = eventRecord.LevelDisplayName;
-            } catch (EventLogNotFoundException) {
-                // Some offline .evtx files reference providers that are not installed on the host.
-                // When the metadata DLL is missing, EventLogReader throws while resolving the display name.
-                _levelDisplayName = string.Empty;
-            } catch (EventLogException) {
-                _levelDisplayName = string.Empty;
-            }
-
-            if (string.IsNullOrEmpty(_levelDisplayName)) {
-                _levelDisplayName = LevelToDisplayName(eventRecord.Level);
-            }
-
-            if (_eventRecord is EventLogRecord eventLogRecord) {
-                ContainerLog = eventLogRecord.ContainerLog;
-            } else {
-                ContainerLog = eventRecord.LogName ?? string.Empty;
-            }
-
-            if (queriedMachine != null && (queriedMachine.EndsWith(".evtx", StringComparison.OrdinalIgnoreCase) || queriedMachine.Contains("\\"))) {
-                GatheredFrom = queriedMachine;
-            } else {
-                GatheredFrom = queriedMachine ?? Environment.MachineName;
-            }
-            GatheredLogName = eventRecord.LogName ?? string.Empty;
-
-            _message = SafeFormatDescription(eventRecord);
-            MessageLines = SplitMessageLines(_message);
-            XMLData = SafeToXml(eventRecord);
-            Data = ParseXML<Dictionary<string, string>>(XMLData);
-            MessageData = ParseMessage<Dictionary<string, string>>(_message);
-            NicIdentifiers = ExtractNicIdentifiers();
-            Attachments = ExtractAttachments(XMLData);
+    /// <summary>
+    /// Creates an event snapshot and releases the supplied native event record.
+    /// </summary>
+    /// <param name="eventRecord">Event record whose ownership is transferred to this constructor.</param>
+    /// <param name="queriedMachine">Computer name or file path from which the event was read.</param>
+    /// <param name="readMode">Amount of provider data to materialize.</param>
+    public EventObject(EventRecord eventRecord, string queriedMachine, EventReadMode readMode = EventReadMode.Full) {
+        if (eventRecord == null) {
+            throw new ArgumentNullException(nameof(eventRecord));
         }
 
-        private static string SafeFormatDescription(EventRecord eventRecord) {
-            try {
-                return eventRecord.FormatDescription() ?? string.Empty;
-            } catch (EventLogNotFoundException ex) {
-                Settings._logger.WriteWarning("Failed to format event description due to missing provider metadata. ({0})",
-                    ex.Message);
-                return string.Empty;
-            } catch (EventLogException ex) {
-                Settings._logger.WriteWarning("Failed to format event description. ({0})", ex.Message);
-                return string.Empty;
-            } catch (Exception ex) {
-                Settings._logger.WriteWarning("Unexpected error while formatting event description. ({0})", ex.Message);
-                return string.Empty;
-            }
-        }
+        ReadMode = readMode;
+        QueriedMachine = queriedMachine ?? string.Empty;
+        _message = string.Empty;
 
-        private static string SafeToXml(EventRecord eventRecord) {
-            try {
-                return eventRecord.ToXml() ?? string.Empty;
-            } catch (EventLogException ex) {
-                Settings._logger.WriteWarning("Failed to read event XML payload. ({0})", ex.Message);
-                return string.Empty;
-            } catch (Exception ex) {
-                Settings._logger.WriteWarning("Unexpected error while reading event XML payload. ({0})", ex.Message);
-                return string.Empty;
-            }
-        }
+        try {
+            TimeCreated = eventRecord.TimeCreated ?? DateTime.MinValue;
+            Id = eventRecord.Id;
+            RecordId = eventRecord.RecordId;
+            LogName = eventRecord.LogName ?? string.Empty;
+            MachineName = eventRecord.MachineName ?? string.Empty;
+            ProviderName = eventRecord.ProviderName ?? string.Empty;
+            Qualifiers = eventRecord.Qualifiers?.ToString();
+            Opcode = eventRecord.Opcode;
+            ProviderId = eventRecord.ProviderId;
+            RelatedActivityId = eventRecord.RelatedActivityId;
+            ActivityId = eventRecord.ActivityId;
+            UserId = eventRecord.UserId;
+            Bookmark = eventRecord.Bookmark;
+            Keywords = eventRecord.Keywords;
+            Level = eventRecord.Level;
+            Version = eventRecord.Version;
+            Task = eventRecord.Task;
+            ProcessId = eventRecord.ProcessId;
+            ThreadId = eventRecord.ThreadId;
+            Properties = readMode == EventReadMode.StructuredData || readMode == EventReadMode.Full
+                ? SnapshotProperties(eventRecord)
+                : Array.Empty<EventProperty>();
+            bool includeProviderDisplayNames = readMode == EventReadMode.Message || readMode == EventReadMode.Full;
+            TaskDisplayName = includeProviderDisplayNames
+                ? SafeReadDisplayName(() => eventRecord.TaskDisplayName)
+                : string.Empty;
+            OpcodeDisplayName = includeProviderDisplayNames
+                ? SafeReadDisplayName(() => eventRecord.OpcodeDisplayName)
+                : string.Empty;
+            KeywordsDisplayNames = includeProviderDisplayNames
+                ? SafeReadKeywordDisplayNames(eventRecord)
+                : Array.Empty<string>();
 
-        private static string LevelToDisplayName(byte? level)
-        {
-            return level switch {
-                1 => "Critical",
-                2 => "Error",
-                3 => "Warning",
-                4 => "Information",
-                5 => "Verbose",
-                _ => level?.ToString() ?? string.Empty
-            };
+            string levelDisplayName = includeProviderDisplayNames
+                ? SafeReadDisplayName(() => eventRecord.LevelDisplayName)
+                : string.Empty;
+            LevelDisplayName = string.IsNullOrEmpty(levelDisplayName)
+                ? LevelToDisplayName(Level)
+                : levelDisplayName;
+
+            ContainerLog = eventRecord is EventLogRecord eventLogRecord
+                ? eventLogRecord.ContainerLog ?? string.Empty
+                : LogName;
+            GatheredFrom = string.IsNullOrEmpty(QueriedMachine) ? Environment.MachineName : QueriedMachine;
+            GatheredLogName = LogName;
+
+            if (readMode == EventReadMode.Message || readMode == EventReadMode.Full) {
+                _message = SafeFormatDescription(eventRecord);
+                MessageLines = SplitMessageLines(_message);
+                MessageData = ParseMessage<Dictionary<string, string>>(_message);
+            }
+
+            if (readMode == EventReadMode.StructuredData || readMode == EventReadMode.Full) {
+                XMLData = SafeToXml(eventRecord);
+                ParseXmlPayload(XMLData, out Dictionary<string, string> data, out List<byte[]> attachments);
+                Data = data;
+                NicIdentifiers = ExtractNicIdentifiers();
+                Attachments = attachments;
+            }
+        } finally {
+            eventRecord.Dispose();
         }
     }
-}
 
+    private static IList<EventProperty> SnapshotProperties(EventRecord eventRecord) {
+        try {
+            return eventRecord.Properties?.ToArray() ?? Array.Empty<EventProperty>();
+        } catch (EventLogException ex) {
+            Settings._logger.WriteVerbose("Failed to snapshot event properties. ({0})", ex.Message);
+            return Array.Empty<EventProperty>();
+        }
+    }
+
+    private static string SafeReadDisplayName(Func<string?> readValue) {
+        try {
+            return readValue() ?? string.Empty;
+        } catch (EventLogException) {
+            return string.Empty;
+        }
+    }
+
+    private static IEnumerable<string> SafeReadKeywordDisplayNames(EventRecord eventRecord) {
+        try {
+            return eventRecord.KeywordsDisplayNames?.ToArray() ?? Array.Empty<string>();
+        } catch (EventLogException) {
+            return Array.Empty<string>();
+        }
+    }
+
+    private static string SafeFormatDescription(EventRecord eventRecord) {
+        try {
+            return eventRecord.FormatDescription() ?? string.Empty;
+        } catch (EventLogNotFoundException ex) {
+            Settings._logger.WriteWarning("Failed to format event description due to missing provider metadata. ({0})", ex.Message);
+            return string.Empty;
+        } catch (EventLogException ex) {
+            Settings._logger.WriteWarning("Failed to format event description. ({0})", ex.Message);
+            return string.Empty;
+        } catch (Exception ex) {
+            Settings._logger.WriteWarning("Unexpected error while formatting event description. ({0})", ex.Message);
+            return string.Empty;
+        }
+    }
+
+    private static string SafeToXml(EventRecord eventRecord) {
+        try {
+            return eventRecord.ToXml() ?? string.Empty;
+        } catch (EventLogException ex) {
+            Settings._logger.WriteWarning("Failed to read event XML payload. ({0})", ex.Message);
+            return string.Empty;
+        } catch (Exception ex) {
+            Settings._logger.WriteWarning("Unexpected error while reading event XML payload. ({0})", ex.Message);
+            return string.Empty;
+        }
+    }
+
+    private static string LevelToDisplayName(byte? level) {
+        return level switch {
+            1 => "Critical",
+            2 => "Error",
+            3 => "Warning",
+            4 => "Information",
+            5 => "Verbose",
+            _ => level?.ToString() ?? string.Empty
+        };
+    }
+}

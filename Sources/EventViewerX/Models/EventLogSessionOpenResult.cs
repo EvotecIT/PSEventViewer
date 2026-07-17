@@ -13,12 +13,12 @@ public enum EventLogSessionOpenStatus {
     LocalSessionUnavailable,
     /// <summary>The host was skipped because it is temporarily cached as unreachable.</summary>
     NegativeCache,
-    /// <summary>The host did not answer the reachability probe.</summary>
-    PingFailed,
     /// <summary>The Event Log RPC endpoint preflight did not succeed.</summary>
     RpcUnavailable,
     /// <summary>The Event Log session open attempt exceeded the timeout budget.</summary>
     Timeout,
+    /// <summary>The caller does not have permission to open the Event Log session.</summary>
+    AccessDenied,
     /// <summary>The Event Log session constructor failed.</summary>
     EventLogSessionUnavailable,
     /// <summary>An unexpected error occurred while opening the Event Log session.</summary>

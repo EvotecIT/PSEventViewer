@@ -189,12 +189,13 @@ public sealed class SecurityUserLogonsReportBuilder {
         CancellationToken cancellationToken = default) {
         var eventIds = request.EventIds ?? Array.Empty<int>();
         var b = new SecurityUserLogonsReportBuilder(includeSamples, sampleSize, eventIds);
-        if (!EvtxQueryExecutor.TryForEachEvent(
-                request,
+        if (!EvtxQueryExecutor.TryForEachEventWithInfo(
+                request.WithReadMode(EventReadMode.StructuredData),
                 ev => {
                     b.Add(ev);
                     return true;
                 },
+                out EvtxQueryExecutionInfo executionInfo,
                 out failure,
                 cancellationToken)) {
             report = new SecurityUserLogonsReport();
@@ -202,6 +203,7 @@ public sealed class SecurityUserLogonsReportBuilder {
         }
 
         report = b.Build();
+        report.Truncated = executionInfo.Truncated;
         return true;
     }
 

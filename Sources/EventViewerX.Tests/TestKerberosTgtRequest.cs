@@ -60,8 +60,7 @@ public class TestKerberosTgtRequest
         SetField(record, "_log", log);
         SetField(record, "_id", id);
 
-        var eo = (EventObject)FormatterServices.GetUninitializedObject(typeof(EventObject));
-        SetField(eo, "_eventRecord", record);
+        var eo = new EventObject(record, "testhost", EventReadMode.Metadata);
         eo.MessageSubject = "A Kerberos authentication ticket (TGT) was requested.";
         eo.ContainerLog = log;
         eo.XMLData = "<Event></Event>";

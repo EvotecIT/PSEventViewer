@@ -11,7 +11,6 @@ public partial class SearchEvents : Settings
 {
     private static int DefaultSessionTimeoutMs => Settings.SessionTimeoutMs;
     private static int DefaultRpcProbeTimeoutMs => Settings.RpcProbeTimeoutMs;
-    private static int DefaultPingTimeoutMs => Settings.PingTimeoutMs;
 
     /// <summary>How long to remember unreachable hosts to avoid repeated slow probes.</summary>
     private static int NegativeCacheTtlSecondsValue => Settings.NegativeCacheTtlSeconds;
@@ -72,35 +71,6 @@ public partial class SearchEvents : Settings
                 cachedUntilUtc);
         }
 
-        // Quick reachability check (ping) to fail fast on dead hosts
-        try
-        {
-            using var ping = new System.Net.NetworkInformation.Ping();
-            var reply = ping.Send(targetHost, Math.Min(DefaultPingTimeoutMs, budget));
-            if (reply == null || reply.Status != System.Net.NetworkInformation.IPStatus.Success)
-            {
-                string pingStatus = reply?.Status.ToString() ?? "NoReply";
-                _logger.WriteWarning($"{operation}: ping failed for '{targetHost}' when opening '{channel}'. Skipping.");
-                MarkHostUnreachable(targetHost);
-                TryGetHostNegativeCacheExpiry(targetHost, out DateTime pingCachedUntilUtc);
-                return SessionFailure(
-                    machineName,
-                    targetHost,
-                    operation,
-                    channel,
-                    EventLogSessionOpenStatus.PingFailed,
-                    $"Ping probe failed for '{targetHost}' with status '{pingStatus}'.",
-                    budget,
-                    nameof(EventLogSessionOpenStatus.PingFailed),
-                    pingCachedUntilUtc);
-            }
-        }
-        catch (Exception ex)
-        {
-            string reason = ex.InnerException?.Message ?? ex.Message;
-            _logger.WriteVerbose($"{operation}: ping probe failed for '{machineName}': {reason}. Continuing to session attempt.");
-        }
-
         // RPC (135) preflight to avoid EventLogSession hangs on dead/filtered hosts
         if (!RpcProbe(normalizedHost, Math.Min(DefaultRpcProbeTimeoutMs, budget)))
         {
@@ -129,14 +99,18 @@ public partial class SearchEvents : Settings
                 _logger.WriteWarning($"{operation}: timeout opening session to '{machineName}' for '{channel}' after {budget} ms");
                 MarkHostUnreachable(normalizedHost);
 
-                // Ensure the late session (if it eventually opens) gets disposed.
+                // Dispose a late successful session and observe a late fault.
                 task.ContinueWith(t =>
                 {
                     if (t.Status == TaskStatus.RanToCompletion && t.Result != null)
                     {
                         t.Result.Dispose();
                     }
-                }, TaskContinuationOptions.OnlyOnRanToCompletion | TaskContinuationOptions.ExecuteSynchronously);
+                    else if (t.IsFaulted)
+                    {
+                        _ = t.Exception;
+                    }
+                }, TaskContinuationOptions.ExecuteSynchronously);
                 TryGetHostNegativeCacheExpiry(normalizedHost, out DateTime timeoutCachedUntilUtc);
                 return SessionFailure(
                     machineName,
@@ -153,11 +127,22 @@ public partial class SearchEvents : Settings
             ClearNegativeCache(normalizedHost);
             return SessionSuccess(machineName, targetHost, operation, channel, budget, task.GetAwaiter().GetResult());
         }
+        catch (UnauthorizedAccessException ex)
+        {
+            _logger.WriteWarning($"{operation}: access denied opening session to '{machineName}' for '{channel}': {ex.Message}");
+            return SessionFailure(
+                machineName,
+                targetHost,
+                operation,
+                channel,
+                EventLogSessionOpenStatus.AccessDenied,
+                ex.Message,
+                budget,
+                ex.GetType().Name);
+        }
         catch (EventLogException ex)
         {
             _logger.WriteWarning($"{operation}: failed opening session to '{machineName}' for '{channel}': {ex.Message}");
-            MarkHostUnreachable(normalizedHost);
-            TryGetHostNegativeCacheExpiry(normalizedHost, out DateTime exceptionCachedUntilUtc);
             return SessionFailure(
                 machineName,
                 targetHost,
@@ -166,14 +151,11 @@ public partial class SearchEvents : Settings
                 EventLogSessionOpenStatus.EventLogSessionUnavailable,
                 ex.Message,
                 budget,
-                ex.GetType().Name,
-                exceptionCachedUntilUtc);
+                ex.GetType().Name);
         }
         catch (Exception ex)
         {
             _logger.WriteWarning($"{operation}: unexpected error opening session to '{machineName}' for '{channel}': {ex.Message}");
-            MarkHostUnreachable(normalizedHost);
-            TryGetHostNegativeCacheExpiry(normalizedHost, out DateTime errorCachedUntilUtc);
             return SessionFailure(
                 machineName,
                 targetHost,
@@ -182,8 +164,7 @@ public partial class SearchEvents : Settings
                 EventLogSessionOpenStatus.Error,
                 ex.Message,
                 budget,
-                ex.GetType().Name,
-                errorCachedUntilUtc);
+                ex.GetType().Name);
         }
     }
 
@@ -228,6 +209,11 @@ public partial class SearchEvents : Settings
             var finished = Task.WhenAny(connectTask, Task.Delay(timeoutMs)).GetAwaiter().GetResult();
             if (finished != connectTask || !tcp.Connected)
             {
+                _ = connectTask.ContinueWith(
+                    t => _ = t.Exception,
+                    CancellationToken.None,
+                    TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
+                    TaskScheduler.Default);
                 return false;
             }
             return true;

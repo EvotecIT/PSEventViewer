@@ -25,8 +25,8 @@
             }
         }
 
-        public static void QueryBasicParallelForEach() {
-            foreach (var eventObject in SearchEvents.QueryLogsParallelForEach("Security", [4932, 4933], ["AD1"])) {
+        public static async Task QueryBasicParallel() {
+            await foreach (var eventObject in SearchEvents.QueryLogsParallel("Security", [4932, 4933], ["AD1"])) {
                 Console.WriteLine("Event ID: {0}", eventObject.Id);
                 Console.WriteLine("Data count: " + eventObject.Data.Count);
                 foreach (var data in eventObject.Data) {

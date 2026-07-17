@@ -26,6 +26,7 @@ namespace PSEventViewer;
 [Cmdlet(VerbsCommon.Get, "EVXLog")]
 [Alias("Get-EventViewerXLog", "Get-WinEventLog")]
 [OutputType(typeof(EventLogDetails))]
+[OutputType(typeof(EventLogDetailsResult))]
 public sealed class CmdletGetEVXLog : AsyncPSCmdlet {
     /// <summary>
     /// Name of the log to retrieve. Wildcards supported.
@@ -41,11 +42,36 @@ public sealed class CmdletGetEVXLog : AsyncPSCmdlet {
     public string? MachineName { get; set; }
 
     /// <summary>
+    /// Returns typed diagnostic results for successful, inaccessible, missing, and partially readable logs.
+    /// </summary>
+    [Parameter]
+    public SwitchParameter AsResult { get; set; }
+
+    /// <summary>
+    /// Session-open timeout in milliseconds.
+    /// </summary>
+    [Parameter]
+    [ValidateRange(1, int.MaxValue)]
+    public int TimeoutMs { get; set; } = 3000;
+
+    /// <summary>
+    /// Reads the oldest and newest event timestamps using the same session. This adds two indexed reads per log.
+    /// </summary>
+    [Parameter]
+    public SwitchParameter IncludeEventTimes { get; set; }
+
+    /// <summary>
     /// Queries the log information.
     /// </summary>
     protected override Task ProcessRecordAsync() {
-        foreach (var item in SearchEvents.DisplayEventLogs(LogName, MachineName)) {
-            WriteObject(item);
+        foreach (EventLogDetailsResult result in SearchEvents.DisplayEventLogResults(LogName, MachineName, TimeoutMs, IncludeEventTimes)) {
+            if (AsResult) {
+                WriteObject(result);
+            } else if (result.Details != null) {
+                WriteObject(result.Details);
+            } else {
+                WriteWarning($"Couldn't read event log details for {result.LogName} on {result.MachineName}: {result.ErrorMessage}");
+            }
         }
 
         return Task.CompletedTask;

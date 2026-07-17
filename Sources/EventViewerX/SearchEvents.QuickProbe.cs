@@ -1,56 +1,42 @@
 using System;
 using System.Diagnostics;
 using System.Diagnostics.Eventing.Reader;
-using System.Threading.Tasks;
+using EventViewerX.Reports.QueryHelpers;
 
 namespace EventViewerX;
 
 /// <summary>
-/// Fast, budgeted probe to fetch the newest matching event without scanning huge logs.
+/// Fast, budgeted probe to fetch the newest matching event without scanning a large log.
 /// </summary>
-public partial class SearchEvents : Settings
-{
-    /// <summary>
-    /// Maximum time (ms) to wait on a single EventLogReader.ReadEvent call to prevent long RPC stalls.
-    /// Tuned to keep overall probe time budgeted while still allowing slow-but-responding hosts.
-    /// </summary>
+public partial class SearchEvents : Settings {
     private const int QuickProbeReadTimeoutMs = 750;
 
-    /// <summary>
-    /// Minimum per-read budget (ms) to avoid overly aggressive time slices that would thrash on busy hosts.
-    /// </summary>
-    private const int QuickProbeMinPerReadMs = 200;
-    private static int QuickProbePingMaxMs => Settings.PingTimeoutMs;
-
     /// <summary>Status of a quick probe.</summary>
-    public enum QuickProbeStatus
-    {
+    public enum QuickProbeStatus {
         /// <summary>Probe succeeded and returned a timestamp.</summary>
         Ok,
-        /// <summary>No event matched the query within the scanned window.</summary>
+        /// <summary>No event matched the query.</summary>
         NoEvent,
         /// <summary>Overall probe timeout was hit.</summary>
         Timeout,
         /// <summary>Scan limit reached without finding a timestamped event.</summary>
         LimitReached,
-        /// <summary>Probe failed due to an error (see message).</summary>
+        /// <summary>The caller does not have permission to read the target.</summary>
+        AccessDenied,
+        /// <summary>The requested event log does not exist.</summary>
+        LogNotFound,
+        /// <summary>The supplied XPath query is invalid.</summary>
+        InvalidQuery,
+        /// <summary>The target host or Event Log RPC endpoint is unavailable.</summary>
+        HostUnavailable,
+        /// <summary>Probe failed due to another error.</summary>
         Error
     }
 
     /// <summary>Outcome for a quick probe.</summary>
-    public sealed class QuickProbeResult
-    {
+    public sealed class QuickProbeResult {
         /// <summary>Creates a quick probe result.</summary>
-        /// <param name="logName">Log that was queried.</param>
-        /// <param name="machine">Machine that was queried.</param>
-        /// <param name="eventTimeUtc">Timestamp of the newest matching event in UTC, if found.</param>
-        /// <param name="status">Outcome of the probe.</param>
-        /// <param name="message">Optional detail describing errors or limits.</param>
-        /// <param name="eventsScanned">Number of events inspected.</param>
-        /// <param name="recordCount">Optional channel record count when available.</param>
-        /// <param name="duration">Total probe duration.</param>
-        public QuickProbeResult(string logName, string machine, DateTime? eventTimeUtc, QuickProbeStatus status, string? message, int eventsScanned, long? recordCount, TimeSpan duration)
-        {
+        public QuickProbeResult(string logName, string machine, DateTime? eventTimeUtc, QuickProbeStatus status, string? message, int eventsScanned, long? recordCount, TimeSpan duration) {
             LogName = logName;
             Machine = machine;
             EventTimeUtc = eventTimeUtc;
@@ -65,285 +51,190 @@ public partial class SearchEvents : Settings
         public string LogName { get; }
         /// <summary>Machine that was queried.</summary>
         public string Machine { get; }
-        /// <summary>Timestamp (UTC) of the newest matching event, if found.</summary>
+        /// <summary>Timestamp of the newest matching event in UTC.</summary>
         public DateTime? EventTimeUtc { get; }
-        /// <summary>Outcome status for the probe.</summary>
+        /// <summary>Outcome status.</summary>
         public QuickProbeStatus Status { get; }
-        /// <summary>Optional details describing errors or limits.</summary>
+        /// <summary>Optional diagnostic message.</summary>
         public string? Message { get; }
-        /// <summary>Number of events inspected during the probe.</summary>
+        /// <summary>Number of events inspected.</summary>
         public int EventsScanned { get; }
-        /// <summary>Optional channel record count when available.</summary>
+        /// <summary>Channel record count when available.</summary>
         public long? RecordCount { get; }
-        /// <summary>Total elapsed time for the probe.</summary>
+        /// <summary>Total elapsed time.</summary>
         public TimeSpan Duration { get; }
     }
 
     /// <summary>
-    /// Reads the newest matching event from a channel with time/record limits to cope with very large logs.
+    /// Reads the newest matching event from a local or remote channel within a bounded time budget.
     /// </summary>
-    /// <param name="logName">Channel name to query.</param>
-    /// <param name="xpathFilter">Optional XPath filter (defaults to '*').</param>
-    /// <param name="machineName">Optional remote computer; null targets local machine.</param>
-    /// <param name="timeout">Total time budget for the probe (default 15s).</param>
-    /// <param name="maxEventsToScan">Maximum events to inspect before returning <see cref="QuickProbeStatus.LimitReached"/>.</param>
-    /// <returns>Quick probe result with status and optional timestamp.</returns>
-    public static QuickProbeResult ProbeLatestEvent(string logName, string? xpathFilter = null, string? machineName = null, TimeSpan? timeout = null, int maxEventsToScan = 4096)
-    {
-        if (string.IsNullOrWhiteSpace(logName)) throw new ArgumentException("logName cannot be null or empty", nameof(logName));
-        if (maxEventsToScan <= 0) maxEventsToScan = 4096;
+    public static QuickProbeResult ProbeLatestEvent(
+        string logName,
+        string? xpathFilter = null,
+        string? machineName = null,
+        TimeSpan? timeout = null,
+        int maxEventsToScan = 4096) {
 
-        var sw = Stopwatch.StartNew();
-        timeout ??= TimeSpan.FromSeconds(15);
-
-        EventLogSession? session = null;
-        try
-        {
-            var open = TryCreateSession(machineName, timeout.Value);
-            if (open.Status != QuickProbeStatus.Ok)
-            {
-                return new QuickProbeResult(logName, machineName ?? GetFQDN(), null, open.Status, open.Message, 0, null, sw.Elapsed);
-            }
-
-            session = open.Session;
-
-            var query = new EventLogQuery(logName, PathType.LogName, string.IsNullOrWhiteSpace(xpathFilter) ? "*" : xpathFilter)
-            {
-                Session = session,
-                ReverseDirection = true,
-                TolerateQueryErrors = true
-            };
-
-            using var reader = new EventLogReader(query);
-            int scanned = 0;
-            while (true)
-            {
-                if (sw.Elapsed > timeout)
-                {
-                    return new QuickProbeResult(logName, machineName ?? GetFQDN(), null, QuickProbeStatus.Timeout,
-                        $"Timed out after {timeout.Value.TotalMilliseconds:F0} ms", scanned, null, sw.Elapsed);
-                }
-
-                // Bound each ReadEvent call so RPC stalls can't exceed the overall budget
-                TimeSpan perReadBudget = timeout.Value - sw.Elapsed;
-                if (perReadBudget < TimeSpan.FromMilliseconds(QuickProbeMinPerReadMs)) perReadBudget = TimeSpan.FromMilliseconds(QuickProbeMinPerReadMs);
-
-                EventRecord? rec = null;
-                try
-                {
-                    // Synchronous bounded read avoids runaway Task.Run that could keep RPC handles alive.
-                    var readWindow = perReadBudget < TimeSpan.FromMilliseconds(QuickProbeReadTimeoutMs)
-                        ? perReadBudget
-                        : TimeSpan.FromMilliseconds(QuickProbeReadTimeoutMs);
-
-                    rec = reader.ReadEvent(readWindow);
-                    if (rec == null)
-                    {
-                        return new QuickProbeResult(logName, machineName ?? GetFQDN(), null, QuickProbeStatus.Timeout,
-                            $"Timed out after {timeout.Value.TotalMilliseconds:F0} ms", scanned, null, sw.Elapsed);
-                    }
-                }
-                catch (EventLogException ex)
-                {
-                    return new QuickProbeResult(logName, machineName ?? GetFQDN(), null, QuickProbeStatus.Error, ex.Message, scanned, null, sw.Elapsed);
-                }
-
-                scanned++;
-                DateTime? created = rec.TimeCreated?.ToUniversalTime();
-                rec.Dispose();
-
-                if (created.HasValue)
-                {
-                    return new QuickProbeResult(logName, machineName ?? GetFQDN(), created, QuickProbeStatus.Ok, null, scanned, null, sw.Elapsed);
-                }
-
-                if (scanned >= maxEventsToScan)
-                {
-                    return new QuickProbeResult(logName, machineName ?? GetFQDN(), null, QuickProbeStatus.LimitReached,
-                        $"Scanned {scanned} events without timestamp (limit {maxEventsToScan}).", scanned, null, sw.Elapsed);
-                }
-            }
+        ValidateQuickProbeArguments(logName, timeout, maxEventsToScan);
+        TimeSpan effectiveTimeout = timeout ?? TimeSpan.FromSeconds(15);
+        var stopwatch = Stopwatch.StartNew();
+        using EventLogSessionOpenResult sessionResult = CreateSessionResult(
+            machineName,
+            "QuickProbe",
+            logName,
+            (int)Math.Min(int.MaxValue, Math.Max(1, effectiveTimeout.TotalMilliseconds)));
+        if (!sessionResult.Success || sessionResult.Session == null) {
+            return new QuickProbeResult(
+                logName,
+                ResolveProbeTarget(machineName),
+                null,
+                MapSessionProbeStatus(sessionResult.Status),
+                sessionResult.ErrorMessage,
+                0,
+                null,
+                stopwatch.Elapsed);
         }
-        catch (Exception ex)
-        {
-            return new QuickProbeResult(logName, machineName ?? GetFQDN(), null, QuickProbeStatus.Error, ex.Message, 0, null, sw.Elapsed);
-        }
-        finally
-        {
-            session?.Dispose();
-        }
+
+        return ProbeLatestEventCore(logName, xpathFilter, sessionResult.Session, machineName, effectiveTimeout, maxEventsToScan, stopwatch);
     }
 
     /// <summary>
-    /// Overload that reuses an existing session (caller owns its lifetime).
+    /// Reads the newest matching event using an existing session owned by the caller.
     /// </summary>
-    /// <param name="logName">Channel name to query.</param>
-    /// <param name="xpathFilter">Optional XPath filter (defaults to '*').</param>
-    /// <param name="session">Existing EventLogSession to reuse.</param>
-    /// <param name="machineName">Optional remote computer; null targets local machine.</param>
-    /// <param name="timeout">Total time budget for the probe (default 15s).</param>
-    /// <param name="maxEventsToScan">Maximum events to inspect before returning <see cref="QuickProbeStatus.LimitReached"/>.</param>
-    /// <returns>Quick probe result with status and optional timestamp.</returns>
-    public static QuickProbeResult ProbeLatestEvent(string logName, string? xpathFilter, EventLogSession session, string? machineName = null, TimeSpan? timeout = null, int maxEventsToScan = 4096)
-    {
-        if (session == null) throw new ArgumentNullException(nameof(session));
-        if (string.IsNullOrWhiteSpace(logName)) throw new ArgumentException("logName cannot be null or empty", nameof(logName));
-        if (maxEventsToScan <= 0) maxEventsToScan = 4096;
+    public static QuickProbeResult ProbeLatestEvent(
+        string logName,
+        string? xpathFilter,
+        EventLogSession session,
+        string? machineName = null,
+        TimeSpan? timeout = null,
+        int maxEventsToScan = 4096) {
 
-        var sw = Stopwatch.StartNew();
-        timeout ??= TimeSpan.FromSeconds(15);
+        if (session == null) {
+            throw new ArgumentNullException(nameof(session));
+        }
+        ValidateQuickProbeArguments(logName, timeout, maxEventsToScan);
+        TimeSpan effectiveTimeout = timeout ?? TimeSpan.FromSeconds(15);
+        return ProbeLatestEventCore(logName, xpathFilter, session, machineName, effectiveTimeout, maxEventsToScan, Stopwatch.StartNew());
+    }
 
-        try
-        {
-            var query = new EventLogQuery(logName, PathType.LogName, string.IsNullOrWhiteSpace(xpathFilter) ? "*" : xpathFilter)
-            {
+    private static QuickProbeResult ProbeLatestEventCore(
+        string logName,
+        string? xpathFilter,
+        EventLogSession session,
+        string? machineName,
+        TimeSpan timeout,
+        int maxEventsToScan,
+        Stopwatch stopwatch) {
+
+        string target = ResolveProbeTarget(machineName);
+        long? recordCount = null;
+        try {
+            TimeSpan remaining = timeout - stopwatch.Elapsed;
+            if (remaining <= TimeSpan.Zero) {
+                return ProbeFailure(logName, target, QuickProbeStatus.Timeout, $"Timed out after {timeout.TotalMilliseconds:F0} ms.", 0, null, stopwatch.Elapsed);
+            }
+
+            int operationBudgetMs = (int)Math.Min(int.MaxValue, Math.Max(1, remaining.TotalMilliseconds));
+            recordCount = ExecuteWithTimeout(
+                () => session.GetLogInformation(logName, PathType.LogName),
+                operationBudgetMs,
+                $"Timed out reading log information for '{logName}' on '{target}' after {operationBudgetMs} ms.").RecordCount;
+            var query = new EventLogQuery(logName, PathType.LogName, string.IsNullOrWhiteSpace(xpathFilter) ? "*" : xpathFilter) {
                 Session = session,
                 ReverseDirection = true,
-                TolerateQueryErrors = true
+                TolerateQueryErrors = false
             };
 
-            using var reader = new EventLogReader(query);
+            remaining = timeout - stopwatch.Elapsed;
+            if (remaining <= TimeSpan.Zero) {
+                return ProbeFailure(logName, target, QuickProbeStatus.Timeout, $"Timed out after {timeout.TotalMilliseconds:F0} ms.", 0, recordCount, stopwatch.Elapsed);
+            }
+            operationBudgetMs = (int)Math.Min(int.MaxValue, Math.Max(1, remaining.TotalMilliseconds));
+            using var reader = CreateEventLogReader(query, machineName, operationBudgetMs);
             int scanned = 0;
-            while (true)
-            {
-                if (sw.Elapsed > timeout)
-                {
-                    return new QuickProbeResult(logName, machineName ?? GetFQDN(), null, QuickProbeStatus.Timeout,
-                        $"Timed out after {timeout.Value.TotalMilliseconds:F0} ms", scanned, null, sw.Elapsed);
+            while (scanned < maxEventsToScan) {
+                remaining = timeout - stopwatch.Elapsed;
+                if (remaining <= TimeSpan.Zero) {
+                    return ProbeFailure(logName, target, QuickProbeStatus.Timeout, $"Timed out after {timeout.TotalMilliseconds:F0} ms.", scanned, recordCount, stopwatch.Elapsed);
                 }
 
-                TimeSpan perReadBudget = timeout.Value - sw.Elapsed;
-                if (perReadBudget < TimeSpan.FromMilliseconds(QuickProbeMinPerReadMs)) perReadBudget = TimeSpan.FromMilliseconds(QuickProbeMinPerReadMs);
-
-                EventRecord? rec = null;
-                try
-                {
-                    var readWindow = perReadBudget < TimeSpan.FromMilliseconds(QuickProbeReadTimeoutMs)
-                        ? perReadBudget
-                        : TimeSpan.FromMilliseconds(QuickProbeReadTimeoutMs);
-
-                    rec = reader.ReadEvent(readWindow);
-                    if (rec == null)
-                    {
-                        return new QuickProbeResult(logName, machineName ?? GetFQDN(), null, QuickProbeStatus.Timeout,
-                            $"Timed out after {timeout.Value.TotalMilliseconds:F0} ms", scanned, null, sw.Elapsed);
-                    }
-                }
-                catch (EventLogException ex)
-                {
-                    return new QuickProbeResult(logName, machineName ?? GetFQDN(), null, QuickProbeStatus.Error, ex.Message, scanned, null, sw.Elapsed);
+                TimeSpan readWindow = remaining < TimeSpan.FromMilliseconds(QuickProbeReadTimeoutMs)
+                    ? remaining
+                    : TimeSpan.FromMilliseconds(QuickProbeReadTimeoutMs);
+                var readStopwatch = Stopwatch.StartNew();
+                EventRecord? record = reader.ReadEvent(readWindow);
+                if (record == null) {
+                    bool exhaustedReadWindow = readStopwatch.Elapsed >= TimeSpan.FromTicks((long)(readWindow.Ticks * 0.9));
+                    return ProbeFailure(
+                        logName,
+                        target,
+                        exhaustedReadWindow ? QuickProbeStatus.Timeout : QuickProbeStatus.NoEvent,
+                        exhaustedReadWindow ? $"The event read exceeded its {readWindow.TotalMilliseconds:F0} ms window." : "No event matched the query.",
+                        scanned,
+                        recordCount,
+                        stopwatch.Elapsed);
                 }
 
-                scanned++;
-                DateTime? created = rec.TimeCreated?.ToUniversalTime();
-                rec.Dispose();
-
-                if (created.HasValue)
-                {
-                    return new QuickProbeResult(logName, machineName ?? GetFQDN(), created, QuickProbeStatus.Ok, null, scanned, null, sw.Elapsed);
+                DateTime? created;
+                using (record) {
+                    scanned++;
+                    created = record.TimeCreated?.ToUniversalTime();
                 }
-
-                if (scanned >= maxEventsToScan)
-                {
-                    return new QuickProbeResult(logName, machineName ?? GetFQDN(), null, QuickProbeStatus.LimitReached,
-                        $"Scanned {scanned} events without timestamp (limit {maxEventsToScan}).", scanned, null, sw.Elapsed);
+                if (created.HasValue) {
+                    return new QuickProbeResult(logName, target, created, QuickProbeStatus.Ok, null, scanned, recordCount, stopwatch.Elapsed);
                 }
             }
-        }
-        catch (Exception ex)
-        {
-            return new QuickProbeResult(logName, machineName ?? GetFQDN(), null, QuickProbeStatus.Error, ex.Message, 0, null, sw.Elapsed);
+
+            return ProbeFailure(logName, target, QuickProbeStatus.LimitReached, $"Scanned {maxEventsToScan} events without a timestamp.", maxEventsToScan, recordCount, stopwatch.Elapsed);
+        } catch (UnauthorizedAccessException ex) {
+            return ProbeFailure(logName, target, QuickProbeStatus.AccessDenied, ex.Message, 0, recordCount, stopwatch.Elapsed);
+        } catch (TimeoutException ex) {
+            return ProbeFailure(logName, target, QuickProbeStatus.Timeout, ex.Message, 0, recordCount, stopwatch.Elapsed);
+        } catch (EventLogNotFoundException ex) {
+            return ProbeFailure(logName, target, QuickProbeStatus.LogNotFound, ex.Message, 0, recordCount, stopwatch.Elapsed);
+        } catch (EventLogException ex) {
+            QuickProbeStatus status = QueryFailureHelpers.IsInvalidEventQuery(ex) ? QuickProbeStatus.InvalidQuery : QuickProbeStatus.Error;
+            return ProbeFailure(logName, target, status, ex.Message, 0, recordCount, stopwatch.Elapsed);
+        } catch (Exception ex) {
+            return ProbeFailure(logName, target, QuickProbeStatus.Error, ex.Message, 0, recordCount, stopwatch.Elapsed);
         }
     }
 
-    private static (EventLogSession? Session, QuickProbeStatus Status, string? Message) TryCreateSession(string? machineName, TimeSpan budget)
-    {
-        // Local: avoid extra work and RPC/ping probes
-        if (IsLocalMachine(machineName))
-        {
-            try { return (new EventLogSession(), QuickProbeStatus.Ok, null); }
-            catch (Exception ex) { return (null, QuickProbeStatus.Error, ex.Message); }
+    private static void ValidateQuickProbeArguments(string logName, TimeSpan? timeout, int maxEventsToScan) {
+        if (string.IsNullOrWhiteSpace(logName)) {
+            throw new ArgumentException("Log name cannot be null or whitespace.", nameof(logName));
         }
-
-        int budgetMs = (int)Math.Max(500, budget.TotalMilliseconds);
-
-        // Shared preflight with negative cache + RPC probe
-        var preflight = Preflight(machineName!, budgetMs);
-        if (preflight.Status != QuickProbeStatus.Ok)
-        {
-            return (null, preflight.Status, preflight.Message);
+        if (timeout.HasValue && timeout.Value <= TimeSpan.Zero) {
+            throw new ArgumentOutOfRangeException(nameof(timeout), "Timeout must be positive when provided.");
         }
-
-        try
-        {
-            using var cts = new System.Threading.CancellationTokenSource(budget);
-            var task = Task.Run(() => new EventLogSession(machineName), cts.Token);
-            var completed = Task.WhenAny(task, Task.Delay(budget, cts.Token)).GetAwaiter().GetResult();
-            if (completed != task)
-            {
-                // Ensure the eventual session is disposed when it completes to avoid lingering handles.
-                task.ContinueWith(t =>
-                {
-                    if (t.Status == TaskStatus.RanToCompletion && t.Result != null)
-                    {
-                        t.Result.Dispose();
-                    }
-                }, TaskContinuationOptions.OnlyOnRanToCompletion | TaskContinuationOptions.ExecuteSynchronously);
-
-                return (null, QuickProbeStatus.Timeout, $"Session open timed out after {budget.TotalMilliseconds:F0} ms");
-            }
-
-            return (task.GetAwaiter().GetResult(), QuickProbeStatus.Ok, null);
-        }
-        catch (EventLogException ex)
-        {
-            return (null, QuickProbeStatus.Error, ex.Message);
-        }
-        catch (Exception ex)
-        {
-            return (null, QuickProbeStatus.Error, ex.Message);
+        if (maxEventsToScan <= 0) {
+            throw new ArgumentOutOfRangeException(nameof(maxEventsToScan), "Maximum events to scan must be positive.");
         }
     }
 
-    private static (QuickProbeStatus Status, string? Message) Preflight(string host, int budgetMs)
-    {
-        try
-        {
-            if (IsHostNegativeCached(host))
-            {
-                return (QuickProbeStatus.Error, "Cached unreachable");
-            }
+    private static QuickProbeStatus MapSessionProbeStatus(EventLogSessionOpenStatus status) {
+        return status switch {
+            EventLogSessionOpenStatus.AccessDenied => QuickProbeStatus.AccessDenied,
+            EventLogSessionOpenStatus.Timeout => QuickProbeStatus.Timeout,
+            EventLogSessionOpenStatus.NegativeCache => QuickProbeStatus.HostUnavailable,
+            EventLogSessionOpenStatus.RpcUnavailable => QuickProbeStatus.HostUnavailable,
+            _ => QuickProbeStatus.Error
+        };
+    }
 
-            // Ping
-            try
-            {
-                using var ping = new System.Net.NetworkInformation.Ping();
-                var pingTimeout = Math.Min(QuickProbePingMaxMs, budgetMs / 2);
-                var reply = ping.Send(host, pingTimeout);
-                if (reply == null || reply.Status != System.Net.NetworkInformation.IPStatus.Success)
-                {
-                    MarkHostUnreachable(host);
-                    return (QuickProbeStatus.Error, "Ping failed");
-                }
-            }
-            catch (Exception ex)
-            {
-                Settings._logger.WriteVerbose($"Preflight: ping failed for '{host}': {ex.Message}");
-            }
+    private static string ResolveProbeTarget(string? machineName) {
+        return string.IsNullOrWhiteSpace(machineName) ? GetFQDN() : machineName!.Trim();
+    }
 
-            // RPC probe
-            if (!RpcProbe(host, Math.Min(DefaultRpcProbeTimeoutMs, budgetMs)))
-            {
-                MarkHostUnreachable(host);
-                return (QuickProbeStatus.Error, "RPC probe failed");
-            }
+    private static QuickProbeResult ProbeFailure(
+        string logName,
+        string target,
+        QuickProbeStatus status,
+        string message,
+        int scanned,
+        long? recordCount,
+        TimeSpan duration) {
 
-            ClearNegativeCache(host);
-            return (QuickProbeStatus.Ok, null);
-        }
-        catch (Exception ex)
-        {
-            return (QuickProbeStatus.Error, ex.Message);
-        }
+        return new QuickProbeResult(logName, target, null, status, message, scanned, recordCount, duration);
     }
 }

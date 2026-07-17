@@ -68,10 +68,7 @@ public class TestRuleHelpers
         SetField(record, "_log", containerLog);
         SetField(record, "_message", message);
 
-        // Bypass ctor to avoid EventLogRecord dependency
-        var eo = (EventObject)FormatterServices.GetUninitializedObject(typeof(EventObject));
-
-        SetField(eo, "_eventRecord", record);
+        var eo = new EventObject(record, "local", EventReadMode.Message);
         eo.MessageSubject = messageSubject;
         eo.ContainerLog = containerLog;
         eo.XMLData = string.Empty;

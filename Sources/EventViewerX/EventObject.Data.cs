@@ -1,17 +1,18 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text.RegularExpressions;
 using System.Xml.Linq;
 
 namespace EventViewerX {
     public partial class EventObject {
+        private static readonly string[] NewLineSeparators = { "\r\n", "\n" };
+
         private static string[] SplitMessageLines(string message) {
             if (string.IsNullOrEmpty(message)) {
                 return Array.Empty<string>();
             }
 
-            return Regex.Split(message, "\r?\n");
+            return message.Split(NewLineSeparators, StringSplitOptions.None);
         }
 
         /// <summary>
@@ -61,12 +62,12 @@ namespace EventViewerX {
         /// <param name="text">Text to parse</param>
         /// <returns>Dictionary with parsed key value pairs</returns>
         private static Dictionary<string, string> ParseColonSeparatedLines(string text) {
-            Dictionary<string, string> data = new Dictionary<string, string>();
+            Dictionary<string, string> data = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             if (string.IsNullOrEmpty(text)) {
                 return data;
             }
 
-            string[] lines = Regex.Split(text, "\r?\n");
+            string[] lines = text.Split(NewLineSeparators, StringSplitOptions.None);
             foreach (string rawLine in lines) {
                 string line = rawLine.Trim();
                 if (string.IsNullOrEmpty(line)) {
@@ -87,21 +88,25 @@ namespace EventViewerX {
         }
 
         /// <summary>
-        /// Parses the XML data of the event record into a dictionary converting it into a key value pair
+        /// Parses structured event data and binary attachments in one XML pass.
         /// </summary>
         /// <param name="xmlData">The XML data.</param>
-        /// <returns></returns>
-        private T ParseXML<T>(string xmlData) where T : IDictionary<string, string>, new() {
-            T data = typeof(T) == typeof(Dictionary<string, string>)
-                ? (T)(object)new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-                : new();
+        /// <param name="data">Parsed named event data.</param>
+        /// <param name="attachments">Decoded binary attachments.</param>
+        private static void ParseXmlPayload(
+            string xmlData,
+            out Dictionary<string, string> data,
+            out List<byte[]> attachments) {
+
+            data = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            attachments = new List<byte[]>();
 
             XElement root;
             try {
                 root = XElement.Parse(xmlData);
             } catch (Exception ex) {
                 Settings._logger.WriteWarning($"Failed to parse event XML. Error: {ex.Message}");
-                return data;
+                return;
             }
 
             XNamespace ns = root.GetDefaultNamespace();
@@ -135,9 +140,27 @@ namespace EventViewerX {
                             data[kv.Key] = kv.Value;
                         }
                     }
+
+                    bool isBinaryElement = string.Equals(dataElement.Name.LocalName, "Binary", StringComparison.OrdinalIgnoreCase);
+                    bool isBinaryData = string.Equals(dataElement.Attribute("Type")?.Value, "Binary", StringComparison.OrdinalIgnoreCase);
+                    if ((isBinaryElement || isBinaryData) && TryDecodeBinary(value, out byte[] bytes)) {
+                        attachments.Add(bytes);
+                    }
                 }
             }
-            return data;
+        }
+
+        private T ParseXML<T>(string xmlData) where T : IDictionary<string, string>, new() {
+            ParseXmlPayload(xmlData, out Dictionary<string, string> parsed, out _);
+            if (typeof(T) == typeof(Dictionary<string, string>)) {
+                return (T)(object)parsed;
+            }
+
+            var result = new T();
+            foreach (KeyValuePair<string, string> item in parsed) {
+                result[item.Key] = item.Value;
+            }
+            return result;
         }
 
         private List<string> ExtractNicIdentifiers() {
@@ -157,40 +180,6 @@ namespace EventViewerX {
             return nics;
         }
 
-        private static List<byte[]> ExtractAttachments(string xmlData) {
-            var attachments = new List<byte[]>();
-            try {
-                var root = XElement.Parse(xmlData);
-                XNamespace ns = root.GetDefaultNamespace();
-                var eventData = root.Element(ns + "EventData");
-                if (eventData == null) {
-                    eventData = root.Element(ns + "UserData")?.Elements().FirstOrDefault();
-                }
-
-                if (eventData != null) {
-                    foreach (var binary in eventData.Elements(ns + "Binary")) {
-                        var value = binary.Value;
-                        if (TryDecodeBinary(value, out var bytes)) {
-                            attachments.Add(bytes);
-                        }
-                    }
-
-                    foreach (var dataElement in eventData.Elements(ns + "Data")) {
-                        if (string.Equals(dataElement.Attribute("Type")?.Value, "Binary", StringComparison.OrdinalIgnoreCase)) {
-                            var value = dataElement.Value;
-                            if (TryDecodeBinary(value, out var bytes)) {
-                                attachments.Add(bytes);
-                            }
-                        }
-                    }
-                }
-            } catch (Exception ex) {
-                Settings._logger.WriteWarning($"Failed to parse attachments. Error: {ex.Message}");
-            }
-
-            return attachments;
-        }
-
         private static bool TryDecodeBinary(string value, out byte[] bytes) {
             bytes = Array.Empty<byte>();
             if (string.IsNullOrWhiteSpace(value)) {
@@ -204,15 +193,19 @@ namespace EventViewerX {
                 value = value.Substring(2);
             }
 
-            if (Regex.IsMatch(value, "^([0-9a-fA-F]{2})+$")) {
-                try {
-                    bytes = new byte[value.Length / 2];
-                    for (int i = 0; i < bytes.Length; i++) {
-                        bytes[i] = Convert.ToByte(value.Substring(i * 2, 2), 16);
+            if (value.Length > 0 && value.Length % 2 == 0) {
+                bytes = new byte[value.Length / 2];
+                for (int i = 0; i < bytes.Length; i++) {
+                    int high = HexValue(value[i * 2]);
+                    int low = HexValue(value[(i * 2) + 1]);
+                    if (high < 0 || low < 0) {
+                        bytes = Array.Empty<byte>();
+                        break;
                     }
+                    bytes[i] = (byte)((high << 4) | low);
+                }
+                if (bytes.Length > 0) {
                     return true;
-                } catch {
-                    return false;
                 }
             }
 
@@ -222,6 +215,19 @@ namespace EventViewerX {
             } catch {
                 return false;
             }
+        }
+
+        private static int HexValue(char value) {
+            if (value >= '0' && value <= '9') {
+                return value - '0';
+            }
+            if (value >= 'a' && value <= 'f') {
+                return value - 'a' + 10;
+            }
+            if (value >= 'A' && value <= 'F') {
+                return value - 'A' + 10;
+            }
+            return -1;
         }
     }
 }

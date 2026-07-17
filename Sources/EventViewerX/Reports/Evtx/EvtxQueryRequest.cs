@@ -41,4 +41,25 @@ public sealed class EvtxQueryRequest {
     /// Gets or sets a value indicating whether events should be read oldest-first.
     /// </summary>
     public bool OldestFirst { get; set; }
+
+    /// <summary>
+    /// Gets or sets the amount of provider data materialized for each event.
+    /// </summary>
+    public EventReadMode ReadMode { get; set; } = EventReadMode.Full;
+
+    /// <summary>
+    /// Creates a copy of this request with the specified event projection.
+    /// </summary>
+    public EvtxQueryRequest WithReadMode(EventReadMode readMode) {
+        return new EvtxQueryRequest {
+            FilePath = FilePath,
+            EventIds = EventIds,
+            ProviderName = ProviderName,
+            StartTimeUtc = StartTimeUtc,
+            EndTimeUtc = EndTimeUtc,
+            MaxEvents = MaxEvents,
+            OldestFirst = OldestFirst,
+            ReadMode = readMode
+        };
+    }
 }

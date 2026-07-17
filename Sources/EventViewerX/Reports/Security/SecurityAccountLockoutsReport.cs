@@ -9,6 +9,8 @@ namespace EventViewerX.Reports.Security;
 public sealed class SecurityAccountLockoutsReport {
     /// <summary>Number of scanned events passed into the builder.</summary>
     public int Scanned { get; set; }
+    /// <summary>True when at least one additional matching event existed beyond the requested cap.</summary>
+    public bool Truncated { get; set; }
     /// <summary>Number of matched events (typically equals <see cref="Scanned"/> unless caller filters).</summary>
     public int Matched { get; set; }
     /// <summary>Minimum event time (UTC) among matched events.</summary>

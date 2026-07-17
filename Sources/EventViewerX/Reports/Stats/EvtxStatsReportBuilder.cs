@@ -114,7 +114,8 @@ public sealed class EvtxStatsReportBuilder {
             StartTimeUtc = startTimeUtc,
             EndTimeUtc = endTimeUtc,
             MaxEvents = maxEvents,
-            OldestFirst = oldestFirst
+            OldestFirst = oldestFirst,
+            ReadMode = EventReadMode.Metadata
         };
 
         if (!TryBuildFromFile(request, out var report, out var failure, cancellationToken)) {
@@ -138,12 +139,13 @@ public sealed class EvtxStatsReportBuilder {
         out EvtxQueryFailure? failure,
         CancellationToken cancellationToken = default) {
         var builder = new EvtxStatsReportBuilder();
-        if (!EvtxQueryExecutor.TryForEachEvent(
-                request,
+        if (!EvtxQueryExecutor.TryForEachEventWithInfo(
+                request.WithReadMode(EventReadMode.Metadata),
                 ev => {
                     builder.Add(ev);
                     return true;
                 },
+                out EvtxQueryExecutionInfo executionInfo,
                 out failure,
                 cancellationToken)) {
             report = new EvtxStatsReport();
@@ -151,6 +153,7 @@ public sealed class EvtxStatsReportBuilder {
         }
 
         report = builder.Build();
+        report.Truncated = executionInfo.Truncated;
         return true;
     }
 
