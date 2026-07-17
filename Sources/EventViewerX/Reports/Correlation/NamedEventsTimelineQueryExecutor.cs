@@ -97,7 +97,8 @@ public static partial class NamedEventsTimelineQueryExecutor {
         var perNamedEventCount = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         var filteredOut = 0;
         var filteredUncorrelated = 0;
-        var truncated = false;
+        var outputTruncated = false;
+        var queryInfo = new NamedEventsQueryExecutionInfo();
 
         try {
             await foreach (var item in SearchEvents.FindEventsByNamedEvents(
@@ -109,6 +110,7 @@ public static partial class NamedEventsTimelineQueryExecutor {
                                maxThreads: maxThreads,
                                maxEvents: 0,
                                maxEventsScanned: request.MaxEventsScanned,
+                               executionInfo: queryInfo,
                                cancellationToken: cancellationToken)) {
                 cancellationToken.ThrowIfCancellationRequested();
 
@@ -142,7 +144,7 @@ public static partial class NamedEventsTimelineQueryExecutor {
                 }
 
                 if (rows.Count >= maxEvents) {
-                    truncated = true;
+                    outputTruncated = true;
                     break;
                 }
 
@@ -286,11 +288,14 @@ public static partial class NamedEventsTimelineQueryExecutor {
             EndTimeUtc = request.EndTimeUtc,
             MaxEvents = maxEvents,
             MaxEventsScanned = request.MaxEventsScanned,
+            EventsScanned = queryInfo.EventsScanned,
             MaxThreads = maxThreads,
             CorrelationKeys = normalizedCorrelationKeys,
             IncludeUncorrelated = includeUncorrelated,
             BucketMinutes = bucketMinutes,
-            Truncated = truncated,
+            Truncated = outputTruncated || queryInfo.ScanLimitReached,
+            OutputTruncated = outputTruncated,
+            ScanTruncated = queryInfo.ScanLimitReached,
             GroupsTruncated = groupsTruncated,
             GroupsTotal = groupsTotal,
             FilteredOut = filteredOut,

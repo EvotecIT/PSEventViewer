@@ -320,6 +320,11 @@ public sealed class NamedEventsTimelineQueryResult {
     public int MaxEventsScanned { get; set; }
 
     /// <summary>
+    /// Number of raw event candidates evaluated by named-event rules.
+    /// </summary>
+    public long EventsScanned { get; set; }
+
+    /// <summary>
     /// Maximum worker concurrency used by the query.
     /// </summary>
     public int MaxThreads { get; set; }
@@ -340,9 +345,19 @@ public sealed class NamedEventsTimelineQueryResult {
     public int BucketMinutes { get; set; }
 
     /// <summary>
-    /// Indicates event collection hit max events cap.
+    /// Indicates either the output cap or candidate scan cap truncated the result.
     /// </summary>
     public bool Truncated { get; set; }
+
+    /// <summary>
+    /// Indicates another matching timeline row existed beyond the output cap.
+    /// </summary>
+    public bool OutputTruncated { get; set; }
+
+    /// <summary>
+    /// Indicates another raw candidate existed beyond the candidate scan cap.
+    /// </summary>
+    public bool ScanTruncated { get; set; }
 
     /// <summary>
     /// Indicates correlation groups were truncated by max group cap.

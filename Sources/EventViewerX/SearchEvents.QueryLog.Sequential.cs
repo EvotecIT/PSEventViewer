@@ -135,7 +135,7 @@ public partial class SearchEvents {
             }
         }
 
-        var candidates = new List<EventObject>(maxEvents);
+        var candidates = new List<EventObject>(Math.Min(maxEvents, 256));
         while (true) {
             while (batch.Count < maxOpenQueries && source.MoveNext()) {
                 batch.Add(source.Current);

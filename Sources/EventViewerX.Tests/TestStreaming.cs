@@ -57,6 +57,21 @@ namespace EventViewerX.Tests {
 
             Assert.InRange(count, 0, 1);
         }
+
+        [Fact]
+        public void NamedEventsExecutionInfoRequiresAnExtraCandidateToReportTruncation() {
+            var executionInfo = new NamedEventsQueryExecutionInfo();
+            executionInfo.Reset(maxEventsScanned: 1);
+
+            Assert.True(executionInfo.TryRecordCandidate());
+            Assert.Equal(1, executionInfo.EventsScanned);
+            Assert.False(executionInfo.ScanLimitReached);
+
+            Assert.False(executionInfo.TryRecordCandidate());
+            Assert.Equal(1, executionInfo.EventsScanned);
+            Assert.True(executionInfo.ScanLimitReached);
+        }
+
         [Fact]
         public async Task QueryLogsParallelAppliesOneGlobalMaximum() {
             if (!OperatingSystem.IsWindows()) return;
@@ -217,6 +232,24 @@ namespace EventViewerX.Tests {
             Assert.Equal(100L, results.Current.RecordId);
             Assert.Equal(2, opened);
             Assert.Equal(0, exhausted);
+        }
+
+        [Fact]
+        public void LargePositiveMaximumDoesNotPreallocateTheRequestedCapacity() {
+            var workItems = new[] {
+                new SearchEvents.QueryWorkItem(null, null, new List<long> { 1 }),
+                new SearchEvents.QueryWorkItem(null, null, new List<long> { 2 })
+            };
+
+            List<EventObject> results = SearchEvents.MergeQueryWorkItems(
+                workItems,
+                static _ => Enumerable.Empty<EventObject>().GetEnumerator(),
+                maxEvents: int.MaxValue,
+                oldest: false,
+                cancellationToken: CancellationToken.None,
+                maxOpenQueries: 2).ToList();
+
+            Assert.Empty(results);
         }
 
         [Fact]

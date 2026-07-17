@@ -20,6 +20,7 @@ namespace EventViewerX {
         /// <param name="maxThreads">Maximum parallel threads.</param>
         /// <param name="maxEvents">Global maximum number of matching rule results to return.</param>
         /// <param name="maxEventsScanned">Global maximum number of candidate event records to evaluate before rule filtering.</param>
+        /// <param name="executionInfo">Optional progress object populated while the query is enumerated.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
         /// <returns>Asynchronous sequence of simplified events.</returns>
         public static async IAsyncEnumerable<EventObjectSlim> FindEventsByNamedEvents(
@@ -31,6 +32,7 @@ namespace EventViewerX {
             int maxThreads = 8,
             int maxEvents = 0,
             int maxEventsScanned = 0,
+            NamedEventsQueryExecutionInfo? executionInfo = null,
             [EnumeratorCancellation] CancellationToken cancellationToken = default) {
 
             if (typeEventsList == null) {
@@ -47,16 +49,19 @@ namespace EventViewerX {
             }
 
             Dictionary<string, HashSet<int>> eventInfo = EventObjectSlim.GetEventInfoForNamedEvents(typeEventsList);
+            NamedEventsQueryExecutionInfo queryInfo = executionInfo ?? new NamedEventsQueryExecutionInfo();
+            queryInfo.Reset(maxEventsScanned);
             int emitted = 0;
-            int scanned = 0;
 
             // Query one channel at a time. QueryLogsParallel already owns bounded machine/filter parallelism;
             // adding a second producer layer here multiplies concurrency and defeats its backpressure.
             foreach (KeyValuePair<string, HashSet<int>> entry in eventInfo) {
-                int remainingScanLimit = maxEventsScanned > 0 ? maxEventsScanned - scanned : 0;
-                if (maxEventsScanned > 0 && remainingScanLimit <= 0) {
-                    yield break;
-                }
+                int remainingScanLimit = maxEventsScanned > 0
+                    ? Math.Max(0, maxEventsScanned - (int)queryInfo.EventsScanned)
+                    : 0;
+                int queryLimit = remainingScanLimit > 0 && remainingScanLimit < int.MaxValue
+                    ? remainingScanLimit + 1
+                    : remainingScanLimit == 0 && maxEventsScanned > 0 ? 1 : remainingScanLimit;
 
                 await foreach (EventObject foundEvent in QueryLogsParallel(
                                    entry.Key,
@@ -64,26 +69,24 @@ namespace EventViewerX {
                                    machineNames,
                                    startTime: startTime,
                                    endTime: endTime,
-                                   maxEvents: remainingScanLimit,
+                                   maxEvents: queryLimit,
                                    maxThreads: maxThreads,
                                    timePeriod: timePeriod,
                                    cancellationToken: cancellationToken,
                                    readMode: EventReadMode.Full)) {
-                    scanned++;
+                    if (!queryInfo.TryRecordCandidate()) {
+                        yield break;
+                    }
+
                     EventObjectSlim? targetEvent = BuildTargetEvents(foundEvent, typeEventsList);
                     if (targetEvent == null) {
-                        if (maxEventsScanned > 0 && scanned >= maxEventsScanned) {
-                            yield break;
-                        }
                         continue;
                     }
 
-                    yield return targetEvent;
                     emitted++;
+                    queryInfo.EventsEmitted = emitted;
+                    yield return targetEvent;
                     if (maxEvents > 0 && emitted >= maxEvents) {
-                        yield break;
-                    }
-                    if (maxEventsScanned > 0 && scanned >= maxEventsScanned) {
                         yield break;
                     }
                 }
