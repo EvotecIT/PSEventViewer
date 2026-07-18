@@ -42,8 +42,8 @@ namespace EventViewerX {
             if (typeEventsList == null) {
                 throw new ArgumentNullException(nameof(typeEventsList));
             }
-            if (maxThreads <= 0) {
-                throw new ArgumentOutOfRangeException(nameof(maxThreads), "Maximum threads must be positive.");
+            if (maxThreads <= 0 || maxThreads > MaximumParallelism) {
+                throw new ArgumentOutOfRangeException(nameof(maxThreads), $"Maximum threads must be between 1 and {MaximumParallelism}.");
             }
             if (maxEvents < 0) {
                 throw new ArgumentOutOfRangeException(nameof(maxEvents), "Maximum events must be greater than or equal to zero.");
@@ -57,36 +57,32 @@ namespace EventViewerX {
             queryInfo.Reset(maxEventsScanned);
             int emitted = 0;
 
-            // Query one channel at a time. QueryLogsParallel already owns bounded machine/filter parallelism;
-            // adding a second producer layer here multiplies concurrency and defeats its backpressure.
-            foreach (KeyValuePair<string, HashSet<int>> entry in eventInfo) {
-                int remainingScanLimit = maxEventsScanned > 0
-                    ? Math.Max(0, maxEventsScanned - (int)queryInfo.EventsScanned)
-                    : 0;
-                int queryLimit = remainingScanLimit > 0 && remainingScanLimit < int.MaxValue
-                    ? remainingScanLimit + 1
-                    : remainingScanLimit == 0 && maxEventsScanned > 0 ? 1 : remainingScanLimit;
+            if (maxEventsScanned > 0) {
+                int candidateLimit = maxEventsScanned == int.MaxValue ? int.MaxValue : maxEventsScanned + 1;
+                var candidates = new List<EventObject>(Math.Min(candidateLimit, 256));
+                foreach (KeyValuePair<string, HashSet<int>> entry in eventInfo) {
+                    await foreach (EventObject foundEvent in QueryNamedEventCandidates(
+                                       entry,
+                                       machineNames,
+                                       startTime,
+                                       endTime,
+                                       timePeriod,
+                                       maxThreads,
+                                       candidateLimit,
+                                       cancellationToken,
+                                       minimumEventRecordIdExclusiveResolver)) {
+                        candidates.Add(foundEvent);
+                        TrimNamedCandidates(candidates, candidateLimit);
+                    }
+                }
 
-                await foreach (EventObject foundEvent in QueryLogsParallel(
-                                   entry.Key,
-                                   entry.Value.ToList(),
-                                   machineNames,
-                                   startTime: startTime,
-                                   endTime: endTime,
-                                   maxEvents: queryLimit,
-                                   maxThreads: maxThreads,
-                                   timePeriod: timePeriod,
-                                   cancellationToken: cancellationToken,
-                                   readMode: EventReadMode.Full,
-                                   minimumEventRecordIdExclusiveResolver: minimumEventRecordIdExclusiveResolver == null
-                                       ? null
-                                       : machineName => minimumEventRecordIdExclusiveResolver(machineName, entry.Key))) {
+                candidates.Sort((left, right) => CompareEvents(left, right, oldest: false));
+                foreach (EventObject foundEvent in candidates) {
                     if (!queryInfo.TryRecordCandidate()) {
                         yield break;
                     }
 
                     candidateObserver?.Invoke(foundEvent);
-
                     EventObjectSlim? targetEvent = BuildTargetEvents(foundEvent, typeEventsList);
                     if (targetEvent == null) {
                         continue;
@@ -99,7 +95,148 @@ namespace EventViewerX {
                         yield break;
                     }
                 }
+                yield break;
             }
+
+            if (maxEvents > 0) {
+                var matches = new List<NamedEventMatch>(Math.Min(maxEvents, 256));
+                foreach (KeyValuePair<string, HashSet<int>> entry in eventInfo) {
+                    int candidateLimit = maxEvents;
+                    List<EventObject> logCandidates;
+                    List<NamedEventMatch> logMatches;
+                    while (true) {
+                        logCandidates = new List<EventObject>(Math.Min(candidateLimit, 256));
+                        await foreach (EventObject foundEvent in QueryNamedEventCandidates(
+                                           entry,
+                                           machineNames,
+                                           startTime,
+                                           endTime,
+                                           timePeriod,
+                                           maxThreads,
+                                           candidateLimit,
+                                           cancellationToken,
+                                           minimumEventRecordIdExclusiveResolver)) {
+                            logCandidates.Add(foundEvent);
+                        }
+
+                        logMatches = new List<NamedEventMatch>(Math.Min(maxEvents, logCandidates.Count));
+                        foreach (EventObject foundEvent in logCandidates) {
+                            EventObjectSlim? targetEvent = BuildTargetEvents(foundEvent, typeEventsList);
+                            if (targetEvent != null) {
+                                logMatches.Add(new NamedEventMatch(foundEvent, targetEvent));
+                                if (logMatches.Count >= maxEvents) {
+                                    break;
+                                }
+                            }
+                        }
+
+                        if (logMatches.Count >= maxEvents || logCandidates.Count < candidateLimit || candidateLimit == int.MaxValue) {
+                            break;
+                        }
+
+                        candidateLimit = candidateLimit > int.MaxValue / 2 ? int.MaxValue : candidateLimit * 2;
+                    }
+
+                    foreach (EventObject foundEvent in logCandidates) {
+                        queryInfo.TryRecordCandidate();
+                        candidateObserver?.Invoke(foundEvent);
+                    }
+                    matches.AddRange(logMatches);
+                    TrimNamedMatches(matches, maxEvents);
+                }
+
+                matches.Sort(static (left, right) => CompareEvents(left.Source, right.Source, oldest: false));
+                int count = Math.Min(maxEvents, matches.Count);
+                for (int index = 0; index < count; index++) {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    queryInfo.EventsEmitted = index + 1;
+                    yield return matches[index].Projection;
+                }
+                yield break;
+            }
+
+            // Unlimited queries retain streaming/backpressure and do not need a cross-log selection buffer.
+            foreach (KeyValuePair<string, HashSet<int>> entry in eventInfo) {
+                await foreach (EventObject foundEvent in QueryNamedEventCandidates(
+                                   entry,
+                                   machineNames,
+                                   startTime,
+                                   endTime,
+                                   timePeriod,
+                                   maxThreads,
+                                   maxEvents: 0,
+                                   cancellationToken,
+                                   minimumEventRecordIdExclusiveResolver)) {
+                    queryInfo.TryRecordCandidate();
+
+                    candidateObserver?.Invoke(foundEvent);
+
+                    EventObjectSlim? targetEvent = BuildTargetEvents(foundEvent, typeEventsList);
+                    if (targetEvent == null) {
+                        continue;
+                    }
+
+                    emitted++;
+                    queryInfo.EventsEmitted = emitted;
+                    yield return targetEvent;
+                }
+            }
+        }
+
+        private static IAsyncEnumerable<EventObject> QueryNamedEventCandidates(
+            KeyValuePair<string, HashSet<int>> entry,
+            List<string?>? machineNames,
+            DateTime? startTime,
+            DateTime? endTime,
+            TimePeriod? timePeriod,
+            int maxThreads,
+            int maxEvents,
+            CancellationToken cancellationToken,
+            Func<string?, string, long?>? minimumEventRecordIdExclusiveResolver) {
+
+            return QueryLogsParallel(
+                entry.Key,
+                entry.Value.ToList(),
+                machineNames,
+                startTime: startTime,
+                endTime: endTime,
+                maxEvents: maxEvents,
+                maxThreads: maxThreads,
+                timePeriod: timePeriod,
+                cancellationToken: cancellationToken,
+                readMode: EventReadMode.Full,
+                minimumEventRecordIdExclusiveResolver: minimumEventRecordIdExclusiveResolver == null
+                    ? null
+                    : machineName => minimumEventRecordIdExclusiveResolver(machineName, entry.Key));
+        }
+
+        private static void TrimNamedCandidates(List<EventObject> candidates, int limit) {
+            long trimThreshold = Math.Min((long)limit * 2, (long)limit + 1024);
+            if (candidates.Count >= trimThreshold) {
+                SortAndTrim(candidates, limit, oldest: false);
+            }
+        }
+
+        private static void TrimNamedMatches(List<NamedEventMatch> matches, int limit) {
+            long trimThreshold = Math.Min((long)limit * 2, (long)limit + 1024);
+            if (matches.Count < trimThreshold) {
+                return;
+            }
+
+            matches.Sort(static (left, right) => CompareEvents(left.Source, right.Source, oldest: false));
+            if (matches.Count > limit) {
+                matches.RemoveRange(limit, matches.Count - limit);
+            }
+        }
+
+        private sealed class NamedEventMatch {
+            internal NamedEventMatch(EventObject source, EventObjectSlim projection) {
+                Source = source;
+                Projection = projection;
+            }
+
+            internal EventObject Source { get; }
+            internal EventObjectSlim Projection { get; }
         }
     }
 }

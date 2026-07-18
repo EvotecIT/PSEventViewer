@@ -1,4 +1,8 @@
 Describe 'Get-EVXEvent - Named Event' {
+    It 'exposes NamedEvents as the documented alias for Type' {
+        (Get-Command Get-EVXEvent).Parameters['Type'].Aliases | Should -Contain 'NamedEvents'
+    }
+
     It 'Returns ADUserLogon events when available' -Tag 'RequiresEvents' {
         $events = Get-EVXEvent -Type ADUserLogon -MaxEvents 1 -ErrorAction SilentlyContinue
         if ($events) {

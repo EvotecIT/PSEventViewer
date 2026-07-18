@@ -38,5 +38,17 @@ Describe 'Get-EVXEvent checkpoint compatibility' {
 
         $Events.Count | Should -Be 1
         $Events[0].RecordId | Should -BeLessThan ([long]::MaxValue)
+        $Persisted = Get-Content -LiteralPath $CheckpointPath -Raw | ConvertFrom-Json
+        [long] $Persisted.'reset-proof' | Should -Be ([long] $Events[0].RecordId)
+    }
+
+    It 'uses distinct default checkpoints for distinct filtered queries' {
+        $CheckpointPath = Join-Path $TestDrive 'filter-identities.json'
+
+        $null = @(Get-EVXEvent -LogName System -RecordIdFile $CheckpointPath -MessageRegex '(?!)' -MaxEventsScanned 1 -ReadMode Message)
+        $null = @(Get-EVXEvent -LogName System -RecordIdFile $CheckpointPath -MessageRegex '.*' -MaxEventsScanned 1 -ReadMode Message)
+
+        $Persisted = Get-Content -LiteralPath $CheckpointPath -Raw | ConvertFrom-Json
+        @($Persisted.PSObject.Properties).Count | Should -Be 2
     }
 }

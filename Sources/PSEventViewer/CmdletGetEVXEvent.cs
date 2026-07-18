@@ -8,6 +8,8 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Net;
+using System.Collections;
+using System.Globalization;
 
 namespace PSEventViewer;
 
@@ -50,6 +52,7 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
     private string _recordIdKey = string.Empty;
     private Dictionary<string, long> _recordMap = new();
     private readonly Dictionary<string, long> _highestRecordIds = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _resetCheckpointKeys = new(StringComparer.OrdinalIgnoreCase);
     private int _eventsOutput;
     /// <summary>
     /// Name of the log to query.
@@ -267,6 +270,7 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
     /// <summary>
     /// Predefined named events to query.
     /// </summary>
+    [Alias("NamedEvents")]
     [Parameter(Mandatory = true, ParameterSetName = "NamedEvents")]
     public NamedEvents[] Type { get; set; } = Array.Empty<NamedEvents>();
 
@@ -304,13 +308,79 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
     }
 
     private string BuildDefaultCheckpointKey() {
-        string queryIdentity = ParameterSetName switch {
+        IEnumerable<string?> checkpointMachines = MachineName == null || MachineName.Count == 0
+            ? new string?[] { null }
+            : MachineName;
+        string sourceIdentity = ParameterSetName switch {
             "NamedEvents" => "Named:" + string.Join(",", Type.OrderBy(static value => value)),
-            "PathEvents" => "Path:" + Path,
-            _ => "Log:" + (LogName ?? string.Empty)
+            "PathEvents" => "Path:" + System.IO.Path.GetFullPath(Path).TrimEnd(System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar).ToUpperInvariant(),
+            _ => "Log:" + (LogName ?? string.Empty).Trim().ToUpperInvariant()
         };
-        string machines = string.Join(",", MachineName ?? new List<string?>());
-        return $"{queryIdentity}|{machines}";
+
+        var identity = new List<string> {
+            ParameterSetName,
+            sourceIdentity,
+            "Machines",
+            string.Join(",", checkpointMachines
+                .Select(static machine => string.IsNullOrWhiteSpace(machine) ? "<LOCAL>" : machine!.Trim().ToUpperInvariant())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(static machine => machine, StringComparer.OrdinalIgnoreCase)),
+            "EventIds",
+            string.Join(",", (EventId ?? new List<int>()).Distinct().OrderBy(static value => value)),
+            "RecordIds",
+            string.Join(",", (EventRecordId ?? new List<long>()).Distinct().OrderBy(static value => value)),
+            "Provider",
+            ProviderName?.Trim().ToUpperInvariant() ?? string.Empty,
+            "Keywords",
+            Keywords.HasValue ? Convert.ToInt64(Keywords.Value, CultureInfo.InvariantCulture).ToString(CultureInfo.InvariantCulture) : string.Empty,
+            "Level",
+            Level.HasValue ? Convert.ToInt32(Level.Value, CultureInfo.InvariantCulture).ToString(CultureInfo.InvariantCulture) : string.Empty,
+            "StartTimeUtc",
+            StartTime?.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture) ?? string.Empty,
+            "EndTimeUtc",
+            EndTime?.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture) ?? string.Empty,
+            "TimePeriod",
+            TimePeriod?.ToString() ?? string.Empty,
+            "UserId",
+            UserId?.Trim().ToUpperInvariant() ?? string.Empty,
+            "MessageRegex",
+            MessageRegex?.ToString() ?? string.Empty,
+            "MessageRegexOptions",
+            MessageRegex == null ? string.Empty : ((int)MessageRegex.Options).ToString(CultureInfo.InvariantCulture),
+            "MessageRegexCulture",
+            MessageRegex == null ? string.Empty : CultureInfo.CurrentCulture.Name,
+            "Oldest",
+            Oldest.IsPresent.ToString(CultureInfo.InvariantCulture)
+        };
+        AddHashtableIdentity(identity, "NamedDataFilter", NamedDataFilter);
+        AddHashtableIdentity(identity, "NamedDataExcludeFilter", NamedDataExcludeFilter);
+
+        using SHA256 sha256 = SHA256.Create();
+        byte[] hash = sha256.ComputeHash(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(identity)));
+        string fingerprint = BitConverter.ToString(hash).Replace("-", string.Empty);
+        return $"{sourceIdentity}|q:{fingerprint}";
+    }
+
+    private static void AddHashtableIdentity(List<string> identity, string name, Hashtable? table) {
+        identity.Add(name);
+        if (table == null) {
+            identity.Add(string.Empty);
+            return;
+        }
+
+        foreach (DictionaryEntry entry in table.Cast<DictionaryEntry>()
+                     .OrderBy(static item => item.Key?.ToString(), StringComparer.OrdinalIgnoreCase)) {
+            identity.Add(entry.Key?.ToString() ?? string.Empty);
+            IEnumerable values = entry.Value is string || entry.Value is not IEnumerable enumerable
+                ? new[] { entry.Value }
+                : enumerable;
+            List<string> normalizedValues = values.Cast<object?>()
+                .Select(static value => Convert.ToString(value, CultureInfo.InvariantCulture) ?? string.Empty)
+                .OrderBy(static value => value, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            identity.Add(normalizedValues.Count.ToString(CultureInfo.InvariantCulture));
+            identity.AddRange(normalizedValues);
+        }
     }
 
     private string BuildLegacyCheckpointKey() {
@@ -570,6 +640,7 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
 
         _recordMap.Remove(checkpointKey);
         _highestRecordIds.Remove(checkpointKey);
+        _resetCheckpointKeys.Add(checkpointKey);
         WriteWarning(
             $"Checkpoint '{checkpointKey}' was {checkpoint}, but the newest record in '{target}' is {newestRecordId.Value}. " +
             "The log was cleared or replaced; restarting this source from its current records.");
@@ -646,33 +717,25 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
     /// Saves the highest processed record ID to <see cref="RecordIdFile"/> when processing completes.
     /// </summary>
     protected override Task EndProcessingAsync() {
-        if (!string.IsNullOrEmpty(RecordIdFile) && _highestRecordIds.Count > 0) {
+        if (!string.IsNullOrEmpty(RecordIdFile) && (_highestRecordIds.Count > 0 || _resetCheckpointKeys.Count > 0)) {
             string checkpointPath = System.IO.Path.GetFullPath(RecordIdFile!);
-            using var checkpointMutex = new Mutex(false, BuildCheckpointMutexName(checkpointPath));
-            bool acquired = false;
-            try {
-                try {
-                    acquired = checkpointMutex.WaitOne(TimeSpan.FromSeconds(30));
-                } catch (AbandonedMutexException) {
-                    acquired = true;
-                }
-
-                if (!acquired) {
-                    throw new TimeoutException($"Timed out waiting to update shared event checkpoint file '{checkpointPath}'.");
-                }
-
+            using (AcquireCheckpointFileLock(checkpointPath)) {
                 Dictionary<string, long> latestMap = ReadCheckpointFile(checkpointPath);
+                foreach (string resetKey in _resetCheckpointKeys) {
+                    if (_highestRecordIds.TryGetValue(resetKey, out long resetValue)) {
+                        latestMap[resetKey] = resetValue;
+                    } else {
+                        latestMap.Remove(resetKey);
+                    }
+                }
                 foreach (KeyValuePair<string, long> checkpoint in _highestRecordIds) {
-                    if (!latestMap.TryGetValue(checkpoint.Key, out long existing) || checkpoint.Value > existing) {
+                    if (_resetCheckpointKeys.Contains(checkpoint.Key) ||
+                        !latestMap.TryGetValue(checkpoint.Key, out long existing) || checkpoint.Value > existing) {
                         latestMap[checkpoint.Key] = checkpoint.Value;
                     }
                 }
                 _recordMap = latestMap;
                 WriteCheckpointFile(checkpointPath, JsonSerializer.Serialize(latestMap));
-            } finally {
-                if (acquired) {
-                    checkpointMutex.ReleaseMutex();
-                }
             }
         }
         return Task.CompletedTask;
@@ -698,12 +761,19 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
         }
     }
 
-    private static string BuildCheckpointMutexName(string checkpointPath) {
-        string identity = checkpointPath.ToUpperInvariant();
-        using SHA256 sha256 = SHA256.Create();
-        byte[] hash = sha256.ComputeHash(Encoding.UTF8.GetBytes(identity));
-        string suffix = BitConverter.ToString(hash).Replace("-", string.Empty);
-        return $"Local\\PSEventViewer.Checkpoint.{suffix}";
+    private static FileStream AcquireCheckpointFileLock(string checkpointPath) {
+        string lockPath = checkpointPath + ".lock";
+        DateTime deadline = DateTime.UtcNow.AddSeconds(30);
+        while (true) {
+            try {
+                return new FileStream(lockPath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
+            } catch (IOException ex) {
+                if (DateTime.UtcNow >= deadline) {
+                    throw new TimeoutException($"Timed out waiting to update shared event checkpoint file '{checkpointPath}'.", ex);
+                }
+                Thread.Sleep(50);
+            }
+        }
     }
 
     private static void WriteCheckpointFile(string path, string contents) {

@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading;
 using System.Xml.Linq;
 using Xunit;
+using System.IO;
 
 namespace EventViewerX.Tests {
     public class TestPowerShellScripts {
@@ -228,8 +229,42 @@ namespace EventViewerX.Tests {
                 cancellation.Token).ToList());
         }
 
+        [Fact]
+        public void RestoredScriptSaveContainsUntrustedMetadataInsideTheDestination() {
+            string destination = Path.Combine(Path.GetTempPath(), "EventViewerX.Tests." + Guid.NewGuid().ToString("N"));
+            try {
+                EventObject eventObject = CreateEventObject();
+                SetSnapshotProperty(eventObject, nameof(EventObject.MachineName), "..\\..\\outside");
+                SetSnapshotProperty(eventObject, nameof(EventObject.RecordId), (long?)1);
+                SetSnapshotProperty(eventObject, nameof(EventObject.LogName), "PowerShell");
+                SetSnapshotProperty(eventObject, nameof(EventObject.TimeCreated), DateTime.UtcNow);
+                var script = new RestoredPowerShellScript {
+                    ScriptBlockId = "..\\..\\payload",
+                    Script = "Get-Date",
+                    Events = new[] { eventObject }
+                };
+
+                string savedPath = script.Save(destination, unblock: true);
+                string destinationPrefix = Path.GetFullPath(destination).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+
+                Assert.StartsWith(destinationPrefix, Path.GetFullPath(savedPath), StringComparison.OrdinalIgnoreCase);
+                Assert.True(File.Exists(savedPath));
+                Assert.DoesNotContain("..", Path.GetFileName(savedPath));
+            } finally {
+                if (Directory.Exists(destination)) {
+                    Directory.Delete(destination, recursive: true);
+                }
+            }
+        }
+
         private static EventObject CreateEventObject() {
             return (EventObject)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(EventObject));
+        }
+
+        private static void SetSnapshotProperty<T>(EventObject eventObject, string propertyName, T value) {
+            typeof(EventObject)
+                .GetField($"<{propertyName}>k__BackingField", BindingFlags.Instance | BindingFlags.NonPublic)!
+                .SetValue(eventObject, value);
         }
     }
 }

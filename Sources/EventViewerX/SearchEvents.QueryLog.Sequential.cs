@@ -137,8 +137,10 @@ public partial class SearchEvents {
         CancellationToken cancellationToken,
         int maxOpenQueries) {
 
-        if (maxOpenQueries <= 0) {
-            throw new ArgumentOutOfRangeException(nameof(maxOpenQueries));
+        if (maxOpenQueries <= 0 || maxOpenQueries > MaximumParallelism) {
+            throw new ArgumentOutOfRangeException(
+                nameof(maxOpenQueries),
+                $"Maximum open queries must be between 1 and {MaximumParallelism}.");
         }
 
         using IEnumerator<QueryWorkItem> source = workItems.GetEnumerator();

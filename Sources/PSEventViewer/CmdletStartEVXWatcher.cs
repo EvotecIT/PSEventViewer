@@ -140,6 +140,7 @@ namespace PSEventViewer {
 
             WatcherInfo? watcher = null;
             Action<EventObject> publish = bridge.Publish;
+            Guid watcherOwnerId = PowerShellResourceOwnerId;
             EventHandler? stoppedHandler = null;
             bool createdPowerShellWatcher = false;
             int subscriptionRemoved = 0;
@@ -171,14 +172,14 @@ namespace PSEventViewer {
                 if (!createdPowerShellWatcher) {
                     RemovePowerShellSubscription();
                 } else {
-                    PowerShellWatcherRegistry.Register(watcher.Id);
+                    PowerShellWatcherRegistry.Register(watcherOwnerId, watcher.Id);
                     stoppedHandler = (_, _) => {
-                        PowerShellWatcherRegistry.Unregister(watcher.Id);
+                        PowerShellWatcherRegistry.Unregister(watcherOwnerId, watcher.Id);
                         RemovePowerShellSubscription();
                     };
                     watcher.Stopped += stoppedHandler;
                     if (watcher.EndTime.HasValue) {
-                        PowerShellWatcherRegistry.Unregister(watcher.Id);
+                        PowerShellWatcherRegistry.Unregister(watcherOwnerId, watcher.Id);
                         RemovePowerShellSubscription();
                     }
                 }
@@ -186,7 +187,7 @@ namespace PSEventViewer {
             } catch {
                 RemovePowerShellSubscription();
                 if (createdPowerShellWatcher && watcher != null) {
-                    PowerShellWatcherRegistry.Unregister(watcher.Id);
+                    PowerShellWatcherRegistry.Unregister(watcherOwnerId, watcher.Id);
                     WatcherManager.StopWatcher(watcher.Id);
                 }
                 throw;

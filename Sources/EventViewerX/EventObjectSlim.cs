@@ -324,10 +324,19 @@ public class EventObjectSlim {
     public static EventObjectSlim? CreateEventRule(EventObject eventObject, List<NamedEvents> targetNamedEvents) {
         var mode = _discoveryMode;
         EnsureInitialized();
+        string eventLog = !string.IsNullOrWhiteSpace(eventObject.ContainerLog)
+            ? eventObject.ContainerLog
+            : !string.IsNullOrWhiteSpace(eventObject.GatheredLogName)
+                ? eventObject.GatheredLogName
+                : eventObject.LogName;
 
         foreach (var namedEvent in targetNamedEvents) {
             if (mode != EventRuleDiscoveryMode.Reflection && _ruleFactories.TryGetValue(namedEvent, out var reg)) {
                 try {
+                    if (!string.Equals(reg.LogName, eventLog, StringComparison.OrdinalIgnoreCase) ||
+                        !reg.EventIds.Contains(eventObject.Id)) {
+                        continue;
+                    }
                     if (reg.CanHandle != null && !reg.CanHandle(eventObject)) {
                         continue;
                     }
@@ -350,6 +359,10 @@ public class EventObjectSlim {
             }
 
             if (!_reflectionRuleTypes.TryGetValue(namedEvent, out var ruleType) || ruleType == null) {
+                continue;
+            }
+            if (!_reflectionHandlers.TryGetValue((eventObject.Id, eventLog), out List<Type>? handlers) ||
+                !handlers.Contains(ruleType)) {
                 continue;
             }
 

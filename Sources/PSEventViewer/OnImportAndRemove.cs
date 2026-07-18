@@ -1,16 +1,30 @@
 using System;
 using System.IO;
 using System.Reflection;
+using System.Management.Automation.Runspaces;
 
 /// <summary>
 /// OnModuleImportAndRemove is a class that implements the IModuleAssemblyInitializer and IModuleAssemblyCleanup interfaces.
 /// This class is used to handle the assembly resolve event when the module is imported and removed.
 /// </summary>
 public class OnModuleImportAndRemove : IModuleAssemblyInitializer, IModuleAssemblyCleanup {
+    private Guid _ownerId;
+
     /// <summary>
     /// OnImport is called when the module is imported.
     /// </summary>
     public void OnImport() {
+        _ownerId = Guid.NewGuid();
+        using (PowerShell powerShell = PowerShell.Create(RunspaceMode.CurrentRunspace)) {
+            powerShell.AddCommand("Set-Variable")
+                .AddParameter("Name", PSEventViewer.PowerShellWatcherRegistry.OwnerVariableName)
+                .AddParameter("Value", _ownerId)
+                .AddParameter("Scope", "Global");
+            powerShell.Invoke();
+            if (powerShell.HadErrors) {
+                throw powerShell.Streams.Error[0].Exception;
+            }
+        }
         if (IsNetFramework()) {
             AppDomain.CurrentDomain.AssemblyResolve += MyResolveEventHandler;
         }
@@ -21,10 +35,28 @@ public class OnModuleImportAndRemove : IModuleAssemblyInitializer, IModuleAssemb
     /// </summary>
     /// <param name="module"></param>
     public void OnRemove(PSModuleInfo module) {
-        PSEventViewer.PowerShellWatcherRegistry.StopAllOwned();
+        Guid ownerId = GetCurrentOwnerId();
+        PSEventViewer.PowerShellWatcherRegistry.StopAllOwned(ownerId);
         if (IsNetFramework()) {
             AppDomain.CurrentDomain.AssemblyResolve -= MyResolveEventHandler;
         }
+    }
+
+    private Guid GetCurrentOwnerId() {
+        using PowerShell powerShell = PowerShell.Create(RunspaceMode.CurrentRunspace);
+        powerShell.AddCommand("Get-Variable")
+            .AddParameter("Name", PSEventViewer.PowerShellWatcherRegistry.OwnerVariableName)
+            .AddParameter("Scope", "Global")
+            .AddParameter("ValueOnly");
+        PSObject? result = powerShell.Invoke().FirstOrDefault();
+        powerShell.Commands.Clear();
+        powerShell.AddCommand("Remove-Variable")
+            .AddParameter("Name", PSEventViewer.PowerShellWatcherRegistry.OwnerVariableName)
+            .AddParameter("Scope", "Global")
+            .AddParameter("Force")
+            .AddParameter("ErrorAction", ActionPreference.SilentlyContinue);
+        powerShell.Invoke();
+        return result?.BaseObject is Guid ownerId ? ownerId : _ownerId;
     }
 
     /// <summary>

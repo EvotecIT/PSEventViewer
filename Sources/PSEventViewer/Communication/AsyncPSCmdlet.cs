@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Management.Automation;
+using System.Management.Automation.Runspaces;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -33,6 +34,7 @@ public abstract class AsyncPSCmdlet : PSCmdlet, IDisposable {
     /// </summary>
     private CancellationTokenSource _cancelSource = new();
     private InternalLogger? _eventViewerLogger;
+    private Guid _powerShellResourceOwnerId;
 
     private BlockingCollection<(object?, PipelineType)>? _currentOutPipe;
     private BlockingCollection<object?>? _currentReplyPipe;
@@ -52,8 +54,16 @@ public abstract class AsyncPSCmdlet : PSCmdlet, IDisposable {
     /// <summary>
     /// Begins processing the cmdlet asynchronously.
     /// </summary>
-    protected override void BeginProcessing()
-        => RunBlockInAsync(BeginProcessingAsync);
+    protected override void BeginProcessing() {
+        object? owner = SessionState.PSVariable.GetValue(PowerShellWatcherRegistry.OwnerVariableName);
+        _powerShellResourceOwnerId = owner is Guid ownerId
+            ? ownerId
+            : Runspace.DefaultRunspace?.InstanceId ?? Guid.Empty;
+        RunBlockInAsync(BeginProcessingAsync);
+    }
+
+    /// <summary>Gets the module instance that owns resources created by this cmdlet invocation.</summary>
+    protected Guid PowerShellResourceOwnerId => _powerShellResourceOwnerId;
 
     /// <summary>
     /// Override this method to implement asynchronous begin processing logic.

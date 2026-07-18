@@ -107,4 +107,45 @@ Describe 'Start-EVXWatcher - PowerShell event dispatch' {
             Import-Module -Name $ModulePath -Force
         }
     }
+
+    It 'does not stop a watcher owned by another runspace module instance' {
+        $Module = Get-Module PSEventViewer
+        $ModulePath = $Module.Path
+        $EscapedModulePath = $ModulePath.Replace("'", "''")
+        $OtherRunspace = [RunspaceFactory]::CreateRunspace()
+        $OtherPowerShell = [PowerShell]::Create()
+        $MainWatcher = $null
+        $OtherWatcher = $null
+        try {
+            $OtherRunspace.Open()
+            $OtherPowerShell.Runspace = $OtherRunspace
+            $OtherName = 'PSEventViewer.OtherRunspace.' + [Guid]::NewGuid().ToString('N')
+            $OtherScript = "Import-Module -Name '$EscapedModulePath' -Force; Start-EVXWatcher -Name '$OtherName' -MachineName '$env:COMPUTERNAME' -LogName Application -EventId 1 -Action {}"
+            $OtherResult = $OtherPowerShell.AddScript($OtherScript).Invoke()
+            if ($OtherPowerShell.HadErrors) {
+                throw ($OtherPowerShell.Streams.Error | Select-Object -First 1)
+            }
+            $OtherWatcher = $OtherResult[0]
+            $MainWatcher = Start-EVXWatcher -Name ('PSEventViewer.MainRunspace.' + [Guid]::NewGuid().ToString('N')) -MachineName $env:COMPUTERNAME -LogName Application -EventId 1 -Action {}
+
+            Remove-Module PSEventViewer -Force
+
+            $MainWatcher.EndTime | Should -Not -BeNullOrEmpty
+            $OtherWatcher.EndTime | Should -BeNullOrEmpty
+
+            $OtherPowerShell.Commands.Clear()
+            $null = $OtherPowerShell.AddScript('Remove-Module PSEventViewer -Force').Invoke()
+            $OtherWatcher.EndTime | Should -Not -BeNullOrEmpty
+        } finally {
+            if ($MainWatcher -and -not $MainWatcher.EndTime) {
+                [EventViewerX.WatcherManager]::StopWatcher($MainWatcher.Id) | Out-Null
+            }
+            if ($OtherWatcher -and -not $OtherWatcher.EndTime) {
+                [EventViewerX.WatcherManager]::StopWatcher($OtherWatcher.Id) | Out-Null
+            }
+            $OtherPowerShell.Dispose()
+            $OtherRunspace.Dispose()
+            Import-Module -Name $ModulePath -Force
+        }
+    }
 }

@@ -49,9 +49,22 @@ public class RestoredPowerShellScript {
     /// </summary>
     public string Save(string directory, bool addComment = true, bool unblock = false) {
         EventObject primary = Event ?? throw new InvalidOperationException("No event data available to save script.");
-        Directory.CreateDirectory(directory);
-        string fileName = $"{primary.MachineName}_{ScriptBlockId}.ps1";
-        string filePath = Path.Combine(directory, fileName);
+        string destination = Path.GetFullPath(directory);
+        Directory.CreateDirectory(destination);
+        string machineName = SanitizeFileNameComponent(primary.MachineName, "machine");
+        string scriptBlockId = SanitizeFileNameComponent(ScriptBlockId, "script");
+        string identity = primary.MachineName + "\0" + ScriptBlockId;
+        string suffix;
+        using (System.Security.Cryptography.SHA256 sha256 = System.Security.Cryptography.SHA256.Create()) {
+            byte[] hash = sha256.ComputeHash(System.Text.Encoding.UTF8.GetBytes(identity));
+            suffix = BitConverter.ToString(hash, 0, 6).Replace("-", string.Empty);
+        }
+        string fileName = $"{machineName}_{scriptBlockId}_{suffix}.ps1";
+        string filePath = Path.GetFullPath(Path.Combine(destination, fileName));
+        string destinationPrefix = destination.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
+        if (!filePath.StartsWith(destinationPrefix, StringComparison.OrdinalIgnoreCase)) {
+            throw new InvalidOperationException("The reconstructed script filename resolved outside the requested destination.");
+        }
         if (addComment) {
             string header = string.Join(Environment.NewLine,
                 "<#",
@@ -68,5 +81,24 @@ public class RestoredPowerShellScript {
             File.WriteAllText(filePath + ":Zone.Identifier", "[ZoneTransfer]\r\nZoneId=3");
         }
         return filePath;
+    }
+
+    private static string SanitizeFileNameComponent(string? value, string fallback) {
+        string candidate = string.IsNullOrWhiteSpace(value) ? fallback : value!.Trim();
+        char[] invalid = Path.GetInvalidFileNameChars()
+            .Concat(new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar, ':', '\0' })
+            .Distinct()
+            .ToArray();
+        foreach (char character in invalid) {
+            candidate = candidate.Replace(character, '_');
+        }
+        while (candidate.IndexOf("..", StringComparison.Ordinal) >= 0) {
+            candidate = candidate.Replace("..", "_");
+        }
+        candidate = candidate.Trim(' ', '.');
+        if (candidate.Length == 0) {
+            candidate = fallback;
+        }
+        return candidate.Length <= 80 ? candidate : candidate.Substring(0, 80);
     }
 }

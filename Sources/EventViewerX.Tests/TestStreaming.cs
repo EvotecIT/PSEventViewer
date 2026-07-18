@@ -359,6 +359,22 @@ namespace EventViewerX.Tests {
         }
 
         [Fact]
+        public void QueryMergeRejectsConcurrencyAboveTheReusableCeiling() {
+            var workItems = new[] {
+                new SearchEvents.QueryWorkItem(null, null, new List<long> { 1 }),
+                new SearchEvents.QueryWorkItem(null, null, new List<long> { 2 })
+            };
+
+            Assert.Throws<ArgumentOutOfRangeException>(() => SearchEvents.MergeQueryWorkItems(
+                workItems,
+                static _ => Enumerable.Empty<EventObject>().GetEnumerator(),
+                maxEvents: 0,
+                oldest: false,
+                cancellationToken: CancellationToken.None,
+                maxOpenQueries: int.MaxValue).ToList());
+        }
+
+        [Fact]
         public void GlobalMergeUsesTimeBeforeUnrelatedRecordIds() {
             var workItems = new[] {
                 new SearchEvents.QueryWorkItem("server-a", null, new List<long> { 100 }),
@@ -378,6 +394,26 @@ namespace EventViewerX.Tests {
                 maxOpenQueries: 2));
 
             Assert.Equal(1L, selected.RecordId);
+        }
+
+        [Fact]
+        public void NamedRuleDispatchRequiresTheRegisteredLogAndEventId() {
+            EventObject eventObject = CreateEventObject(
+                recordId: 1,
+                timeCreated: DateTime.UtcNow,
+                eventId: 12,
+                logName: "System",
+                providerName: "Microsoft-Windows-Kernel-General");
+
+            EventObjectSlim? wrongRule = EventObjectSlim.CreateEventRule(
+                eventObject,
+                new List<NamedEvents> { NamedEvents.OSStartupSecurity });
+            EventObjectSlim? selectedRule = EventObjectSlim.CreateEventRule(
+                eventObject,
+                new List<NamedEvents> { NamedEvents.OSStartupSecurity, NamedEvents.OSStartup });
+
+            Assert.Null(wrongRule);
+            Assert.IsType<Rules.Windows.OSStartup>(selectedRule);
         }
 
         [Fact]
@@ -476,12 +512,22 @@ namespace EventViewerX.Tests {
 
         private static IEnumerable<EventObject> CreateSingleResultQuery(long recordId, DateTime timeCreated, Action opened, Action exhausted) {
             opened();
+            EventObject eventObject = CreateEventObject(recordId, timeCreated, (int)recordId, "System", "Test");
+            yield return eventObject;
+            exhausted();
+        }
+
+        private static EventObject CreateEventObject(long recordId, DateTime timeCreated, int eventId, string logName, string providerName) {
             var eventObject = (EventObject)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(EventObject));
             SetSnapshotProperty(eventObject, nameof(EventObject.RecordId), (long?)recordId);
             SetSnapshotProperty(eventObject, nameof(EventObject.TimeCreated), timeCreated);
-            SetSnapshotProperty(eventObject, nameof(EventObject.Id), (int)recordId);
-            yield return eventObject;
-            exhausted();
+            SetSnapshotProperty(eventObject, nameof(EventObject.Id), eventId);
+            SetSnapshotProperty(eventObject, nameof(EventObject.LogName), logName);
+            SetSnapshotProperty(eventObject, nameof(EventObject.ProviderName), providerName);
+            SetSnapshotProperty(eventObject, nameof(EventObject.MachineName), "test-machine");
+            SetSnapshotProperty(eventObject, nameof(EventObject.Data), new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase));
+            eventObject.ContainerLog = logName;
+            return eventObject;
         }
 
         private static void SetSnapshotProperty<T>(EventObject eventObject, string propertyName, T value) {
