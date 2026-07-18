@@ -51,7 +51,10 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
     private string _recordIdKey = string.Empty;
     private Dictionary<string, long> _recordMap = new();
     private readonly Dictionary<string, Guid> _checkpointGenerations = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, string> _checkpointBoundaries = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, string> _checkpointBoundaryMigrations = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, long> _highestRecordIds = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, EventObject> _highestCheckpointEvents = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _resetCheckpointKeys = new(StringComparer.OrdinalIgnoreCase);
     private int _eventsOutput;
     /// <summary>
@@ -300,6 +303,9 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
                 StringComparer.OrdinalIgnoreCase);
             foreach (KeyValuePair<string, EventCheckpointValue> checkpoint in checkpointSnapshot.Checkpoints) {
                 _checkpointGenerations[checkpoint.Key] = checkpoint.Value.GenerationId;
+                if (!string.IsNullOrWhiteSpace(checkpoint.Value.BoundaryIdentity)) {
+                    _checkpointBoundaries[checkpoint.Key] = checkpoint.Value.BoundaryIdentity!;
+                }
             }
         }
         _recordIdKey = !string.IsNullOrEmpty(RecordIdKey)
@@ -309,8 +315,8 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
             string legacyKey = BuildLegacyCheckpointKey();
             if (!_recordMap.ContainsKey(_recordIdKey) && _recordMap.TryGetValue(legacyKey, out long legacyRecordId)) {
                 _recordMap[_recordIdKey] = legacyRecordId;
-                if (_checkpointGenerations.TryGetValue(legacyKey, out Guid legacyGeneration)) {
-                    _checkpointGenerations[_recordIdKey] = legacyGeneration;
+                if (_checkpointBoundaries.TryGetValue(legacyKey, out string? legacyBoundary)) {
+                    _checkpointBoundaries[_recordIdKey] = legacyBoundary;
                 }
             }
         }
@@ -519,6 +525,7 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
         }
         if (!_highestRecordIds.TryGetValue(checkpointKey, out long highestRecordId) || recordId > highestRecordId) {
             _highestRecordIds[checkpointKey] = recordId;
+            _highestCheckpointEvents[checkpointKey] = eventObject;
         }
         return true;
     }
@@ -595,12 +602,15 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
 
         if (ParameterSetName == "PathEvents") {
             if (TryGetCheckpoint(null, Path, out string checkpointKey, out long checkpoint)) {
-                EventObject? newest = SearchEvents.QueryLogFile(
-                    Path,
-                    maxEvents: 1,
-                    cancellationToken: cancellationToken,
-                    readMode: EventReadMode.Metadata).FirstOrDefault();
-                ResetCheckpointWhenLogRestarted(checkpointKey, checkpoint, newest?.RecordId, Path);
+                EventObject? boundaryEvent = checkpoint > 0
+                    ? SearchEvents.QueryLogFile(
+                        Path,
+                        maxEvents: 1,
+                        eventRecordId: new List<long> { checkpoint },
+                        cancellationToken: cancellationToken,
+                        readMode: EventReadMode.Metadata).FirstOrDefault()
+                    : null;
+                EvaluateCheckpointBoundary(checkpointKey, checkpoint, boundaryEvent, Path);
             }
             return;
         }
@@ -620,17 +630,20 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
                 }
 
                 try {
-                    EventObject? newest = SearchEvents.QueryLog(
-                        log,
-                        machineName: machine,
-                        maxEvents: 1,
-                        cancellationToken: cancellationToken,
-                        sessionTimeoutMs: ParameterSetName == "GenericEvents" ? SessionTimeoutMs : null,
-                        readMode: EventReadMode.Metadata).FirstOrDefault();
-                    ResetCheckpointWhenLogRestarted(
+                    EventObject? boundaryEvent = checkpoint > 0
+                        ? SearchEvents.QueryLog(
+                            log,
+                            eventRecordId: new List<long> { checkpoint },
+                            machineName: machine,
+                            maxEvents: 1,
+                            cancellationToken: cancellationToken,
+                            sessionTimeoutMs: ParameterSetName == "GenericEvents" ? SessionTimeoutMs : null,
+                            readMode: EventReadMode.Metadata).FirstOrDefault()
+                        : null;
+                    EvaluateCheckpointBoundary(
                         checkpointKey,
                         checkpoint,
-                        newest?.RecordId,
+                        boundaryEvent,
                         string.IsNullOrWhiteSpace(machine) ? log : $"{log} on {machine}");
                 } catch (Exception ex) when (EventLogRemoteQueryFailureClassifier.TryClassify(machine, ex, out _)) {
                     WriteVerbose($"Checkpoint generation probe skipped unavailable target '{machine}': {ex.Message}");
@@ -639,22 +652,36 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
         }
     }
 
-    private void ResetCheckpointWhenLogRestarted(
+    private void EvaluateCheckpointBoundary(
         string checkpointKey,
         long checkpoint,
-        long? newestRecordId,
+        EventObject? boundaryEvent,
         string target) {
 
-        if (!newestRecordId.HasValue || newestRecordId.Value >= checkpoint) {
+        if (checkpoint <= 0) {
+            return;
+        }
+
+        string? actualBoundary = boundaryEvent == null
+            ? null
+            : EventCheckpointBoundaryIdentity.Create(boundaryEvent);
+        if (!_checkpointBoundaries.TryGetValue(checkpointKey, out string? expectedBoundary)) {
+            if (actualBoundary != null) {
+                _checkpointBoundaryMigrations[checkpointKey] = actualBoundary;
+                return;
+            }
+        } else if (string.Equals(expectedBoundary, actualBoundary, StringComparison.Ordinal)) {
             return;
         }
 
         _recordMap.Remove(checkpointKey);
         _highestRecordIds.Remove(checkpointKey);
+        _highestCheckpointEvents.Remove(checkpointKey);
+        _checkpointBoundaryMigrations.Remove(checkpointKey);
         _resetCheckpointKeys.Add(checkpointKey);
         WriteWarning(
-            $"Checkpoint '{checkpointKey}' was {checkpoint}, but the newest record in '{target}' is {newestRecordId.Value}. " +
-            "The log was cleared or replaced; restarting this source from its current records.");
+            $"Checkpoint boundary {checkpoint} for '{checkpointKey}' no longer identifies the same record in '{target}'. " +
+            "The source was cleared, replaced, or aged past that boundary; restarting from its oldest available matching record.");
     }
 
     private bool OutputLimitReached => MaxEvents > 0 && _eventsOutput >= MaxEvents;
@@ -732,14 +759,19 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
     /// Saves the highest contiguously processed record ID to <see cref="RecordIdFile"/> when processing completes.
     /// </summary>
     protected override Task EndProcessingAsync() {
-        if (!string.IsNullOrEmpty(RecordIdFile) && (_highestRecordIds.Count > 0 || _resetCheckpointKeys.Count > 0)) {
-            var updates = new List<EventCheckpointUpdate>(_highestRecordIds.Count + _resetCheckpointKeys.Count);
+        if (!string.IsNullOrEmpty(RecordIdFile) &&
+            (_highestRecordIds.Count > 0 || _resetCheckpointKeys.Count > 0 || _checkpointBoundaryMigrations.Count > 0)) {
+            var updates = new List<EventCheckpointUpdate>(
+                _highestRecordIds.Count + _resetCheckpointKeys.Count + _checkpointBoundaryMigrations.Count);
             foreach (string resetKey in _resetCheckpointKeys) {
                 updates.Add(new EventCheckpointUpdate(
                     resetKey,
                     _highestRecordIds.TryGetValue(resetKey, out long resetValue) ? resetValue : null,
                     GetInitialCheckpointGeneration(resetKey),
-                    startsNewGeneration: true));
+                    startsNewGeneration: true,
+                    boundaryIdentity: _highestCheckpointEvents.TryGetValue(resetKey, out EventObject? resetBoundaryEvent)
+                        ? EventCheckpointBoundaryIdentity.Create(resetBoundaryEvent)
+                        : null));
             }
             foreach (KeyValuePair<string, long> checkpoint in _highestRecordIds) {
                 if (_resetCheckpointKeys.Contains(checkpoint.Key)) {
@@ -748,7 +780,21 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
                 updates.Add(new EventCheckpointUpdate(
                     checkpoint.Key,
                     checkpoint.Value,
-                    GetInitialCheckpointGeneration(checkpoint.Key)));
+                    GetInitialCheckpointGeneration(checkpoint.Key),
+                    boundaryIdentity: _highestCheckpointEvents.TryGetValue(checkpoint.Key, out EventObject? boundaryEvent)
+                        ? EventCheckpointBoundaryIdentity.Create(boundaryEvent)
+                        : null));
+            }
+            foreach (KeyValuePair<string, string> migration in _checkpointBoundaryMigrations) {
+                if (_resetCheckpointKeys.Contains(migration.Key) || _highestRecordIds.ContainsKey(migration.Key) ||
+                    !_recordMap.TryGetValue(migration.Key, out long recordId)) {
+                    continue;
+                }
+                updates.Add(new EventCheckpointUpdate(
+                    migration.Key,
+                    recordId,
+                    GetInitialCheckpointGeneration(migration.Key),
+                    boundaryIdentity: migration.Value));
             }
 
             EventCheckpointSnapshot persisted = EventCheckpointStore.Update(RecordIdFile!, updates);

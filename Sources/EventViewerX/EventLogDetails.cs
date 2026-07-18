@@ -137,7 +137,7 @@ public class EventLogDetails {
 
         double size = value.Value;
 
-        switch (fromUnit.ToUpper()) {
+        switch (fromUnit.ToUpperInvariant()) {
             case "B":
                 break;
             case "KB":
@@ -157,7 +157,7 @@ public class EventLogDetails {
                 break;
         }
 
-        switch (toUnit.ToUpper()) {
+        switch (toUnit.ToUpperInvariant()) {
             case "B":
                 break;
             case "KB":

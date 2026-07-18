@@ -220,7 +220,7 @@ public partial class SearchEvents : Settings {
         EventLogSession activeSession = sessionResult.Session;
         try {
             bool hasOnlyExactNames = listLog != null && listLog.Length > 0 &&
-                                     listLog.All(name => !name.Contains("*") && !name.Contains("?"));
+                                     listLog.All(name => name.IndexOf('*') < 0 && name.IndexOf('?') < 0);
             if (hasOnlyExactNames) {
                 foreach (string exactName in listLog!.Distinct(StringComparer.OrdinalIgnoreCase)) {
                     yield return SafeGetResult(exactName, activeSession, timeoutMs, hostName, includeEventTimes);

@@ -166,4 +166,41 @@ Describe 'Start-EVXWatcher - PowerShell event dispatch' {
             Import-Module -Name $ModulePath -Force
         }
     }
+
+    It 'does not borrow a newer owner when an unused module instance is removed' {
+        $RegistryType = [PSEventViewer.CmdletStartEVXWatcher].Assembly.GetType('PSEventViewer.PowerShellWatcherRegistry', $true)
+        $Flags = [Reflection.BindingFlags]'Static,NonPublic'
+        $Begin = $RegistryType.GetMethod('BeginModuleInstance', $Flags)
+        $Register = $RegistryType.GetMethod('Register', $Flags)
+        $End = $RegistryType.GetMethod('EndModuleInstance', $Flags)
+        $StopAndRemove = $RegistryType.GetMethod('StopAndRemoveOwner', $Flags)
+        $RunspaceId = [Guid]::NewGuid()
+        $ActiveOwner = $Begin.Invoke($null, @($RunspaceId))
+        $Ids = [Collections.Generic.List[int]]::new()
+        $Ids.Add(1)
+        $NamedEvents = [Collections.Generic.List[EventViewerX.NamedEvents]]::new()
+        $Action = [Action[EventViewerX.EventObject]] { param($EventObject) }
+        $Watcher = [EventViewerX.WatcherManager]::StartWatcher(
+            ('PSEventViewer.OwnerIsolation.' + [Guid]::NewGuid().ToString('N')),
+            $env:COMPUTERNAME,
+            'Application',
+            $Ids,
+            $NamedEvents,
+            $Action,
+            $false,
+            $false,
+            0,
+            $null)
+        try {
+            $null = $Register.Invoke($null, @($ActiveOwner, $Watcher.Id))
+            $null = $End.Invoke($null, @($RunspaceId, $null))
+
+            $Watcher.EndTime | Should -BeNullOrEmpty
+        } finally {
+            $null = $StopAndRemove.Invoke($null, @($RunspaceId, $ActiveOwner))
+            if (-not $Watcher.EndTime) {
+                [EventViewerX.WatcherManager]::StopWatcher($Watcher.Id) | Out-Null
+            }
+        }
+    }
 }

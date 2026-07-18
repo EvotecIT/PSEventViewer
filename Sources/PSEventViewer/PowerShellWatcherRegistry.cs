@@ -35,19 +35,21 @@ internal static class PowerShellWatcherRegistry {
         string? moduleKey = GetStableModuleKey(module, standaloneOwnerId);
         if (moduleKey != null && StableModuleOwners.TryGetValue(moduleKey, out Guid stableOwnerId)) {
             if (IsActiveOwner(standaloneOwnerId, stableOwnerId)) {
-                return stableOwnerId;
+                return RegisterModuleOwner(module!, standaloneOwnerId, stableOwnerId);
             }
             StableModuleOwners.TryRemove(moduleKey, out _);
         }
 
-        Guid ownerId = GetNewestRunspaceOwner(standaloneOwnerId);
         if (moduleKey != null) {
-            ownerId = StableModuleOwners.GetOrAdd(moduleKey, ownerId);
+            Guid proposedOwnerId = BeginModuleInstance(standaloneOwnerId);
+            Guid ownerId = StableModuleOwners.GetOrAdd(moduleKey, proposedOwnerId);
+            if (ownerId != proposedOwnerId) {
+                StopAndRemoveOwner(standaloneOwnerId, proposedOwnerId);
+            }
+            return RegisterModuleOwner(module!, standaloneOwnerId, ownerId);
         }
-        if (module != null) {
-            ownerId = ModuleOwners.GetValue(module, _ => new OwnerRegistration(ownerId)).OwnerId;
-        }
-        return ownerId;
+
+        return standaloneOwnerId;
     }
 
     internal static void Register(Guid ownerId, Guid watcherId) {
@@ -76,22 +78,58 @@ internal static class PowerShellWatcherRegistry {
     }
 
     internal static void EndModuleInstance(Guid runspaceId, PSModuleInfo? module) {
-        string? moduleKey = GetStableModuleKey(module, runspaceId);
-        Guid ownerId;
-        if (module != null && ModuleOwners.TryGetValue(module, out OwnerRegistration? registeredOwner)) {
-            ownerId = registeredOwner.OwnerId;
-        } else if (moduleKey != null && StableModuleOwners.TryGetValue(moduleKey, out Guid stableOwnerId)) {
-            ownerId = stableOwnerId;
-        } else {
-            ownerId = GetNewestRunspaceOwner(runspaceId);
+        List<PSModuleInfo> moduleCandidates = GetModuleCandidates(module).ToList();
+        Guid? ownerId = null;
+        Guid effectiveRunspaceId = runspaceId;
+        foreach (PSModuleInfo candidate in moduleCandidates) {
+            if (ModuleOwners.TryGetValue(candidate, out OwnerRegistration? registeredOwner) &&
+                TryGetOwnerRunspace(registeredOwner.OwnerId, out effectiveRunspaceId)) {
+                ownerId = registeredOwner.OwnerId;
+                break;
+            }
         }
+        if (!ownerId.HasValue) {
+            return;
+        }
+
+        foreach (PSModuleInfo candidate in moduleCandidates) {
+            ModuleOwners.Remove(candidate);
+            string? candidateKey = GetStableModuleKey(candidate, effectiveRunspaceId);
+            if (candidateKey != null) {
+                StableModuleOwners.TryRemove(candidateKey, out _);
+            }
+        }
+        StopAndRemoveOwner(effectiveRunspaceId, ownerId.Value);
+    }
+
+    private static Guid RegisterModuleOwner(PSModuleInfo module, Guid runspaceId, Guid ownerId) {
+        OwnerRegistration registration = ModuleOwners.GetValue(module, _ => new OwnerRegistration(ownerId));
+        lock (registration) {
+            if (!registration.CleanupRegistered) {
+                PowerShellModuleCleanup.Register(module, runspaceId, registration.OwnerId);
+                registration.CleanupRegistered = true;
+            }
+        }
+        return registration.OwnerId;
+    }
+
+    private static bool IsActiveOwner(Guid runspaceId, Guid ownerId)
+        => RunspaceOwners.TryGetValue(runspaceId, out ConcurrentDictionary<Guid, long>? owners) &&
+           owners.ContainsKey(ownerId);
+
+    private static bool TryGetOwnerRunspace(Guid ownerId, out Guid runspaceId) {
+        foreach (KeyValuePair<Guid, ConcurrentDictionary<Guid, long>> runspace in RunspaceOwners) {
+            if (runspace.Value.ContainsKey(ownerId)) {
+                runspaceId = runspace.Key;
+                return true;
+            }
+        }
+        runspaceId = Guid.Empty;
+        return false;
+    }
+
+    internal static void StopAndRemoveOwner(Guid runspaceId, Guid ownerId) {
         StopAllOwned(ownerId);
-        if (module != null) {
-            ModuleOwners.Remove(module);
-        }
-        if (moduleKey != null) {
-            StableModuleOwners.TryRemove(moduleKey, out _);
-        }
         foreach (KeyValuePair<string, Guid> stableOwner in StableModuleOwners) {
             if (stableOwner.Value == ownerId) {
                 StableModuleOwners.TryRemove(stableOwner.Key, out _);
@@ -107,33 +145,37 @@ internal static class PowerShellWatcherRegistry {
         }
     }
 
-    private static Guid GetNewestRunspaceOwner(Guid runspaceId) {
-        if (!RunspaceOwners.TryGetValue(runspaceId, out ConcurrentDictionary<Guid, long>? owners)) {
-            return runspaceId;
-        }
-
-        Guid newestOwner = runspaceId;
-        long newestSequence = long.MinValue;
-        foreach (KeyValuePair<Guid, long> owner in owners) {
-            if (owner.Value > newestSequence) {
-                newestOwner = owner.Key;
-                newestSequence = owner.Value;
-            }
-        }
-        return newestOwner;
-    }
-
-    private static bool IsActiveOwner(Guid runspaceId, Guid ownerId)
-        => RunspaceOwners.TryGetValue(runspaceId, out ConcurrentDictionary<Guid, long>? owners) &&
-           owners.ContainsKey(ownerId);
-
     private static string? GetStableModuleKey(PSModuleInfo? module, Guid runspaceId) {
         if (module == null) {
             return null;
         }
 
+        return $"{runspaceId:N}{GetStableModuleSuffix(module)}";
+    }
+
+    private static string GetStableModuleSuffix(PSModuleInfo module) {
         string identity = string.IsNullOrWhiteSpace(module.Path) ? module.Name : module.Path;
-        return $"{runspaceId:N}|{identity}|{module.Prefix}";
+        return $"|{identity}|{module.Prefix}";
+    }
+
+    private static IEnumerable<PSModuleInfo> GetModuleCandidates(PSModuleInfo? module) {
+        if (module == null) {
+            yield break;
+        }
+
+        var pending = new Stack<PSModuleInfo>();
+        var seen = new HashSet<PSModuleInfo>(ReferenceEqualityComparer<PSModuleInfo>.Instance);
+        pending.Push(module);
+        while (pending.Count > 0) {
+            PSModuleInfo candidate = pending.Pop();
+            if (!seen.Add(candidate)) {
+                continue;
+            }
+            yield return candidate;
+            foreach (PSModuleInfo nested in candidate.NestedModules) {
+                pending.Push(nested);
+            }
+        }
     }
 
     private sealed class OwnerRegistration {
@@ -142,5 +184,16 @@ internal static class PowerShellWatcherRegistry {
         }
 
         internal Guid OwnerId { get; }
+        internal bool CleanupRegistered { get; set; }
+    }
+
+    private sealed class ReferenceEqualityComparer<T> : IEqualityComparer<T> where T : class {
+        internal static readonly ReferenceEqualityComparer<T> Instance = new();
+
+        public bool Equals(T? left, T? right)
+            => ReferenceEquals(left, right);
+
+        public int GetHashCode(T value)
+            => RuntimeHelpers.GetHashCode(value);
     }
 }

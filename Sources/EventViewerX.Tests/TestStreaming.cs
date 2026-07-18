@@ -312,6 +312,53 @@ namespace EventViewerX.Tests {
         }
 
         [Fact]
+        public void PagedSourceMergeIncludesLaterSourcesInGlobalOrder() {
+            int leftIndex = 0;
+            int rightIndex = 0;
+            int[] left = { 1, 3, 5, 7 };
+            int[] right = { 2, 4, 6, 8 };
+
+            IReadOnlyList<int> ReadPage(int[] source, ref int sourceIndex, int requested) {
+                int count = Math.Min(requested, source.Length - sourceIndex);
+                int[] page = source.Skip(sourceIndex).Take(count).ToArray();
+                sourceIndex += count;
+                return page;
+            }
+
+            List<int> merged = SearchEvents.MergePagedSources(
+                    new Func<int, IReadOnlyList<int>>[] {
+                        requested => ReadPage(left, ref leftIndex, requested),
+                        requested => ReadPage(right, ref rightIndex, requested)
+                    },
+                    static (leftValue, rightValue) => leftValue.CompareTo(rightValue),
+                    pageSize: 2)
+                .Take(4)
+                .ToList();
+
+            Assert.Equal(new[] { 1, 2, 3, 4 }, merged);
+        }
+
+        [Fact]
+        public void PagedSourceMergeDoesNotRefillAfterTheConsumerStops() {
+            var requests = new List<int>();
+
+            IReadOnlyList<int> ReadPage(int requested) {
+                requests.Add(requested);
+                return new[] { requests.Count };
+            }
+
+            int first = SearchEvents.MergePagedSources(
+                    new Func<int, IReadOnlyList<int>>[] { ReadPage },
+                    static (left, right) => left.CompareTo(right),
+                    pageSize: 32)
+                .Take(1)
+                .Single();
+
+            Assert.Equal(1, first);
+            Assert.Equal(new[] { 1 }, requests);
+        }
+
+        [Fact]
         public void QueryWorkItemsAvoidCartesianProductForLargeCombinedFilters() {
             var eventIds = Enumerable.Range(1, 5000).ToList();
             var recordIds = Enumerable.Range(1, 5000).Select(static value => (long)value).ToList();

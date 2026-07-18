@@ -10,9 +10,10 @@ namespace EventViewerX;
 
 /// <summary>Represents one persisted event-log checkpoint and its log-generation identity.</summary>
 public sealed class EventCheckpointValue {
-    internal EventCheckpointValue(long? recordId, Guid generationId) {
+    internal EventCheckpointValue(long? recordId, Guid generationId, string? boundaryIdentity) {
         RecordId = recordId;
         GenerationId = generationId;
+        BoundaryIdentity = boundaryIdentity;
     }
 
     /// <summary>Last contiguously processed record identifier, or <c>null</c> before the first record in a generation.</summary>
@@ -20,6 +21,9 @@ public sealed class EventCheckpointValue {
 
     /// <summary>Identity used to reject stale writers after a log is cleared or replaced.</summary>
     public Guid GenerationId { get; }
+
+    /// <summary>Identity of the event stored at <see cref="RecordId"/>, used to detect a cleared or replaced source.</summary>
+    public string? BoundaryIdentity { get; }
 }
 
 /// <summary>Immutable snapshot of checkpoints loaded from a checkpoint file.</summary>
@@ -68,18 +72,28 @@ public sealed class EventCheckpointUpdate {
     /// <param name="recordId">Last contiguously processed record, or <c>null</c> to start a generation without progress.</param>
     /// <param name="expectedGenerationId">Generation observed when the query began.</param>
     /// <param name="startsNewGeneration">Whether the source was detected as cleared or replaced.</param>
-    public EventCheckpointUpdate(string key, long? recordId, Guid expectedGenerationId, bool startsNewGeneration = false) {
+    /// <param name="boundaryIdentity">Identity of the event stored at <paramref name="recordId"/>.</param>
+    public EventCheckpointUpdate(
+        string key,
+        long? recordId,
+        Guid expectedGenerationId,
+        bool startsNewGeneration = false,
+        string? boundaryIdentity = null) {
         if (string.IsNullOrWhiteSpace(key)) {
             throw new ArgumentException("Checkpoint key cannot be null or empty.", nameof(key));
         }
         if (recordId < 0) {
             throw new ArgumentOutOfRangeException(nameof(recordId), "Checkpoint record ID must be greater than or equal to zero.");
         }
+        if (!recordId.HasValue && !string.IsNullOrWhiteSpace(boundaryIdentity)) {
+            throw new ArgumentException("A checkpoint boundary identity requires a record ID.", nameof(boundaryIdentity));
+        }
 
         Key = key;
         RecordId = recordId;
         ExpectedGenerationId = expectedGenerationId;
         StartsNewGeneration = startsNewGeneration;
+        BoundaryIdentity = string.IsNullOrWhiteSpace(boundaryIdentity) ? null : boundaryIdentity!.Trim();
     }
 
     /// <summary>Checkpoint key.</summary>
@@ -93,6 +107,9 @@ public sealed class EventCheckpointUpdate {
 
     /// <summary>Whether this update starts a new log generation.</summary>
     public bool StartsNewGeneration { get; }
+
+    /// <summary>Identity of the event stored at <see cref="RecordId"/>.</summary>
+    public string? BoundaryIdentity { get; }
 }
 
 /// <summary>
@@ -143,7 +160,7 @@ public static class EventCheckpointStore {
                 }
 
                 if (update.StartsNewGeneration) {
-                    values[update.Key] = new EventCheckpointValue(update.RecordId, Guid.NewGuid());
+                    values[update.Key] = new EventCheckpointValue(update.RecordId, Guid.NewGuid(), update.BoundaryIdentity);
                     continue;
                 }
 
@@ -152,7 +169,10 @@ public static class EventCheckpointStore {
                 }
 
                 if (current?.RecordId == null || update.RecordId.Value > current.RecordId.Value) {
-                    values[update.Key] = new EventCheckpointValue(update.RecordId, currentGeneration);
+                    values[update.Key] = new EventCheckpointValue(update.RecordId, currentGeneration, update.BoundaryIdentity);
+                } else if (update.RecordId.Value == current.RecordId.Value &&
+                           current.BoundaryIdentity == null && update.BoundaryIdentity != null) {
+                    values[update.Key] = new EventCheckpointValue(current.RecordId, currentGeneration, update.BoundaryIdentity);
                 }
             }
 
@@ -165,7 +185,7 @@ public static class EventCheckpointStore {
         Dictionary<string, EventCheckpointValue> values = ReadNumericFile(checkpointPath)
             .ToDictionary(
                 static entry => entry.Key,
-                static entry => new EventCheckpointValue(entry.Value, Guid.Empty),
+                static entry => new EventCheckpointValue(entry.Value, Guid.Empty, boundaryIdentity: null),
                 StringComparer.OrdinalIgnoreCase);
 
         string statePath = GetStatePath(checkpointPath);
@@ -185,10 +205,14 @@ public static class EventCheckpointStore {
         }
 
         foreach (KeyValuePair<string, CheckpointStateEntry> entry in state.Checkpoints) {
-            if (entry.Value == null || entry.Value.RecordId < 0) {
+            if (entry.Value == null || entry.Value.RecordId < 0 ||
+                (!entry.Value.RecordId.HasValue && !string.IsNullOrWhiteSpace(entry.Value.BoundaryIdentity))) {
                 throw new InvalidDataException($"Checkpoint generation state '{statePath}' contains an invalid entry for '{entry.Key}'.");
             }
-            values[entry.Key] = new EventCheckpointValue(entry.Value.RecordId, entry.Value.GenerationId);
+            values[entry.Key] = new EventCheckpointValue(
+                entry.Value.RecordId,
+                entry.Value.GenerationId,
+                entry.Value.BoundaryIdentity);
         }
 
         return new EventCheckpointSnapshot(values);
@@ -222,7 +246,8 @@ public static class EventCheckpointStore {
                 static entry => entry.Key,
                 static entry => new CheckpointStateEntry {
                     RecordId = entry.Value.RecordId,
-                    GenerationId = entry.Value.GenerationId
+                    GenerationId = entry.Value.GenerationId,
+                    BoundaryIdentity = entry.Value.BoundaryIdentity
                 },
                 StringComparer.OrdinalIgnoreCase)
         };
@@ -297,5 +322,6 @@ public static class EventCheckpointStore {
     private sealed class CheckpointStateEntry {
         public long? RecordId { get; set; }
         public Guid GenerationId { get; set; }
+        public string? BoundaryIdentity { get; set; }
     }
 }

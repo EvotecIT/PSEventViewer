@@ -89,12 +89,12 @@ namespace EventViewerX {
             var lines = script.Replace("\r", string.Empty).Split('\n');
             foreach (var raw in lines) {
                 var line = raw.Trim();
-                if (line.StartsWith("}")) {
+                if (line.StartsWith("}", StringComparison.Ordinal)) {
                     indent = Math.Max(0, indent - 4);
                 }
                 sb.Append(' ', indent);
                 sb.AppendLine(line);
-                if (line.EndsWith("{")) {
+                if (line.EndsWith("{", StringComparison.Ordinal)) {
                     indent += 4;
                 }
             }

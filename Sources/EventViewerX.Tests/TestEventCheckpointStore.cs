@@ -20,10 +20,37 @@ public class TestEventCheckpointStore {
 
             EventCheckpointSnapshot updated = EventCheckpointStore.Update(
                 path,
-                new[] { new EventCheckpointUpdate("System", 101, value.GenerationId) });
+                new[] { new EventCheckpointUpdate("System", 101, value.GenerationId, boundaryIdentity: "boundary-101") });
 
             Assert.Equal(101, updated.Records["System"]);
+            Assert.Equal("boundary-101", updated.Checkpoints["System"].BoundaryIdentity);
             Assert.True(File.Exists(path + ".state.json"));
+        } finally {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void BoundaryIdentityCanBeMigratedWithoutAdvancingTheRecord() {
+        string root = CreateTemporaryDirectory();
+        try {
+            string path = Path.Combine(root, "checkpoint.json");
+            EventCheckpointSnapshot initial = EventCheckpointStore.Update(
+                path,
+                new[] { new EventCheckpointUpdate("System", 100, Guid.Empty) });
+
+            EventCheckpointSnapshot migrated = EventCheckpointStore.Update(
+                path,
+                new[] {
+                    new EventCheckpointUpdate(
+                        "System",
+                        100,
+                        initial.Checkpoints["System"].GenerationId,
+                        boundaryIdentity: "boundary-100")
+                });
+
+            Assert.Equal(100, migrated.Records["System"]);
+            Assert.Equal("boundary-100", migrated.Checkpoints["System"].BoundaryIdentity);
         } finally {
             Directory.Delete(root, recursive: true);
         }

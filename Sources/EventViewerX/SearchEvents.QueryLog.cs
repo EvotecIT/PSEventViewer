@@ -459,7 +459,7 @@ public partial class SearchEvents : Settings {
         }
 
         // Check if any conditions were added to the query
-        if (queryString.ToString().EndsWith("[System[")) {
+        if (queryString.ToString().EndsWith("[System[", StringComparison.Ordinal)) {
             // If no conditions were added, return a query that selects all events
             queryString.Append("*");
         }
@@ -470,7 +470,7 @@ public partial class SearchEvents : Settings {
     }
 
     private static void AddCondition(StringBuilder queryString, string condition) {
-        if (!queryString.ToString().EndsWith("[System[")) {
+        if (!queryString.ToString().EndsWith("[System[", StringComparison.Ordinal)) {
             queryString.Append(" and ");
         }
         queryString.Append(condition);

@@ -112,11 +112,11 @@ public class ADGroupPolicyLinks : EventRuleBase {
         // AttributeLDAPDisplayName = _eventObject.GetValueFromDataDictionary("AttributeLDAPDisplayName");
         var attributeValue = _eventObject.GetValueFromDataDictionary("AttributeValue");
         var gpoLinks = ExtractGpoLinks(attributeValue);
-        if (OperationType.Contains("Value Added")) {
+        if (OperationType.IndexOf("Value Added", StringComparison.Ordinal) >= 0) {
             Action = "Group Policies were linked";
             GroupPolicyLink = gpoLinks;
             GroupPolicyNames = gpoLinks.Select(x => x.DisplayName).ToList();
-        } else if (OperationType.Contains("Value Deleted")) {
+        } else if (OperationType.IndexOf("Value Deleted", StringComparison.Ordinal) >= 0) {
             Action = "Group Policies were unlinked";
             GroupPolicyUnlink = gpoLinks;
             GroupPolicyNames = gpoLinks.Select(x => x.DisplayName).ToList();

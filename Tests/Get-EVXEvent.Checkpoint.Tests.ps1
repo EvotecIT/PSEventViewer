@@ -84,4 +84,40 @@ Describe 'Get-EVXEvent checkpoint compatibility' {
         { Get-EVXEvent -LogName System -RecordIdFile $CheckpointPath -MaxEvents 1 -ReadMode Metadata -ErrorAction Stop } |
             Should -Throw
     }
+
+    It 'detects a replaced boundary even when the source has refilled above the checkpoint' {
+        $CheckpointPath = Join-Path $TestDrive 'replaced-boundary-checkpoint.json'
+        $Initial = @(Get-EVXEvent -LogName System -RecordIdFile $CheckpointPath -RecordIdKey 'replaced-boundary' -MaxEvents 3 -ReadMode Metadata)
+        if ($Initial.Count -lt 3) {
+            Set-ItResult -Skipped -Because 'The System event log did not contain three checkpointable events.'
+            return
+        }
+        $PreviousBoundary = [long] $Initial[-1].RecordId
+
+        $StatePath = $CheckpointPath + '.state.json'
+        $State = Get-Content -LiteralPath $StatePath -Raw | ConvertFrom-Json
+        $State.Checkpoints.'replaced-boundary'.BoundaryIdentity = 'SIMULATED-REPLACED-LOG-GENERATION'
+        $State | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $StatePath -Encoding UTF8
+
+        $AfterReplacement = @(Get-EVXEvent -LogName System -RecordIdFile $CheckpointPath -RecordIdKey 'replaced-boundary' -MaxEvents 1 -ReadMode Metadata -WarningAction SilentlyContinue)
+        $AfterReplacement.Count | Should -Be 1
+        [long] $AfterReplacement[0].RecordId | Should -BeLessThan $PreviousBoundary
+    }
+
+    It 'creates the same checkpoint boundary identity across read modes' {
+        $Full = Get-EVXEvent -LogName System -MaxEvents 1 -ReadMode Full | Select-Object -First 1
+        if (-not $Full -or -not $Full.RecordId) {
+            Set-ItResult -Skipped -Because 'The System event log contained no checkpointable event.'
+            return
+        }
+
+        $Metadata = Get-EVXEvent -LogName System -EventRecordId $Full.RecordId -MaxEvents 1 -ReadMode Metadata | Select-Object -First 1
+        if (-not $Metadata) {
+            Set-ItResult -Skipped -Because 'The selected System event aged out before it could be queried again.'
+            return
+        }
+
+        [EventViewerX.EventCheckpointBoundaryIdentity]::Create($Full.PSObject.BaseObject) |
+            Should -Be ([EventViewerX.EventCheckpointBoundaryIdentity]::Create($Metadata.PSObject.BaseObject))
+    }
 }

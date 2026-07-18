@@ -149,6 +149,30 @@ namespace EventViewerX {
                 yield break;
             }
 
+            if (oldest && minimumEventRecordIdExclusiveResolver != null) {
+                foreach (EventObject foundEvent in QueryNamedCheckpointCandidates(
+                             eventInfo,
+                             machineNames,
+                             startTime,
+                             endTime,
+                             timePeriod,
+                             cancellationToken,
+                             minimumEventRecordIdExclusiveResolver)) {
+                    queryInfo.TryRecordCandidate();
+                    candidateObserver?.Invoke(foundEvent);
+
+                    EventObjectSlim? targetEvent = BuildTargetEvents(foundEvent, typeEventsList);
+                    if (targetEvent == null) {
+                        continue;
+                    }
+
+                    emitted++;
+                    queryInfo.EventsEmitted = emitted;
+                    yield return targetEvent;
+                }
+                yield break;
+            }
+
             // Unlimited queries retain streaming/backpressure and do not need a cross-log selection buffer.
             foreach (KeyValuePair<string, HashSet<int>> entry in eventInfo) {
                 await foreach (EventObject foundEvent in QueryNamedEventCandidates(

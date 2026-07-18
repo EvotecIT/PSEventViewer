@@ -12,8 +12,6 @@ public class OnModuleImportAndRemove : IModuleAssemblyInitializer, IModuleAssemb
     /// OnImport is called when the module is imported.
     /// </summary>
     public void OnImport() {
-        Guid runspaceId = Runspace.DefaultRunspace?.InstanceId ?? Guid.Empty;
-        PSEventViewer.PowerShellWatcherRegistry.BeginModuleInstance(runspaceId);
         if (IsNetFramework()) {
             AppDomain.CurrentDomain.AssemblyResolve += MyResolveEventHandler;
         }
