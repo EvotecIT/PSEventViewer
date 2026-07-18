@@ -15,7 +15,9 @@ public partial class SearchEvents : Settings {
     public static EventLogDetails? GetLogDetails(string logName, string? machineName = null, int timeoutMs = 3000, bool includeEventTimes = false) {
         if (string.IsNullOrWhiteSpace(logName)) throw new ArgumentException("logName cannot be null or empty", nameof(logName));
 
-        return GetLogDetailsResult(logName, machineName, timeoutMs, includeEventTimes).Details;
+        EventLogDetailsResult result = GetLogDetailsResult(logName, machineName, timeoutMs, includeEventTimes);
+        WriteLogDetailsWarningIfNeeded(result);
+        return result.Details;
     }
 
     /// <summary>
@@ -39,7 +41,9 @@ public partial class SearchEvents : Settings {
         if (session == null) throw new ArgumentNullException(nameof(session));
         if (string.IsNullOrWhiteSpace(logName)) throw new ArgumentException("logName cannot be null or empty", nameof(logName));
 
-        return GetLogDetailsResult(logName, session, timeoutMs, machineName, includeEventTimes).Details;
+        EventLogDetailsResult result = GetLogDetailsResult(logName, session, timeoutMs, machineName, includeEventTimes);
+        WriteLogDetailsWarningIfNeeded(result);
+        return result.Details;
     }
 
     /// <summary>
@@ -63,7 +67,7 @@ public partial class SearchEvents : Settings {
     private static EventLogDetailsResult SafeGetResult(string logName, string? machineName, int timeoutMs, bool includeEventTimes) {
         EventLogSessionOpenResult? sessionResult = null;
         try {
-            sessionResult = CreateSessionResult(machineName, "LogDetails", logName, timeoutMs);
+            sessionResult = CreateSessionResult(machineName, "LogDetails", logName, timeoutMs, emitDiagnostics: false);
             if (!sessionResult.Success || sessionResult.Session == null) {
                 return Failure(
                     logName,
@@ -100,16 +104,12 @@ public partial class SearchEvents : Settings {
                     $"Timed out reading configuration for '{logName}' on '{hostName}' after {timeoutMs} ms.",
                     static configuration => configuration.Dispose());
             } catch (TimeoutException ex) {
-                _logger.WriteWarning(ex.Message);
                 return Failure(logName, machineName, EventLogDetailsStatus.Timeout, ex.Message, timeoutMs, ex.GetType().Name);
             } catch (UnauthorizedAccessException ex) {
-                _logger.WriteWarning($"Access denied reading configuration for {logName} on {hostName}: {ex.Message}");
                 return Failure(logName, machineName, EventLogDetailsStatus.AccessDenied, ex.Message, timeoutMs, ex.GetType().Name);
             } catch (EventLogException ex) {
-                _logger.WriteWarning($"Couldn't create EventLogConfiguration for {logName} on {hostName}: {ex.Message}");
                 return Failure(logName, machineName, EventLogDetailsStatus.LogConfigurationUnavailable, ex.Message, timeoutMs, ex.GetType().Name);
             } catch (Exception ex) {
-                _logger.WriteWarning($"Couldn't create EventLogConfiguration for {logName} on {hostName}: {ex.Message}");
                 return Failure(logName, machineName, EventLogDetailsStatus.LogConfigurationUnavailable, ex.Message, timeoutMs, ex.GetType().Name);
             }
 
@@ -120,13 +120,10 @@ public partial class SearchEvents : Settings {
                     timeoutMs,
                     $"Timed out reading runtime information for '{logName}' on '{hostName}' after {timeoutMs} ms.");
             } catch (TimeoutException ex) {
-                _logger.WriteWarning(ex.Message);
                 logInformationFailure = ex;
             } catch (UnauthorizedAccessException ex) {
-                _logger.WriteWarning($"Access denied reading runtime information for {logName} on {hostName}: {ex.Message}");
                 logInformationFailure = ex;
             } catch (Exception ex) {
-                _logger.WriteVerbose($"Couldn't get log information for {logName} on {hostName}: {ex.Message}");
                 logInformationFailure = ex;
             }
 
@@ -134,27 +131,22 @@ public partial class SearchEvents : Settings {
             Exception? eventTimeFailure = includeEventTimes
                 ? ReadEventTimes(logName, session, timeoutMs, details)
                 : null;
-            EventLogDetailsResult result;
+            var result = new EventLogDetailsResult {
+                LogName = logName,
+                MachineName = hostName,
+                Status = EventLogDetailsStatus.Success,
+                Details = details,
+                TimeoutMs = timeoutMs
+            };
+            foreach (EventLogDetailsDiagnostic diagnostic in details.Diagnostics) {
+                AppendResultDiagnostic(result, diagnostic.Status, diagnostic.Message, diagnostic.ErrorType);
+            }
             if (logInfoObj == null) {
-                result = new EventLogDetailsResult
-                {
-                    LogName = logName,
-                    MachineName = hostName,
-                    Status = MapLogInformationFailureStatus(logInformationFailure),
-                    Details = details,
-                    ErrorMessage = CreateLogInformationFailureMessage(logInformationFailure),
-                    ErrorType = logInformationFailure?.GetType().Name ?? string.Empty,
-                    TimeoutMs = timeoutMs
-                };
-            } else {
-                result = new EventLogDetailsResult
-                {
-                    LogName = logName,
-                    MachineName = hostName,
-                    Status = EventLogDetailsStatus.Success,
-                    Details = details,
-                    TimeoutMs = timeoutMs
-                };
+                AppendResultDiagnostic(
+                    result,
+                    MapLogInformationFailureStatus(logInformationFailure),
+                    CreateLogInformationFailureMessage(logInformationFailure),
+                    logInformationFailure?.GetType().Name ?? string.Empty);
             }
             if (eventTimeFailure != null) {
                 ApplyEventTimeFailure(result, eventTimeFailure);
@@ -189,7 +181,6 @@ public partial class SearchEvents : Settings {
             }
             return null;
         } catch (Exception ex) {
-            _logger.WriteVerbose($"Couldn't read oldest/newest event times for {logName} on {details.MachineName}: {ex.Message}");
             return ex;
         }
     }
@@ -198,19 +189,52 @@ public partial class SearchEvents : Settings {
         if (result == null) throw new ArgumentNullException(nameof(result));
         if (failure == null) throw new ArgumentNullException(nameof(failure));
 
-        if (result.Status == EventLogDetailsStatus.Success) {
-            result.Status = MapEventTimeFailureStatus(failure);
-        }
         string message = $"Oldest/newest event times could not be read: {failure.Message}";
-        result.ErrorMessage = string.IsNullOrWhiteSpace(result.ErrorMessage)
-            ? message
-            : $"{result.ErrorMessage} {message}";
-        string failureType = failure.GetType().Name;
-        if (string.IsNullOrWhiteSpace(result.ErrorType)) {
-            result.ErrorType = failureType;
-        } else if (!result.ErrorType.Split(';').Contains(failureType, StringComparer.Ordinal)) {
-            result.ErrorType = $"{result.ErrorType};{failureType}";
+        AppendResultDiagnostic(result, MapEventTimeFailureStatus(failure), message, failure.GetType().Name);
+    }
+
+    internal static void AppendResultDiagnostic(
+        EventLogDetailsResult result,
+        EventLogDetailsStatus status,
+        string message,
+        string errorType) {
+
+        if (result == null) throw new ArgumentNullException(nameof(result));
+        result.Status = MergeDiagnosticStatus(result.Status, status);
+        if (!string.IsNullOrWhiteSpace(message)) {
+            result.ErrorMessage = string.IsNullOrWhiteSpace(result.ErrorMessage)
+                ? message
+                : $"{result.ErrorMessage} {message}";
         }
+        if (string.IsNullOrWhiteSpace(errorType)) {
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(result.ErrorType)) {
+            result.ErrorType = errorType;
+        } else if (!result.ErrorType.Split(';').Contains(errorType, StringComparer.Ordinal)) {
+            result.ErrorType = $"{result.ErrorType};{errorType}";
+        }
+    }
+
+    internal static EventLogDetailsStatus MergeDiagnosticStatus(
+        EventLogDetailsStatus current,
+        EventLogDetailsStatus candidate) {
+
+        if (current == EventLogDetailsStatus.Success) {
+            return candidate;
+        }
+        if (IsActionableDetailsStatus(current) || !IsActionableDetailsStatus(candidate)) {
+            return current;
+        }
+        return candidate;
+    }
+
+    private static bool IsActionableDetailsStatus(EventLogDetailsStatus status) {
+        return status == EventLogDetailsStatus.AccessDenied ||
+               status == EventLogDetailsStatus.Timeout ||
+               status == EventLogDetailsStatus.HostUnavailable ||
+               status == EventLogDetailsStatus.SessionUnavailable ||
+               status == EventLogDetailsStatus.Error;
     }
 
     internal static EventLogDetailsStatus MapEventTimeFailureStatus(Exception failure) {
@@ -278,7 +302,7 @@ public partial class SearchEvents : Settings {
         }
 
         string hostName = string.IsNullOrWhiteSpace(machineName) ? GetFQDN() : machineName!;
-        EventLogSessionOpenResult sessionResult = CreateSessionResult(machineName, "DisplayEventLogResults", "*", timeoutMs);
+        EventLogSessionOpenResult sessionResult = CreateSessionResult(machineName, "DisplayEventLogResults", "*", timeoutMs, emitDiagnostics: false);
         if (!sessionResult.Success || sessionResult.Session == null) {
             yield return Failure("*", hostName, MapSessionFailureStatus(sessionResult.Status), sessionResult.ErrorMessage, timeoutMs, sessionResult.ErrorType);
             sessionResult.Dispose();

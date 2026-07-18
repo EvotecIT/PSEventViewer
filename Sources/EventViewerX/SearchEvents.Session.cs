@@ -33,7 +33,8 @@ public partial class SearchEvents : Settings
         int? timeoutMs = null,
         Func<EventLogSession>? localSessionFactory = null,
         Func<string, int, bool>? rpcProbeOverride = null,
-        Func<string, EventLogSession>? remoteSessionFactory = null) {
+        Func<string, EventLogSession>? remoteSessionFactory = null,
+        bool emitDiagnostics = true) {
         int budget = timeoutMs ?? DefaultSessionTimeoutMs;
         if (budget <= 0) {
             throw new ArgumentOutOfRangeException(nameof(timeoutMs), "Session timeout must be positive.");
@@ -52,7 +53,9 @@ public partial class SearchEvents : Settings
                     static lateSession => lateSession.Dispose());
                 return SessionSuccess(machineName, GetFQDN(), operation, channel, budget, session);
             } catch (TimeoutException ex) {
-                _logger.WriteWarning($"{operation}: {ex.Message}");
+                if (emitDiagnostics) {
+                    _logger.WriteWarning($"{operation}: {ex.Message}");
+                }
                 return SessionFailure(
                     machineName,
                     GetFQDN(),
@@ -63,7 +66,9 @@ public partial class SearchEvents : Settings
                     budget,
                     ex.GetType().Name);
             } catch (Exception ex) {
-                _logger.WriteWarning($"{operation}: failed to open local session for '{channel}': {ex.Message}");
+                if (emitDiagnostics) {
+                    _logger.WriteWarning($"{operation}: failed to open local session for '{channel}': {ex.Message}");
+                }
                 return SessionFailure(
                     machineName,
                     GetFQDN(),
@@ -78,9 +83,10 @@ public partial class SearchEvents : Settings
 
         var normalizedHost = machineName?.Trim() ?? string.Empty;
         var targetHost = string.IsNullOrWhiteSpace(normalizedHost) ? GetFQDN() : normalizedHost;
-        if (TryGetHostNegativeCacheExpiry(normalizedHost, out DateTime cachedUntilUtc))
-        {
-            _logger.WriteVerbose($"{operation}: skipping {normalizedHost} (cached unreachable)");
+        if (TryGetHostNegativeCacheExpiry(normalizedHost, out DateTime cachedUntilUtc)) {
+            if (emitDiagnostics) {
+                _logger.WriteVerbose($"{operation}: skipping {normalizedHost} (cached unreachable)");
+            }
             return SessionFailure(
                 machineName,
                 targetHost,
@@ -107,7 +113,9 @@ public partial class SearchEvents : Settings
                 nameof(EventLogSessionOpenStatus.Timeout));
         }
         if (!(rpcProbeOverride?.Invoke(normalizedHost, rpcBudget) ?? RpcProbe(normalizedHost, rpcBudget))) {
-            _logger.WriteVerbose($"{operation}: RPC preflight failed for '{machineName}'");
+            if (emitDiagnostics) {
+                _logger.WriteVerbose($"{operation}: RPC preflight failed for '{machineName}'");
+            }
             MarkHostUnreachable(normalizedHost);
             TryGetHostNegativeCacheExpiry(normalizedHost, out DateTime rpcCachedUntilUtc);
             return SessionFailure(
@@ -146,7 +154,9 @@ public partial class SearchEvents : Settings
             ClearNegativeCache(normalizedHost);
             return SessionSuccess(machineName, targetHost, operation, channel, budget, session);
         } catch (TimeoutException ex) {
-            _logger.WriteWarning($"{operation}: {ex.Message}");
+            if (emitDiagnostics) {
+                _logger.WriteWarning($"{operation}: {ex.Message}");
+            }
             MarkHostUnreachable(normalizedHost);
             TryGetHostNegativeCacheExpiry(normalizedHost, out DateTime timeoutCachedUntilUtc);
             return SessionFailure(
@@ -160,7 +170,9 @@ public partial class SearchEvents : Settings
                 ex.GetType().Name,
                 timeoutCachedUntilUtc);
         } catch (UnauthorizedAccessException ex) {
-            _logger.WriteWarning($"{operation}: access denied opening session to '{machineName}' for '{channel}': {ex.Message}");
+            if (emitDiagnostics) {
+                _logger.WriteWarning($"{operation}: access denied opening session to '{machineName}' for '{channel}': {ex.Message}");
+            }
             return SessionFailure(
                 machineName,
                 targetHost,
@@ -170,10 +182,10 @@ public partial class SearchEvents : Settings
                 ex.Message,
                 budget,
                 ex.GetType().Name);
-        }
-        catch (EventLogException ex)
-        {
-            _logger.WriteWarning($"{operation}: failed opening session to '{machineName}' for '{channel}': {ex.Message}");
+        } catch (EventLogException ex) {
+            if (emitDiagnostics) {
+                _logger.WriteWarning($"{operation}: failed opening session to '{machineName}' for '{channel}': {ex.Message}");
+            }
             return SessionFailure(
                 machineName,
                 targetHost,
@@ -183,10 +195,10 @@ public partial class SearchEvents : Settings
                 ex.Message,
                 budget,
                 ex.GetType().Name);
-        }
-        catch (Exception ex)
-        {
-            _logger.WriteWarning($"{operation}: unexpected error opening session to '{machineName}' for '{channel}': {ex.Message}");
+        } catch (Exception ex) {
+            if (emitDiagnostics) {
+                _logger.WriteWarning($"{operation}: unexpected error opening session to '{machineName}' for '{channel}': {ex.Message}");
+            }
             return SessionFailure(
                 machineName,
                 targetHost,

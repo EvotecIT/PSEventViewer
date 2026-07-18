@@ -170,4 +170,94 @@ public class TestEventLogDetailsResult {
         Assert.Contains("System", warning, StringComparison.Ordinal);
         Assert.Contains(nameof(EventLogDetailsStatus.EventTimesUnavailable), warning, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void MergeDiagnosticStatus_PromotesGenericFailureButRetainsActionableFailure() {
+        Assert.Equal(
+            EventLogDetailsStatus.Timeout,
+            SearchEvents.MergeDiagnosticStatus(
+                EventLogDetailsStatus.LogInformationUnavailable,
+                EventLogDetailsStatus.Timeout));
+        Assert.Equal(
+            EventLogDetailsStatus.AccessDenied,
+            SearchEvents.MergeDiagnosticStatus(
+                EventLogDetailsStatus.AccessDenied,
+                EventLogDetailsStatus.Timeout));
+        Assert.Equal(
+            EventLogDetailsStatus.LogConfigurationUnavailable,
+            SearchEvents.MergeDiagnosticStatus(
+                EventLogDetailsStatus.LogConfigurationUnavailable,
+                EventLogDetailsStatus.EventTimesUnavailable));
+    }
+
+    [Fact]
+    public void AppendResultDiagnostic_PreservesAllPartialFailureEvidence() {
+        var result = new EventLogDetailsResult { Status = EventLogDetailsStatus.LogInformationUnavailable };
+
+        SearchEvents.AppendResultDiagnostic(
+            result,
+            EventLogDetailsStatus.Timeout,
+            "Runtime information timed out.",
+            nameof(TimeoutException));
+        SearchEvents.AppendResultDiagnostic(
+            result,
+            EventLogDetailsStatus.EventTimesUnavailable,
+            "Event time failed.",
+            nameof(InvalidOperationException));
+
+        Assert.Equal(EventLogDetailsStatus.Timeout, result.Status);
+        Assert.Contains("Runtime information timed out.", result.ErrorMessage, StringComparison.Ordinal);
+        Assert.Contains("Event time failed.", result.ErrorMessage, StringComparison.Ordinal);
+        Assert.Equal($"{nameof(TimeoutException)};{nameof(InvalidOperationException)}", result.ErrorType);
+    }
+
+    [Fact]
+    public void DetailsOnlyCompatibilityApiOwnsWarningButTypedApiDoesNot() {
+        if (!OperatingSystem.IsWindows()) return;
+
+        InternalLogger previous = Settings._logger;
+        var logger = new InternalLogger();
+        var warnings = new List<string>();
+        logger.OnWarningMessage += (_, args) => warnings.Add(args.FullMessage);
+        Settings._logger = logger;
+        try {
+            EventLogDetailsResult typed = SearchEvents.GetLogDetailsResult("Definitely-Missing-EventViewerX-Warning-Test-Log");
+            Assert.True(typed.HasDiagnosticFailure);
+            Assert.Empty(warnings);
+
+            EventLogDetails? details = SearchEvents.GetLogDetails("Definitely-Missing-EventViewerX-Warning-Test-Log");
+            Assert.Null(details);
+        } finally {
+            Settings._logger = previous;
+        }
+
+        string warning = Assert.Single(warnings);
+        Assert.Contains("Definitely-Missing-EventViewerX-Warning-Test-Log", warning, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TypedSessionResultCanSuppressBoundaryDiagnostics() {
+        if (!OperatingSystem.IsWindows()) return;
+
+        InternalLogger previous = Settings._logger;
+        var logger = new InternalLogger();
+        var warnings = new List<string>();
+        logger.OnWarningMessage += (_, args) => warnings.Add(args.FullMessage);
+        Settings._logger = logger;
+        try {
+            using EventLogSessionOpenResult result = SearchEvents.CreateSessionResult(
+                null,
+                "LogDetails",
+                "Application",
+                timeoutMs: 1000,
+                localSessionFactory: static () => throw new InvalidOperationException("Expected session failure."),
+                emitDiagnostics: false);
+
+            Assert.False(result.Success);
+            Assert.Equal(EventLogSessionOpenStatus.LocalSessionUnavailable, result.Status);
+            Assert.Empty(warnings);
+        } finally {
+            Settings._logger = previous;
+        }
+    }
 }
