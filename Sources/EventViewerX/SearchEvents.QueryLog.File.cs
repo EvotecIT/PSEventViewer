@@ -113,17 +113,21 @@ public partial class SearchEvents : Settings {
                 yield break;
             }
 
+            int boundedPageSize = maxEvents > 0
+                ? GetBoundedCandidatePageSize(1, maxEvents)
+                : 0;
             List<Func<int, IReadOnlyList<EventObject>>> pageReaders = CreateRecordOrderedSourcePageReaders(
                 pagedWorkItems,
                 createEnumerator,
                 oldest,
-                cancellationToken);
+                cancellationToken,
+                boundedPageSize);
             if (pageReaders.Count == 0) {
                 yield break;
             }
 
             int pageSize = maxEvents > 0
-                ? GetBoundedCandidatePageSize(pageReaders.Count, maxEvents)
+                ? boundedPageSize
                 : GetCheckpointCandidatePageSize(pageReaders.Count);
             int returned = 0;
             foreach (EventObject eventObject in MergePagedSources(

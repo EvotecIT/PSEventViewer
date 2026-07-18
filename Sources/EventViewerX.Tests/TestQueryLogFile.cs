@@ -44,6 +44,26 @@ namespace EventViewerX.Tests {
         }
 
         [Fact]
+        public void QueryLogFileBoundsPrefetchAcrossXPathChunks() {
+            if (!OperatingSystem.IsWindows()) return;
+            string path = Path.Combine("..", "..", "..", "..", "..", "Tests", "Logs", "Active Directory Web Services.evtx");
+            var eventIds = Enumerable.Range(100000, 463).ToList();
+            eventIds.Add(1200);
+            int observed = 0;
+
+            List<EventObject> events = SearchEvents.QueryLogFile(
+                path,
+                eventIds: eventIds,
+                maxEvents: 2,
+                readMode: EventReadMode.Metadata,
+                candidateObserver: _ => observed++).ToList();
+
+            Assert.Equal(2, events.Count);
+            Assert.InRange(observed, events.Count, events.Count + 1);
+            Assert.All(events, eventObject => Assert.Equal(1200, eventObject.Id));
+        }
+
+        [Fact]
         public void QueryLogFileCombinesEventAndRecordIdFilters() {
             if (!OperatingSystem.IsWindows()) return;
             string path = Path.Combine("..", "..", "..", "..", "..", "Tests", "Logs", "Active Directory Web Services.evtx");
