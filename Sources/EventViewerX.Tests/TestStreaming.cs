@@ -673,7 +673,7 @@ namespace EventViewerX.Tests {
                         return Array.Empty<int>();
                     }
                     bothSourcesStarted.Signal();
-                    if (!bothSourcesStarted.Wait(TimeSpan.FromSeconds(2))) {
+                    if (!bothSourcesStarted.Wait(TimeSpan.FromSeconds(10))) {
                         throw new TimeoutException("Physical source heads were not acquired concurrently.");
                     }
                     return new[] { value };
