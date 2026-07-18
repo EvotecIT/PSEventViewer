@@ -112,7 +112,7 @@ public partial class SearchEvents : Settings
                 budget,
                 nameof(EventLogSessionOpenStatus.Timeout));
         }
-        if (!(rpcProbeOverride?.Invoke(normalizedHost, rpcBudget) ?? RpcProbe(normalizedHost, rpcBudget))) {
+        if (!(rpcProbeOverride?.Invoke(normalizedHost, rpcBudget) ?? RpcProbe(normalizedHost, rpcBudget, emitDiagnostics))) {
             if (emitDiagnostics) {
                 _logger.WriteVerbose($"{operation}: RPC preflight failed for '{machineName}'");
             }
@@ -227,9 +227,8 @@ public partial class SearchEvents : Settings
     /// <summary>
     /// Opens an Event Log session and returns diagnostic details when the session cannot be created.
     /// </summary>
-    public static EventLogSessionOpenResult OpenSessionResult(string? machineName, int? timeoutMs = null, string? purpose = null, string? logName = null)
-    {
-        return CreateSessionResult(machineName, purpose, logName, timeoutMs);
+    public static EventLogSessionOpenResult OpenSessionResult(string? machineName, int? timeoutMs = null, string? purpose = null, string? logName = null) {
+        return CreateSessionResult(machineName, purpose, logName, timeoutMs, emitDiagnostics: false);
     }
 
     /// <summary>
@@ -248,7 +247,7 @@ public partial class SearchEvents : Settings
         _unreachable.Clear();
     }
 
-    private static bool RpcProbe(string host, int timeoutMs) {
+    private static bool RpcProbe(string host, int timeoutMs, bool emitDiagnostics) {
         try {
             using var tcp = new TcpClient();
             Task connectTask = tcp.ConnectAsync(host, Settings.RpcProbePort);
@@ -270,7 +269,9 @@ public partial class SearchEvents : Settings
             }
             return true;
         } catch (Exception ex) {
-            _logger.WriteVerbose($"Session: RPC probe failed for '{host}': {ex.Message}");
+            if (emitDiagnostics) {
+                _logger.WriteVerbose($"Session: RPC probe failed for '{host}': {ex.Message}");
+            }
             return false;
         }
     }

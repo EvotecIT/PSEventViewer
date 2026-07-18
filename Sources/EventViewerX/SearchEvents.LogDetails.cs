@@ -25,6 +25,7 @@ public partial class SearchEvents : Settings {
     /// </summary>
     public static EventLogDetailsResult GetLogDetailsResult(string logName, string? machineName = null, int timeoutMs = 3000, bool includeEventTimes = false) {
         if (string.IsNullOrWhiteSpace(logName)) throw new ArgumentException("logName cannot be null or empty", nameof(logName));
+        if (timeoutMs <= 0) throw new ArgumentOutOfRangeException(nameof(timeoutMs), "Timeout must be positive.");
 
         try {
             return SafeGetResult(logName, machineName, timeoutMs, includeEventTimes);
@@ -49,17 +50,14 @@ public partial class SearchEvents : Settings {
     /// <summary>
     /// Reuses an existing EventLogSession (caller owns it) and returns diagnostic status when the log cannot be read.
     /// </summary>
-    public static EventLogDetailsResult GetLogDetailsResult(string logName, EventLogSession session, int timeoutMs = 3000, string? machineName = null, bool includeEventTimes = false)
-    {
+    public static EventLogDetailsResult GetLogDetailsResult(string logName, EventLogSession session, int timeoutMs = 3000, string? machineName = null, bool includeEventTimes = false) {
         if (session == null) throw new ArgumentNullException(nameof(session));
         if (string.IsNullOrWhiteSpace(logName)) throw new ArgumentException("logName cannot be null or empty", nameof(logName));
+        if (timeoutMs <= 0) throw new ArgumentOutOfRangeException(nameof(timeoutMs), "Timeout must be positive.");
 
-        try
-        {
+        try {
             return SafeGetResult(logName, session, timeoutMs, machineName, includeEventTimes);
-        }
-        catch (Exception ex)
-        {
+        } catch (Exception ex) {
             return Failure(logName, machineName, EventLogDetailsStatus.Error, ex.Message, timeoutMs, ex.GetType().Name);
         }
     }
@@ -360,6 +358,7 @@ public partial class SearchEvents : Settings {
             EventLogSessionOpenStatus.NegativeCache => EventLogDetailsStatus.HostUnavailable,
             EventLogSessionOpenStatus.RpcUnavailable => EventLogDetailsStatus.HostUnavailable,
             EventLogSessionOpenStatus.EventLogSessionUnavailable => EventLogDetailsStatus.HostUnavailable,
+            EventLogSessionOpenStatus.Error => EventLogDetailsStatus.Error,
             _ => EventLogDetailsStatus.SessionUnavailable
         };
     }

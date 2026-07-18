@@ -66,6 +66,53 @@ public class TestEventLogDetailsResult {
         Assert.Equal(
             EventLogDetailsStatus.HostUnavailable,
             SearchEvents.MapSessionFailureStatus(EventLogSessionOpenStatus.EventLogSessionUnavailable));
+        Assert.Equal(
+            EventLogDetailsStatus.Error,
+            SearchEvents.MapSessionFailureStatus(EventLogSessionOpenStatus.Error));
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void GetLogDetailsResult_RejectsNonPositiveTimeoutsAcrossOverloads(int timeoutMs) {
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            SearchEvents.GetLogDetailsResult("Application", timeoutMs: timeoutMs));
+
+        if (!OperatingSystem.IsWindows()) return;
+
+        using var session = new EventLogSession();
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            SearchEvents.GetLogDetailsResult("Application", session, timeoutMs));
+    }
+
+    [Fact]
+    public void OpenSessionResult_DoesNotWriteBoundaryDiagnostics() {
+        if (!OperatingSystem.IsWindows()) return;
+
+        const string host = "[";
+        InternalLogger previous = Settings._logger;
+        var logger = new InternalLogger();
+        var warnings = new List<string>();
+        var verboseMessages = new List<string>();
+        logger.OnWarningMessage += (_, args) => warnings.Add(args.FullMessage);
+        logger.OnVerboseMessage += (_, args) => verboseMessages.Add(args.FullMessage);
+        Settings._logger = logger;
+        SearchEvents.ClearHostCache(host);
+        try {
+            using EventLogSessionOpenResult result = SearchEvents.OpenSessionResult(
+                host,
+                timeoutMs: 100,
+                purpose: "UnitTest",
+                logName: "Application");
+
+            Assert.False(result.Success);
+            Assert.Equal(EventLogSessionOpenStatus.RpcUnavailable, result.Status);
+            Assert.Empty(warnings);
+            Assert.Empty(verboseMessages);
+        } finally {
+            SearchEvents.ClearHostCache(host);
+            Settings._logger = previous;
+        }
     }
 
     [Fact]

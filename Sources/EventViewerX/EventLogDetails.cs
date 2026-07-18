@@ -149,14 +149,7 @@ public class EventLogDetails {
 
     private static EventLogDetailsStatus ClassifyProjectionFailure(Exception exception, EventLogDetailsStatus fallbackStatus) {
         if (exception is EventLogSessionException sessionException) {
-            return sessionException.Status switch {
-                EventLogSessionOpenStatus.AccessDenied => EventLogDetailsStatus.AccessDenied,
-                EventLogSessionOpenStatus.Timeout => EventLogDetailsStatus.Timeout,
-                EventLogSessionOpenStatus.NegativeCache or
-                EventLogSessionOpenStatus.RpcUnavailable or
-                EventLogSessionOpenStatus.EventLogSessionUnavailable => EventLogDetailsStatus.HostUnavailable,
-                _ => EventLogDetailsStatus.SessionUnavailable
-            };
+            return SearchEvents.MapSessionFailureStatus(sessionException.Status);
         }
 
         return exception switch {
