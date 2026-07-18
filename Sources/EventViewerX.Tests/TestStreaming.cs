@@ -34,6 +34,27 @@ namespace EventViewerX.Tests {
         }
 
         [Fact]
+        public async Task NamedEventsPositiveCapObservesOnlyConsumedMergedCandidates() {
+            if (!OperatingSystem.IsWindows()) return;
+            if (!TestEnv.CanReadLog("Security")) return;
+
+            int candidatesObserved = 0;
+            int emitted = 0;
+            await foreach (EventObjectSlim _ in SearchEvents.FindEventsByNamedEvents(
+                               [NamedEvents.OSStartupSecurity],
+                               new List<string?> { null, Environment.MachineName },
+                               maxThreads: 2,
+                               maxEvents: 1,
+                               candidateObserver: _ => candidatesObserved++)) {
+                emitted++;
+            }
+
+            if (emitted == 0) return;
+            Assert.Equal(1, emitted);
+            Assert.Equal(1, candidatesObserved);
+        }
+
+        [Fact]
         public async Task NamedEventsRejectNegativeCandidateScanLimit() {
             await Assert.ThrowsAsync<ArgumentOutOfRangeException>(async () => {
                 await foreach (var _ in SearchEvents.FindEventsByNamedEvents(

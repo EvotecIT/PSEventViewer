@@ -23,7 +23,7 @@ namespace EventViewerX {
         /// <param name="maxEventsScanned">Global maximum number of candidate event records to evaluate before rule filtering.</param>
         /// <param name="executionInfo">Optional progress object populated while the query is enumerated.</param>
         /// <param name="minimumEventRecordIdExclusiveResolver">Optional per-machine/per-log native checkpoint resolver.</param>
-        /// <param name="candidateObserver">Optional observer invoked for every native candidate before named-event projection.</param>
+        /// <param name="candidateObserver">Optional observer invoked for every globally merged candidate delivered for named-event projection.</param>
         /// <param name="oldest">Whether to enumerate candidates and select results from oldest to newest.</param>
         /// <param name="resultPredicate">Optional predicate applied to projected named-event results before enforcing <paramref name="maxEvents"/>.</param>
         /// <param name="sourceLogName">Optional exact log source filter applied before the candidate scan cap.</param>
@@ -70,17 +70,18 @@ namespace EventViewerX {
 
             if (maxEventsScanned > 0) {
                 int candidateLimit = maxEventsScanned == int.MaxValue ? int.MaxValue : maxEventsScanned + 1;
-                foreach (EventObject foundEvent in QueryNamedPagedCandidates(
-                             eventInfo,
-                             machineNames,
-                             startTime,
-                             endTime,
-                             timePeriod,
-                             candidateLimit,
-                             cancellationToken,
-                             minimumEventRecordIdExclusiveResolver,
-                             oldest,
-                             queryInfo.RecordTargetFailure)) {
+                await foreach (EventObject foundEvent in QueryNamedPagedCandidatesAsync(
+                                   eventInfo,
+                                   machineNames,
+                                   startTime,
+                                   endTime,
+                                   timePeriod,
+                                   candidateLimit,
+                                   maxThreads,
+                                   cancellationToken,
+                                   minimumEventRecordIdExclusiveResolver,
+                                   oldest,
+                                   queryInfo.RecordTargetFailure)) {
                     if (!queryInfo.TryRecordCandidate()) {
                         yield break;
                     }
@@ -102,17 +103,18 @@ namespace EventViewerX {
             }
 
             if (oldest && minimumEventRecordIdExclusiveResolver != null) {
-                foreach (EventObject foundEvent in QueryNamedPagedCandidates(
-                             eventInfo,
-                             machineNames,
-                             startTime,
-                             endTime,
-                             timePeriod,
-                             maxEvents: 0,
-                             cancellationToken,
-                             minimumEventRecordIdExclusiveResolver,
-                             oldest: true,
-                             queryInfo.RecordTargetFailure)) {
+                await foreach (EventObject foundEvent in QueryNamedPagedCandidatesAsync(
+                                   eventInfo,
+                                   machineNames,
+                                   startTime,
+                                   endTime,
+                                   timePeriod,
+                                   maxEvents: 0,
+                                   maxThreads,
+                                   cancellationToken,
+                                   minimumEventRecordIdExclusiveResolver,
+                                   oldest: true,
+                                   queryInfo.RecordTargetFailure)) {
                     queryInfo.TryRecordCandidate();
                     candidateObserver?.Invoke(foundEvent);
 
@@ -132,23 +134,21 @@ namespace EventViewerX {
             }
 
             if (maxEvents > 0) {
-                foreach (EventObject foundEvent in QueryNamedPagedCandidates(
-                             eventInfo,
-                             machineNames,
-                             startTime,
-                             endTime,
-                             timePeriod,
-                             maxEvents,
-                             cancellationToken,
-                             minimumEventRecordIdExclusiveResolver,
-                             oldest,
-                             queryInfo.RecordTargetFailure,
-                             candidate => {
-                                 queryInfo.EventsScanned++;
-                                 candidateObserver?.Invoke(candidate);
-                             },
-                             enforceMaxEvents: false)) {
+                await foreach (EventObject foundEvent in QueryNamedPagedCandidatesAsync(
+                                   eventInfo,
+                                   machineNames,
+                                   startTime,
+                                   endTime,
+                                   timePeriod,
+                                   maxEvents,
+                                   maxThreads,
+                                   cancellationToken,
+                                   minimumEventRecordIdExclusiveResolver,
+                                   oldest,
+                                   queryInfo.RecordTargetFailure)) {
                     cancellationToken.ThrowIfCancellationRequested();
+                    queryInfo.EventsScanned++;
+                    candidateObserver?.Invoke(foundEvent);
                     EventObjectSlim? targetEvent = BuildTargetEvents(foundEvent, typeEventsList);
                     if (targetEvent == null || (resultPredicate != null && !resultPredicate(targetEvent))) {
                         continue;

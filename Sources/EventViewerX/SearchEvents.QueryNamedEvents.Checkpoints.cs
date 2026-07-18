@@ -12,19 +12,18 @@ public partial class SearchEvents : Settings {
     private const int CheckpointCandidateBufferBudget = 4096;
     private const int MaximumCheckpointCandidatePageSize = 1024;
 
-    private static IEnumerable<EventObject> QueryNamedPagedCandidates(
+    private static async IAsyncEnumerable<EventObject> QueryNamedPagedCandidatesAsync(
         Dictionary<string, HashSet<int>> eventInfo,
         List<string?>? machineNames,
         DateTime? startTime,
         DateTime? endTime,
         TimePeriod? timePeriod,
         int maxEvents,
-        CancellationToken cancellationToken,
+        int maxThreads,
+        [EnumeratorCancellation] CancellationToken cancellationToken,
         Func<string?, string, long?>? minimumEventRecordIdExclusiveResolver,
         bool oldest,
-        Action<EventLogQueryTargetFailure>? targetFailureObserver,
-        Action<EventObject>? candidateObserver = null,
-        bool enforceMaxEvents = true) {
+        Action<EventLogQueryTargetFailure>? targetFailureObserver) {
 
         List<string?> targets = NormalizeNamedCheckpointTargets(machineNames);
         var pageReaders = new List<Func<int, IReadOnlyList<EventObject>>>(eventInfo.Count * targets.Count);
@@ -72,7 +71,7 @@ public partial class SearchEvents : Settings {
                 isolateRemoteFailures,
                 failedTargets,
                 resultPredicate: null,
-                candidateObserver: candidateObserver,
+                candidateObserver: null,
                 targetFailureObserver: targetFailureObserver);
             pageReaders.AddRange(CreateRecordOrderedSourcePageReaders(
                 workItems,
@@ -83,17 +82,20 @@ public partial class SearchEvents : Settings {
         }
 
         if (pageReaders.Count == 0) {
-            return Array.Empty<EventObject>();
+            yield break;
         }
 
-        IEnumerable<EventObject> merged = MergePagedSources(
-            pageReaders,
-            (left, right) => CompareEvents(left, right, oldest),
-            maxEvents > 0
-                ? boundedPageSize
-                : GetCheckpointCandidatePageSize(pageReaders.Count),
-            cancellationToken);
-        return maxEvents > 0 && enforceMaxEvents ? merged.Take(maxEvents) : merged;
+        int pageSize = maxEvents > 0
+            ? boundedPageSize
+            : GetCheckpointCandidatePageSize(pageReaders.Count);
+        await foreach (EventObject eventObject in MergePagedSourcesParallel(
+                           pageReaders,
+                           (left, right) => CompareEvents(left, right, oldest),
+                           pageSize,
+                           maxThreads,
+                           cancellationToken)) {
+            yield return eventObject;
+        }
     }
 
     internal static IEnumerable<T> MergePagedSources<T>(
