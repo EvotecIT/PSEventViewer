@@ -275,7 +275,7 @@ namespace EventViewerX.Tests {
             Assert.Equal(EventLogRemoteQueryFailureKind.None, localFailure);
 
             string localFqdn = System.Net.Dns.GetHostEntry("").HostName;
-            foreach (string localAlias in new[] { ".", "localhost", Environment.MachineName, localFqdn }) {
+            foreach (string localAlias in new[] { ".", "localhost", "LocalHost", "LOCALHOST", Environment.MachineName, localFqdn }) {
                 Assert.False(EventLogRemoteQueryFailureClassifier.TryClassify(
                     localAlias,
                     new TimeoutException("local timeout"),

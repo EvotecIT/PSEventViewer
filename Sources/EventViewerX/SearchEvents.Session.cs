@@ -347,7 +347,7 @@ public partial class SearchEvents : Settings
 
         string name = machineName!.Trim();
         var cmp = StringComparison.OrdinalIgnoreCase;
-        return name == "." || name == "localhost" || name.Equals(Environment.MachineName, cmp) || name.Equals(GetFQDN(), cmp);
+        return name == "." || name.Equals("localhost", cmp) || name.Equals(Environment.MachineName, cmp) || name.Equals(GetFQDN(), cmp);
     }
 
     private static EventLogSessionOpenResult SessionSuccess(
