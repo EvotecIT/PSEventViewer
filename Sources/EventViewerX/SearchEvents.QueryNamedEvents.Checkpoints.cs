@@ -53,7 +53,7 @@ public partial class SearchEvents : Settings {
                     reserveRecordIdPagingBoundary: maxEvents > 0 && !(oldest && minimumResolver != null))
                 .ToList();
             bool isolateRemoteFailures = ShouldIsolateRemoteFailures(
-                expectedSourceCount,
+                targets.Count,
                 targetFailureObserver);
             var failedTargets = new ConcurrentDictionary<string, byte>(StringComparer.OrdinalIgnoreCase);
             Func<QueryWorkItem, IEnumerator<EventObject>> createEnumerator = workItem => CreateSequentialQueryEnumerator(

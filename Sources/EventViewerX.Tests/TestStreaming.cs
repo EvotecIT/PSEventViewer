@@ -248,7 +248,7 @@ namespace EventViewerX.Tests {
         }
 
         [Fact]
-        public void RemoteFailureIsolationCoversMultiplePhysicalSourcesAndTypedObservers() {
+        public void RemoteFailureIsolationCoversIndependentTargetsAndTypedObservers() {
             Assert.False(SearchEvents.ShouldIsolateRemoteFailures(
                 independentSourceCount: 1,
                 targetFailureObserver: null));
