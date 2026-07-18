@@ -238,12 +238,6 @@ public static class LiveStatsQueryExecutor {
 
     internal static string BuildEffectiveXPath(string? xpath, DateTime? startUtc, DateTime? endUtc) {
         string baseXPath = string.IsNullOrWhiteSpace(xpath) ? "*" : xpath!.Trim();
-        if (baseXPath != "*") {
-            // EventLogQuery expects a selector expression. Combining two complete selectors with
-            // a boolean 'and' produces a boolean expression rather than a selector. Custom XPath
-            // remains provider-filtered as supplied; TryBuild applies the time bounds while reading.
-            return baseXPath;
-        }
         if (!startUtc.HasValue && !endUtc.HasValue) {
             return baseXPath;
         }
@@ -257,7 +251,10 @@ public static class LiveStatsQueryExecutor {
             timeCondition = $"TimeCreated[@SystemTime <= '{FormatUtc(endUtc!.Value)}']";
         }
 
-        return $"*[System[{timeCondition}]]";
+        string timePredicate = $"System[{timeCondition}]";
+        return baseXPath == "*"
+            ? $"*[{timePredicate}]"
+            : $"({baseXPath})[{timePredicate}]";
     }
 
     private static string FormatUtc(DateTime value) {
