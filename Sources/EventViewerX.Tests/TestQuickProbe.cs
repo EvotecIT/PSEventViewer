@@ -5,6 +5,14 @@ using Xunit;
 
 namespace EventViewerX.Tests {
     public class TestQuickProbe {
+        [Theory]
+        [InlineData(EventLogSessionOpenStatus.NegativeCache)]
+        [InlineData(EventLogSessionOpenStatus.RpcUnavailable)]
+        [InlineData(EventLogSessionOpenStatus.EventLogSessionUnavailable)]
+        public void RemoteSessionAvailabilityFailuresMapToHostUnavailable(EventLogSessionOpenStatus status) {
+            Assert.Equal(SearchEvents.QuickProbeStatus.HostUnavailable, SearchEvents.MapSessionProbeStatus(status));
+        }
+
         [Fact]
         public void LocalSessionCreationHonorsSubSecondProbeBudget() {
             if (!OperatingSystem.IsWindows()) return;

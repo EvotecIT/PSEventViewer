@@ -8,7 +8,7 @@ Describe 'Start-EVXWatcher - Parameter validation' {
 }
 
 Describe 'Start-EVXWatcher - PowerShell event dispatch' {
-    It 'queues detached events into the PowerShell action runspace and preserves $_' {
+    It 'queues detached events and preserves positional and pipeline action inputs' {
         $EventObject = Get-EVXEvent -LogName System -MaxEvents 1 -ReadMode Metadata | Select-Object -First 1
         if (-not $EventObject) {
             Set-ItResult -Skipped -Because 'The System event log contained no readable events.'
@@ -23,7 +23,7 @@ Describe 'Start-EVXWatcher - PowerShell event dispatch' {
         $Publish = $BridgeType.GetMethod('Publish', [Reflection.BindingFlags]'Instance,NonPublic')
         $Marker = Join-Path $TestDrive 'watcher-action.txt'
         $EscapedMarker = $Marker.Replace("'", "''")
-        $UserAction = [ScriptBlock]::Create("Set-Content -LiteralPath '$EscapedMarker' -Value `$_.Id")
+        $UserAction = [ScriptBlock]::Create("param(`$EventObject) Set-Content -LiteralPath '$EscapedMarker' -Value (`$EventObject.Id.ToString() + '|' + `$_.Id.ToString())")
         $SourceIdentifier = 'PSEventViewer.Tests.' + [Guid]::NewGuid().ToString('N')
         $Subscriber = Register-ObjectEvent -InputObject $Bridge -EventName EventReceived -SourceIdentifier $SourceIdentifier -MessageData $UserAction -Action $ActionBridge
 
@@ -35,7 +35,7 @@ Describe 'Start-EVXWatcher - PowerShell event dispatch' {
             }
 
             Test-Path -LiteralPath $Marker | Should -BeTrue
-            Get-Content -LiteralPath $Marker | Should -Be ([string] $EventObject.Id)
+            Get-Content -LiteralPath $Marker | Should -Be (([string] $EventObject.Id) + '|' + ([string] $EventObject.Id))
         } finally {
             Unregister-Event -SourceIdentifier $SourceIdentifier -ErrorAction SilentlyContinue
             if ($Subscriber.Action) {

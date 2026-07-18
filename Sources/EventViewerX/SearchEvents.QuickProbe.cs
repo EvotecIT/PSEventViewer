@@ -212,12 +212,13 @@ public partial class SearchEvents : Settings {
         }
     }
 
-    private static QuickProbeStatus MapSessionProbeStatus(EventLogSessionOpenStatus status) {
+    internal static QuickProbeStatus MapSessionProbeStatus(EventLogSessionOpenStatus status) {
         return status switch {
             EventLogSessionOpenStatus.AccessDenied => QuickProbeStatus.AccessDenied,
             EventLogSessionOpenStatus.Timeout => QuickProbeStatus.Timeout,
             EventLogSessionOpenStatus.NegativeCache => QuickProbeStatus.HostUnavailable,
             EventLogSessionOpenStatus.RpcUnavailable => QuickProbeStatus.HostUnavailable,
+            EventLogSessionOpenStatus.EventLogSessionUnavailable => QuickProbeStatus.HostUnavailable,
             _ => QuickProbeStatus.Error
         };
     }

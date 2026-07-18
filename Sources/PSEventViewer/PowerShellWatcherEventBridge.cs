@@ -15,7 +15,7 @@ internal sealed class PowerShellWatcherEventArgs : EventArgs {
 
 internal sealed class PowerShellWatcherEventBridge {
     internal static ScriptBlock ActionScript { get; } = ScriptBlock.Create(
-        "$EventArgs.EventObject | ForEach-Object -Process $Event.MessageData");
+        "$EventArgs.EventObject | ForEach-Object -Process { & $Event.MessageData $_ }");
 
     /// <summary>Raised when the native event-log callback publishes a detached event snapshot.</summary>
     public event EventHandler<PowerShellWatcherEventArgs>? EventReceived;

@@ -31,4 +31,19 @@ Describe 'Get-EVXEvent - Named Event' {
         $Expanded.PSObject.Properties.Name | Should -Contain $PayloadKey[0]
         $Expanded.PSObject.BaseObject | Should -BeOfType $Plain.GetType()
     }
+
+    It 'applies MessageRegex before the global named-event result limit' {
+        $Types = @('OSStartup', 'OSShutdown', 'OSStartupSecurity')
+        $Expected = @(Get-EVXEvent -Type $Types -MaxEvents 5 -ErrorAction SilentlyContinue)
+        if ($Expected.Count -lt 2 -or @($Expected.Event.ContainerLog | Sort-Object -Unique).Count -lt 2) {
+            Set-ItResult -Skipped -Because 'Two named-event logs were not available for a global-order comparison.'
+            return
+        }
+
+        $Actual = @(Get-EVXEvent -Type $Types -MessageRegex '(?s).*' -MaxEvents 5 -ErrorAction Stop)
+        $ExpectedKeys = @($Expected | ForEach-Object { '{0}|{1}|{2}' -f $_.Event.QueriedMachine, $_.Event.ContainerLog, $_.Event.RecordId })
+        $ActualKeys = @($Actual | ForEach-Object { '{0}|{1}|{2}' -f $_.Event.QueriedMachine, $_.Event.ContainerLog, $_.Event.RecordId })
+
+        ($ActualKeys -join "`n") | Should -Be ($ExpectedKeys -join "`n")
+    }
 }

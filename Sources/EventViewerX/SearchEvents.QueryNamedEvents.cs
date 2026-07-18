@@ -26,6 +26,7 @@ namespace EventViewerX {
         /// <param name="minimumEventRecordIdExclusiveResolver">Optional per-machine/per-log native checkpoint resolver.</param>
         /// <param name="candidateObserver">Optional observer invoked for every native candidate before named-event projection.</param>
         /// <param name="oldest">Whether to enumerate candidates and select results from oldest to newest.</param>
+        /// <param name="resultPredicate">Optional predicate applied to projected named-event results before enforcing <paramref name="maxEvents"/>.</param>
         /// <returns>Asynchronous sequence of simplified events.</returns>
         public static async IAsyncEnumerable<EventObjectSlim> FindEventsByNamedEvents(
             List<NamedEvents> typeEventsList,
@@ -40,7 +41,8 @@ namespace EventViewerX {
             NamedEventsQueryExecutionInfo? executionInfo = null,
             Func<string?, string, long?>? minimumEventRecordIdExclusiveResolver = null,
             Action<EventObject>? candidateObserver = null,
-            bool oldest = false) {
+            bool oldest = false,
+            Func<EventObjectSlim, bool>? resultPredicate = null) {
 
             if (typeEventsList == null) {
                 throw new ArgumentNullException(nameof(typeEventsList));
@@ -78,7 +80,36 @@ namespace EventViewerX {
 
                     candidateObserver?.Invoke(foundEvent);
                     EventObjectSlim? targetEvent = BuildTargetEvents(foundEvent, typeEventsList);
-                    if (targetEvent == null) {
+                    if (targetEvent == null || (resultPredicate != null && !resultPredicate(targetEvent))) {
+                        continue;
+                    }
+
+                    emitted++;
+                    queryInfo.EventsEmitted = emitted;
+                    yield return targetEvent;
+                    if (maxEvents > 0 && emitted >= maxEvents) {
+                        yield break;
+                    }
+                }
+                yield break;
+            }
+
+            if (oldest && minimumEventRecordIdExclusiveResolver != null) {
+                foreach (EventObject foundEvent in QueryNamedPagedCandidates(
+                             eventInfo,
+                             machineNames,
+                             startTime,
+                             endTime,
+                             timePeriod,
+                             maxEvents: 0,
+                             cancellationToken,
+                             minimumEventRecordIdExclusiveResolver,
+                             oldest: true)) {
+                    queryInfo.TryRecordCandidate();
+                    candidateObserver?.Invoke(foundEvent);
+
+                    EventObjectSlim? targetEvent = BuildTargetEvents(foundEvent, typeEventsList);
+                    if (targetEvent == null || (resultPredicate != null && !resultPredicate(targetEvent))) {
                         continue;
                     }
 
@@ -94,6 +125,7 @@ namespace EventViewerX {
 
             if (maxEvents > 0) {
                 var matches = new List<NamedEventMatch>(Math.Min(maxEvents, 256));
+                object resultPredicateSync = new();
                 foreach (KeyValuePair<string, HashSet<int>> entry in eventInfo) {
                     long scanned = 0;
                     object observerSync = new();
@@ -119,7 +151,17 @@ namespace EventViewerX {
                                        },
                                        candidate => {
                                            EventObjectSlim? projection = BuildTargetEvents(candidate, typeEventsList);
-                                           return projection != null && projections.TryAdd(candidate, projection);
+                                           if (projection == null) {
+                                               return false;
+                                           }
+                                           if (resultPredicate != null) {
+                                               lock (resultPredicateSync) {
+                                                   if (!resultPredicate(projection)) {
+                                                       return false;
+                                                   }
+                                               }
+                                           }
+                                           return projections.TryAdd(candidate, projection);
                                        })) {
                         if (projections.TryRemove(foundEvent, out EventObjectSlim? targetEvent)) {
                             matches.Add(new NamedEventMatch(foundEvent, targetEvent));
@@ -135,32 +177,6 @@ namespace EventViewerX {
                     cancellationToken.ThrowIfCancellationRequested();
                     queryInfo.EventsEmitted = index + 1;
                     yield return matches[index].Projection;
-                }
-                yield break;
-            }
-
-            if (oldest && minimumEventRecordIdExclusiveResolver != null) {
-                foreach (EventObject foundEvent in QueryNamedPagedCandidates(
-                             eventInfo,
-                             machineNames,
-                             startTime,
-                             endTime,
-                             timePeriod,
-                             maxEvents: 0,
-                             cancellationToken,
-                             minimumEventRecordIdExclusiveResolver,
-                             oldest: true)) {
-                    queryInfo.TryRecordCandidate();
-                    candidateObserver?.Invoke(foundEvent);
-
-                    EventObjectSlim? targetEvent = BuildTargetEvents(foundEvent, typeEventsList);
-                    if (targetEvent == null) {
-                        continue;
-                    }
-
-                    emitted++;
-                    queryInfo.EventsEmitted = emitted;
-                    yield return targetEvent;
                 }
                 yield break;
             }
@@ -183,7 +199,7 @@ namespace EventViewerX {
                     candidateObserver?.Invoke(foundEvent);
 
                     EventObjectSlim? targetEvent = BuildTargetEvents(foundEvent, typeEventsList);
-                    if (targetEvent == null) {
+                    if (targetEvent == null || (resultPredicate != null && !resultPredicate(targetEvent))) {
                         continue;
                     }
 
