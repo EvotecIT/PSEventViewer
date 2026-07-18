@@ -68,6 +68,22 @@ public class TestEventLogDetailsResult {
     }
 
     [Fact]
+    public void DiagnosticProperties_DistinguishPartialFailureFromCleanSuccess() {
+        var result = new EventLogDetailsResult {
+            LogName = "System",
+            MachineName = "AD1",
+            Status = EventLogDetailsStatus.EventTimesUnavailable,
+            ErrorMessage = "Newest event could not be read."
+        };
+
+        Assert.True(result.HasDiagnosticFailure);
+        Assert.Contains("System", result.DiagnosticMessage, StringComparison.Ordinal);
+        Assert.Contains("AD1", result.DiagnosticMessage, StringComparison.Ordinal);
+        Assert.Contains(nameof(EventLogDetailsStatus.EventTimesUnavailable), result.DiagnosticMessage, StringComparison.Ordinal);
+        Assert.Contains("Newest event could not be read.", result.DiagnosticMessage, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ApplyEventTimeFailure_ReportsTimeoutWithPartialDetailsStatus() {
         var result = new EventLogDetailsResult { Status = EventLogDetailsStatus.Success };
 

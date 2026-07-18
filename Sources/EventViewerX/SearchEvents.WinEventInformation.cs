@@ -31,10 +31,11 @@ namespace EventViewerX {
                              maxDegreeOfParallelism,
                              Settings.SessionTimeoutMs,
                              includeEventTimes: true)) {
+                    if (result.HasDiagnosticFailure) {
+                        _logger.WriteWarning(result.DiagnosticMessage);
+                    }
                     if (result.Details != null) {
                         yield return ConvertLogDetails(result.Details);
-                    } else {
-                        _logger.WriteWarning($"Couldn't read event log information for {result.LogName} on {result.MachineName}: {result.ErrorMessage}");
                     }
                 }
             }

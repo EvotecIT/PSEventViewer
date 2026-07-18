@@ -67,10 +67,13 @@ public sealed class CmdletGetEVXLog : AsyncPSCmdlet {
         foreach (EventLogDetailsResult result in SearchEvents.DisplayEventLogResults(LogName, MachineName, TimeoutMs, IncludeEventTimes)) {
             if (AsResult) {
                 WriteObject(result);
-            } else if (result.Details != null) {
-                WriteObject(result.Details);
             } else {
-                WriteWarning($"Couldn't read event log details for {result.LogName} on {result.MachineName}: {result.ErrorMessage}");
+                if (result.HasDiagnosticFailure) {
+                    WriteWarning(result.DiagnosticMessage);
+                }
+                if (result.Details != null) {
+                    WriteObject(result.Details);
+                }
             }
         }
 

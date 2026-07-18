@@ -40,6 +40,9 @@ public sealed class EventLogDetailsResult {
     /// <summary>True when details were collected successfully or partial details are available.</summary>
     public bool Success => Status == EventLogDetailsStatus.Success || Details != null;
 
+    /// <summary>True when the query produced a timeout, access, availability, or partial-data diagnostic.</summary>
+    public bool HasDiagnosticFailure => Status != EventLogDetailsStatus.Success;
+
     /// <summary>Collected event log details when available.</summary>
     public EventLogDetails? Details { get; set; }
 
@@ -51,4 +54,13 @@ public sealed class EventLogDetailsResult {
 
     /// <summary>Timeout budget used for the query, in milliseconds.</summary>
     public int TimeoutMs { get; set; }
+
+    /// <summary>Human-readable diagnostic including the target, status, and underlying message.</summary>
+    public string DiagnosticMessage {
+        get {
+            string target = string.IsNullOrWhiteSpace(MachineName) ? "the local computer" : $"'{MachineName}'";
+            string summary = $"Event log query for '{LogName}' on {target} completed with status '{Status}'.";
+            return string.IsNullOrWhiteSpace(ErrorMessage) ? summary : $"{summary} {ErrorMessage}";
+        }
+    }
 }
