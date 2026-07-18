@@ -183,7 +183,7 @@ public partial class SearchEvents {
                 maximumEventRecordIdExclusive: workItem.MaximumEventRecordIdExclusive,
                 oldest: oldest)).GetEnumerator();
         IEnumerator<EventObject> safeResults = isolateRemoteFailures
-            ? EnumerateQueryWorkItemSafely(workItem, queryResults, failedTargets, targetFailureObserver).GetEnumerator()
+            ? EnumerateQueryWorkItemSafely(workItem, queryResults, failedTargets, targetFailureObserver, logName).GetEnumerator()
             : queryResults;
         return resultPredicate == null && candidateObserver == null
             ? safeResults
@@ -194,7 +194,8 @@ public partial class SearchEvents {
         QueryWorkItem workItem,
         IEnumerator<EventObject> queryResults,
         ConcurrentDictionary<string, byte> failedTargets,
-        Action<EventLogQueryTargetFailure>? targetFailureObserver) {
+        Action<EventLogQueryTargetFailure>? targetFailureObserver,
+        string logName) {
 
         using (queryResults) {
             while (TryMoveNextQueryWorkItem(
@@ -202,7 +203,8 @@ public partial class SearchEvents {
                        workItem,
                        failedTargets,
                        out EventObject? result,
-                       targetFailureObserver)) {
+                       targetFailureObserver,
+                       logName)) {
                 yield return result!;
             }
         }

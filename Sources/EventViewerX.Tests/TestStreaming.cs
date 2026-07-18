@@ -88,12 +88,23 @@ namespace EventViewerX.Tests {
             Assert.True(executionInfo.ScanLimitReached);
 
             executionInfo.RecordTargetFailure(
-                new EventLogQueryTargetFailure("SERVER", EventLogRemoteQueryFailureKind.Timeout, "timeout"));
+                new EventLogQueryTargetFailure("SERVER", "System", EventLogRemoteQueryFailureKind.Timeout, "timeout"));
             executionInfo.RecordTargetFailure(
-                new EventLogQueryTargetFailure("server", EventLogRemoteQueryFailureKind.HostUnavailable, "duplicate"));
-            EventLogQueryTargetFailure failure = Assert.Single(executionInfo.TargetFailures);
-            Assert.Equal("SERVER", failure.MachineName);
-            Assert.Equal(EventLogRemoteQueryFailureKind.Timeout, failure.Kind);
+                new EventLogQueryTargetFailure("server", "System", EventLogRemoteQueryFailureKind.HostUnavailable, "duplicate"));
+            executionInfo.RecordTargetFailure(
+                new EventLogQueryTargetFailure("server", "Security", EventLogRemoteQueryFailureKind.AccessDenied, "denied"));
+            Assert.Collection(
+                executionInfo.TargetFailures,
+                failure => {
+                    Assert.Equal("server", failure.MachineName, ignoreCase: true);
+                    Assert.Equal("Security", failure.LogName);
+                    Assert.Equal(EventLogRemoteQueryFailureKind.AccessDenied, failure.Kind);
+                },
+                failure => {
+                    Assert.Equal("SERVER", failure.MachineName);
+                    Assert.Equal("System", failure.LogName);
+                    Assert.Equal(EventLogRemoteQueryFailureKind.Timeout, failure.Kind);
+                });
 
             executionInfo.Reset(maxEventsScanned: 0);
             Assert.Empty(executionInfo.TargetFailures);
@@ -193,11 +204,13 @@ namespace EventViewerX.Tests {
                 remoteWorkItem,
                 failedTargets,
                 out EventObject? result,
-                observedFailures.Add));
+                observedFailures.Add,
+                "System"));
             Assert.Null(result);
             Assert.True(SearchEvents.ShouldSkipFailedTarget(new SearchEvents.QueryWorkItem("SERVER", null, null), failedTargets));
             EventLogQueryTargetFailure observedFailure = Assert.Single(observedFailures);
             Assert.Equal("server", observedFailure.MachineName);
+            Assert.Equal("System", observedFailure.LogName);
             Assert.Equal(EventLogRemoteQueryFailureKind.Timeout, observedFailure.Kind);
 
             using IEnumerator<EventObject> localResults = new[] { placeholder }
@@ -207,7 +220,9 @@ namespace EventViewerX.Tests {
                 localResults,
                 new SearchEvents.QueryWorkItem(null, null, null),
                 failedTargets,
-                out _));
+                out _,
+                targetFailureObserver: null,
+                logName: "System"));
         }
 
         [Fact]

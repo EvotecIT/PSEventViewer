@@ -130,7 +130,10 @@ namespace EventViewerX {
         /// <param name="maxCachedEvents">Maximum event snapshots retained across incomplete script groups.</param>
         /// <param name="cancellationToken">Cancellation token used to interrupt native reads.</param>
         /// <param name="executionInfo">Optional reusable completion record populated while the query runs.</param>
-        /// <returns>Restored script blocks in reverse chronological order.</returns>
+        /// <returns>
+        /// With a positive <paramref name="maxScripts"/>, the newest matching script blocks in native encounter order.
+        /// Unlimited queries stream complete blocks as they are reconstructed and emit bounded incomplete groups at the end.
+        /// </returns>
         public static IEnumerable<RestoredPowerShellScript> RestorePowerShellScripts(
             PowerShellEdition type,
             string? machineName = null,
@@ -192,6 +195,9 @@ namespace EventViewerX {
             }
 
             var cache = new PowerShellScriptFragmentCache(maxPendingScripts, maxCachedEvents);
+            List<KeyValuePair<long, RestoredPowerShellScript>>? boundedScripts = maxScripts > 0
+                ? new List<KeyValuePair<long, RestoredPowerShellScript>>(Math.Min(maxScripts, 256))
+                : null;
             try {
                 using EventLogReader reader = CreateEventLogReader(query, machineName, DefaultSessionTimeoutMs);
                 using CancellationTokenRegistration readerCancellation = RegisterReaderCancellation(reader, cancellationToken);
@@ -239,20 +245,28 @@ namespace EventViewerX {
                     if (cache.TryAdd(scriptId, messageNumber, messageTotal, nonNullScriptText, eventObject, out PowerShellScriptAssembly? completed) &&
                         completed != null &&
                         TryBuildRestoredPowerShellScript(completed, format, textFilters, out RestoredPowerShellScript restored)) {
-                        if (!restored.IsComplete) {
-                            queryInfo.IncompleteScriptsReturned++;
+                        if (boundedScripts != null) {
+                            AddBoundedRestoredPowerShellScript(
+                                boundedScripts,
+                                completed.EncounterOrder,
+                                restored,
+                                maxScripts);
+                        } else {
+                            if (!restored.IsComplete) {
+                                queryInfo.IncompleteScriptsReturned++;
+                            }
+                            returned++;
+                            queryInfo.ResultsReturned = returned;
+                            yield return restored;
                         }
-                        returned++;
-                        queryInfo.ResultsReturned = returned;
-                        bool outputLimitReached = maxScripts > 0 && returned >= maxScripts;
-                        if (outputLimitReached) {
-                            queryInfo.OutputLimitReached = true;
-                        }
-                        yield return restored;
-                        if (outputLimitReached) {
-                            _logger.WriteVerbose($"PowerShellScripts: stopped after returning the configured maximum of {maxScripts} scripts.");
-                            yield break;
-                        }
+                    }
+
+                    if (boundedScripts != null && CanFinalizeBoundedPowerShellScriptSelection(
+                            boundedScripts,
+                            maxScripts,
+                            cache.NewestPendingEncounterOrder)) {
+                        queryInfo.OutputLimitReached = true;
+                        break;
                     }
                 }
 
@@ -262,19 +276,33 @@ namespace EventViewerX {
                         continue;
                     }
 
+                    if (boundedScripts != null) {
+                        AddBoundedRestoredPowerShellScript(
+                            boundedScripts,
+                            pending.EncounterOrder,
+                            restored,
+                            maxScripts);
+                        continue;
+                    }
+
                     if (!restored.IsComplete) {
                         queryInfo.IncompleteScriptsReturned++;
                     }
                     returned++;
                     queryInfo.ResultsReturned = returned;
-                    bool outputLimitReached = maxScripts > 0 && returned >= maxScripts;
-                    if (outputLimitReached) {
-                        queryInfo.OutputLimitReached = true;
-                    }
                     yield return restored;
-                    if (outputLimitReached) {
-                        _logger.WriteVerbose($"PowerShellScripts: stopped after returning the configured maximum of {maxScripts} scripts.");
-                        yield break;
+                }
+
+                if (boundedScripts != null) {
+                    queryInfo.OutputLimitReached |= boundedScripts.Count >= maxScripts;
+                    foreach (KeyValuePair<long, RestoredPowerShellScript> selected in boundedScripts.OrderBy(static item => item.Key)) {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        if (!selected.Value.IsComplete) {
+                            queryInfo.IncompleteScriptsReturned++;
+                        }
+                        returned++;
+                        queryInfo.ResultsReturned = returned;
+                        yield return selected.Value;
                     }
                 }
             }
@@ -287,6 +315,59 @@ namespace EventViewerX {
                         $"containing {cache.EvictedEventCount} events after reaching the configured cache bounds.");
                 }
                 session?.Dispose();
+            }
+        }
+
+        internal static bool CanFinalizeBoundedPowerShellScriptSelection(
+            IReadOnlyList<KeyValuePair<long, RestoredPowerShellScript>> selected,
+            int maxScripts,
+            long? newestPendingEncounterOrder) {
+
+            if (selected == null) {
+                throw new ArgumentNullException(nameof(selected));
+            }
+            if (maxScripts <= 0) {
+                throw new ArgumentOutOfRangeException(nameof(maxScripts), "Maximum scripts must be positive.");
+            }
+            if (selected.Count < maxScripts) {
+                return false;
+            }
+
+            long oldestSelectedOrder = selected.Max(static item => item.Key);
+            return !newestPendingEncounterOrder.HasValue ||
+                   newestPendingEncounterOrder.Value > oldestSelectedOrder;
+        }
+
+        internal static void AddBoundedRestoredPowerShellScript(
+            List<KeyValuePair<long, RestoredPowerShellScript>> selected,
+            long encounterOrder,
+            RestoredPowerShellScript script,
+            int maxScripts) {
+
+            if (selected == null) {
+                throw new ArgumentNullException(nameof(selected));
+            }
+            if (script == null) {
+                throw new ArgumentNullException(nameof(script));
+            }
+            if (maxScripts <= 0) {
+                throw new ArgumentOutOfRangeException(nameof(maxScripts), "Maximum scripts must be positive.");
+            }
+
+            var candidate = new KeyValuePair<long, RestoredPowerShellScript>(encounterOrder, script);
+            if (selected.Count < maxScripts) {
+                selected.Add(candidate);
+                return;
+            }
+
+            int oldestIndex = 0;
+            for (int index = 1; index < selected.Count; index++) {
+                if (selected[index].Key > selected[oldestIndex].Key) {
+                    oldestIndex = index;
+                }
+            }
+            if (encounterOrder < selected[oldestIndex].Key) {
+                selected[oldestIndex] = candidate;
             }
         }
 

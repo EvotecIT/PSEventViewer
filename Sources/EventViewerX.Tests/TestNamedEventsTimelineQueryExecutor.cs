@@ -174,7 +174,7 @@ public class TestNamedEventsTimelineQueryExecutor {
         var queryInfo = new NamedEventsQueryExecutionInfo();
         queryInfo.Reset(maxEventsScanned: 0);
         queryInfo.RecordTargetFailure(
-            new EventLogQueryTargetFailure("AD2", EventLogRemoteQueryFailureKind.HostUnavailable, "offline"));
+            new EventLogQueryTargetFailure("AD2", "System", EventLogRemoteQueryFailureKind.HostUnavailable, "offline"));
         var result = new NamedEventsTimelineQueryResult();
 
         NamedEventsTimelineQueryExecutor.ApplyTargetFailures(result, queryInfo);
@@ -183,6 +183,7 @@ public class TestNamedEventsTimelineQueryExecutor {
         Assert.True(result.Truncated);
         EventLogQueryTargetFailure failure = Assert.Single(result.TargetFailures);
         Assert.Equal("AD2", failure.MachineName);
+        Assert.Equal("System", failure.LogName);
         Assert.Equal(EventLogRemoteQueryFailureKind.HostUnavailable, failure.Kind);
     }
 

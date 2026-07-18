@@ -22,7 +22,7 @@ public partial class SearchEvents : Settings {
         bool oldest,
         Action<EventLogQueryTargetFailure>? targetFailureObserver,
         Action<EventObject>? candidateObserver = null,
-        Func<EventObject, bool>? resultPredicate = null) {
+        bool enforceMaxEvents = true) {
 
         List<string?> targets = NormalizeNamedCheckpointTargets(machineNames);
         var pageReaders = new List<Func<int, IReadOnlyList<EventObject>>>(eventInfo.Count * targets.Count);
@@ -69,9 +69,9 @@ public partial class SearchEvents : Settings {
                 oldest,
                 isolateRemoteFailures,
                 failedTargets,
-                resultPredicate,
-                candidateObserver,
-                targetFailureObserver);
+                resultPredicate: null,
+                candidateObserver: candidateObserver,
+                targetFailureObserver: targetFailureObserver);
             pageReaders.AddRange(CreateRecordOrderedSourcePageReaders(
                 workItems,
                 createEnumerator,
@@ -91,7 +91,7 @@ public partial class SearchEvents : Settings {
                 ? boundedPageSize
                 : GetCheckpointCandidatePageSize(pageReaders.Count),
             cancellationToken);
-        return maxEvents > 0 ? merged.Take(maxEvents) : merged;
+        return maxEvents > 0 && enforceMaxEvents ? merged.Take(maxEvents) : merged;
     }
 
     internal static IEnumerable<T> MergePagedSources<T>(

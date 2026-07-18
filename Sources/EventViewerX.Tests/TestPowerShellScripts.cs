@@ -122,13 +122,35 @@ namespace EventViewerX.Tests {
             cache.TryAdd("script-2", 1, 2, "two", CreateEventObject(), out _);
             cache.TryAdd("script-3", 1, 2, "three", CreateEventObject(), out _);
 
-            Assert.False(cache.Contains("script-1"));
+            Assert.True(cache.Contains("script-1"));
             Assert.True(cache.Contains("script-2"));
-            Assert.True(cache.Contains("script-3"));
+            Assert.False(cache.Contains("script-3"));
             Assert.Equal(2, cache.PendingScriptCount);
             Assert.Equal(2, cache.CachedEventCount);
             Assert.Equal(1, cache.EvictedScriptCount);
             Assert.Equal(1, cache.EvictedEventCount);
+        }
+
+        [Fact]
+        public void BoundedScriptSelectionKeepsTheNewestEncounterInsteadOfTheFirstCompletion() {
+            var selected = new List<KeyValuePair<long, RestoredPowerShellScript>>();
+            var olderCompletion = new RestoredPowerShellScript { ScriptBlockId = "older" };
+            var newerCompletion = new RestoredPowerShellScript { ScriptBlockId = "newer" };
+
+            SearchEvents.AddBoundedRestoredPowerShellScript(selected, encounterOrder: 1, olderCompletion, maxScripts: 1);
+            SearchEvents.AddBoundedRestoredPowerShellScript(selected, encounterOrder: 0, newerCompletion, maxScripts: 1);
+
+            KeyValuePair<long, RestoredPowerShellScript> retained = Assert.Single(selected);
+            Assert.Equal(0, retained.Key);
+            Assert.Same(newerCompletion, retained.Value);
+            Assert.False(SearchEvents.CanFinalizeBoundedPowerShellScriptSelection(
+                selected,
+                maxScripts: 1,
+                newestPendingEncounterOrder: 0));
+            Assert.True(SearchEvents.CanFinalizeBoundedPowerShellScriptSelection(
+                selected,
+                maxScripts: 1,
+                newestPendingEncounterOrder: 2));
         }
 
         [Fact]

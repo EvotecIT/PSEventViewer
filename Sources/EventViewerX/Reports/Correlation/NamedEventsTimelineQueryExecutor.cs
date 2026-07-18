@@ -97,6 +97,46 @@ public static partial class NamedEventsTimelineQueryExecutor {
         var filteredUncorrelated = 0;
         var outputTruncated = false;
         var queryInfo = new NamedEventsQueryExecutionInfo();
+        var selectedRows = new Dictionary<EventObject, EventRowAccumulator>();
+        int selectionLimit = maxEvents == int.MaxValue ? int.MaxValue : maxEvents + 1;
+
+        bool TrySelectTimelineEvent(EventObjectSlim item) {
+            var namedEventName = ResolveNamedEventName(item);
+            if (!string.IsNullOrWhiteSpace(logName) &&
+                !string.Equals(item.GatheredLogName, logName, StringComparison.OrdinalIgnoreCase)) {
+                filteredOut++;
+                return false;
+            }
+
+            if (normalizedEventIds is not null && !normalizedEventIds.Contains(item.EventID)) {
+                filteredOut++;
+                return false;
+            }
+
+            var row = ToAccumulator(item, namedEventName, includePayload, normalizedPayloadKeys);
+            var correlation = BuildCorrelationValues(row, normalizedCorrelationKeys);
+            row.Correlation = correlation;
+            var hasCorrelation = correlation.Values.Any(static value => !string.IsNullOrWhiteSpace(value));
+            if (!hasCorrelation && !includeUncorrelated) {
+                filteredUncorrelated++;
+                return false;
+            }
+
+            if (maxEventsPerNamedEvent.HasValue) {
+                var current = perNamedEventCount.TryGetValue(namedEventName, out var count) ? count : 0;
+                if (current >= maxEventsPerNamedEvent.Value) {
+                    truncatedNamedEvents.Add(namedEventName);
+                    filteredOut++;
+                    return false;
+                }
+            }
+
+            selectedRows[item.Event] = row;
+            perNamedEventCount[namedEventName] = perNamedEventCount.TryGetValue(namedEventName, out var existingCount)
+                ? existingCount + 1
+                : 1;
+            return true;
+        }
 
         try {
             await foreach (var item in SearchEvents.FindEventsByNamedEvents(
@@ -106,49 +146,20 @@ public static partial class NamedEventsTimelineQueryExecutor {
                                endTime: request.EndTimeUtc,
                                timePeriod: request.TimePeriod,
                                maxThreads: maxThreads,
-                               maxEvents: 0,
+                               maxEvents: selectionLimit,
                                maxEventsScanned: request.MaxEventsScanned,
                                executionInfo: queryInfo,
-                               cancellationToken: cancellationToken)) {
+                               cancellationToken: cancellationToken,
+                               resultPredicate: TrySelectTimelineEvent)) {
                 cancellationToken.ThrowIfCancellationRequested();
-
-                var namedEventName = ResolveNamedEventName(item);
-                if (!string.IsNullOrWhiteSpace(logName) &&
-                    !string.Equals(item.GatheredLogName, logName, StringComparison.OrdinalIgnoreCase)) {
-                    filteredOut++;
-                    continue;
-                }
-
-                if (normalizedEventIds is not null && !normalizedEventIds.Contains(item.EventID)) {
-                    filteredOut++;
-                    continue;
-                }
-
-                var row = ToAccumulator(item, namedEventName, includePayload, normalizedPayloadKeys);
-                var correlation = BuildCorrelationValues(row, normalizedCorrelationKeys);
-                row.Correlation = correlation;
-                var hasCorrelation = correlation.Values.Any(static value => !string.IsNullOrWhiteSpace(value));
-                if (!hasCorrelation && !includeUncorrelated) {
-                    filteredUncorrelated++;
-                    continue;
-                }
-
-                if (maxEventsPerNamedEvent.HasValue) {
-                    var current = perNamedEventCount.TryGetValue(namedEventName, out var count) ? count : 0;
-                    if (current >= maxEventsPerNamedEvent.Value) {
-                        truncatedNamedEvents.Add(namedEventName);
-                        filteredOut++;
-                        continue;
-                    }
-                }
-
                 if (rows.Count >= maxEvents) {
                     outputTruncated = true;
                     break;
                 }
-
-                rows.Add(row);
-                perNamedEventCount[namedEventName] = perNamedEventCount.TryGetValue(namedEventName, out var existingCount) ? existingCount + 1 : 1;
+                if (selectedRows.TryGetValue(item.Event, out EventRowAccumulator? row)) {
+                    selectedRows.Remove(item.Event);
+                    rows.Add(row);
+                }
             }
         } catch (OperationCanceledException) {
             throw;

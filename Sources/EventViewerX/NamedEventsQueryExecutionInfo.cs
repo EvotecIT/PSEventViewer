@@ -34,6 +34,7 @@ public sealed class NamedEventsQueryExecutionInfo {
     /// </summary>
     public IReadOnlyList<EventLogQueryTargetFailure> TargetFailures => _targetFailures.Values
         .OrderBy(static failure => failure.MachineName, StringComparer.OrdinalIgnoreCase)
+        .ThenBy(static failure => failure.LogName, StringComparer.OrdinalIgnoreCase)
         .ToArray();
 
     internal void Reset(int maxEventsScanned) {
@@ -57,10 +58,11 @@ public sealed class NamedEventsQueryExecutionInfo {
     internal void RecordTargetFailure(EventLogQueryTargetFailure failure) {
         if (failure == null ||
             string.IsNullOrWhiteSpace(failure.MachineName) ||
+            string.IsNullOrWhiteSpace(failure.LogName) ||
             failure.Kind == EventLogRemoteQueryFailureKind.None) {
             return;
         }
 
-        _targetFailures.TryAdd(failure.MachineName, failure);
+        _targetFailures.TryAdd(failure.MachineName + "\0" + failure.LogName, failure);
     }
 }

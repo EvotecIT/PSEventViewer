@@ -430,6 +430,9 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
         }
 
         PrepareCheckpointBounds(token);
+        Func<EventObject, bool>? queryResultPredicate = UsesManagedOutputSelection
+            ? MessageMatches
+            : null;
 
         if (ParameterSetName == "ListLog") {
             foreach (EventLogDetails log in SearchEvents.DisplayEventLogsParallel(ListLog, MachineName, NumberOfThreads, token)) {
@@ -441,7 +444,7 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
                 }
             }
         } else if (ParameterSetName == "PathEvents") {
-            foreach (EventObject eventObject in SearchEvents.QueryLogFile(Path, EventId, ProviderName, Keywords, Level, StartTime, EndTime, UserId, GetQueryReadLimit(), EventRecordId, TimePeriod, EffectiveOldest, NamedDataFilter, NamedDataExcludeFilter, token, ReadMode, GetCheckpointLowerBound(null, Path))) {
+            foreach (EventObject eventObject in SearchEvents.QueryLogFile(Path, EventId, ProviderName, Keywords, Level, StartTime, EndTime, UserId, GetQueryReadLimit(), EventRecordId, TimePeriod, EffectiveOldest, NamedDataFilter, NamedDataExcludeFilter, token, ReadMode, GetCheckpointLowerBound(null, Path), queryResultPredicate)) {
                 token.ThrowIfCancellationRequested();
                 ProcessEventResult(eventObject, results);
                 if (OutputLimitReached) {
@@ -488,7 +491,7 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
                     }
                 }
             } else if (ParallelOption == ParallelOption.Disabled || MaxEventsScanned > 0 || UsesCheckpoint) {
-                foreach (EventObject eventObject in SearchEvents.QueryLogsSequential(LogName, EventId, MachineName, ProviderName, Keywords, Level, StartTime, EndTime, UserId, GetQueryReadLimit(), EventRecordId, TimePeriod, token, SessionTimeoutMs, ReadMode, GetCheckpointResolver(LogName), oldest: EffectiveOldest)) {
+                foreach (EventObject eventObject in SearchEvents.QueryLogsSequential(LogName, EventId, MachineName, ProviderName, Keywords, Level, StartTime, EndTime, UserId, GetQueryReadLimit(), EventRecordId, TimePeriod, token, SessionTimeoutMs, ReadMode, GetCheckpointResolver(LogName), oldest: EffectiveOldest, resultPredicate: queryResultPredicate)) {
                     token.ThrowIfCancellationRequested();
                     ProcessEventResult(eventObject, results);
                     if (OutputLimitReached) {
@@ -496,7 +499,7 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
                     }
                 }
             } else {
-                await foreach (EventObject eventObject in SearchEvents.QueryLogsParallel(LogName, EventId, MachineName, ProviderName, Keywords, Level, StartTime, EndTime, UserId, GetQueryReadLimit(), NumberOfThreads, EventRecordId, TimePeriod, token, SessionTimeoutMs, ReadMode, BufferCapacity, GetCheckpointResolver(LogName), oldest: EffectiveOldest)) {
+                await foreach (EventObject eventObject in SearchEvents.QueryLogsParallel(LogName, EventId, MachineName, ProviderName, Keywords, Level, StartTime, EndTime, UserId, GetQueryReadLimit(), NumberOfThreads, EventRecordId, TimePeriod, token, SessionTimeoutMs, ReadMode, BufferCapacity, GetCheckpointResolver(LogName), oldest: EffectiveOldest, resultPredicate: queryResultPredicate)) {
                     token.ThrowIfCancellationRequested();
                     ProcessEventResult(eventObject, results);
                     if (OutputLimitReached) {
@@ -702,6 +705,9 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
     private bool EffectiveOldest => Oldest.IsPresent || UsesCheckpoint;
 
     private int GetQueryReadLimit() {
+        if (UsesManagedOutputSelection) {
+            return MaxEvents;
+        }
         if (HasManagedPostReadFilter || MaxEvents <= 0) {
             return MaxEventsScanned;
         }
@@ -712,6 +718,9 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
     }
 
     private bool HasManagedPostReadFilter => MessageRegex != null || UsesCheckpoint;
+
+    private bool UsesManagedOutputSelection =>
+        MessageRegex != null && !UsesCheckpoint && MaxEvents > 0 && MaxEventsScanned <= 0;
 
     private void ProcessEventResult(EventObject eventObject, List<object>? results) {
         if (!TrackCheckpointProgress(eventObject) || !MessageMatches(eventObject)) {

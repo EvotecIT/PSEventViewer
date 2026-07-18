@@ -117,7 +117,10 @@ namespace EventViewerX {
         /// <param name="maxCachedEvents">Maximum event snapshots retained across incomplete script groups.</param>
         /// <param name="cancellationToken">Cancellation token used to interrupt native reads.</param>
         /// <param name="executionInfo">Optional reusable completion record populated while the query runs.</param>
-        /// <returns>Recovered script blocks in the order they are read.</returns>
+        /// <returns>
+        /// With a positive <paramref name="maxScripts"/>, the newest matching script blocks in native encounter order.
+        /// Unlimited queries stream complete blocks as they are reconstructed and emit bounded incomplete groups at the end.
+        /// </returns>
         public static IEnumerable<RestoredPowerShellScript> GetPowerShellScripts(
             PowerShellEdition type,
             string? machineName = null,

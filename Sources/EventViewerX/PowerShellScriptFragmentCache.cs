@@ -14,6 +14,7 @@ internal sealed class PowerShellScriptFragmentCache {
     private int _cachedEventCount;
     private int _evictedScriptCount;
     private int _evictedEventCount;
+    private long _nextEncounterOrder;
 
     internal PowerShellScriptFragmentCache(int maxPendingScripts, int maxCachedEvents) {
         if (maxPendingScripts <= 0) {
@@ -35,6 +36,10 @@ internal sealed class PowerShellScriptFragmentCache {
 
     internal int EvictedEventCount => _evictedEventCount;
 
+    internal long? NewestPendingEncounterOrder => _pendingOrder.First == null
+        ? null
+        : _pending[_pendingOrder.First.Value].EncounterOrder;
+
     internal bool Contains(string scriptBlockId) => _pending.ContainsKey(scriptBlockId);
 
     internal bool TryAdd(
@@ -54,7 +59,7 @@ internal sealed class PowerShellScriptFragmentCache {
 
         if (!_pending.TryGetValue(scriptBlockId, out PendingScript? script)) {
             LinkedListNode<string> orderNode = _pendingOrder.AddLast(scriptBlockId);
-            script = new PendingScript(orderNode);
+            script = new PendingScript(_nextEncounterOrder++, orderNode);
             _pending.Add(scriptBlockId, script);
         }
 
@@ -106,7 +111,8 @@ internal sealed class PowerShellScriptFragmentCache {
 
     private void EnforceLimits() {
         while (_pending.Count > _maxPendingScripts || _cachedEventCount > _maxCachedEvents) {
-            LinkedListNode<string>? oldest = _pendingOrder.First;
+            // Native input is read newest-to-oldest, so the last newly encountered group is the oldest.
+            LinkedListNode<string>? oldest = _pendingOrder.Last;
             if (oldest == null) {
                 break;
             }
@@ -131,13 +137,17 @@ internal sealed class PowerShellScriptFragmentCache {
             script.Events.AsReadOnly(),
             new Dictionary<int, string>(script.Parts),
             script.ExpectedParts,
-            isComplete);
+            isComplete,
+            script.EncounterOrder);
     }
 
     private sealed class PendingScript {
-        internal PendingScript(LinkedListNode<string> orderNode) {
+        internal PendingScript(long encounterOrder, LinkedListNode<string> orderNode) {
+            EncounterOrder = encounterOrder;
             OrderNode = orderNode;
         }
+
+        internal long EncounterOrder { get; }
 
         internal LinkedListNode<string> OrderNode { get; }
 
@@ -159,7 +169,8 @@ internal sealed class PowerShellScriptAssembly {
         IReadOnlyList<EventObject> events,
         IReadOnlyDictionary<int, string> parts,
         int expectedParts,
-        bool isComplete) {
+        bool isComplete,
+        long encounterOrder = 0) {
 
         ScriptBlockId = scriptBlockId;
         MetaRecord = metaRecord;
@@ -167,6 +178,7 @@ internal sealed class PowerShellScriptAssembly {
         Parts = parts;
         ExpectedParts = expectedParts;
         IsComplete = isComplete;
+        EncounterOrder = encounterOrder;
     }
 
     internal string ScriptBlockId { get; }
@@ -180,4 +192,7 @@ internal sealed class PowerShellScriptAssembly {
     internal int ExpectedParts { get; }
 
     internal bool IsComplete { get; }
+
+    /// <summary>Zero-based native encounter order; lower values are newer in a reverse-directed query.</summary>
+    internal long EncounterOrder { get; }
 }

@@ -117,6 +117,25 @@ Describe 'Get-EVXEvent - MessageRegex' {
         $events   = Get-EVXEvent -Path $FilePath -MaxEvents 1 -MessageRegex '.*'
         $events.Count | Should -Be 1
     }
+
+    It 'applies the regex before the global cap across EVTX query chunks' {
+        $FilePath = [System.IO.Path]::Combine($PSScriptRoot, 'Logs', 'Active Directory Web Services.evtx')
+        $RealIds = @(1200, 1202, 1004, 1006, 1008, 1400, 1000, 1100)
+        $ChunkedIds = [Collections.Generic.List[int]]::new()
+        $SyntheticId = 200000
+        foreach ($RealId in $RealIds) {
+            $ChunkedIds.Add($RealId)
+            foreach ($Offset in 1..21) {
+                $ChunkedIds.Add($SyntheticId)
+                $SyntheticId++
+            }
+        }
+
+        $Expected = @(Get-EVXEvent -Path $FilePath -EventId $ChunkedIds -MaxEvents 8 -ReadMode Message)
+        $Actual = @(Get-EVXEvent -Path $FilePath -EventId $ChunkedIds -MessageRegex '(?s).*' -MaxEvents 8 -ReadMode Message)
+
+        ($Actual.RecordId -join ',') | Should -Be ($Expected.RecordId -join ',')
+    }
 }
 
 Describe 'Get-EVXEvent - Parameter validation' {

@@ -21,6 +21,8 @@ public partial class SearchEvents : Settings {
     /// A positive limit uses deterministic bounded selection across the native record prefixes returned by each source/chunk,
     /// so producer arrival cannot change the selected set. Provider timestamps can move backwards, so a bounded multi-source
     /// result is not guaranteed to be a strict global timestamp sort.
+    /// The managed result predicate runs before the global cap; observers can receive every native candidate and every
+    /// expected failure isolated to one remote machine/log source.
     /// Unlimited result order is intentionally unspecified when more than one query runs concurrently.
     /// </remarks>
     public static async IAsyncEnumerable<EventObject> QueryLogsParallel(
@@ -43,6 +45,8 @@ public partial class SearchEvents : Settings {
         int bufferCapacity = 0,
         Func<string?, long?>? minimumEventRecordIdExclusiveResolver = null,
         bool oldest = false,
+        Func<EventObject, bool>? resultPredicate = null,
+        Action<EventObject>? candidateObserver = null,
         Action<EventLogQueryTargetFailure>? targetFailureObserver = null) {
 
         if (oldest && minimumEventRecordIdExclusiveResolver != null) {
@@ -66,6 +70,8 @@ public partial class SearchEvents : Settings {
                          minimumEventRecordIdExclusiveResolver: minimumEventRecordIdExclusiveResolver,
                          maxOpenQueries: maxThreads,
                          oldest: true,
+                         resultPredicate: resultPredicate,
+                         candidateObserver: candidateObserver,
                          targetFailureObserver: targetFailureObserver)) {
                 yield return result;
             }
@@ -92,6 +98,8 @@ public partial class SearchEvents : Settings {
                            bufferCapacity,
                            minimumEventRecordIdExclusiveResolver,
                            oldest,
+                           resultPredicate,
+                           candidateObserver,
                            targetFailureObserver)) {
             yield return result;
         }
@@ -117,6 +125,8 @@ public partial class SearchEvents : Settings {
         int bufferCapacity,
         Func<string?, long?>? minimumEventRecordIdExclusiveResolver,
         bool oldest,
+        Func<EventObject, bool>? resultPredicate,
+        Action<EventObject>? candidateObserver,
         Action<EventLogQueryTargetFailure>? targetFailureObserver) {
 
         ValidateParallelArguments(logName, maxEvents, maxThreads, bufferCapacity, sessionTimeoutMs);
@@ -140,8 +150,8 @@ public partial class SearchEvents : Settings {
                          minimumEventRecordIdExclusiveResolver,
                          maxThreads,
                          oldest,
-                         resultPredicate: null,
-                         candidateObserver: null,
+                         resultPredicate,
+                         candidateObserver,
                          targetFailureObserver)) {
                 yield return result;
             }
@@ -206,7 +216,12 @@ public partial class SearchEvents : Settings {
                                    failedTargets,
                                    isolateRemoteFailures,
                                    out EventObject? result,
-                                   targetFailureObserver)) {
+                                   targetFailureObserver,
+                                   logName)) {
+                            candidateObserver?.Invoke(result!);
+                            if (resultPredicate != null && !resultPredicate(result!)) {
+                                continue;
+                            }
                             if (!results.Writer.TryWrite(result!)) {
                                 results.Writer.WriteAsync(result!, workerCancellation.Token).AsTask().GetAwaiter().GetResult();
                             }
@@ -268,7 +283,8 @@ public partial class SearchEvents : Settings {
         ConcurrentDictionary<string, byte> failedTargets,
         bool isolateRemoteFailures,
         out EventObject? result,
-        Action<EventLogQueryTargetFailure>? targetFailureObserver) {
+        Action<EventLogQueryTargetFailure>? targetFailureObserver,
+        string logName) {
 
         if (isolateRemoteFailures) {
             return TryMoveNextQueryWorkItem(
@@ -276,7 +292,8 @@ public partial class SearchEvents : Settings {
                 workItem,
                 failedTargets,
                 out result,
-                targetFailureObserver);
+                targetFailureObserver,
+                logName);
         }
 
         if (!queryResults.MoveNext()) {
@@ -293,7 +310,8 @@ public partial class SearchEvents : Settings {
         QueryWorkItem workItem,
         ConcurrentDictionary<string, byte> failedTargets,
         out EventObject? result,
-        Action<EventLogQueryTargetFailure>? targetFailureObserver = null) {
+        Action<EventLogQueryTargetFailure>? targetFailureObserver,
+        string logName) {
 
         try {
             if (!queryResults.MoveNext()) {
@@ -310,7 +328,7 @@ public partial class SearchEvents : Settings {
             string target = NormalizeRemoteTarget(workItem.MachineName)!;
             if (failedTargets.TryAdd(target, 0)) {
                 _logger.WriteWarning($"Skipping event-log target '{target}' after {ex.GetType().Name}: {ex.Message}");
-                targetFailureObserver?.Invoke(new EventLogQueryTargetFailure(target, failureKind, ex.Message));
+                targetFailureObserver?.Invoke(new EventLogQueryTargetFailure(target, logName, failureKind, ex.Message));
             }
             result = null;
             return false;
@@ -342,11 +360,13 @@ public partial class SearchEvents : Settings {
         int bufferCapacity = 0,
         Func<string?, long?>? minimumEventRecordIdExclusiveResolver = null,
         bool oldest = false,
+        Func<EventObject, bool>? resultPredicate = null,
+        Action<EventObject>? candidateObserver = null,
         Action<EventLogQueryTargetFailure>? targetFailureObserver = null) {
 
         var results = new List<EventObject>();
         try {
-            await foreach (EventObject ev in QueryLogsParallel(logName, eventIds, machineNames, providerName, keywords, level, startTime, endTime, userId, maxEvents, maxThreads, eventRecordId, timePeriod, cancellationToken, sessionTimeoutMs, readMode, bufferCapacity, minimumEventRecordIdExclusiveResolver, oldest, targetFailureObserver)) {
+            await foreach (EventObject ev in QueryLogsParallel(logName, eventIds, machineNames, providerName, keywords, level, startTime, endTime, userId, maxEvents, maxThreads, eventRecordId, timePeriod, cancellationToken, sessionTimeoutMs, readMode, bufferCapacity, minimumEventRecordIdExclusiveResolver, oldest, resultPredicate, candidateObserver, targetFailureObserver)) {
                 results.Add(ev);
             }
         } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
@@ -376,9 +396,11 @@ public partial class SearchEvents : Settings {
         int bufferCapacity = 0,
         Func<string?, long?>? minimumEventRecordIdExclusiveResolver = null,
         bool oldest = false,
+        Func<EventObject, bool>? resultPredicate = null,
+        Action<EventObject>? candidateObserver = null,
         Action<EventLogQueryTargetFailure>? targetFailureObserver = null) {
 
-        return QueryLogsParallel(LogNameToString(logName), eventIds, machineNames, providerName, keywords, level, startTime, endTime, userId, maxEvents, maxThreads, eventRecordId, timePeriod, cancellationToken, sessionTimeoutMs, readMode, bufferCapacity, minimumEventRecordIdExclusiveResolver, oldest, targetFailureObserver);
+        return QueryLogsParallel(LogNameToString(logName), eventIds, machineNames, providerName, keywords, level, startTime, endTime, userId, maxEvents, maxThreads, eventRecordId, timePeriod, cancellationToken, sessionTimeoutMs, readMode, bufferCapacity, minimumEventRecordIdExclusiveResolver, oldest, resultPredicate, candidateObserver, targetFailureObserver);
     }
 
     /// <summary>Materializes events from a known log through the bounded parallel query pipeline.</summary>
@@ -402,9 +424,11 @@ public partial class SearchEvents : Settings {
         int bufferCapacity = 0,
         Func<string?, long?>? minimumEventRecordIdExclusiveResolver = null,
         bool oldest = false,
+        Func<EventObject, bool>? resultPredicate = null,
+        Action<EventObject>? candidateObserver = null,
         Action<EventLogQueryTargetFailure>? targetFailureObserver = null) {
 
-        return QueryLogsParallelAsync(LogNameToString(logName), eventIds, machineNames, providerName, keywords, level, startTime, endTime, userId, maxEvents, maxThreads, eventRecordId, timePeriod, cancellationToken, sessionTimeoutMs, readMode, bufferCapacity, minimumEventRecordIdExclusiveResolver, oldest, targetFailureObserver);
+        return QueryLogsParallelAsync(LogNameToString(logName), eventIds, machineNames, providerName, keywords, level, startTime, endTime, userId, maxEvents, maxThreads, eventRecordId, timePeriod, cancellationToken, sessionTimeoutMs, readMode, bufferCapacity, minimumEventRecordIdExclusiveResolver, oldest, resultPredicate, candidateObserver, targetFailureObserver);
     }
 
     /// <summary>
@@ -430,9 +454,11 @@ public partial class SearchEvents : Settings {
         int bufferCapacity = 0,
         Func<string?, long?>? minimumEventRecordIdExclusiveResolver = null,
         bool oldest = false,
+        Func<EventObject, bool>? resultPredicate = null,
+        Action<EventObject>? candidateObserver = null,
         Action<EventLogQueryTargetFailure>? targetFailureObserver = null) {
 
-        IAsyncEnumerator<EventObject> enumerator = QueryLogsParallel(logName, eventIds, machineNames, providerName, keywords, level, startTime, endTime, userId, maxEvents, maxThreads, eventRecordId, cancellationToken: cancellationToken, sessionTimeoutMs: sessionTimeoutMs, readMode: readMode, bufferCapacity: bufferCapacity, minimumEventRecordIdExclusiveResolver: minimumEventRecordIdExclusiveResolver, oldest: oldest, targetFailureObserver: targetFailureObserver).GetAsyncEnumerator(cancellationToken);
+        IAsyncEnumerator<EventObject> enumerator = QueryLogsParallel(logName, eventIds, machineNames, providerName, keywords, level, startTime, endTime, userId, maxEvents, maxThreads, eventRecordId, cancellationToken: cancellationToken, sessionTimeoutMs: sessionTimeoutMs, readMode: readMode, bufferCapacity: bufferCapacity, minimumEventRecordIdExclusiveResolver: minimumEventRecordIdExclusiveResolver, oldest: oldest, targetFailureObserver: targetFailureObserver, resultPredicate: resultPredicate, candidateObserver: candidateObserver).GetAsyncEnumerator(cancellationToken);
         try {
             while (enumerator.MoveNextAsync().AsTask().GetAwaiter().GetResult()) {
                 yield return enumerator.Current;
@@ -463,9 +489,11 @@ public partial class SearchEvents : Settings {
         int bufferCapacity = 0,
         Func<string?, long?>? minimumEventRecordIdExclusiveResolver = null,
         bool oldest = false,
+        Func<EventObject, bool>? resultPredicate = null,
+        Action<EventObject>? candidateObserver = null,
         Action<EventLogQueryTargetFailure>? targetFailureObserver = null) {
 
-        return QueryLogsParallelForEach(LogNameToString(logName), eventIds, machineNames, providerName, keywords, level, startTime, endTime, userId, maxEvents, maxThreads, eventRecordId, cancellationToken, sessionTimeoutMs, readMode, bufferCapacity, minimumEventRecordIdExclusiveResolver, oldest, targetFailureObserver);
+        return QueryLogsParallelForEach(LogNameToString(logName), eventIds, machineNames, providerName, keywords, level, startTime, endTime, userId, maxEvents, maxThreads, eventRecordId, cancellationToken, sessionTimeoutMs, readMode, bufferCapacity, minimumEventRecordIdExclusiveResolver, oldest, resultPredicate, candidateObserver, targetFailureObserver);
     }
 
     internal static IEnumerable<QueryWorkItem> BuildQueryWorkItems(

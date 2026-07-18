@@ -26,13 +26,15 @@ public partial class SearchEvents : Settings {
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <param name="readMode">Amount of provider data to materialize for each event.</param>
     /// <param name="minimumEventRecordIdExclusive">Optional native record-ID lower bound.</param>
+    /// <param name="resultPredicate">Optional managed predicate applied before <paramref name="maxEvents"/>.</param>
+    /// <param name="candidateObserver">Optional observer invoked for every native candidate before managed filtering.</param>
     /// <returns>Enumerable sequence of <see cref="EventObject"/> read from the file.</returns>
     /// <remarks>
     /// Unlimited queries that require multiple XPath chunks stream bounded chunk batches; ordering is preserved
     /// within each batch. A positive <paramref name="maxEvents"/> preserves monotonic native record order across
     /// XPath chunks. Provider timestamps are not used to reorder records within the EVTX source because they can move backwards.
     /// </remarks>
-    public static IEnumerable<EventObject> QueryLogFile(string filePath, List<int>? eventIds = null, string? providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string? userId = null, int maxEvents = 0, List<long>? eventRecordId = null, TimePeriod? timePeriod = null, bool oldest = false, System.Collections.Hashtable? namedDataFilter = null, System.Collections.Hashtable? namedDataExcludeFilter = null, CancellationToken cancellationToken = default, EventReadMode readMode = EventReadMode.Full, long? minimumEventRecordIdExclusive = null) {
+    public static IEnumerable<EventObject> QueryLogFile(string filePath, List<int>? eventIds = null, string? providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string? userId = null, int maxEvents = 0, List<long>? eventRecordId = null, TimePeriod? timePeriod = null, bool oldest = false, System.Collections.Hashtable? namedDataFilter = null, System.Collections.Hashtable? namedDataExcludeFilter = null, CancellationToken cancellationToken = default, EventReadMode readMode = EventReadMode.Full, long? minimumEventRecordIdExclusive = null, Func<EventObject, bool>? resultPredicate = null, Action<EventObject>? candidateObserver = null) {
         if (string.IsNullOrWhiteSpace(filePath)) {
             throw new ArgumentException("File path cannot be null or empty.", nameof(filePath));
         }
@@ -71,25 +73,30 @@ public partial class SearchEvents : Settings {
             fixedExpressionCount,
             minimumResolver,
             reserveRecordIdPagingBoundary: maxEvents > 0 && !(oldest && minimumResolver != null));
-        Func<QueryWorkItem, IEnumerator<EventObject>> createEnumerator = workItem => FilterQueryWorkItemResults(
-            workItem,
-            QueryLogFileChunk(
-                absolutePath,
-                workItem.EventIds,
-                providerName,
-                keywords,
-                level,
-                startTime,
-                endTime,
-                userId,
-                workItem.EventRecordIds,
-                oldest,
-                namedDataFilter,
-                namedDataExcludeFilter,
-                cancellationToken,
-                readMode,
-                workItem.MinimumEventRecordIdExclusive,
-                workItem.MaximumEventRecordIdExclusive)).GetEnumerator();
+        Func<QueryWorkItem, IEnumerator<EventObject>> createEnumerator = workItem => {
+            IEnumerator<EventObject> queryResults = FilterQueryWorkItemResults(
+                workItem,
+                QueryLogFileChunk(
+                    absolutePath,
+                    workItem.EventIds,
+                    providerName,
+                    keywords,
+                    level,
+                    startTime,
+                    endTime,
+                    userId,
+                    workItem.EventRecordIds,
+                    oldest,
+                    namedDataFilter,
+                    namedDataExcludeFilter,
+                    cancellationToken,
+                    readMode,
+                    workItem.MinimumEventRecordIdExclusive,
+                    workItem.MaximumEventRecordIdExclusive)).GetEnumerator();
+            return resultPredicate == null && candidateObserver == null
+                ? queryResults
+                : ObserveAndFilterQueryResults(queryResults, resultPredicate, candidateObserver).GetEnumerator();
+        };
 
         if (maxEvents > 0 || (oldest && minimumResolver != null)) {
             List<QueryWorkItem> pagedWorkItems = workItems.ToList();

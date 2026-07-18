@@ -125,7 +125,6 @@ namespace EventViewerX {
             }
 
             if (maxEvents > 0) {
-                var projections = new Dictionary<EventObject, EventObjectSlim>();
                 foreach (EventObject foundEvent in QueryNamedPagedCandidates(
                              eventInfo,
                              machineNames,
@@ -141,23 +140,19 @@ namespace EventViewerX {
                                  queryInfo.EventsScanned++;
                                  candidateObserver?.Invoke(candidate);
                              },
-                             candidate => {
-                                 EventObjectSlim? projection = BuildTargetEvents(candidate, typeEventsList);
-                                 if (projection == null || (resultPredicate != null && !resultPredicate(projection))) {
-                                     return false;
-                                 }
-                                 projections[candidate] = projection;
-                                 return true;
-                             })) {
+                             enforceMaxEvents: false)) {
                     cancellationToken.ThrowIfCancellationRequested();
-                    if (!projections.TryGetValue(foundEvent, out EventObjectSlim? targetEvent)) {
+                    EventObjectSlim? targetEvent = BuildTargetEvents(foundEvent, typeEventsList);
+                    if (targetEvent == null || (resultPredicate != null && !resultPredicate(targetEvent))) {
                         continue;
                     }
-                    projections.Remove(foundEvent);
 
                     emitted++;
                     queryInfo.EventsEmitted = emitted;
-                    yield return targetEvent!;
+                    yield return targetEvent;
+                    if (emitted >= maxEvents) {
+                        yield break;
+                    }
                 }
                 yield break;
             }

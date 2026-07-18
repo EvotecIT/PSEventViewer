@@ -4,6 +4,7 @@ namespace EventViewerX;
 public sealed class EventLogQueryTargetFailure {
     internal EventLogQueryTargetFailure(
         string machineName,
+        string logName,
         EventLogRemoteQueryFailureKind kind,
         string message) {
         if (string.IsNullOrWhiteSpace(machineName)) {
@@ -12,14 +13,21 @@ public sealed class EventLogQueryTargetFailure {
         if (kind == EventLogRemoteQueryFailureKind.None) {
             throw new ArgumentOutOfRangeException(nameof(kind), "A target failure must have a classified failure kind.");
         }
+        if (string.IsNullOrWhiteSpace(logName)) {
+            throw new ArgumentException("Event-log source cannot be null or empty.", nameof(logName));
+        }
 
         MachineName = machineName.Trim();
+        LogName = logName.Trim();
         Kind = kind;
         Message = message ?? string.Empty;
     }
 
     /// <summary>Normalized remote machine name.</summary>
     public string MachineName { get; }
+
+    /// <summary>Event-log source that failed on the remote machine.</summary>
+    public string LogName { get; }
 
     /// <summary>Typed remote-target failure kind.</summary>
     public EventLogRemoteQueryFailureKind Kind { get; }
