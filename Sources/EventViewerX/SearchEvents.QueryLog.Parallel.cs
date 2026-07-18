@@ -133,8 +133,6 @@ public partial class SearchEvents : Settings {
         if (maxEvents > 0) {
             List<string?> boundedTargets = NormalizeQueryTargets(machineNames);
             int boundedFixedExpressionCount = CountFixedQueryExpressions(providerName, keywords, level, startTime, endTime, userId, timePeriod);
-            bool isolateBoundedRemoteFailures = boundedTargets.Count > 1;
-            var boundedFailedTargets = new ConcurrentDictionary<string, byte>(StringComparer.OrdinalIgnoreCase);
             var boundedWorkItems = new List<QueryWorkItem>(BuildQueryWorkItems(
                 boundedTargets,
                 eventIds,
@@ -142,6 +140,10 @@ public partial class SearchEvents : Settings {
                 boundedFixedExpressionCount,
                 minimumEventRecordIdExclusiveResolver,
                 reserveRecordIdPagingBoundary: !(oldest && minimumEventRecordIdExclusiveResolver != null)));
+            bool isolateBoundedRemoteFailures = ShouldIsolateRemoteFailures(
+                boundedWorkItems.Count,
+                targetFailureObserver);
+            var boundedFailedTargets = new ConcurrentDictionary<string, byte>(StringComparer.OrdinalIgnoreCase);
             Func<QueryWorkItem, IEnumerator<EventObject>> createBoundedEnumerator = workItem => CreateSequentialQueryEnumerator(
                 workItem,
                 logName,
@@ -186,7 +188,7 @@ public partial class SearchEvents : Settings {
 
         List<string?> targets = NormalizeQueryTargets(machineNames);
         int fixedExpressionCount = CountFixedQueryExpressions(providerName, keywords, level, startTime, endTime, userId, timePeriod);
-        bool isolateRemoteFailures = targets.Count > 1;
+        bool isolateRemoteFailures = ShouldIsolateRemoteFailures(targets.Count, targetFailureObserver);
         int effectiveBufferCapacity = bufferCapacity > 0 ? bufferCapacity : Math.Max(16, maxThreads * 4);
 
         using var workerCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -301,6 +303,13 @@ public partial class SearchEvents : Settings {
 
         string? target = NormalizeRemoteTarget(workItem.MachineName);
         return target != null && failedTargets.ContainsKey(target);
+    }
+
+    internal static bool ShouldIsolateRemoteFailures(
+        int physicalSourceCount,
+        Action<EventLogQueryTargetFailure>? targetFailureObserver) {
+
+        return physicalSourceCount > 1 || targetFailureObserver != null;
     }
 
     private static bool TryMoveNextParallelResult(

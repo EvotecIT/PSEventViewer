@@ -51,7 +51,7 @@ public partial class SearchEvents {
         }
         List<string?> targets = NormalizeQueryTargets(machineNames);
         int fixedExpressionCount = CountFixedQueryExpressions(providerName, keywords, level, startTime, endTime, userId, timePeriod);
-        bool isolateRemoteFailures = targets.Count > 1;
+        bool isolateRemoteFailures = ShouldIsolateRemoteFailures(targets.Count, targetFailureObserver);
         var failedTargets = new ConcurrentDictionary<string, byte>(StringComparer.OrdinalIgnoreCase);
         IEnumerable<QueryWorkItem> workItems = BuildQueryWorkItems(
             targets,

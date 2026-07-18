@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
 
@@ -45,7 +46,7 @@ namespace EventViewerX.Tests {
                                new List<string?> { null, Environment.MachineName },
                                maxThreads: 2,
                                maxEvents: 1,
-                               candidateObserver: _ => candidatesObserved++)) {
+                               candidateObserver: _ => Interlocked.Increment(ref candidatesObserved))) {
                 emitted++;
             }
 
@@ -244,6 +245,19 @@ namespace EventViewerX.Tests {
                 out _,
                 targetFailureObserver: null,
                 logName: "System"));
+        }
+
+        [Fact]
+        public void RemoteFailureIsolationCoversMultiplePhysicalSourcesAndTypedObservers() {
+            Assert.False(SearchEvents.ShouldIsolateRemoteFailures(
+                physicalSourceCount: 1,
+                targetFailureObserver: null));
+            Assert.True(SearchEvents.ShouldIsolateRemoteFailures(
+                physicalSourceCount: 2,
+                targetFailureObserver: null));
+            Assert.True(SearchEvents.ShouldIsolateRemoteFailures(
+                physicalSourceCount: 1,
+                targetFailureObserver: static _ => { }));
         }
 
         [Fact]
