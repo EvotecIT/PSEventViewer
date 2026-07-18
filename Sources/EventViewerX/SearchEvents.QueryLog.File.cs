@@ -68,8 +68,49 @@ public partial class SearchEvents : Settings {
             eventIds,
             eventRecordId,
             fixedExpressionCount,
-            minimumResolver,
-            preserveSourceProgression: oldest);
+            minimumResolver);
+
+        if (oldest && minimumResolver != null) {
+            List<Func<int, IReadOnlyList<EventObject>>> pageReaders = workItems
+                .Select(workItem => CreateCheckpointPageReader(
+                    workItem,
+                    pageWorkItem => FilterQueryWorkItemResults(
+                        pageWorkItem,
+                        QueryLogFileChunk(
+                            absolutePath,
+                            pageWorkItem.EventIds,
+                            providerName,
+                            keywords,
+                            level,
+                            startTime,
+                            endTime,
+                            userId,
+                            pageWorkItem.EventRecordIds,
+                            true,
+                            namedDataFilter,
+                            namedDataExcludeFilter,
+                            cancellationToken,
+                            readMode,
+                            pageWorkItem.MinimumEventRecordIdExclusive)).GetEnumerator()))
+                .ToList();
+            if (pageReaders.Count == 0) {
+                yield break;
+            }
+
+            int returned = 0;
+            foreach (EventObject eventObject in MergePagedSources(
+                         pageReaders,
+                         static (left, right) => CompareEvents(left, right, oldest: true),
+                         GetCheckpointCandidatePageSize(pageReaders.Count),
+                         cancellationToken)) {
+                yield return eventObject;
+                returned++;
+                if (maxEvents > 0 && returned >= maxEvents) {
+                    yield break;
+                }
+            }
+            yield break;
+        }
 
         foreach (EventObject eventObject in MergeQueryWorkItems(
                      workItems,

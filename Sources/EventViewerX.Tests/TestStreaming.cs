@@ -215,6 +215,18 @@ namespace EventViewerX.Tests {
                 new InvalidOperationException("projection bug"),
                 out EventLogRemoteQueryFailureKind unexpectedFailure));
             Assert.Equal(EventLogRemoteQueryFailureKind.None, unexpectedFailure);
+
+            Assert.False(EventLogRemoteQueryFailureClassifier.TryClassify(
+                "server",
+                new InvalidEventLogQueryException(),
+                out EventLogRemoteQueryFailureKind invalidQueryFailure));
+            Assert.Equal(EventLogRemoteQueryFailureKind.None, invalidQueryFailure);
+        }
+
+        private sealed class InvalidEventLogQueryException : System.Diagnostics.Eventing.Reader.EventLogException {
+            internal InvalidEventLogQueryException() {
+                HResult = 15001;
+            }
         }
 
         [Fact]
@@ -291,24 +303,43 @@ namespace EventViewerX.Tests {
         }
 
         [Fact]
-        public void ProgressionPreservingQueriesUseOneOrderedWorkItemPerSource() {
-            var eventIds = Enumerable.Range(1, 100).ToList();
-            var recordIds = Enumerable.Range(1, 100).Select(static value => (long)value).ToList();
+        public void CheckpointQueriesKeepSparseEventIdsInNativeChunks() {
+            var eventIds = Enumerable.Range(1, SearchEvents.MaxXPathExpressionCount + 1).ToList();
 
             List<SearchEvents.QueryWorkItem> workItems = SearchEvents.BuildQueryWorkItems(
-                new List<string?> { null, "server" },
+                new List<string?> { "server" },
                 eventIds,
-                recordIds,
+                null,
                 fixedExpressionCount: 0,
-                preserveSourceProgression: true).ToList();
+                minimumEventRecordIdExclusiveResolver: _ => 100).ToList();
 
             Assert.Equal(2, workItems.Count);
             Assert.All(workItems, item => {
-                Assert.Null(item.EventIds);
+                Assert.NotNull(item.EventIds);
                 Assert.Null(item.EventRecordIds);
-                Assert.True(item.ManagedEventIds!.SetEquals(eventIds));
-                Assert.True(item.ManagedEventRecordIds!.SetEquals(recordIds));
+                Assert.Null(item.ManagedEventIds);
+                Assert.Null(item.ManagedEventRecordIds);
+                Assert.Equal(100, item.MinimumEventRecordIdExclusive);
             });
+            Assert.Equal(eventIds, workItems.SelectMany(static item => item.EventIds!).ToList());
+        }
+
+        [Fact]
+        public void QueryTargetsAreTrimmedAndDeduplicatedBeforeCheckpointResolution() {
+            List<string?> targets = SearchEvents.NormalizeQueryTargets(
+                new List<string?> { " AD1 ", "ad1", " ", null, "AD2" });
+
+            Assert.Equal(new string?[] { "AD1", null, "AD2" }, targets);
+        }
+
+        [Theory]
+        [InlineData(1, 1024)]
+        [InlineData(4, 1024)]
+        [InlineData(8, 512)]
+        [InlineData(128, 32)]
+        [InlineData(4096, 1)]
+        public void CheckpointPageSizeKeepsCandidateBufferBounded(int sources, int expectedPageSize) {
+            Assert.Equal(expectedPageSize, SearchEvents.GetCheckpointCandidatePageSize(sources));
         }
 
         [Fact]
@@ -356,6 +387,42 @@ namespace EventViewerX.Tests {
 
             Assert.Equal(1, first);
             Assert.Equal(new[] { 1 }, requests);
+        }
+
+        [Fact]
+        public void CheckpointPageReadersAdvanceEachNativeChunkWithoutSkipping() {
+            var sourceEvents = new Dictionary<int, EventObject[]> {
+                [1] = new[] {
+                    CreateEventObject(1, new DateTime(1, DateTimeKind.Utc), 1, "System", "Test"),
+                    CreateEventObject(3, new DateTime(3, DateTimeKind.Utc), 1, "System", "Test"),
+                    CreateEventObject(5, new DateTime(5, DateTimeKind.Utc), 1, "System", "Test")
+                },
+                [2] = new[] {
+                    CreateEventObject(2, new DateTime(2, DateTimeKind.Utc), 2, "System", "Test"),
+                    CreateEventObject(4, new DateTime(4, DateTimeKind.Utc), 2, "System", "Test"),
+                    CreateEventObject(6, new DateTime(6, DateTimeKind.Utc), 2, "System", "Test")
+                }
+            };
+            var workItems = new[] {
+                new SearchEvents.QueryWorkItem(null, new List<int> { 1 }, null, minimumEventRecordIdExclusive: 0),
+                new SearchEvents.QueryWorkItem(null, new List<int> { 2 }, null, minimumEventRecordIdExclusive: 0)
+            };
+            List<Func<int, IReadOnlyList<EventObject>>> pageReaders = workItems
+                .Select(workItem => SearchEvents.CreateCheckpointPageReader(
+                    workItem,
+                    pageWorkItem => sourceEvents[pageWorkItem.EventIds![0]]
+                        .Where(eventObject => eventObject.RecordId > pageWorkItem.MinimumEventRecordIdExclusive)
+                        .GetEnumerator()))
+                .ToList();
+
+            List<long> recordIds = SearchEvents.MergePagedSources(
+                    pageReaders,
+                    static (left, right) => left.TimeCreated.CompareTo(right.TimeCreated),
+                    pageSize: 2)
+                .Select(static eventObject => eventObject.RecordId!.Value)
+                .ToList();
+
+            Assert.Equal(new long[] { 1, 2, 3, 4, 5, 6 }, recordIds);
         }
 
         [Fact]

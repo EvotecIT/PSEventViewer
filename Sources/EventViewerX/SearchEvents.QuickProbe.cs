@@ -128,6 +128,7 @@ public partial class SearchEvents : Settings {
 
         string target = ResolveProbeTarget(machineName);
         long? recordCount = null;
+        int scanned = 0;
         try {
             TimeSpan remaining = timeout - stopwatch.Elapsed;
             if (remaining <= TimeSpan.Zero) {
@@ -151,7 +152,6 @@ public partial class SearchEvents : Settings {
             }
             operationBudgetMs = (int)Math.Min(int.MaxValue, Math.Max(1, remaining.TotalMilliseconds));
             using var reader = CreateEventLogReader(query, machineName, operationBudgetMs);
-            int scanned = 0;
             while (scanned < maxEventsToScan) {
                 remaining = timeout - stopwatch.Elapsed;
                 if (remaining <= TimeSpan.Zero) {
@@ -187,16 +187,16 @@ public partial class SearchEvents : Settings {
 
             return ProbeFailure(logName, target, QuickProbeStatus.LimitReached, $"Scanned {maxEventsToScan} events without a timestamp.", maxEventsToScan, recordCount, stopwatch.Elapsed);
         } catch (UnauthorizedAccessException ex) {
-            return ProbeFailure(logName, target, QuickProbeStatus.AccessDenied, ex.Message, 0, recordCount, stopwatch.Elapsed);
+            return ProbeFailure(logName, target, QuickProbeStatus.AccessDenied, ex.Message, scanned, recordCount, stopwatch.Elapsed);
         } catch (TimeoutException ex) {
-            return ProbeFailure(logName, target, QuickProbeStatus.Timeout, ex.Message, 0, recordCount, stopwatch.Elapsed);
+            return ProbeFailure(logName, target, QuickProbeStatus.Timeout, ex.Message, scanned, recordCount, stopwatch.Elapsed);
         } catch (EventLogNotFoundException ex) {
-            return ProbeFailure(logName, target, QuickProbeStatus.LogNotFound, ex.Message, 0, recordCount, stopwatch.Elapsed);
+            return ProbeFailure(logName, target, QuickProbeStatus.LogNotFound, ex.Message, scanned, recordCount, stopwatch.Elapsed);
         } catch (EventLogException ex) {
             QuickProbeStatus status = QueryFailureHelpers.IsInvalidEventQuery(ex) ? QuickProbeStatus.InvalidQuery : QuickProbeStatus.Error;
-            return ProbeFailure(logName, target, status, ex.Message, 0, recordCount, stopwatch.Elapsed);
+            return ProbeFailure(logName, target, status, ex.Message, scanned, recordCount, stopwatch.Elapsed);
         } catch (Exception ex) {
-            return ProbeFailure(logName, target, QuickProbeStatus.Error, ex.Message, 0, recordCount, stopwatch.Elapsed);
+            return ProbeFailure(logName, target, QuickProbeStatus.Error, ex.Message, scanned, recordCount, stopwatch.Elapsed);
         }
     }
 

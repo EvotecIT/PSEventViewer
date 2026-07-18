@@ -6,7 +6,8 @@ using System.Threading;
 namespace EventViewerX;
 
 public partial class SearchEvents : Settings {
-    private const int CheckpointCandidatePageSize = 32;
+    private const int CheckpointCandidateBufferBudget = 4096;
+    private const int MaximumCheckpointCandidatePageSize = 1024;
 
     private static IEnumerable<EventObject> QueryNamedCheckpointCandidates(
         Dictionary<string, HashSet<int>> eventInfo,
@@ -20,9 +21,9 @@ public partial class SearchEvents : Settings {
         List<string?> targets = NormalizeNamedCheckpointTargets(machineNames);
         var pageReaders = new List<Func<int, IReadOnlyList<EventObject>>>(eventInfo.Count * targets.Count);
         foreach (KeyValuePair<string, HashSet<int>> entry in eventInfo) {
+            List<int> eventIds = entry.Value.ToList();
             foreach (string? machineName in targets) {
                 string logName = entry.Key;
-                List<int> eventIds = entry.Value.ToList();
                 string? target = machineName;
                 long? lowerBound = minimumEventRecordIdExclusiveResolver(target, logName);
                 bool completed = false;
@@ -70,10 +71,14 @@ public partial class SearchEvents : Settings {
             }
         }
 
+        if (pageReaders.Count == 0) {
+            return Array.Empty<EventObject>();
+        }
+
         return MergePagedSources(
             pageReaders,
             static (left, right) => CompareEvents(left, right, oldest: true),
-            CheckpointCandidatePageSize,
+            GetCheckpointCandidatePageSize(pageReaders.Count),
             cancellationToken);
     }
 
@@ -114,21 +119,67 @@ public partial class SearchEvents : Settings {
         }
     }
 
-    private static List<string?> NormalizeNamedCheckpointTargets(List<string?>? machineNames) {
-        if (machineNames == null || machineNames.Count == 0) {
-            return new List<string?> { null };
+    private static List<string?> NormalizeNamedCheckpointTargets(List<string?>? machineNames)
+        => NormalizeQueryTargets(machineNames);
+
+    internal static int GetCheckpointCandidatePageSize(int sourceCount) {
+        if (sourceCount <= 0) {
+            throw new ArgumentOutOfRangeException(nameof(sourceCount), "Source count must be positive.");
         }
 
-        var targets = new List<string?>();
-        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (string? machineName in machineNames) {
-            string? normalized = string.IsNullOrWhiteSpace(machineName) ? null : machineName!.Trim();
-            string key = normalized ?? "<LOCAL>";
-            if (seen.Add(key)) {
-                targets.Add(normalized);
-            }
+        return Math.Min(
+            MaximumCheckpointCandidatePageSize,
+            Math.Max(1, CheckpointCandidateBufferBudget / sourceCount));
+    }
+
+    internal static Func<int, IReadOnlyList<EventObject>> CreateCheckpointPageReader(
+        QueryWorkItem initialWorkItem,
+        Func<QueryWorkItem, IEnumerator<EventObject>> createEnumerator) {
+
+        if (initialWorkItem == null) {
+            throw new ArgumentNullException(nameof(initialWorkItem));
         }
-        return targets;
+        if (createEnumerator == null) {
+            throw new ArgumentNullException(nameof(createEnumerator));
+        }
+
+        long? lowerBound = initialWorkItem.MinimumEventRecordIdExclusive;
+        bool completed = false;
+        return requested => {
+            if (completed) {
+                return Array.Empty<EventObject>();
+            }
+
+            var pageWorkItem = new QueryWorkItem(
+                initialWorkItem.MachineName,
+                initialWorkItem.EventIds,
+                initialWorkItem.EventRecordIds,
+                initialWorkItem.ManagedEventIds,
+                initialWorkItem.ManagedEventRecordIds,
+                lowerBound);
+            var page = new List<EventObject>(requested);
+            using (IEnumerator<EventObject> enumerator = createEnumerator(pageWorkItem)) {
+                while (page.Count < requested && enumerator.MoveNext()) {
+                    page.Add(enumerator.Current);
+                }
+            }
+
+            long? nextLowerBound = null;
+            foreach (EventObject eventObject in page) {
+                if (eventObject.RecordId.HasValue &&
+                    (!nextLowerBound.HasValue || eventObject.RecordId.Value > nextLowerBound.Value)) {
+                    nextLowerBound = eventObject.RecordId.Value;
+                }
+            }
+            if (page.Count < requested ||
+                !nextLowerBound.HasValue ||
+                (lowerBound.HasValue && nextLowerBound.Value <= lowerBound.Value)) {
+                completed = true;
+            } else {
+                lowerBound = nextLowerBound;
+            }
+            return page;
+        };
     }
 
     private sealed class PagedSourceCursor<T> {

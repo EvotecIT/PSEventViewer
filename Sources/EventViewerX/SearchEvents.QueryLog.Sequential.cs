@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 
 namespace EventViewerX;
@@ -36,9 +37,12 @@ public partial class SearchEvents {
         bool oldest = false) {
 
         ValidateQueryArguments(logName, maxEvents, sessionTimeoutMs);
-        List<string?> targets = machineNames == null || machineNames.Count == 0
-            ? new List<string?> { null }
-            : machineNames;
+        if (maxOpenQueries <= 0 || maxOpenQueries > MaximumParallelism) {
+            throw new ArgumentOutOfRangeException(
+                nameof(maxOpenQueries),
+                $"Maximum open queries must be between 1 and {MaximumParallelism}.");
+        }
+        List<string?> targets = NormalizeQueryTargets(machineNames);
         int fixedExpressionCount = CountFixedQueryExpressions(providerName, keywords, level, startTime, endTime, userId, timePeriod);
         bool isolateRemoteFailures = targets.Count > 1;
         var failedTargets = new ConcurrentDictionary<string, byte>(StringComparer.OrdinalIgnoreCase);
@@ -47,8 +51,47 @@ public partial class SearchEvents {
             eventIds,
             eventRecordId,
             fixedExpressionCount,
-            minimumEventRecordIdExclusiveResolver,
-            preserveSourceProgression: oldest && minimumEventRecordIdExclusiveResolver != null);
+            minimumEventRecordIdExclusiveResolver);
+
+        if (oldest && minimumEventRecordIdExclusiveResolver != null) {
+            List<Func<int, IReadOnlyList<EventObject>>> pageReaders = workItems
+                .Select(workItem => CreateCheckpointPageReader(
+                    workItem,
+                    pageWorkItem => CreateSequentialQueryEnumerator(
+                        pageWorkItem,
+                        logName,
+                        providerName,
+                        keywords,
+                        level,
+                        startTime,
+                        endTime,
+                        userId,
+                        timePeriod,
+                        cancellationToken,
+                        sessionTimeoutMs,
+                        readMode,
+                        oldest: true,
+                        isolateRemoteFailures,
+                        failedTargets)))
+                .ToList();
+            if (pageReaders.Count == 0) {
+                yield break;
+            }
+
+            int returned = 0;
+            foreach (EventObject result in MergePagedSources(
+                         pageReaders,
+                         static (left, right) => CompareEvents(left, right, oldest: true),
+                         GetCheckpointCandidatePageSize(pageReaders.Count),
+                         cancellationToken)) {
+                yield return result;
+                returned++;
+                if (maxEvents > 0 && returned >= maxEvents) {
+                    yield break;
+                }
+            }
+            yield break;
+        }
 
         foreach (EventObject result in MergeQueryWorkItems(
                      workItems,

@@ -119,14 +119,17 @@ Describe 'Start-EVXWatcher - PowerShell event dispatch' {
         try {
             $OtherRunspace.Open()
             $OtherPowerShell.Runspace = $OtherRunspace
-            $OtherName = 'PSEventViewer.OtherRunspace.' + [Guid]::NewGuid().ToString('N')
-            $OtherScript = "Import-Module -Name '$EscapedModulePath' -Force; Start-EVXWatcher -Name '$OtherName' -MachineName '$env:COMPUTERNAME' -LogName Application -EventId 1 -Action {}"
+            $SharedName = 'PSEventViewer.SharedRunspace.' + [Guid]::NewGuid().ToString('N')
+            $ActionIdentity = 'PSEventViewer.Tests.SharedAction'
+            $OtherScript = "Import-Module -Name '$EscapedModulePath' -Force; Start-EVXWatcher -Name '$SharedName' -MachineName '$env:COMPUTERNAME' -LogName Application -EventId 1 -ActionIdentity '$ActionIdentity' -Action {}"
             $OtherResult = $OtherPowerShell.AddScript($OtherScript).Invoke()
             if ($OtherPowerShell.HadErrors) {
                 throw ($OtherPowerShell.Streams.Error | Select-Object -First 1)
             }
             $OtherWatcher = $OtherResult[0]
-            $MainWatcher = Start-EVXWatcher -Name ('PSEventViewer.MainRunspace.' + [Guid]::NewGuid().ToString('N')) -MachineName $env:COMPUTERNAME -LogName Application -EventId 1 -Action {}
+            $MainWatcher = Start-EVXWatcher -Name $SharedName -MachineName $env:COMPUTERNAME -LogName Application -EventId 1 -ActionIdentity $ActionIdentity -Action {}
+
+            $MainWatcher.Id | Should -Not -Be $OtherWatcher.Id
 
             Remove-Module PSEventViewer -Force
 

@@ -47,6 +47,12 @@ public static class EventLogRemoteQueryFailureClassifier {
             return true;
         }
 
+        if (exception is EventLogException eventLogException &&
+            Reports.QueryHelpers.QueryFailureHelpers.IsInvalidEventQuery(eventLogException)) {
+            failureKind = EventLogRemoteQueryFailureKind.None;
+            return false;
+        }
+
         failureKind = exception switch {
             UnauthorizedAccessException => EventLogRemoteQueryFailureKind.AccessDenied,
             TimeoutException => EventLogRemoteQueryFailureKind.Timeout,

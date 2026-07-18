@@ -76,6 +76,50 @@ namespace EventViewerX.Tests {
         }
 
         [Fact]
+        public void StableWatcherReuseIsIsolatedByHostScope() {
+            WatcherManager.StopAll();
+            const string watcherName = "unit-scoped-reuse";
+            try {
+                WatcherInfo first = WatcherManager.StartWatcher(
+                    watcherName,
+                    Environment.MachineName,
+                    "Application",
+                    new List<int> { 1 },
+                    new List<NamedEvents>(),
+                    _ => { },
+                    false,
+                    false,
+                    0,
+                    null,
+                    actionIdentity: "script:stable",
+                    reuseScopeIdentity: "scope-a");
+                WatcherInfo second = WatcherManager.StartWatcher(
+                    watcherName,
+                    Environment.MachineName,
+                    "Application",
+                    new List<int> { 1 },
+                    new List<NamedEvents>(),
+                    _ => { },
+                    false,
+                    false,
+                    0,
+                    null,
+                    actionIdentity: "script:stable",
+                    reuseScopeIdentity: "scope-b");
+
+                Assert.NotSame(first, second);
+                Assert.NotEqual(first.Id, second.Id);
+                Assert.Contains(first, WatcherManager.GetWatchers(watcherName));
+                Assert.Contains(second, WatcherManager.GetWatchers(watcherName));
+
+                WatcherManager.StopWatchersByName(watcherName);
+                Assert.Empty(WatcherManager.GetWatchers(watcherName));
+            } finally {
+                WatcherManager.StopAll();
+            }
+        }
+
+        [Fact]
         public void StartWatcherRejectsSameNameWithDifferentConfiguration() {
             WatcherManager.StopAll();
             Action<EventObject> action = _ => { };

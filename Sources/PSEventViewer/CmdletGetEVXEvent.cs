@@ -517,9 +517,6 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
         string checkpointKey = GetCheckpointKey(eventObject);
         long recordId = eventObject.RecordId.Value;
         bool hasCheckpoint = _recordMap.TryGetValue(checkpointKey, out long previousRecordId);
-        if (!hasCheckpoint && !string.Equals(checkpointKey, _recordIdKey, StringComparison.OrdinalIgnoreCase)) {
-            hasCheckpoint = _recordMap.TryGetValue(_recordIdKey, out previousRecordId);
-        }
         if (hasCheckpoint && recordId <= previousRecordId) {
             return false;
         }
@@ -577,7 +574,7 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
             }
         }
 
-        return _recordMap.TryGetValue(_recordIdKey, out checkpoint);
+        return false;
     }
 
     private static HashSet<string> GetCheckpointSourceNames(string? machineName) {
@@ -646,7 +643,11 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
                         boundaryEvent,
                         string.IsNullOrWhiteSpace(machine) ? log : $"{log} on {machine}");
                 } catch (Exception ex) when (EventLogRemoteQueryFailureClassifier.TryClassify(machine, ex, out _)) {
-                    WriteVerbose($"Checkpoint generation probe skipped unavailable target '{machine}': {ex.Message}");
+                    ResetCheckpointForSafeReplay(
+                        checkpointKey,
+                        $"Checkpoint boundary {checkpoint} for '{checkpointKey}' could not be validated on " +
+                        $"'{(string.IsNullOrWhiteSpace(machine) ? log : $"{log} on {machine}")}'. " +
+                        $"Replaying this source without the saved lower bound to avoid event loss. {ex.GetType().Name}: {ex.Message}");
                 }
             }
         }
@@ -674,14 +675,19 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
             return;
         }
 
+        ResetCheckpointForSafeReplay(
+            checkpointKey,
+            $"Checkpoint boundary {checkpoint} for '{checkpointKey}' no longer identifies the same record in '{target}'. " +
+            "The source was cleared, replaced, or aged past that boundary; restarting from its oldest available matching record.");
+    }
+
+    private void ResetCheckpointForSafeReplay(string checkpointKey, string warning) {
         _recordMap.Remove(checkpointKey);
         _highestRecordIds.Remove(checkpointKey);
         _highestCheckpointEvents.Remove(checkpointKey);
         _checkpointBoundaryMigrations.Remove(checkpointKey);
         _resetCheckpointKeys.Add(checkpointKey);
-        WriteWarning(
-            $"Checkpoint boundary {checkpoint} for '{checkpointKey}' no longer identifies the same record in '{target}'. " +
-            "The source was cleared, replaced, or aged past that boundary; restarting from its oldest available matching record.");
+        WriteWarning(warning);
     }
 
     private bool OutputLimitReached => MaxEvents > 0 && _eventsOutput >= MaxEvents;

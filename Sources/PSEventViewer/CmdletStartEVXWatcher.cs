@@ -167,7 +167,8 @@ namespace PSEventViewer {
                     StopOnMatch.IsPresent,
                     StopAfter,
                     TimeOut,
-                    string.IsNullOrWhiteSpace(ActionIdentity) ? null : ActionIdentity!.Trim());
+                    string.IsNullOrWhiteSpace(ActionIdentity) ? null : ActionIdentity!.Trim(),
+                    reuseScopeIdentity: watcherOwnerId.ToString("N"));
                 createdPowerShellWatcher = watcher.Action.Equals(publish);
                 if (!createdPowerShellWatcher) {
                     RemovePowerShellSubscription();

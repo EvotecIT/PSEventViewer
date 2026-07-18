@@ -45,7 +45,7 @@ public sealed class EventCheckpointSnapshot {
         _recordView = new ReadOnlyDictionary<string, long>(_records);
     }
 
-    /// <summary>Numeric checkpoint values compatible with the primary JSON checkpoint file.</summary>
+    /// <summary>Numeric checkpoint values mirrored to the compatibility JSON file on a best-effort basis.</summary>
     public IReadOnlyDictionary<string, long> Records => _recordView;
 
     /// <summary>All generation-aware checkpoints, including generations that have not emitted a record yet.</summary>
@@ -259,7 +259,15 @@ public static class EventCheckpointStore {
                 StringComparer.OrdinalIgnoreCase);
 
         AtomicWrite(GetStatePath(checkpointPath), JsonSerializer.Serialize(document));
-        AtomicWrite(checkpointPath, JsonSerializer.Serialize(numeric));
+        try {
+            AtomicWrite(checkpointPath, JsonSerializer.Serialize(numeric));
+        } catch (IOException ex) {
+            Settings._logger.WriteWarning(
+                $"The authoritative checkpoint state was saved, but the legacy numeric mirror '{checkpointPath}' could not be updated: {ex.Message}");
+        } catch (UnauthorizedAccessException ex) {
+            Settings._logger.WriteWarning(
+                $"The authoritative checkpoint state was saved, but the legacy numeric mirror '{checkpointPath}' could not be updated: {ex.Message}");
+        }
     }
 
     private static FileStream AcquireFileLock(string checkpointPath, TimeSpan timeout) {

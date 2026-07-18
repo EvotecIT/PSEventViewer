@@ -46,6 +46,7 @@ namespace EventViewerX {
         /// <summary>Callback invoked when a matching event arrives.</summary>
         public Action<EventObject> Action { get; }
         internal string? ActionIdentity { get; set; }
+        internal string? ReuseScopeIdentity { get; set; }
         /// <summary>Whether staging event ID 350 is included in the subscription.</summary>
         public bool Staging { get; }
         /// <summary>Stops the watcher after the first match when <c>true</c>.</summary>
@@ -180,8 +181,9 @@ namespace EventViewerX {
         /// <param name="stopAfter">Stop after this many matches when &gt; 0.</param>
         /// <param name="timeout">Optional timeout after which the watcher stops.</param>
         /// <param name="actionIdentity">Optional stable callback identity used by hosts that recreate equivalent delegate instances.</param>
+        /// <param name="reuseScopeIdentity">Optional host scope that isolates friendly-name and action reuse from other host instances.</param>
         /// <returns>A <see cref="WatcherInfo"/> describing the running watcher.</returns>
-        public static WatcherInfo StartWatcher(string? name, string machineName, string logName, List<int> eventIds, List<NamedEvents> namedEvents, Action<EventObject> action, bool staging, bool stopOnMatch, int stopAfter, TimeSpan? timeout, string? actionIdentity = null) {
+        public static WatcherInfo StartWatcher(string? name, string machineName, string logName, List<int> eventIds, List<NamedEvents> namedEvents, Action<EventObject> action, bool staging, bool stopOnMatch, int stopAfter, TimeSpan? timeout, string? actionIdentity = null, string? reuseScopeIdentity = null) {
             if (string.IsNullOrWhiteSpace(machineName)) {
                 machineName = Environment.MachineName;
             } else {
@@ -208,6 +210,8 @@ namespace EventViewerX {
 
             logName = logName.Trim();
             name = string.IsNullOrWhiteSpace(name) ? null : name!.Trim();
+            actionIdentity = string.IsNullOrWhiteSpace(actionIdentity) ? null : actionIdentity!.Trim();
+            reuseScopeIdentity = string.IsNullOrWhiteSpace(reuseScopeIdentity) ? null : reuseScopeIdentity!.Trim();
             eventIds = eventIds.Where(static id => id > 0).Distinct().OrderBy(static id => id).ToList();
             if (eventIds.Count == 0) {
                 throw new ArgumentException("At least one positive event ID is required.", nameof(eventIds));
@@ -217,7 +221,8 @@ namespace EventViewerX {
             WatcherInfo info;
             lock (_syncRoot) {
                 if (!string.IsNullOrEmpty(name)) {
-                    if (_watchersByName.TryGetValue(name!, out var existingByName) && existingByName.EndTime == null) {
+                    string watcherKey = GetWatcherKey(name!, reuseScopeIdentity);
+                    if (_watchersByName.TryGetValue(watcherKey, out var existingByName) && existingByName.EndTime == null) {
                         if (HasEquivalentConfiguration(existingByName, machineName, logName, eventIds, namedEvents, action, staging, stopOnMatch, stopAfter, timeout, actionIdentity)) {
                             return existingByName;
                         }
@@ -226,26 +231,32 @@ namespace EventViewerX {
                     }
 
                     // Detect pre-existing duplicates injected outside the manager.
-                    var sameName = _watchers.Values.Where(w => string.Equals(w.Name, name, StringComparison.OrdinalIgnoreCase)).ToList();
-                    if (sameName.Count > 1 && !_watchersByName.ContainsKey(name!)) {
+                    var sameName = _watchers.Values.Where(w =>
+                        string.Equals(w.Name, name, StringComparison.OrdinalIgnoreCase) &&
+                        string.Equals(w.ReuseScopeIdentity, reuseScopeIdentity, StringComparison.OrdinalIgnoreCase)).ToList();
+                    if (sameName.Count > 1 && !_watchersByName.ContainsKey(watcherKey)) {
                         throw new InvalidOperationException($"Multiple watchers with name '{name}' already exist.");
                     }
                     if (sameName.Count >= 1) {
                         var active = sameName.FirstOrDefault(w => w.EndTime == null) ?? sameName[0];
-                        _watchersByName[name!] = active;
+                        _watchersByName[watcherKey] = active;
                         if (active.EndTime == null) {
-                            return active;
+                            if (HasEquivalentConfiguration(active, machineName, logName, eventIds, namedEvents, action, staging, stopOnMatch, stopAfter, timeout, actionIdentity)) {
+                                return active;
+                            }
+                            throw new InvalidOperationException($"A running watcher named '{name}' already exists with different configuration.");
                         }
                     }
                 }
 
                 info = new WatcherInfo(name ?? string.Empty, machineName, logName, eventIds, namedEvents, action, staging, stopOnMatch, stopAfter, timeout) {
-                    ActionIdentity = actionIdentity
+                    ActionIdentity = actionIdentity,
+                    ReuseScopeIdentity = reuseScopeIdentity
                 };
                 info.Stopped += RemoveStoppedWatcher;
                 _watchers.TryAdd(info.Id, info);
                 if (!string.IsNullOrEmpty(name)) {
-                    _watchersByName[name!] = info;
+                    _watchersByName[GetWatcherKey(name!, reuseScopeIdentity)] = info;
                 }
                 try {
                     info.Start();
@@ -253,7 +264,7 @@ namespace EventViewerX {
                 } catch {
                     _watchers.TryRemove(info.Id, out _);
                     if (!string.IsNullOrEmpty(info.Name)) {
-                        _watchersByName.TryRemove(info.Name, out _);
+                        _watchersByName.TryRemove(GetWatcherKey(info.Name, info.ReuseScopeIdentity), out _);
                     }
                     info.Dispose();
                     throw;
@@ -295,11 +306,16 @@ namespace EventViewerX {
 
             _watchers.TryRemove(info.Id, out _);
             if (!string.IsNullOrEmpty(info.Name) &&
-                _watchersByName.TryGetValue(info.Name, out WatcherInfo? mapped) &&
+                _watchersByName.TryGetValue(GetWatcherKey(info.Name, info.ReuseScopeIdentity), out WatcherInfo? mapped) &&
                 ReferenceEquals(mapped, info)) {
-                _watchersByName.TryRemove(info.Name, out _);
+                _watchersByName.TryRemove(GetWatcherKey(info.Name, info.ReuseScopeIdentity), out _);
             }
         }
+
+        private static string GetWatcherKey(string name, string? reuseScopeIdentity)
+            => reuseScopeIdentity == null
+                ? $"U:{name}"
+                : $"S:{reuseScopeIdentity.Length}:{reuseScopeIdentity}:{name}";
 
         /// <summary>Returns all active watchers or those matching a specific name.</summary>
         public static IReadOnlyCollection<WatcherInfo> GetWatchers(string? name = null) {
@@ -316,9 +332,10 @@ namespace EventViewerX {
                 info.Dispose();
                 // Remove name mapping if it points to this instance or if no watcher with that name exists
                 if (!string.IsNullOrEmpty(info.Name)) {
-                    _watchersByName.TryGetValue(info.Name, out var mapped);
+                    string watcherKey = GetWatcherKey(info.Name, info.ReuseScopeIdentity);
+                    _watchersByName.TryGetValue(watcherKey, out var mapped);
                     if (mapped == null || ReferenceEquals(mapped, info)) {
-                        _watchersByName.TryRemove(info.Name, out _);
+                        _watchersByName.TryRemove(watcherKey, out _);
                     }
                 }
                 return true;
@@ -331,7 +348,6 @@ namespace EventViewerX {
             foreach (var w in GetWatchers(name)) {
                 StopWatcher(w.Id);
             }
-            _watchersByName.TryRemove(name, out _);
         }
 
         /// <summary>Stops every active watcher and clears internal tracking.</summary>
