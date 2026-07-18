@@ -102,17 +102,6 @@ public static partial class NamedEventsTimelineQueryExecutor {
 
         bool TrySelectTimelineEvent(EventObjectSlim item) {
             var namedEventName = ResolveNamedEventName(item);
-            if (!string.IsNullOrWhiteSpace(logName) &&
-                !string.Equals(item.GatheredLogName, logName, StringComparison.OrdinalIgnoreCase)) {
-                filteredOut++;
-                return false;
-            }
-
-            if (normalizedEventIds is not null && !normalizedEventIds.Contains(item.EventID)) {
-                filteredOut++;
-                return false;
-            }
-
             var row = ToAccumulator(item, namedEventName, includePayload, normalizedPayloadKeys);
             var correlation = BuildCorrelationValues(row, normalizedCorrelationKeys);
             row.Correlation = correlation;
@@ -150,7 +139,9 @@ public static partial class NamedEventsTimelineQueryExecutor {
                                maxEventsScanned: request.MaxEventsScanned,
                                executionInfo: queryInfo,
                                cancellationToken: cancellationToken,
-                               resultPredicate: TrySelectTimelineEvent)) {
+                               resultPredicate: TrySelectTimelineEvent,
+                               sourceLogName: logName,
+                               sourceEventIds: normalizedEventIds)) {
                 cancellationToken.ThrowIfCancellationRequested();
                 if (rows.Count >= maxEvents) {
                     outputTruncated = true;

@@ -41,7 +41,9 @@ public static class EventLogRemoteQueryFailureClassifier {
             failureKind = sessionException.Status switch {
                 EventLogSessionOpenStatus.AccessDenied => EventLogRemoteQueryFailureKind.AccessDenied,
                 EventLogSessionOpenStatus.Timeout => EventLogRemoteQueryFailureKind.Timeout,
-                EventLogSessionOpenStatus.NegativeCache or EventLogSessionOpenStatus.RpcUnavailable => EventLogRemoteQueryFailureKind.HostUnavailable,
+                EventLogSessionOpenStatus.NegativeCache or
+                EventLogSessionOpenStatus.RpcUnavailable or
+                EventLogSessionOpenStatus.EventLogSessionUnavailable => EventLogRemoteQueryFailureKind.HostUnavailable,
                 _ => EventLogRemoteQueryFailureKind.EventLogError
             };
             return true;

@@ -258,6 +258,42 @@ namespace EventViewerX.Tests {
             Assert.Equal(EventLogRemoteQueryFailureKind.None, invalidQueryFailure);
         }
 
+        [Fact]
+        public void RemoteFailureClassifierTreatsSessionConstructionFailureAsHostUnavailable() {
+            var sessionResult = new EventLogSessionOpenResult {
+                TargetHost = "server",
+                Status = EventLogSessionOpenStatus.EventLogSessionUnavailable
+            };
+            var exception = new EventLogSessionException(sessionResult, "session constructor failed");
+
+            Assert.True(EventLogRemoteQueryFailureClassifier.TryClassify(
+                "server",
+                exception,
+                out EventLogRemoteQueryFailureKind failureKind));
+            Assert.Equal(EventLogRemoteQueryFailureKind.HostUnavailable, failureKind);
+        }
+
+        [Fact]
+        public void NamedEventSourceRestrictionsApplyBeforeCandidateEnumeration() {
+            var sources = new Dictionary<string, HashSet<int>>(StringComparer.OrdinalIgnoreCase) {
+                ["System"] = new HashSet<int> { 12, 13 },
+                ["Security"] = new HashSet<int> { 4608 }
+            };
+
+            Dictionary<string, HashSet<int>> restricted = SearchEvents.RestrictNamedEventSources(
+                sources,
+                sourceLogName: " system ",
+                sourceEventIds: new[] { 13, 4608 });
+
+            KeyValuePair<string, HashSet<int>> source = Assert.Single(restricted);
+            Assert.Equal("System", source.Key);
+            Assert.Equal(new[] { 13 }, source.Value);
+            Assert.Throws<ArgumentException>(() => SearchEvents.RestrictNamedEventSources(
+                sources,
+                sourceLogName: null,
+                sourceEventIds: new[] { 0 }));
+        }
+
         private sealed class InvalidEventLogQueryException : System.Diagnostics.Eventing.Reader.EventLogException {
             internal InvalidEventLogQueryException() {
                 HResult = 15001;

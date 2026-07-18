@@ -26,6 +26,8 @@ namespace EventViewerX {
         /// <param name="candidateObserver">Optional observer invoked for every native candidate before named-event projection.</param>
         /// <param name="oldest">Whether to enumerate candidates and select results from oldest to newest.</param>
         /// <param name="resultPredicate">Optional predicate applied to projected named-event results before enforcing <paramref name="maxEvents"/>.</param>
+        /// <param name="sourceLogName">Optional exact log source filter applied before the candidate scan cap.</param>
+        /// <param name="sourceEventIds">Optional event-ID source filter applied before the candidate scan cap.</param>
         /// <returns>Asynchronous sequence of simplified events.</returns>
         public static async IAsyncEnumerable<EventObjectSlim> FindEventsByNamedEvents(
             List<NamedEvents> typeEventsList,
@@ -41,7 +43,9 @@ namespace EventViewerX {
             Func<string?, string, long?>? minimumEventRecordIdExclusiveResolver = null,
             Action<EventObject>? candidateObserver = null,
             bool oldest = false,
-            Func<EventObjectSlim, bool>? resultPredicate = null) {
+            Func<EventObjectSlim, bool>? resultPredicate = null,
+            string? sourceLogName = null,
+            IReadOnlyCollection<int>? sourceEventIds = null) {
 
             if (typeEventsList == null) {
                 throw new ArgumentNullException(nameof(typeEventsList));
@@ -56,7 +60,10 @@ namespace EventViewerX {
                 throw new ArgumentOutOfRangeException(nameof(maxEventsScanned), "Maximum scanned events must be greater than or equal to zero.");
             }
 
-            Dictionary<string, HashSet<int>> eventInfo = EventObjectSlim.GetEventInfoForNamedEvents(typeEventsList);
+            Dictionary<string, HashSet<int>> eventInfo = RestrictNamedEventSources(
+                EventObjectSlim.GetEventInfoForNamedEvents(typeEventsList),
+                sourceLogName,
+                sourceEventIds);
             NamedEventsQueryExecutionInfo queryInfo = executionInfo ?? new NamedEventsQueryExecutionInfo();
             queryInfo.Reset(maxEventsScanned);
             int emitted = 0;
@@ -185,6 +192,42 @@ namespace EventViewerX {
                     yield return targetEvent;
                 }
             }
+        }
+
+        internal static Dictionary<string, HashSet<int>> RestrictNamedEventSources(
+            IReadOnlyDictionary<string, HashSet<int>> eventInfo,
+            string? sourceLogName,
+            IReadOnlyCollection<int>? sourceEventIds) {
+
+            if (eventInfo == null) {
+                throw new ArgumentNullException(nameof(eventInfo));
+            }
+            if (sourceEventIds != null && sourceEventIds.Any(static eventId => eventId <= 0)) {
+                throw new ArgumentException("Source event IDs must be positive.", nameof(sourceEventIds));
+            }
+
+            string? normalizedLogName = string.IsNullOrWhiteSpace(sourceLogName)
+                ? null
+                : sourceLogName!.Trim();
+            HashSet<int>? allowedEventIds = sourceEventIds == null
+                ? null
+                : new HashSet<int>(sourceEventIds);
+            var restricted = new Dictionary<string, HashSet<int>>(StringComparer.OrdinalIgnoreCase);
+            foreach (KeyValuePair<string, HashSet<int>> source in eventInfo) {
+                if (normalizedLogName != null &&
+                    !string.Equals(source.Key, normalizedLogName, StringComparison.OrdinalIgnoreCase)) {
+                    continue;
+                }
+
+                var eventIds = new HashSet<int>(source.Value);
+                if (allowedEventIds != null) {
+                    eventIds.IntersectWith(allowedEventIds);
+                }
+                if (eventIds.Count > 0) {
+                    restricted[source.Key] = eventIds;
+                }
+            }
+            return restricted;
         }
 
         private static IAsyncEnumerable<EventObject> QueryNamedEventCandidates(
