@@ -77,6 +77,7 @@ namespace EventViewerX {
             if (eventId == null) {
                 throw new ArgumentNullException(nameof(eventId));
             }
+            cancellationToken.ThrowIfCancellationRequested();
 
             var ids = new HashSet<int>(eventId.Where(static id => id > 0));
             if (staging) {
@@ -118,6 +119,7 @@ namespace EventViewerX {
                     if (cancellationToken.CanBeCanceled) {
                         _cancellationRegistration = cancellationToken.Register(CancelWatch);
                         _hasCancellationRegistration = true;
+                        cancellationToken.ThrowIfCancellationRequested();
                     }
                     string eventIds = string.Join(",", ids.OrderBy(static id => id).Select(static id => id.ToString()));
                     _instanceLogger.WriteVerbose("Created event log subscription to {0} for {1}.", _machineName ?? Environment.MachineName, eventIds);

@@ -158,6 +158,33 @@ public class TestEventCheckpointStore {
         }
     }
 
+    [Fact]
+    public void AuthoritativeStateLoadsWhenTheCompatibilityMirrorIsCorrupt() {
+        string root = CreateTemporaryDirectory();
+        try {
+            string path = Path.Combine(root, "checkpoint.json");
+            EventCheckpointSnapshot initial = EventCheckpointStore.Update(
+                path,
+                new[] { new EventCheckpointUpdate("System", 100, Guid.Empty) });
+            File.WriteAllText(path, "not-json");
+
+            EventCheckpointSnapshot loaded = EventCheckpointStore.Load(path);
+            EventCheckpointSnapshot updated = EventCheckpointStore.Update(
+                path,
+                new[] {
+                    new EventCheckpointUpdate(
+                        "System",
+                        101,
+                        initial.Checkpoints["System"].GenerationId)
+                });
+
+            Assert.Equal(100, loaded.Records["System"]);
+            Assert.Equal(101, updated.Records["System"]);
+        } finally {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
     private static string CreateTemporaryDirectory() {
         string path = Path.Combine(Path.GetTempPath(), "EventViewerX.Tests." + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(path);

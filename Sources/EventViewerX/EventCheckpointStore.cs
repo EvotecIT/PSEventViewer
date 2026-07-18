@@ -182,17 +182,17 @@ public static class EventCheckpointStore {
     }
 
     private static EventCheckpointSnapshot LoadUnlocked(string checkpointPath) {
-        Dictionary<string, EventCheckpointValue> values = ReadNumericFile(checkpointPath)
-            .ToDictionary(
-                static entry => entry.Key,
-                static entry => new EventCheckpointValue(entry.Value, Guid.Empty, boundaryIdentity: null),
-                StringComparer.OrdinalIgnoreCase);
-
         string statePath = GetStatePath(checkpointPath);
         if (!File.Exists(statePath)) {
-            return new EventCheckpointSnapshot(values);
+            Dictionary<string, EventCheckpointValue> legacyValues = ReadNumericFile(checkpointPath)
+                .ToDictionary(
+                    static entry => entry.Key,
+                    static entry => new EventCheckpointValue(entry.Value, Guid.Empty, boundaryIdentity: null),
+                    StringComparer.OrdinalIgnoreCase);
+            return new EventCheckpointSnapshot(legacyValues);
         }
 
+        var values = new Dictionary<string, EventCheckpointValue>(StringComparer.OrdinalIgnoreCase);
         CheckpointStateDocument? state;
         try {
             state = JsonSerializer.Deserialize<CheckpointStateDocument>(File.ReadAllText(statePath));

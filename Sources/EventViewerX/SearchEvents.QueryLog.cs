@@ -179,8 +179,9 @@ public partial class SearchEvents : Settings {
     /// <param name="sessionTimeoutMs">Timeout for establishing sessions and reading events.</param>
     /// <param name="readMode">Amount of provider data to materialize for each event.</param>
     /// <param name="minimumEventRecordIdExclusive">Optional native record-ID lower bound.</param>
+    /// <param name="maximumEventRecordIdExclusive">Optional native record-ID upper bound.</param>
     /// <param name="oldest">Whether to enumerate matching records from oldest to newest.</param>
-    private static IEnumerable<EventObject> QueryLogEnumerable(string logName, List<int>? eventIds = null, string? machineName = null, string? providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string? userId = null, int maxEvents = 0, List<long>? eventRecordId = null, TimePeriod? timePeriod = null, CancellationToken cancellationToken = default, int? sessionTimeoutMs = null, EventReadMode readMode = EventReadMode.Full, long? minimumEventRecordIdExclusive = null, bool oldest = false) {
+    private static IEnumerable<EventObject> QueryLogEnumerable(string logName, List<int>? eventIds = null, string? machineName = null, string? providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string? userId = null, int maxEvents = 0, List<long>? eventRecordId = null, TimePeriod? timePeriod = null, CancellationToken cancellationToken = default, int? sessionTimeoutMs = null, EventReadMode readMode = EventReadMode.Full, long? minimumEventRecordIdExclusive = null, long? maximumEventRecordIdExclusive = null, bool oldest = false) {
         ValidateQueryArguments(logName, maxEvents, sessionTimeoutMs);
         if (eventIds != null && eventIds.Any(id => id <= 0)) {
             throw new ArgumentException("Event IDs must be positive.", nameof(eventIds));
@@ -201,7 +202,8 @@ public partial class SearchEvents : Settings {
             userId ?? string.Empty,
             timePeriod: timePeriod,
             eventRecordIds: eventRecordId,
-            minimumEventRecordIdExclusive: minimumEventRecordIdExclusive);
+            minimumEventRecordIdExclusive: minimumEventRecordIdExclusive,
+            maximumEventRecordIdExclusive: maximumEventRecordIdExclusive);
 
         _logger.WriteVerbose($"Querying log '{logName}' on '{machineName} with query: {queryString}");
 
@@ -372,8 +374,9 @@ public partial class SearchEvents : Settings {
     /// <param name="timePeriod">The time period.</param>
     /// <param name="eventRecordIds">Optional event record identifiers combined with the other filters.</param>
     /// <param name="minimumEventRecordIdExclusive">Optional native record-ID lower bound.</param>
+    /// <param name="maximumEventRecordIdExclusive">Optional native record-ID upper bound.</param>
     /// <returns>XML query string.</returns>
-    private static string BuildQueryString(string logName, List<int>? eventIds = null, string? providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string? userId = null, List<int>? tasks = null, List<int>? opcodes = null, TimePeriod? timePeriod = null, List<long>? eventRecordIds = null, long? minimumEventRecordIdExclusive = null) {
+    private static string BuildQueryString(string logName, List<int>? eventIds = null, string? providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string? userId = null, List<int>? tasks = null, List<int>? opcodes = null, TimePeriod? timePeriod = null, List<long>? eventRecordIds = null, long? minimumEventRecordIdExclusive = null, long? maximumEventRecordIdExclusive = null) {
         TimeSpan? lastPeriod = null;
         if (timePeriod.HasValue) {
             var times = TimeHelper.GetTimePeriod(timePeriod.Value);
@@ -456,6 +459,12 @@ public partial class SearchEvents : Settings {
                 throw new ArgumentOutOfRangeException(nameof(minimumEventRecordIdExclusive), "Minimum event record ID must be greater than or equal to zero.");
             }
             AddCondition(queryString, $"EventRecordID&gt;{minimumEventRecordIdExclusive.Value.ToString(CultureInfo.InvariantCulture)}");
+        }
+        if (maximumEventRecordIdExclusive.HasValue) {
+            if (maximumEventRecordIdExclusive.Value < 0) {
+                throw new ArgumentOutOfRangeException(nameof(maximumEventRecordIdExclusive), "Maximum event record ID must be greater than or equal to zero.");
+            }
+            AddCondition(queryString, $"EventRecordID&lt;{maximumEventRecordIdExclusive.Value.ToString(CultureInfo.InvariantCulture)}");
         }
 
         // Check if any conditions were added to the query

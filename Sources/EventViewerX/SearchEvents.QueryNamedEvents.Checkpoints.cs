@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -9,77 +10,77 @@ public partial class SearchEvents : Settings {
     private const int CheckpointCandidateBufferBudget = 4096;
     private const int MaximumCheckpointCandidatePageSize = 1024;
 
-    private static IEnumerable<EventObject> QueryNamedCheckpointCandidates(
+    private static IEnumerable<EventObject> QueryNamedPagedCandidates(
         Dictionary<string, HashSet<int>> eventInfo,
         List<string?>? machineNames,
         DateTime? startTime,
         DateTime? endTime,
         TimePeriod? timePeriod,
+        int maxEvents,
         CancellationToken cancellationToken,
-        Func<string?, string, long?> minimumEventRecordIdExclusiveResolver) {
+        Func<string?, string, long?>? minimumEventRecordIdExclusiveResolver,
+        bool oldest) {
 
         List<string?> targets = NormalizeNamedCheckpointTargets(machineNames);
         var pageReaders = new List<Func<int, IReadOnlyList<EventObject>>>(eventInfo.Count * targets.Count);
         foreach (KeyValuePair<string, HashSet<int>> entry in eventInfo) {
-            List<int> eventIds = entry.Value.ToList();
-            foreach (string? machineName in targets) {
-                string logName = entry.Key;
-                string? target = machineName;
-                long? lowerBound = minimumEventRecordIdExclusiveResolver(target, logName);
-                bool completed = false;
-
-                pageReaders.Add(requested => {
-                    if (completed) {
-                        return Array.Empty<EventObject>();
-                    }
-
-                    try {
-                        List<EventObject> page = QueryLog(
-                            logName,
-                            eventIds,
-                            target,
-                            startTime: startTime,
-                            endTime: endTime,
-                            maxEvents: requested,
-                            timePeriod: timePeriod,
-                            cancellationToken: cancellationToken,
-                            readMode: EventReadMode.Full,
-                            minimumEventRecordIdExclusive: lowerBound,
-                            oldest: true).ToList();
-                        long? nextLowerBound = null;
-                        foreach (EventObject eventObject in page) {
-                            if (eventObject.RecordId.HasValue &&
-                                (!nextLowerBound.HasValue || eventObject.RecordId.Value > nextLowerBound.Value)) {
-                                nextLowerBound = eventObject.RecordId.Value;
-                            }
-                        }
-                        if (!nextLowerBound.HasValue ||
-                            (lowerBound.HasValue && nextLowerBound.Value <= lowerBound.Value)) {
-                            completed = true;
-                        } else {
-                            lowerBound = nextLowerBound;
-                        }
-                        return page;
-                    } catch (Exception ex) when (EventLogRemoteQueryFailureClassifier.TryClassify(target, ex, out _)) {
-                        completed = true;
-                        _logger.WriteWarning(
-                            $"Skipping event-log target '{target}' for named-event log '{logName}' after " +
-                            $"{ex.GetType().Name}: {ex.Message}");
-                        return Array.Empty<EventObject>();
-                    }
-                });
-            }
+            string logName = entry.Key;
+            Func<string?, long?>? minimumResolver = minimumEventRecordIdExclusiveResolver == null
+                ? null
+                : machineName => minimumEventRecordIdExclusiveResolver(machineName, logName);
+            int fixedExpressionCount = CountFixedQueryExpressions(
+                providerName: null,
+                keywords: null,
+                level: null,
+                startTime,
+                endTime,
+                userId: null,
+                timePeriod);
+            List<QueryWorkItem> workItems = BuildQueryWorkItems(
+                    targets,
+                    entry.Value.ToList(),
+                    eventRecordIds: null,
+                    fixedExpressionCount,
+                    minimumResolver,
+                    reserveRecordIdPagingBoundary: maxEvents > 0 && !(oldest && minimumResolver != null))
+                .ToList();
+            bool isolateRemoteFailures = targets.Count > 1;
+            var failedTargets = new ConcurrentDictionary<string, byte>(StringComparer.OrdinalIgnoreCase);
+            Func<QueryWorkItem, IEnumerator<EventObject>> createEnumerator = workItem => CreateSequentialQueryEnumerator(
+                workItem,
+                logName,
+                providerName: null,
+                keywords: null,
+                level: null,
+                startTime,
+                endTime,
+                userId: null,
+                timePeriod,
+                cancellationToken,
+                sessionTimeoutMs: null,
+                EventReadMode.Full,
+                oldest,
+                isolateRemoteFailures,
+                failedTargets);
+            pageReaders.AddRange(CreateRecordOrderedSourcePageReaders(
+                workItems,
+                createEnumerator,
+                oldest,
+                cancellationToken));
         }
 
         if (pageReaders.Count == 0) {
             return Array.Empty<EventObject>();
         }
 
-        return MergePagedSources(
+        IEnumerable<EventObject> merged = MergePagedSources(
             pageReaders,
-            static (left, right) => CompareEvents(left, right, oldest: true),
-            GetCheckpointCandidatePageSize(pageReaders.Count),
+            (left, right) => CompareEvents(left, right, oldest),
+            maxEvents > 0
+                ? GetBoundedCandidatePageSize(pageReaders.Count, maxEvents)
+                : GetCheckpointCandidatePageSize(pageReaders.Count),
             cancellationToken);
+        return maxEvents > 0 ? merged.Take(maxEvents) : merged;
     }
 
     internal static IEnumerable<T> MergePagedSources<T>(
@@ -132,9 +133,110 @@ public partial class SearchEvents : Settings {
             Math.Max(1, CheckpointCandidateBufferBudget / sourceCount));
     }
 
+    internal static int GetBoundedCandidatePageSize(int sourceCount, int maxEvents) {
+        if (maxEvents <= 0) {
+            throw new ArgumentOutOfRangeException(nameof(maxEvents), "Maximum events must be positive.");
+        }
+
+        return Math.Min(
+            GetCheckpointCandidatePageSize(sourceCount),
+            Math.Max(1, maxEvents / sourceCount));
+    }
+
+    internal static int CompareCheckpointEvents(EventObject left, EventObject right) {
+        return CompareEvents(left, right, oldest: true);
+    }
+
+    internal static int CompareRecordOrderedEvents(EventObject left, EventObject right, bool oldest) {
+        if (left == null) {
+            throw new ArgumentNullException(nameof(left));
+        }
+        if (right == null) {
+            throw new ArgumentNullException(nameof(right));
+        }
+
+        if (left.RecordId.HasValue && right.RecordId.HasValue) {
+            int recordComparison = oldest
+                ? left.RecordId.Value.CompareTo(right.RecordId.Value)
+                : right.RecordId.Value.CompareTo(left.RecordId.Value);
+            if (recordComparison != 0) {
+                return recordComparison;
+            }
+        }
+
+        return CompareEvents(left, right, oldest);
+    }
+
+    internal static List<Func<int, IReadOnlyList<EventObject>>> CreateRecordOrderedSourcePageReaders(
+        IReadOnlyList<QueryWorkItem> workItems,
+        Func<QueryWorkItem, IEnumerator<EventObject>> createEnumerator,
+        bool oldest,
+        CancellationToken cancellationToken = default) {
+
+        if (workItems == null) {
+            throw new ArgumentNullException(nameof(workItems));
+        }
+        if (createEnumerator == null) {
+            throw new ArgumentNullException(nameof(createEnumerator));
+        }
+
+        var sourceGroups = new List<List<QueryWorkItem>>();
+        var sourceIndexes = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        foreach (QueryWorkItem workItem in workItems) {
+            string sourceKey = workItem.MachineName == null ? "0:" : "1:" + workItem.MachineName;
+            if (!sourceIndexes.TryGetValue(sourceKey, out int sourceIndex)) {
+                sourceIndex = sourceGroups.Count;
+                sourceIndexes.Add(sourceKey, sourceIndex);
+                sourceGroups.Add(new List<QueryWorkItem>());
+            }
+            sourceGroups[sourceIndex].Add(workItem);
+        }
+
+        var sourcePageReaders = new List<Func<int, IReadOnlyList<EventObject>>>(sourceGroups.Count);
+        foreach (List<QueryWorkItem> sourceGroup in sourceGroups) {
+            List<Func<int, IReadOnlyList<EventObject>>> chunkPageReaders = sourceGroup
+                .Select(workItem => CreateCheckpointPageReader(workItem, createEnumerator, oldest))
+                .ToList();
+            if (chunkPageReaders.Count == 1) {
+                sourcePageReaders.Add(chunkPageReaders[0]);
+                continue;
+            }
+
+            IEnumerator<EventObject>? mergedChunks = null;
+            bool completed = false;
+            sourcePageReaders.Add(requested => {
+                if (requested <= 0) {
+                    throw new ArgumentOutOfRangeException(nameof(requested), "Requested page size must be positive.");
+                }
+                if (completed) {
+                    return Array.Empty<EventObject>();
+                }
+
+                mergedChunks ??= MergePagedSources(
+                        chunkPageReaders,
+                        (left, right) => CompareRecordOrderedEvents(left, right, oldest),
+                        GetCheckpointCandidatePageSize(chunkPageReaders.Count),
+                        cancellationToken)
+                    .GetEnumerator();
+                var page = new List<EventObject>(requested);
+                while (page.Count < requested && mergedChunks.MoveNext()) {
+                    page.Add(mergedChunks.Current);
+                }
+                if (page.Count < requested) {
+                    completed = true;
+                    mergedChunks.Dispose();
+                    mergedChunks = null;
+                }
+                return page;
+            });
+        }
+        return sourcePageReaders;
+    }
+
     internal static Func<int, IReadOnlyList<EventObject>> CreateCheckpointPageReader(
         QueryWorkItem initialWorkItem,
-        Func<QueryWorkItem, IEnumerator<EventObject>> createEnumerator) {
+        Func<QueryWorkItem, IEnumerator<EventObject>> createEnumerator,
+        bool oldest = true) {
 
         if (initialWorkItem == null) {
             throw new ArgumentNullException(nameof(initialWorkItem));
@@ -144,6 +246,7 @@ public partial class SearchEvents : Settings {
         }
 
         long? lowerBound = initialWorkItem.MinimumEventRecordIdExclusive;
+        long? upperBound = initialWorkItem.MaximumEventRecordIdExclusive;
         bool completed = false;
         return requested => {
             if (completed) {
@@ -156,7 +259,8 @@ public partial class SearchEvents : Settings {
                 initialWorkItem.EventRecordIds,
                 initialWorkItem.ManagedEventIds,
                 initialWorkItem.ManagedEventRecordIds,
-                lowerBound);
+                lowerBound,
+                upperBound);
             var page = new List<EventObject>(requested);
             using (IEnumerator<EventObject> enumerator = createEnumerator(pageWorkItem)) {
                 while (page.Count < requested && enumerator.MoveNext()) {
@@ -164,19 +268,25 @@ public partial class SearchEvents : Settings {
                 }
             }
 
-            long? nextLowerBound = null;
+            long? nextBoundary = null;
             foreach (EventObject eventObject in page) {
                 if (eventObject.RecordId.HasValue &&
-                    (!nextLowerBound.HasValue || eventObject.RecordId.Value > nextLowerBound.Value)) {
-                    nextLowerBound = eventObject.RecordId.Value;
+                    (!nextBoundary.HasValue ||
+                     (oldest
+                         ? eventObject.RecordId.Value > nextBoundary.Value
+                         : eventObject.RecordId.Value < nextBoundary.Value))) {
+                    nextBoundary = eventObject.RecordId.Value;
                 }
             }
             if (page.Count < requested ||
-                !nextLowerBound.HasValue ||
-                (lowerBound.HasValue && nextLowerBound.Value <= lowerBound.Value)) {
+                !nextBoundary.HasValue ||
+                (oldest && lowerBound.HasValue && nextBoundary.Value <= lowerBound.Value) ||
+                (!oldest && upperBound.HasValue && nextBoundary.Value >= upperBound.Value)) {
                 completed = true;
+            } else if (oldest) {
+                lowerBound = nextBoundary;
             } else {
-                lowerBound = nextLowerBound;
+                upperBound = nextBoundary;
             }
             return page;
         };

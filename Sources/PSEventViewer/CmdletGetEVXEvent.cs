@@ -56,6 +56,7 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
     private readonly Dictionary<string, long> _highestRecordIds = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, EventObject> _highestCheckpointEvents = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _resetCheckpointKeys = new(StringComparer.OrdinalIgnoreCase);
+    private IReadOnlyList<string?>? _effectiveCheckpointMachines;
     private int _eventsOutput;
     /// <summary>
     /// Name of the log to query.
@@ -192,7 +193,9 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
     public int MaxEvents { get; set; }
 
     /// <summary>
-    /// Maximum number of candidate events to scan before applying message and checkpoint filters. Zero scans until the output limit is satisfied or the query is exhausted.
+    /// Maximum number of globally merged candidate events delivered for message and checkpoint filtering.
+    /// Zero continues until the output limit is satisfied or the query is exhausted. Native selection may perform
+    /// one initial lookahead per machine/XPath chunk plus bounded page prefetch; those rows are not evaluated by the cmdlet.
     /// </summary>
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
@@ -324,9 +327,7 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
     }
 
     private string BuildDefaultCheckpointKey() {
-        IEnumerable<string?> checkpointMachines = MachineName == null || MachineName.Count == 0
-            ? new string?[] { null }
-            : MachineName;
+        IReadOnlyList<string?> checkpointMachines = GetEffectiveCheckpointMachines();
         string sourceIdentity = ParameterSetName switch {
             "NamedEvents" => "Named:" + string.Join(",", Type.OrderBy(static value => value)),
             "PathEvents" => "Path:" + System.IO.Path.GetFullPath(Path).TrimEnd(System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar).ToUpperInvariant(),
@@ -483,7 +484,7 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
                         break;
                     }
                 }
-            } else if (ParallelOption == ParallelOption.Disabled) {
+            } else if (ParallelOption == ParallelOption.Disabled || MaxEventsScanned > 0) {
                 foreach (EventObject eventObject in SearchEvents.QueryLogsSequential(LogName, EventId, MachineName, ProviderName, Keywords, Level, StartTime, EndTime, UserId, GetQueryReadLimit(), EventRecordId, TimePeriod, token, SessionTimeoutMs, ReadMode, GetCheckpointResolver(LogName), oldest: EffectiveOldest)) {
                     token.ThrowIfCancellationRequested();
                     ProcessEventResult(eventObject, results);
@@ -528,7 +529,7 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
     }
 
     private string GetCheckpointKey(EventObject eventObject) {
-        bool hasMultipleSources = ParameterSetName == "NamedEvents" || (MachineName?.Count ?? 0) > 1;
+        bool hasMultipleSources = ParameterSetName == "NamedEvents" || GetEffectiveCheckpointMachines().Count > 1;
         if (!hasMultipleSources) {
             return _recordIdKey;
         }
@@ -560,7 +561,7 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
         checkpointKey = _recordIdKey;
         checkpoint = 0;
 
-        bool hasMultipleSources = ParameterSetName == "NamedEvents" || (MachineName?.Count ?? 0) > 1;
+        bool hasMultipleSources = ParameterSetName == "NamedEvents" || GetEffectiveCheckpointMachines().Count > 1;
         if (!hasMultipleSources) {
             return _recordMap.TryGetValue(_recordIdKey, out checkpoint);
         }
@@ -592,6 +593,9 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
         return sourceNames;
     }
 
+    private IReadOnlyList<string?> GetEffectiveCheckpointMachines()
+        => _effectiveCheckpointMachines ??= SearchEvents.NormalizeMachineTargets(MachineName);
+
     private void PrepareCheckpointBounds(CancellationToken cancellationToken) {
         if (string.IsNullOrWhiteSpace(RecordIdFile) || _recordMap.Count == 0 || ParameterSetName == "ListLog") {
             return;
@@ -615,9 +619,7 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
         IEnumerable<string> logs = ParameterSetName == "NamedEvents"
             ? EventObjectSlim.GetEventInfoForNamedEvents(Type.ToList()).Keys
             : new[] { LogName };
-        IEnumerable<string?> machines = MachineName == null || MachineName.Count == 0
-            ? new string?[] { null }
-            : MachineName;
+        IReadOnlyList<string?> machines = GetEffectiveCheckpointMachines();
 
         foreach (string log in logs) {
             foreach (string? machine in machines) {

@@ -168,6 +168,7 @@ public partial class SearchEvents : Settings {
                                 sessionTimeoutMs: sessionTimeoutMs ?? Settings.QuerySessionTimeoutMs,
                                 readMode: readMode,
                                 minimumEventRecordIdExclusive: workItem.MinimumEventRecordIdExclusive,
+                                maximumEventRecordIdExclusive: workItem.MaximumEventRecordIdExclusive,
                                 oldest: oldest)).GetEnumerator();
                         int workItemResults = 0;
                         while (TryMoveNextParallelResult(queryResults, workItem, failedTargets, isolateRemoteFailures, out EventObject? result)) {
@@ -492,9 +493,12 @@ public partial class SearchEvents : Settings {
         List<int>? eventIds,
         List<long>? eventRecordIds,
         int fixedExpressionCount,
-        Func<string?, long?>? minimumEventRecordIdExclusiveResolver = null) {
+        Func<string?, long?>? minimumEventRecordIdExclusiveResolver = null,
+        bool reserveRecordIdPagingBoundary = false) {
 
-        int effectiveFixedExpressionCount = fixedExpressionCount + (minimumEventRecordIdExclusiveResolver != null ? 1 : 0);
+        int effectiveFixedExpressionCount = fixedExpressionCount +
+                                            (minimumEventRecordIdExclusiveResolver != null ? 1 : 0) +
+                                            (reserveRecordIdPagingBoundary ? 1 : 0);
         if (effectiveFixedExpressionCount < 0 || effectiveFixedExpressionCount > MaxXPathExpressionCount) {
             throw new ArgumentOutOfRangeException(nameof(fixedExpressionCount), $"Fixed query expressions must be between zero and {MaxXPathExpressionCount}.");
         }
@@ -568,13 +572,21 @@ public partial class SearchEvents : Settings {
     }
 
     internal static List<string?> NormalizeQueryTargets(List<string?>? machineNames) {
-        if (machineNames == null || machineNames.Count == 0) {
+        return NormalizeMachineTargets(machineNames).ToList();
+    }
+
+    /// <summary>Trims and case-insensitively deduplicates event-log target names while preserving order.</summary>
+    /// <param name="machineNames">Machine names to normalize; null or empty selects the local machine.</param>
+    /// <returns>Normalized targets, using <c>null</c> for the local machine.</returns>
+    public static IReadOnlyList<string?> NormalizeMachineTargets(IEnumerable<string?>? machineNames) {
+        List<string?>? supplied = machineNames?.ToList();
+        if (supplied == null || supplied.Count == 0) {
             return new List<string?> { null };
         }
 
         var targets = new List<string?>();
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (string? machineName in machineNames) {
+        foreach (string? machineName in supplied) {
             string? normalized = string.IsNullOrWhiteSpace(machineName) ? null : machineName!.Trim();
             string key = normalized ?? "<LOCAL>";
             if (seen.Add(key)) {
@@ -651,13 +663,15 @@ public partial class SearchEvents : Settings {
             List<long>? eventRecordIds,
             HashSet<int>? managedEventIds = null,
             HashSet<long>? managedEventRecordIds = null,
-            long? minimumEventRecordIdExclusive = null) {
+            long? minimumEventRecordIdExclusive = null,
+            long? maximumEventRecordIdExclusive = null) {
             MachineName = machineName;
             EventIds = eventIds;
             EventRecordIds = eventRecordIds;
             ManagedEventIds = managedEventIds;
             ManagedEventRecordIds = managedEventRecordIds;
             MinimumEventRecordIdExclusive = minimumEventRecordIdExclusive;
+            MaximumEventRecordIdExclusive = maximumEventRecordIdExclusive;
         }
 
         internal string? MachineName { get; }
@@ -666,5 +680,6 @@ public partial class SearchEvents : Settings {
         internal HashSet<int>? ManagedEventIds { get; }
         internal HashSet<long>? ManagedEventRecordIds { get; }
         internal long? MinimumEventRecordIdExclusive { get; }
+        internal long? MaximumEventRecordIdExclusive { get; }
     }
 }

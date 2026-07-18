@@ -393,12 +393,12 @@ namespace EventViewerX.Tests {
         public void CheckpointPageReadersAdvanceEachNativeChunkWithoutSkipping() {
             var sourceEvents = new Dictionary<int, EventObject[]> {
                 [1] = new[] {
-                    CreateEventObject(1, new DateTime(1, DateTimeKind.Utc), 1, "System", "Test"),
-                    CreateEventObject(3, new DateTime(3, DateTimeKind.Utc), 1, "System", "Test"),
+                    CreateEventObject(1, new DateTime(100, DateTimeKind.Utc), 1, "System", "Test"),
+                    CreateEventObject(3, new DateTime(1, DateTimeKind.Utc), 1, "System", "Test"),
                     CreateEventObject(5, new DateTime(5, DateTimeKind.Utc), 1, "System", "Test")
                 },
                 [2] = new[] {
-                    CreateEventObject(2, new DateTime(2, DateTimeKind.Utc), 2, "System", "Test"),
+                    CreateEventObject(2, new DateTime(200, DateTimeKind.Utc), 2, "System", "Test"),
                     CreateEventObject(4, new DateTime(4, DateTimeKind.Utc), 2, "System", "Test"),
                     CreateEventObject(6, new DateTime(6, DateTimeKind.Utc), 2, "System", "Test")
                 }
@@ -407,22 +407,46 @@ namespace EventViewerX.Tests {
                 new SearchEvents.QueryWorkItem(null, new List<int> { 1 }, null, minimumEventRecordIdExclusive: 0),
                 new SearchEvents.QueryWorkItem(null, new List<int> { 2 }, null, minimumEventRecordIdExclusive: 0)
             };
-            List<Func<int, IReadOnlyList<EventObject>>> pageReaders = workItems
-                .Select(workItem => SearchEvents.CreateCheckpointPageReader(
-                    workItem,
-                    pageWorkItem => sourceEvents[pageWorkItem.EventIds![0]]
-                        .Where(eventObject => eventObject.RecordId > pageWorkItem.MinimumEventRecordIdExclusive)
-                        .GetEnumerator()))
-                .ToList();
+            List<Func<int, IReadOnlyList<EventObject>>> pageReaders = SearchEvents.CreateRecordOrderedSourcePageReaders(
+                workItems,
+                pageWorkItem => sourceEvents[pageWorkItem.EventIds![0]]
+                    .Where(eventObject => eventObject.RecordId > pageWorkItem.MinimumEventRecordIdExclusive)
+                    .GetEnumerator(),
+                oldest: true);
+            Assert.Single(pageReaders);
 
             List<long> recordIds = SearchEvents.MergePagedSources(
                     pageReaders,
-                    static (left, right) => left.TimeCreated.CompareTo(right.TimeCreated),
+                    SearchEvents.CompareCheckpointEvents,
                     pageSize: 2)
                 .Select(static eventObject => eventObject.RecordId!.Value)
                 .ToList();
 
             Assert.Equal(new long[] { 1, 2, 3, 4, 5, 6 }, recordIds);
+        }
+
+        [Fact]
+        public void ReversePageReadersResumeBelowTheLastNativeRecord() {
+            EventObject[] source = Enumerable.Range(1, 6)
+                .Reverse()
+                .Select(value => CreateEventObject(value, new DateTime(value, DateTimeKind.Utc), value, "System", "Test"))
+                .ToArray();
+            var observedUpperBounds = new List<long?>();
+            var workItem = new SearchEvents.QueryWorkItem(null, null, null);
+            Func<int, IReadOnlyList<EventObject>> reader = SearchEvents.CreateCheckpointPageReader(
+                workItem,
+                pageWorkItem => {
+                    observedUpperBounds.Add(pageWorkItem.MaximumEventRecordIdExclusive);
+                    return source
+                        .Where(eventObject => !pageWorkItem.MaximumEventRecordIdExclusive.HasValue ||
+                                              eventObject.RecordId < pageWorkItem.MaximumEventRecordIdExclusive)
+                        .GetEnumerator();
+                },
+                oldest: false);
+
+            Assert.Equal(new long[] { 6, 5 }, reader(2).Select(static item => item.RecordId!.Value));
+            Assert.Equal(new long[] { 4, 3 }, reader(2).Select(static item => item.RecordId!.Value));
+            Assert.Equal(new long?[] { null, 5 }, observedUpperBounds);
         }
 
         [Fact]
@@ -662,6 +686,7 @@ namespace EventViewerX.Tests {
             SetSnapshotProperty(eventObject, nameof(EventObject.MachineName), "test-machine");
             SetSnapshotProperty(eventObject, nameof(EventObject.Data), new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase));
             eventObject.ContainerLog = logName;
+            eventObject.QueriedMachine = "test-machine";
             return eventObject;
         }
 

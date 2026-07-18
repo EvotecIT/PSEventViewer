@@ -62,26 +62,16 @@ namespace EventViewerX {
 
             if (maxEventsScanned > 0) {
                 int candidateLimit = maxEventsScanned == int.MaxValue ? int.MaxValue : maxEventsScanned + 1;
-                var candidates = new List<EventObject>(Math.Min(candidateLimit, 256));
-                foreach (KeyValuePair<string, HashSet<int>> entry in eventInfo) {
-                    await foreach (EventObject foundEvent in QueryNamedEventCandidates(
-                                       entry,
-                                       machineNames,
-                                       startTime,
-                                       endTime,
-                                       timePeriod,
-                                       maxThreads,
-                                       candidateLimit,
-                                       cancellationToken,
-                                       minimumEventRecordIdExclusiveResolver,
-                                       oldest)) {
-                        candidates.Add(foundEvent);
-                        TrimNamedCandidates(candidates, candidateLimit, oldest);
-                    }
-                }
-
-                candidates.Sort((left, right) => CompareEvents(left, right, oldest));
-                foreach (EventObject foundEvent in candidates) {
+                foreach (EventObject foundEvent in QueryNamedPagedCandidates(
+                             eventInfo,
+                             machineNames,
+                             startTime,
+                             endTime,
+                             timePeriod,
+                             candidateLimit,
+                             cancellationToken,
+                             minimumEventRecordIdExclusiveResolver,
+                             oldest)) {
                     if (!queryInfo.TryRecordCandidate()) {
                         yield break;
                     }
@@ -150,14 +140,16 @@ namespace EventViewerX {
             }
 
             if (oldest && minimumEventRecordIdExclusiveResolver != null) {
-                foreach (EventObject foundEvent in QueryNamedCheckpointCandidates(
+                foreach (EventObject foundEvent in QueryNamedPagedCandidates(
                              eventInfo,
                              machineNames,
                              startTime,
                              endTime,
                              timePeriod,
+                             maxEvents: 0,
                              cancellationToken,
-                             minimumEventRecordIdExclusiveResolver)) {
+                             minimumEventRecordIdExclusiveResolver,
+                             oldest: true)) {
                     queryInfo.TryRecordCandidate();
                     candidateObserver?.Invoke(foundEvent);
 
@@ -261,13 +253,6 @@ namespace EventViewerX {
                     ? null
                     : machineName => minimumEventRecordIdExclusiveResolver(machineName, entry.Key),
                 oldest);
-        }
-
-        private static void TrimNamedCandidates(List<EventObject> candidates, int limit, bool oldest) {
-            long trimThreshold = Math.Min((long)limit * 2, (long)limit + 1024);
-            if (candidates.Count >= trimThreshold) {
-                SortAndTrim(candidates, limit, oldest);
-            }
         }
 
         private static void TrimNamedMatches(List<NamedEventMatch> matches, int limit, bool oldest) {

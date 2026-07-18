@@ -51,5 +51,19 @@ namespace EventViewerX.Tests {
             using var watcher = new WatchEvents();
             Assert.Throws<ArgumentException>(() => watcher.Watch(null, "Application", new List<int>()));
         }
+
+        [Fact]
+        public void WatchRejectsAnAlreadyCancelledSubscription() {
+            using var watcher = new WatchEvents();
+            using var cancellation = new System.Threading.CancellationTokenSource();
+            cancellation.Cancel();
+
+            Assert.Throws<OperationCanceledException>(() => watcher.Watch(
+                null,
+                "Application",
+                new List<int> { 1 },
+                cancellationToken: cancellation.Token));
+            Assert.Empty(GetIds(watcher));
+        }
     }
 }

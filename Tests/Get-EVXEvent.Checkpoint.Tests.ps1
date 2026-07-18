@@ -34,6 +34,21 @@ Describe 'Get-EVXEvent checkpoint compatibility' {
         $Events.Count | Should -Be 1
     }
 
+    It 'uses the same checkpoint layout for equivalent duplicate targets' {
+        $CheckpointPath = Join-Path $TestDrive 'normalized-target-checkpoint.json'
+        $First = @(Get-EVXEvent -LogName System -MachineName $env:COMPUTERNAME -RecordIdFile $CheckpointPath -RecordIdKey normalized -MaxEvents 1 -ReadMode Metadata)
+        $Second = @(Get-EVXEvent -LogName System -MachineName $env:COMPUTERNAME, $env:COMPUTERNAME.ToLowerInvariant() -RecordIdFile $CheckpointPath -RecordIdKey normalized -MaxEvents 1 -ReadMode Metadata)
+        if ($First.Count -eq 0 -or $Second.Count -eq 0) {
+            Set-ItResult -Skipped -Because 'The System event log did not contain two checkpointable events.'
+            return
+        }
+
+        [long] $Second[0].RecordId | Should -BeGreaterThan ([long] $First[0].RecordId)
+        $Persisted = Get-Content -LiteralPath $CheckpointPath -Raw | ConvertFrom-Json
+        @($Persisted.PSObject.Properties.Name) | Should -Contain normalized
+        @($Persisted.PSObject.Properties.Name | Where-Object { $_ -like 'normalized|*' }) | Should -BeNullOrEmpty
+    }
+
     It 'advances the checkpoint for scanned records rejected by MessageRegex' {
         $CheckpointPath = Join-Path $TestDrive 'filtered-progress-checkpoint.json'
 

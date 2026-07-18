@@ -68,40 +68,60 @@ public partial class SearchEvents : Settings {
             eventIds,
             eventRecordId,
             fixedExpressionCount,
-            minimumResolver);
+            minimumResolver,
+            reserveRecordIdPagingBoundary: maxEvents > 0 && !(oldest && minimumResolver != null));
+        Func<QueryWorkItem, IEnumerator<EventObject>> createEnumerator = workItem => FilterQueryWorkItemResults(
+            workItem,
+            QueryLogFileChunk(
+                absolutePath,
+                workItem.EventIds,
+                providerName,
+                keywords,
+                level,
+                startTime,
+                endTime,
+                userId,
+                workItem.EventRecordIds,
+                oldest,
+                namedDataFilter,
+                namedDataExcludeFilter,
+                cancellationToken,
+                readMode,
+                workItem.MinimumEventRecordIdExclusive,
+                workItem.MaximumEventRecordIdExclusive)).GetEnumerator();
 
-        if (oldest && minimumResolver != null) {
-            List<Func<int, IReadOnlyList<EventObject>>> pageReaders = workItems
-                .Select(workItem => CreateCheckpointPageReader(
-                    workItem,
-                    pageWorkItem => FilterQueryWorkItemResults(
-                        pageWorkItem,
-                        QueryLogFileChunk(
-                            absolutePath,
-                            pageWorkItem.EventIds,
-                            providerName,
-                            keywords,
-                            level,
-                            startTime,
-                            endTime,
-                            userId,
-                            pageWorkItem.EventRecordIds,
-                            true,
-                            namedDataFilter,
-                            namedDataExcludeFilter,
-                            cancellationToken,
-                            readMode,
-                            pageWorkItem.MinimumEventRecordIdExclusive)).GetEnumerator()))
-                .ToList();
+        if (maxEvents > 0 || (oldest && minimumResolver != null)) {
+            List<QueryWorkItem> pagedWorkItems = workItems.ToList();
+            if (pagedWorkItems.Count == 1) {
+                foreach (EventObject eventObject in MergeQueryWorkItems(
+                             pagedWorkItems,
+                             createEnumerator,
+                             maxEvents,
+                             oldest,
+                             cancellationToken,
+                             MaxSequentialOpenQueries)) {
+                    yield return eventObject;
+                }
+                yield break;
+            }
+
+            List<Func<int, IReadOnlyList<EventObject>>> pageReaders = CreateRecordOrderedSourcePageReaders(
+                pagedWorkItems,
+                createEnumerator,
+                oldest,
+                cancellationToken);
             if (pageReaders.Count == 0) {
                 yield break;
             }
 
+            int pageSize = maxEvents > 0
+                ? GetBoundedCandidatePageSize(pageReaders.Count, maxEvents)
+                : GetCheckpointCandidatePageSize(pageReaders.Count);
             int returned = 0;
             foreach (EventObject eventObject in MergePagedSources(
                          pageReaders,
-                         static (left, right) => CompareEvents(left, right, oldest: true),
-                         GetCheckpointCandidatePageSize(pageReaders.Count),
+                         (left, right) => CompareEvents(left, right, oldest),
+                         pageSize,
                          cancellationToken)) {
                 yield return eventObject;
                 returned++;
@@ -114,24 +134,7 @@ public partial class SearchEvents : Settings {
 
         foreach (EventObject eventObject in MergeQueryWorkItems(
                      workItems,
-                     workItem => FilterQueryWorkItemResults(
-                         workItem,
-                         QueryLogFileChunk(
-                             absolutePath,
-                             workItem.EventIds,
-                             providerName,
-                             keywords,
-                             level,
-                             startTime,
-                             endTime,
-                             userId,
-                             workItem.EventRecordIds,
-                             oldest,
-                             namedDataFilter,
-                             namedDataExcludeFilter,
-                             cancellationToken,
-                             readMode,
-                             workItem.MinimumEventRecordIdExclusive)).GetEnumerator(),
+                     createEnumerator,
                      maxEvents,
                      oldest,
                      cancellationToken,
@@ -155,7 +158,8 @@ public partial class SearchEvents : Settings {
         System.Collections.Hashtable? namedDataExcludeFilter,
         CancellationToken cancellationToken,
         EventReadMode readMode,
-        long? minimumEventRecordIdExclusive) {
+        long? minimumEventRecordIdExclusive,
+        long? maximumEventRecordIdExclusive) {
 
         string xpath = BuildWinEventFilter(
             id: eventIds?.Select(static id => id.ToString()).ToArray(),
@@ -169,7 +173,8 @@ public partial class SearchEvents : Settings {
             namedDataFilter: namedDataFilter != null ? new[] { namedDataFilter } : null,
             namedDataExcludeFilter: namedDataExcludeFilter != null ? new[] { namedDataExcludeFilter } : null,
             xpathOnly: true,
-            minimumEventRecordIdExclusive: minimumEventRecordIdExclusive);
+            minimumEventRecordIdExclusive: minimumEventRecordIdExclusive,
+            maximumEventRecordIdExclusive: maximumEventRecordIdExclusive);
 
         _logger.WriteVerbose($"QueryLogFile: path '{absolutePath}', xpath '{xpath}'");
         var query = new EventLogQuery(absolutePath, PathType.FilePath, xpath) {

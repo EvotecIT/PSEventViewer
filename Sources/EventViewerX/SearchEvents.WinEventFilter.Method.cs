@@ -27,6 +27,7 @@ public partial class SearchEvents {
     /// <param name="path">Optional EVTX file path; when set, QueryList uses file://.</param>
     /// <param name="xpathOnly">When true, returns raw XPath instead of QueryList XML.</param>
     /// <param name="minimumEventRecordIdExclusive">Optional native lower bound used by checkpoint/resume queries.</param>
+    /// <param name="maximumEventRecordIdExclusive">Optional native upper bound used by reverse paged queries.</param>
     /// <returns>XPath fragment or full QueryList XML depending on <paramref name="xpathOnly"/> and <paramref name="path"/>.</returns>
     public static string BuildWinEventFilter(
         string[]? id = null,
@@ -44,9 +45,13 @@ public partial class SearchEvents {
         string? logName = null,
         string? path = null,
         bool xpathOnly = false,
-        long? minimumEventRecordIdExclusive = null) {
+        long? minimumEventRecordIdExclusive = null,
+        long? maximumEventRecordIdExclusive = null) {
         if (minimumEventRecordIdExclusive < 0) {
             throw new ArgumentOutOfRangeException(nameof(minimumEventRecordIdExclusive), "Minimum event record ID must be greater than or equal to zero.");
+        }
+        if (maximumEventRecordIdExclusive < 0) {
+            throw new ArgumentOutOfRangeException(nameof(maximumEventRecordIdExclusive), "Maximum event record ID must be greater than or equal to zero.");
         }
 
         int expressionCount = CountWinEventFilterExpressions(
@@ -62,7 +67,8 @@ public partial class SearchEvents {
             namedDataFilter,
             namedDataExcludeFilter,
             excludeId,
-            minimumEventRecordIdExclusive);
+            minimumEventRecordIdExclusive,
+            maximumEventRecordIdExclusive);
         if (expressionCount > MaxXPathExpressionCount) {
             throw new ArgumentException(
                 $"The filter contains {expressionCount} XPath expressions; Windows Event Log supports at most {MaxXPathExpressionCount}. Split the query or reduce the filter values.");
@@ -80,6 +86,11 @@ public partial class SearchEvents {
         if (minimumEventRecordIdExclusive.HasValue) {
             filter = JoinXPathFilter(
                 $"*[System[EventRecordID>{minimumEventRecordIdExclusive.Value.ToString(CultureInfo.InvariantCulture)}]]",
+                filter);
+        }
+        if (maximumEventRecordIdExclusive.HasValue) {
+            filter = JoinXPathFilter(
+                $"*[System[EventRecordID<{maximumEventRecordIdExclusive.Value.ToString(CultureInfo.InvariantCulture)}]]",
                 filter);
         }
         if (excludeId != null && excludeId.Length > 0) {
@@ -196,7 +207,8 @@ public partial class SearchEvents {
         Hashtable[]? namedDataFilter,
         Hashtable[]? namedDataExcludeFilter,
         string[]? excludeId,
-        long? minimumEventRecordIdExclusive) {
+        long? minimumEventRecordIdExclusive,
+        long? maximumEventRecordIdExclusive) {
 
         int count = id?.Length ?? 0;
         count += eventRecordId?.Length ?? 0;
@@ -211,6 +223,7 @@ public partial class SearchEvents {
         count += CountNamedDataExpressions(namedDataFilter);
         count += CountNamedDataExpressions(namedDataExcludeFilter);
         count += minimumEventRecordIdExclusive.HasValue ? 1 : 0;
+        count += maximumEventRecordIdExclusive.HasValue ? 1 : 0;
         return count;
     }
 

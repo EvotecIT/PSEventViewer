@@ -155,6 +155,15 @@ namespace EventViewerX.Tests {
         }
 
         [Fact]
+        public void MaximumRecordIdIsEmittedAsNativeExclusiveBoundary() {
+            string result = SearchEvents.BuildWinEventFilter(
+                maximumEventRecordIdExclusive: 123,
+                xpathOnly: true);
+
+            Assert.Equal("*[System[EventRecordID<123]]", result);
+        }
+
+        [Fact]
         public void FilterRejectsMoreThanTheNativeXpathExpressionBudget() {
             var namedData = new Hashtable {
                 { "Correlation", Enumerable.Range(1, SearchEvents.MaxXPathExpressionCount + 1).Select(static value => value.ToString()).ToArray() }

@@ -51,38 +51,57 @@ public partial class SearchEvents {
             eventIds,
             eventRecordId,
             fixedExpressionCount,
-            minimumEventRecordIdExclusiveResolver);
+            minimumEventRecordIdExclusiveResolver,
+            reserveRecordIdPagingBoundary: maxEvents > 0 && !(oldest && minimumEventRecordIdExclusiveResolver != null));
+        Func<QueryWorkItem, IEnumerator<EventObject>> createEnumerator = workItem => CreateSequentialQueryEnumerator(
+            workItem,
+            logName,
+            providerName,
+            keywords,
+            level,
+            startTime,
+            endTime,
+            userId,
+            timePeriod,
+            cancellationToken,
+            sessionTimeoutMs,
+            readMode,
+            oldest,
+            isolateRemoteFailures,
+            failedTargets);
 
-        if (oldest && minimumEventRecordIdExclusiveResolver != null) {
-            List<Func<int, IReadOnlyList<EventObject>>> pageReaders = workItems
-                .Select(workItem => CreateCheckpointPageReader(
-                    workItem,
-                    pageWorkItem => CreateSequentialQueryEnumerator(
-                        pageWorkItem,
-                        logName,
-                        providerName,
-                        keywords,
-                        level,
-                        startTime,
-                        endTime,
-                        userId,
-                        timePeriod,
-                        cancellationToken,
-                        sessionTimeoutMs,
-                        readMode,
-                        oldest: true,
-                        isolateRemoteFailures,
-                        failedTargets)))
-                .ToList();
+        if (maxEvents > 0 || (oldest && minimumEventRecordIdExclusiveResolver != null)) {
+            List<QueryWorkItem> pagedWorkItems = workItems.ToList();
+            if (pagedWorkItems.Count == 1) {
+                foreach (EventObject result in MergeQueryWorkItems(
+                             pagedWorkItems,
+                             createEnumerator,
+                             maxEvents,
+                             oldest,
+                             cancellationToken,
+                             maxOpenQueries)) {
+                    yield return result;
+                }
+                yield break;
+            }
+
+            List<Func<int, IReadOnlyList<EventObject>>> pageReaders = CreateRecordOrderedSourcePageReaders(
+                pagedWorkItems,
+                createEnumerator,
+                oldest,
+                cancellationToken);
             if (pageReaders.Count == 0) {
                 yield break;
             }
 
+            int pageSize = maxEvents > 0
+                ? GetBoundedCandidatePageSize(pageReaders.Count, maxEvents)
+                : GetCheckpointCandidatePageSize(pageReaders.Count);
             int returned = 0;
             foreach (EventObject result in MergePagedSources(
                          pageReaders,
-                         static (left, right) => CompareEvents(left, right, oldest: true),
-                         GetCheckpointCandidatePageSize(pageReaders.Count),
+                         (left, right) => CompareEvents(left, right, oldest),
+                         pageSize,
                          cancellationToken)) {
                 yield return result;
                 returned++;
@@ -95,22 +114,7 @@ public partial class SearchEvents {
 
         foreach (EventObject result in MergeQueryWorkItems(
                      workItems,
-                     workItem => CreateSequentialQueryEnumerator(
-                         workItem,
-                         logName,
-                         providerName,
-                         keywords,
-                         level,
-                         startTime,
-                         endTime,
-                         userId,
-                         timePeriod,
-                         cancellationToken,
-                         sessionTimeoutMs,
-                         readMode,
-                         oldest,
-                         isolateRemoteFailures,
-                         failedTargets),
+                     createEnumerator,
                      maxEvents,
                      oldest,
                      cancellationToken,
@@ -159,6 +163,7 @@ public partial class SearchEvents {
                 sessionTimeoutMs: sessionTimeoutMs ?? Settings.QuerySessionTimeoutMs,
                 readMode: readMode,
                 minimumEventRecordIdExclusive: workItem.MinimumEventRecordIdExclusive,
+                maximumEventRecordIdExclusive: workItem.MaximumEventRecordIdExclusive,
                 oldest: oldest)).GetEnumerator();
         return isolateRemoteFailures
             ? EnumerateQueryWorkItemSafely(workItem, queryResults, failedTargets).GetEnumerator()
