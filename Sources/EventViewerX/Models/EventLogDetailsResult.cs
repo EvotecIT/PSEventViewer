@@ -49,7 +49,7 @@ public sealed class EventLogDetailsResult {
     /// <summary>Diagnostic message when the query did not fully succeed.</summary>
     public string ErrorMessage { get; set; } = string.Empty;
 
-    /// <summary>Underlying exception type when available.</summary>
+    /// <summary>Underlying exception types when available, separated by semicolons when multiple partial reads fail.</summary>
     public string ErrorType { get; set; } = string.Empty;
 
     /// <summary>Timeout budget used for the query, in milliseconds.</summary>

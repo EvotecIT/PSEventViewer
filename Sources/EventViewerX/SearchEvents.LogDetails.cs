@@ -102,6 +102,9 @@ public partial class SearchEvents : Settings {
             } catch (TimeoutException ex) {
                 _logger.WriteWarning(ex.Message);
                 return Failure(logName, machineName, EventLogDetailsStatus.Timeout, ex.Message, timeoutMs, ex.GetType().Name);
+            } catch (UnauthorizedAccessException ex) {
+                _logger.WriteWarning($"Access denied reading configuration for {logName} on {hostName}: {ex.Message}");
+                return Failure(logName, machineName, EventLogDetailsStatus.AccessDenied, ex.Message, timeoutMs, ex.GetType().Name);
             } catch (EventLogException ex) {
                 _logger.WriteWarning($"Couldn't create EventLogConfiguration for {logName} on {hostName}: {ex.Message}");
                 return Failure(logName, machineName, EventLogDetailsStatus.LogConfigurationUnavailable, ex.Message, timeoutMs, ex.GetType().Name);
@@ -110,6 +113,7 @@ public partial class SearchEvents : Settings {
                 return Failure(logName, machineName, EventLogDetailsStatus.LogConfigurationUnavailable, ex.Message, timeoutMs, ex.GetType().Name);
             }
 
+            Exception? logInformationFailure = null;
             try {
                 logInfoObj = ExecuteWithTimeout(
                     () => session.GetLogInformation(logName, PathType.LogName),
@@ -117,9 +121,13 @@ public partial class SearchEvents : Settings {
                     $"Timed out reading runtime information for '{logName}' on '{hostName}' after {timeoutMs} ms.");
             } catch (TimeoutException ex) {
                 _logger.WriteWarning(ex.Message);
-                return Failure(logName, machineName, EventLogDetailsStatus.Timeout, ex.Message, timeoutMs, ex.GetType().Name);
+                logInformationFailure = ex;
+            } catch (UnauthorizedAccessException ex) {
+                _logger.WriteWarning($"Access denied reading runtime information for {logName} on {hostName}: {ex.Message}");
+                logInformationFailure = ex;
             } catch (Exception ex) {
                 _logger.WriteVerbose($"Couldn't get log information for {logName} on {hostName}: {ex.Message}");
+                logInformationFailure = ex;
             }
 
             var details = new EventLogDetails(_logger, hostName, logConfig, logInfoObj);
@@ -132,9 +140,10 @@ public partial class SearchEvents : Settings {
                 {
                     LogName = logName,
                     MachineName = hostName,
-                    Status = EventLogDetailsStatus.LogInformationUnavailable,
+                    Status = MapLogInformationFailureStatus(logInformationFailure),
                     Details = details,
-                    ErrorMessage = "Event log configuration was collected, but runtime log information was unavailable.",
+                    ErrorMessage = CreateLogInformationFailureMessage(logInformationFailure),
+                    ErrorType = logInformationFailure?.GetType().Name ?? string.Empty,
                     TimeoutMs = timeoutMs
                 };
             } else {
@@ -196,7 +205,12 @@ public partial class SearchEvents : Settings {
         result.ErrorMessage = string.IsNullOrWhiteSpace(result.ErrorMessage)
             ? message
             : $"{result.ErrorMessage} {message}";
-        result.ErrorType = failure.GetType().Name;
+        string failureType = failure.GetType().Name;
+        if (string.IsNullOrWhiteSpace(result.ErrorType)) {
+            result.ErrorType = failureType;
+        } else if (!result.ErrorType.Split(';').Contains(failureType, StringComparer.Ordinal)) {
+            result.ErrorType = $"{result.ErrorType};{failureType}";
+        }
     }
 
     internal static EventLogDetailsStatus MapEventTimeFailureStatus(Exception failure) {
@@ -208,6 +222,29 @@ public partial class SearchEvents : Settings {
             TimeoutException => EventLogDetailsStatus.Timeout,
             _ => EventLogDetailsStatus.EventTimesUnavailable
         };
+    }
+
+    internal static EventLogDetailsStatus MapLogInformationFailureStatus(Exception? failure) {
+        return failure switch {
+            EventLogSessionException sessionException => MapSessionFailureStatus(sessionException.Status),
+            UnauthorizedAccessException => EventLogDetailsStatus.AccessDenied,
+            TimeoutException => EventLogDetailsStatus.Timeout,
+            _ => EventLogDetailsStatus.LogInformationUnavailable
+        };
+    }
+
+    private static string CreateLogInformationFailureMessage(Exception? failure) {
+        const string summary = "Event log configuration was collected, but runtime log information was unavailable.";
+        return failure == null || string.IsNullOrWhiteSpace(failure.Message)
+            ? summary
+            : $"{summary} {failure.Message}";
+    }
+
+    internal static void WriteLogDetailsWarningIfNeeded(EventLogDetailsResult result) {
+        if (result == null) throw new ArgumentNullException(nameof(result));
+        if (result.HasDiagnosticFailure) {
+            _logger.WriteWarning(result.DiagnosticMessage);
+        }
     }
 
     private static EventLogDetailsResult Failure(
@@ -311,10 +348,9 @@ public partial class SearchEvents : Settings {
     /// <returns>Available details for matching channels.</returns>
     public static IEnumerable<EventLogDetails> DisplayEventLogs(string[]? listLog = null, string? machineName = null) {
         foreach (EventLogDetailsResult result in DisplayEventLogResults(listLog, machineName, DefaultSessionTimeoutMs)) {
+            WriteLogDetailsWarningIfNeeded(result);
             if (result.Details != null) {
                 yield return result.Details;
-            } else {
-                _logger.WriteWarning($"Couldn't read event log details for {result.LogName} on {result.MachineName}: {result.ErrorMessage}");
             }
         }
     }
@@ -395,10 +431,9 @@ public partial class SearchEvents : Settings {
                      Settings.SessionTimeoutMs,
                      includeEventTimes: false,
                      cancellationToken)) {
+            WriteLogDetailsWarningIfNeeded(result);
             if (result.Details != null) {
                 yield return result.Details;
-            } else {
-                _logger.WriteWarning($"Couldn't read event log details for {result.LogName} on {result.MachineName}: {result.ErrorMessage}");
             }
         }
     }

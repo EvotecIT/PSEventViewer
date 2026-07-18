@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics.Eventing.Reader;
 using Xunit;
 
@@ -118,15 +119,55 @@ public class TestEventLogDetailsResult {
     [Fact]
     public void ApplyEventTimeFailure_PreservesEarlierPartialStatusAndAppendsDiagnostic() {
         var result = new EventLogDetailsResult {
-            Status = EventLogDetailsStatus.LogInformationUnavailable,
-            ErrorMessage = "Runtime information was unavailable."
+            Status = EventLogDetailsStatus.Timeout,
+            ErrorMessage = "Runtime information was unavailable.",
+            ErrorType = nameof(TimeoutException)
         };
 
         SearchEvents.ApplyEventTimeFailure(result, new InvalidOperationException("event-time read failed"));
 
-        Assert.Equal(EventLogDetailsStatus.LogInformationUnavailable, result.Status);
-        Assert.Equal(nameof(InvalidOperationException), result.ErrorType);
+        Assert.Equal(EventLogDetailsStatus.Timeout, result.Status);
+        Assert.Equal($"{nameof(TimeoutException)};{nameof(InvalidOperationException)}", result.ErrorType);
         Assert.Contains("Runtime information was unavailable.", result.ErrorMessage, StringComparison.Ordinal);
         Assert.Contains("event-time read failed", result.ErrorMessage, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void MapLogInformationFailureStatus_PreservesActionableClassification() {
+        Assert.Equal(
+            EventLogDetailsStatus.Timeout,
+            SearchEvents.MapLogInformationFailureStatus(new TimeoutException()));
+        Assert.Equal(
+            EventLogDetailsStatus.AccessDenied,
+            SearchEvents.MapLogInformationFailureStatus(new UnauthorizedAccessException()));
+        Assert.Equal(
+            EventLogDetailsStatus.LogInformationUnavailable,
+            SearchEvents.MapLogInformationFailureStatus(new InvalidOperationException()));
+    }
+
+    [Fact]
+    public void WriteLogDetailsWarningIfNeeded_WarnsForPartialStatusOnly() {
+        InternalLogger previous = Settings._logger;
+        var logger = new InternalLogger();
+        var warnings = new List<string>();
+        logger.OnWarningMessage += (_, args) => warnings.Add(args.FullMessage);
+        Settings._logger = logger;
+        try {
+            SearchEvents.WriteLogDetailsWarningIfNeeded(new EventLogDetailsResult {
+                LogName = "System",
+                Status = EventLogDetailsStatus.EventTimesUnavailable,
+                ErrorMessage = "Timestamp read failed."
+            });
+            SearchEvents.WriteLogDetailsWarningIfNeeded(new EventLogDetailsResult {
+                LogName = "Application",
+                Status = EventLogDetailsStatus.Success
+            });
+        } finally {
+            Settings._logger = previous;
+        }
+
+        string warning = Assert.Single(warnings);
+        Assert.Contains("System", warning, StringComparison.Ordinal);
+        Assert.Contains(nameof(EventLogDetailsStatus.EventTimesUnavailable), warning, StringComparison.Ordinal);
     }
 }

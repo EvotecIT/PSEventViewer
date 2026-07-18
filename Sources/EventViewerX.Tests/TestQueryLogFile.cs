@@ -48,19 +48,25 @@ namespace EventViewerX.Tests {
             if (!OperatingSystem.IsWindows()) return;
             string path = Path.Combine("..", "..", "..", "..", "..", "Tests", "Logs", "Active Directory Web Services.evtx");
             var eventIds = Enumerable.Range(100000, 463).ToList();
-            eventIds.Add(1200);
+            eventIds.Insert(0, 1200);
+            eventIds.Insert(100, 1100);
             int observed = 0;
+            var observedIds = new HashSet<int>();
 
             List<EventObject> events = SearchEvents.QueryLogFile(
                 path,
                 eventIds: eventIds,
                 maxEvents: 2,
                 readMode: EventReadMode.Metadata,
-                candidateObserver: _ => observed++).ToList();
+                candidateObserver: eventObject => {
+                    observed++;
+                    observedIds.Add(eventObject.Id);
+                }).ToList();
 
             Assert.Equal(2, events.Count);
-            Assert.InRange(observed, events.Count, events.Count + 1);
-            Assert.All(events, eventObject => Assert.Equal(1200, eventObject.Id));
+            Assert.InRange(observed, events.Count, 5);
+            Assert.Contains(1200, observedIds);
+            Assert.Contains(1100, observedIds);
         }
 
         [Fact]

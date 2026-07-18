@@ -31,9 +31,7 @@ namespace EventViewerX {
                              maxDegreeOfParallelism,
                              Settings.SessionTimeoutMs,
                              includeEventTimes: true)) {
-                    if (result.HasDiagnosticFailure) {
-                        _logger.WriteWarning(result.DiagnosticMessage);
-                    }
+                    WriteLogDetailsWarningIfNeeded(result);
                     if (result.Details != null) {
                         yield return ConvertLogDetails(result.Details);
                     }
