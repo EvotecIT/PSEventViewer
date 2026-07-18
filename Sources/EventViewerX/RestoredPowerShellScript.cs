@@ -65,6 +65,7 @@ public class RestoredPowerShellScript {
         if (!filePath.StartsWith(destinationPrefix, StringComparison.OrdinalIgnoreCase)) {
             throw new InvalidOperationException("The reconstructed script filename resolved outside the requested destination.");
         }
+        string contents;
         if (addComment) {
             string header = string.Join(Environment.NewLine,
                 "<#",
@@ -73,14 +74,31 @@ public class RestoredPowerShellScript {
                 $"MachineName = {primary.MachineName}",
                 $"TimeCreated = {primary.TimeCreated}",
                 "#>");
-            File.WriteAllText(filePath, header + Environment.NewLine + Script);
+            contents = header + Environment.NewLine + Script;
         } else {
-            File.WriteAllText(filePath, Script);
+            contents = Script;
         }
-        if (!unblock) {
-            File.WriteAllText(filePath + ":Zone.Identifier", "[ZoneTransfer]\r\nZoneId=3");
+
+        bool created = false;
+        try {
+            WriteNewFile(filePath, contents);
+            created = true;
+            if (!unblock) {
+                WriteNewFile(filePath + ":Zone.Identifier", "[ZoneTransfer]\r\nZoneId=3");
+            }
+        } catch {
+            if (created && File.Exists(filePath)) {
+                File.Delete(filePath);
+            }
+            throw;
         }
         return filePath;
+    }
+
+    private static void WriteNewFile(string path, string contents) {
+        using var stream = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None);
+        using var writer = new StreamWriter(stream, new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+        writer.Write(contents);
     }
 
     private static string SanitizeFileNameComponent(string? value, string fallback) {

@@ -1,15 +1,14 @@
-﻿using System.Collections;
+using System.Collections;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
-using System.Text.Json;
-using System.Text.RegularExpressions;
 using System.Linq;
+using System.Net;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Threading;
-using System.Net;
-using System.Collections;
-using System.Globalization;
 
 namespace PSEventViewer;
 
@@ -51,6 +50,7 @@ namespace PSEventViewer;
 public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
     private string _recordIdKey = string.Empty;
     private Dictionary<string, long> _recordMap = new();
+    private readonly Dictionary<string, Guid> _checkpointGenerations = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, long> _highestRecordIds = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _resetCheckpointKeys = new(StringComparer.OrdinalIgnoreCase);
     private int _eventsOutput;
@@ -292,8 +292,15 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
         var internalLoggerPowerShell = new InternalLoggerPowerShell(internalLogger, this.WriteVerbose, this.WriteWarning, this.WriteDebug, this.WriteError, this.WriteProgress, this.WriteInformation);
         SetEventViewerLogger(internalLogger);
         var searchEvents = new SearchEvents(internalLogger);
-        if (!string.IsNullOrEmpty(RecordIdFile) && File.Exists(RecordIdFile)) {
-            _recordMap = ReadCheckpointFile(RecordIdFile!);
+        if (!string.IsNullOrWhiteSpace(RecordIdFile)) {
+            EventCheckpointSnapshot checkpointSnapshot = EventCheckpointStore.Load(RecordIdFile!);
+            _recordMap = checkpointSnapshot.Records.ToDictionary(
+                static entry => entry.Key,
+                static entry => entry.Value,
+                StringComparer.OrdinalIgnoreCase);
+            foreach (KeyValuePair<string, EventCheckpointValue> checkpoint in checkpointSnapshot.Checkpoints) {
+                _checkpointGenerations[checkpoint.Key] = checkpoint.Value.GenerationId;
+            }
         }
         _recordIdKey = !string.IsNullOrEmpty(RecordIdKey)
             ? RecordIdKey!
@@ -302,6 +309,9 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
             string legacyKey = BuildLegacyCheckpointKey();
             if (!_recordMap.ContainsKey(_recordIdKey) && _recordMap.TryGetValue(legacyKey, out long legacyRecordId)) {
                 _recordMap[_recordIdKey] = legacyRecordId;
+                if (_checkpointGenerations.TryGetValue(legacyKey, out Guid legacyGeneration)) {
+                    _checkpointGenerations[_recordIdKey] = legacyGeneration;
+                }
             }
         }
         return Task.CompletedTask;
@@ -350,7 +360,7 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
             "MessageRegexCulture",
             MessageRegex == null ? string.Empty : CultureInfo.CurrentCulture.Name,
             "Oldest",
-            Oldest.IsPresent.ToString(CultureInfo.InvariantCulture)
+            EffectiveOldest.ToString(CultureInfo.InvariantCulture)
         };
         AddHashtableIdentity(identity, "NamedDataFilter", NamedDataFilter);
         AddHashtableIdentity(identity, "NamedDataExcludeFilter", NamedDataExcludeFilter);
@@ -424,7 +434,7 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
                 }
             }
         } else if (ParameterSetName == "PathEvents") {
-            foreach (EventObject eventObject in SearchEvents.QueryLogFile(Path, EventId, ProviderName, Keywords, Level, StartTime, EndTime, UserId, GetQueryReadLimit(), EventRecordId, TimePeriod, Oldest, NamedDataFilter, NamedDataExcludeFilter, token, ReadMode, GetCheckpointLowerBound(null, Path))) {
+            foreach (EventObject eventObject in SearchEvents.QueryLogFile(Path, EventId, ProviderName, Keywords, Level, StartTime, EndTime, UserId, GetQueryReadLimit(), EventRecordId, TimePeriod, EffectiveOldest, NamedDataFilter, NamedDataExcludeFilter, token, ReadMode, GetCheckpointLowerBound(null, Path))) {
                 token.ThrowIfCancellationRequested();
                 ProcessEventResult(eventObject, results);
                 if (OutputLimitReached) {
@@ -448,7 +458,8 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
                                    maxEventsScanned: MaxEventsScanned,
                                    cancellationToken: token,
                                    minimumEventRecordIdExclusiveResolver: GetCheckpointLowerBound,
-                                   candidateObserver: candidate => TrackCheckpointProgress(candidate))) {
+                                   candidateObserver: candidate => TrackCheckpointProgress(candidate),
+                                   oldest: EffectiveOldest)) {
                     token.ThrowIfCancellationRequested();
                     if (!TrackCheckpointProgress(eventObject.Event) || !MessageMatches(eventObject.Event)) {
                         continue;
@@ -467,7 +478,7 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
                     }
                 }
             } else if (ParallelOption == ParallelOption.Disabled) {
-                foreach (EventObject eventObject in SearchEvents.QueryLogsSequential(LogName, EventId, MachineName, ProviderName, Keywords, Level, StartTime, EndTime, UserId, GetQueryReadLimit(), EventRecordId, TimePeriod, token, SessionTimeoutMs, ReadMode, GetCheckpointResolver(LogName))) {
+                foreach (EventObject eventObject in SearchEvents.QueryLogsSequential(LogName, EventId, MachineName, ProviderName, Keywords, Level, StartTime, EndTime, UserId, GetQueryReadLimit(), EventRecordId, TimePeriod, token, SessionTimeoutMs, ReadMode, GetCheckpointResolver(LogName), oldest: EffectiveOldest)) {
                     token.ThrowIfCancellationRequested();
                     ProcessEventResult(eventObject, results);
                     if (OutputLimitReached) {
@@ -475,7 +486,7 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
                     }
                 }
             } else {
-                await foreach (EventObject eventObject in SearchEvents.QueryLogsParallel(LogName, EventId, MachineName, ProviderName, Keywords, Level, StartTime, EndTime, UserId, GetQueryReadLimit(), NumberOfThreads, EventRecordId, TimePeriod, token, SessionTimeoutMs, ReadMode, BufferCapacity, GetCheckpointResolver(LogName))) {
+                await foreach (EventObject eventObject in SearchEvents.QueryLogsParallel(LogName, EventId, MachineName, ProviderName, Keywords, Level, StartTime, EndTime, UserId, GetQueryReadLimit(), NumberOfThreads, EventRecordId, TimePeriod, token, SessionTimeoutMs, ReadMode, BufferCapacity, GetCheckpointResolver(LogName), oldest: EffectiveOldest)) {
                     token.ThrowIfCancellationRequested();
                     ProcessEventResult(eventObject, results);
                     if (OutputLimitReached) {
@@ -648,6 +659,10 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
 
     private bool OutputLimitReached => MaxEvents > 0 && _eventsOutput >= MaxEvents;
 
+    private bool UsesCheckpoint => !string.IsNullOrWhiteSpace(RecordIdFile);
+
+    private bool EffectiveOldest => Oldest.IsPresent || UsesCheckpoint;
+
     private int GetQueryReadLimit() {
         if (HasManagedPostReadFilter || MaxEvents <= 0) {
             return MaxEventsScanned;
@@ -658,7 +673,7 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
         return Math.Min(MaxEvents, MaxEventsScanned);
     }
 
-    private bool HasManagedPostReadFilter => MessageRegex != null || !string.IsNullOrEmpty(RecordIdFile);
+    private bool HasManagedPostReadFilter => MessageRegex != null || UsesCheckpoint;
 
     private void ProcessEventResult(EventObject eventObject, List<object>? results) {
         if (!TrackCheckpointProgress(eventObject) || !MessageMatches(eventObject)) {
@@ -714,81 +729,39 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
     }
 
     /// <summary>
-    /// Saves the highest processed record ID to <see cref="RecordIdFile"/> when processing completes.
+    /// Saves the highest contiguously processed record ID to <see cref="RecordIdFile"/> when processing completes.
     /// </summary>
     protected override Task EndProcessingAsync() {
         if (!string.IsNullOrEmpty(RecordIdFile) && (_highestRecordIds.Count > 0 || _resetCheckpointKeys.Count > 0)) {
-            string checkpointPath = System.IO.Path.GetFullPath(RecordIdFile!);
-            using (AcquireCheckpointFileLock(checkpointPath)) {
-                Dictionary<string, long> latestMap = ReadCheckpointFile(checkpointPath);
-                foreach (string resetKey in _resetCheckpointKeys) {
-                    if (_highestRecordIds.TryGetValue(resetKey, out long resetValue)) {
-                        latestMap[resetKey] = resetValue;
-                    } else {
-                        latestMap.Remove(resetKey);
-                    }
-                }
-                foreach (KeyValuePair<string, long> checkpoint in _highestRecordIds) {
-                    if (_resetCheckpointKeys.Contains(checkpoint.Key) ||
-                        !latestMap.TryGetValue(checkpoint.Key, out long existing) || checkpoint.Value > existing) {
-                        latestMap[checkpoint.Key] = checkpoint.Value;
-                    }
-                }
-                _recordMap = latestMap;
-                WriteCheckpointFile(checkpointPath, JsonSerializer.Serialize(latestMap));
+            var updates = new List<EventCheckpointUpdate>(_highestRecordIds.Count + _resetCheckpointKeys.Count);
+            foreach (string resetKey in _resetCheckpointKeys) {
+                updates.Add(new EventCheckpointUpdate(
+                    resetKey,
+                    _highestRecordIds.TryGetValue(resetKey, out long resetValue) ? resetValue : null,
+                    GetInitialCheckpointGeneration(resetKey),
+                    startsNewGeneration: true));
             }
+            foreach (KeyValuePair<string, long> checkpoint in _highestRecordIds) {
+                if (_resetCheckpointKeys.Contains(checkpoint.Key)) {
+                    continue;
+                }
+                updates.Add(new EventCheckpointUpdate(
+                    checkpoint.Key,
+                    checkpoint.Value,
+                    GetInitialCheckpointGeneration(checkpoint.Key)));
+            }
+
+            EventCheckpointSnapshot persisted = EventCheckpointStore.Update(RecordIdFile!, updates);
+            _recordMap = persisted.Records.ToDictionary(
+                static entry => entry.Key,
+                static entry => entry.Value,
+                StringComparer.OrdinalIgnoreCase);
         }
         return Task.CompletedTask;
     }
 
-    private static Dictionary<string, long> ReadCheckpointFile(string path) {
-        try {
-            if (!File.Exists(path)) {
-                return new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
-            }
-
-            string json = File.ReadAllText(path);
-            Dictionary<string, long>? persistedMap = JsonSerializer.Deserialize<Dictionary<string, long>>(json);
-            return persistedMap == null
-                ? new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase)
-                : new Dictionary<string, long>(persistedMap, StringComparer.OrdinalIgnoreCase);
-        } catch (FileNotFoundException) {
-            return new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
-        } catch (DirectoryNotFoundException) {
-            return new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
-        } catch (JsonException) {
-            return new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
-        }
-    }
-
-    private static FileStream AcquireCheckpointFileLock(string checkpointPath) {
-        string lockPath = checkpointPath + ".lock";
-        DateTime deadline = DateTime.UtcNow.AddSeconds(30);
-        while (true) {
-            try {
-                return new FileStream(lockPath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
-            } catch (IOException ex) {
-                if (DateTime.UtcNow >= deadline) {
-                    throw new TimeoutException($"Timed out waiting to update shared event checkpoint file '{checkpointPath}'.", ex);
-                }
-                Thread.Sleep(50);
-            }
-        }
-    }
-
-    private static void WriteCheckpointFile(string path, string contents) {
-        string temporaryPath = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
-        try {
-            File.WriteAllText(temporaryPath, contents);
-            if (File.Exists(path)) {
-                File.Replace(temporaryPath, path, null);
-            } else {
-                File.Move(temporaryPath, path);
-            }
-        } finally {
-            if (File.Exists(temporaryPath)) {
-                File.Delete(temporaryPath);
-            }
-        }
-    }
+    private Guid GetInitialCheckpointGeneration(string checkpointKey)
+        => _checkpointGenerations.TryGetValue(checkpointKey, out Guid generationId)
+            ? generationId
+            : Guid.Empty;
 }

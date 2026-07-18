@@ -13,7 +13,7 @@ public partial class SearchEvents {
     /// </summary>
     /// <remarks>
     /// Unlimited queries that require multiple XPath chunks stream bounded chunk batches; ordering is preserved
-    /// within each batch. A positive <paramref name="maxEvents"/> keeps a bounded global newest-first merge.
+    /// within each batch. A positive <paramref name="maxEvents"/> keeps a bounded global merge in the requested direction.
     /// </remarks>
     public static IEnumerable<EventObject> QueryLogsSequential(
         string logName,
@@ -32,7 +32,8 @@ public partial class SearchEvents {
         int? sessionTimeoutMs = null,
         EventReadMode readMode = EventReadMode.Full,
         Func<string?, long?>? minimumEventRecordIdExclusiveResolver = null,
-        int maxOpenQueries = MaxSequentialOpenQueries) {
+        int maxOpenQueries = MaxSequentialOpenQueries,
+        bool oldest = false) {
 
         ValidateQueryArguments(logName, maxEvents, sessionTimeoutMs);
         List<string?> targets = machineNames == null || machineNames.Count == 0
@@ -46,7 +47,8 @@ public partial class SearchEvents {
             eventIds,
             eventRecordId,
             fixedExpressionCount,
-            minimumEventRecordIdExclusiveResolver);
+            minimumEventRecordIdExclusiveResolver,
+            preserveSourceProgression: oldest && minimumEventRecordIdExclusiveResolver != null);
 
         foreach (EventObject result in MergeQueryWorkItems(
                      workItems,
@@ -63,10 +65,11 @@ public partial class SearchEvents {
                          cancellationToken,
                          sessionTimeoutMs,
                          readMode,
+                         oldest,
                          isolateRemoteFailures,
                          failedTargets),
                      maxEvents,
-                     oldest: false,
+                     oldest,
                      cancellationToken,
                      maxOpenQueries)) {
             yield return result;
@@ -86,6 +89,7 @@ public partial class SearchEvents {
         CancellationToken cancellationToken,
         int? sessionTimeoutMs,
         EventReadMode readMode,
+        bool oldest,
         bool isolateRemoteFailures,
         ConcurrentDictionary<string, byte> failedTargets) {
 
@@ -111,7 +115,8 @@ public partial class SearchEvents {
                 cancellationToken: cancellationToken,
                 sessionTimeoutMs: sessionTimeoutMs ?? Settings.QuerySessionTimeoutMs,
                 readMode: readMode,
-                minimumEventRecordIdExclusive: workItem.MinimumEventRecordIdExclusive)).GetEnumerator();
+                minimumEventRecordIdExclusive: workItem.MinimumEventRecordIdExclusive,
+                oldest: oldest)).GetEnumerator();
         return isolateRemoteFailures
             ? EnumerateQueryWorkItemSafely(workItem, queryResults, failedTargets).GetEnumerator()
             : queryResults;

@@ -148,4 +148,22 @@ Describe 'Start-EVXWatcher - PowerShell event dispatch' {
             Import-Module -Name $ModulePath -Force
         }
     }
+
+    It 'keeps module ownership independent from user-mutable global variables' {
+        $Module = Get-Module PSEventViewer
+        $ModulePath = $Module.Path
+        $Watcher = Start-EVXWatcher -Name ('PSEventViewer.MutableVariable.' + [Guid]::NewGuid().ToString('N')) -MachineName $env:COMPUTERNAME -LogName Application -EventId 1 -Action {}
+        try {
+            Set-Variable -Name PSEventViewer_WatcherOwnerId -Scope Global -Value ([Guid]::NewGuid()) -Force
+            Remove-Module PSEventViewer -Force
+
+            $Watcher.EndTime | Should -Not -BeNullOrEmpty
+        } finally {
+            Remove-Variable -Name PSEventViewer_WatcherOwnerId -Scope Global -Force -ErrorAction SilentlyContinue
+            if ($Watcher -and -not $Watcher.EndTime) {
+                [EventViewerX.WatcherManager]::StopWatcher($Watcher.Id) | Out-Null
+            }
+            Import-Module -Name $ModulePath -Force
+        }
+    }
 }

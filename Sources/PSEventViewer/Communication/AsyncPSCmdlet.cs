@@ -55,10 +55,10 @@ public abstract class AsyncPSCmdlet : PSCmdlet, IDisposable {
     /// Begins processing the cmdlet asynchronously.
     /// </summary>
     protected override void BeginProcessing() {
-        object? owner = SessionState.PSVariable.GetValue(PowerShellWatcherRegistry.OwnerVariableName);
-        _powerShellResourceOwnerId = owner is Guid ownerId
-            ? ownerId
-            : Runspace.DefaultRunspace?.InstanceId ?? Guid.Empty;
+        Guid standaloneOwnerId = Runspace.DefaultRunspace?.InstanceId ?? Guid.Empty;
+        _powerShellResourceOwnerId = PowerShellWatcherRegistry.GetOwnerId(
+            MyInvocation.MyCommand.Module,
+            standaloneOwnerId);
         RunBlockInAsync(BeginProcessingAsync);
     }
 

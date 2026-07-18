@@ -179,7 +179,8 @@ public partial class SearchEvents : Settings {
     /// <param name="sessionTimeoutMs">Timeout for establishing sessions and reading events.</param>
     /// <param name="readMode">Amount of provider data to materialize for each event.</param>
     /// <param name="minimumEventRecordIdExclusive">Optional native record-ID lower bound.</param>
-    private static IEnumerable<EventObject> QueryLogEnumerable(string logName, List<int>? eventIds = null, string? machineName = null, string? providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string? userId = null, int maxEvents = 0, List<long>? eventRecordId = null, TimePeriod? timePeriod = null, CancellationToken cancellationToken = default, int? sessionTimeoutMs = null, EventReadMode readMode = EventReadMode.Full, long? minimumEventRecordIdExclusive = null) {
+    /// <param name="oldest">Whether to enumerate matching records from oldest to newest.</param>
+    private static IEnumerable<EventObject> QueryLogEnumerable(string logName, List<int>? eventIds = null, string? machineName = null, string? providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string? userId = null, int maxEvents = 0, List<long>? eventRecordId = null, TimePeriod? timePeriod = null, CancellationToken cancellationToken = default, int? sessionTimeoutMs = null, EventReadMode readMode = EventReadMode.Full, long? minimumEventRecordIdExclusive = null, bool oldest = false) {
         ValidateQueryArguments(logName, maxEvents, sessionTimeoutMs);
         if (eventIds != null && eventIds.Any(id => id <= 0)) {
             throw new ArgumentException("Event IDs must be positive.", nameof(eventIds));
@@ -206,7 +207,7 @@ public partial class SearchEvents : Settings {
 
         EventLogQuery query = new EventLogQuery(logName, PathType.LogName, queryString)
         {
-            ReverseDirection = true,
+            ReverseDirection = !oldest,
             TolerateQueryErrors = false
         };
         int effectiveTimeout = sessionTimeoutMs ?? Settings.QuerySessionTimeoutMs;
@@ -331,17 +332,18 @@ public partial class SearchEvents : Settings {
     /// <param name="sessionTimeoutMs">Session open/read timeout (ms); null uses defaults.</param>
     /// <param name="readMode">Amount of provider data to materialize for each event.</param>
     /// <param name="minimumEventRecordIdExclusive">Optional native record-ID lower bound.</param>
+    /// <param name="oldest">Whether to enumerate matching records from oldest to newest.</param>
     /// <returns>Enumerable collection of matching events.</returns>
-    public static IEnumerable<EventObject> QueryLog(string logName, List<int>? eventIds = null, string? machineName = null, string? providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string? userId = null, int maxEvents = 0, List<long>? eventRecordId = null, TimePeriod? timePeriod = null, CancellationToken cancellationToken = default, int? sessionTimeoutMs = null, EventReadMode readMode = EventReadMode.Full, long? minimumEventRecordIdExclusive = null) {
+    public static IEnumerable<EventObject> QueryLog(string logName, List<int>? eventIds = null, string? machineName = null, string? providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string? userId = null, int maxEvents = 0, List<long>? eventRecordId = null, TimePeriod? timePeriod = null, CancellationToken cancellationToken = default, int? sessionTimeoutMs = null, EventReadMode readMode = EventReadMode.Full, long? minimumEventRecordIdExclusive = null, bool oldest = false) {
         Func<string?, long?>? resolver = minimumEventRecordIdExclusive.HasValue ? _ => minimumEventRecordIdExclusive : null;
-        return QueryLogsSequential(logName, eventIds, new List<string?> { machineName }, providerName, keywords, level, startTime, endTime, userId, maxEvents, eventRecordId, timePeriod, cancellationToken, sessionTimeoutMs ?? Settings.QuerySessionTimeoutMs, readMode, resolver);
+        return QueryLogsSequential(logName, eventIds, new List<string?> { machineName }, providerName, keywords, level, startTime, endTime, userId, maxEvents, eventRecordId, timePeriod, cancellationToken, sessionTimeoutMs ?? Settings.QuerySessionTimeoutMs, readMode, resolver, oldest: oldest);
     }
 
     /// <summary>
     /// Queries a Windows event log by known-log enum with optional filters.
     /// </summary>
-    public static IEnumerable<EventObject> QueryLog(KnownLog logName, List<int>? eventIds = null, string? machineName = null, string? providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string? userId = null, int maxEvents = 0, List<long>? eventRecordId = null, TimePeriod? timePeriod = null, CancellationToken cancellationToken = default, int? sessionTimeoutMs = null, EventReadMode readMode = EventReadMode.Full, long? minimumEventRecordIdExclusive = null) {
-        return QueryLog(LogNameToString(logName), eventIds, machineName, providerName, keywords, level, startTime, endTime, userId, maxEvents, eventRecordId, timePeriod, cancellationToken, sessionTimeoutMs ?? Settings.QuerySessionTimeoutMs, readMode, minimumEventRecordIdExclusive);
+    public static IEnumerable<EventObject> QueryLog(KnownLog logName, List<int>? eventIds = null, string? machineName = null, string? providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string? userId = null, int maxEvents = 0, List<long>? eventRecordId = null, TimePeriod? timePeriod = null, CancellationToken cancellationToken = default, int? sessionTimeoutMs = null, EventReadMode readMode = EventReadMode.Full, long? minimumEventRecordIdExclusive = null, bool oldest = false) {
+        return QueryLog(LogNameToString(logName), eventIds, machineName, providerName, keywords, level, startTime, endTime, userId, maxEvents, eventRecordId, timePeriod, cancellationToken, sessionTimeoutMs ?? Settings.QuerySessionTimeoutMs, readMode, minimumEventRecordIdExclusive, oldest);
     }
 
     /// <summary>
@@ -349,9 +351,9 @@ public partial class SearchEvents : Settings {
     /// </summary>
     /// <remarks>This compatibility API materializes every result. Prefer the streaming APIs for large logs.</remarks>
     [Obsolete("Use QueryLog for synchronous streaming or QueryLogsParallel for bounded asynchronous streaming.")]
-    public static async Task<IEnumerable<EventObject>> QueryLogAsync(string logName, List<int>? eventIds = null, string? machineName = null, string? providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string? userId = null, int maxEvents = 0, List<long>? eventRecordId = null, TimePeriod? timePeriod = null, CancellationToken cancellationToken = default, int? sessionTimeoutMs = null, EventReadMode readMode = EventReadMode.Full, long? minimumEventRecordIdExclusive = null) {
+    public static async Task<IEnumerable<EventObject>> QueryLogAsync(string logName, List<int>? eventIds = null, string? machineName = null, string? providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string? userId = null, int maxEvents = 0, List<long>? eventRecordId = null, TimePeriod? timePeriod = null, CancellationToken cancellationToken = default, int? sessionTimeoutMs = null, EventReadMode readMode = EventReadMode.Full, long? minimumEventRecordIdExclusive = null, bool oldest = false) {
         int timeout = sessionTimeoutMs ?? Settings.QuerySessionTimeoutMs;
-        return await Task.Run(() => QueryLog(logName, eventIds, machineName, providerName, keywords, level, startTime, endTime, userId, maxEvents, eventRecordId, timePeriod, cancellationToken, timeout, readMode, minimumEventRecordIdExclusive).ToList().AsEnumerable(), cancellationToken);
+        return await Task.Run(() => QueryLog(logName, eventIds, machineName, providerName, keywords, level, startTime, endTime, userId, maxEvents, eventRecordId, timePeriod, cancellationToken, timeout, readMode, minimumEventRecordIdExclusive, oldest).ToList().AsEnumerable(), cancellationToken);
     }
 
     /// <summary>

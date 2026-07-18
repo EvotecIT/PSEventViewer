@@ -68,7 +68,8 @@ public partial class SearchEvents : Settings {
             eventIds,
             eventRecordId,
             fixedExpressionCount,
-            minimumResolver);
+            minimumResolver,
+            preserveSourceProgression: oldest);
 
         foreach (EventObject eventObject in MergeQueryWorkItems(
                      workItems,

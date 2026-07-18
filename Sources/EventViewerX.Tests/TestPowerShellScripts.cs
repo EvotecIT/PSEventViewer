@@ -1,11 +1,11 @@
-using System.Reflection;
 using System.Collections.Generic;
 using System.Diagnostics.Eventing.Reader;
+using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Threading;
 using System.Xml.Linq;
 using Xunit;
-using System.IO;
 
 namespace EventViewerX.Tests {
     public class TestPowerShellScripts {
@@ -257,9 +257,72 @@ namespace EventViewerX.Tests {
             }
         }
 
+        [Fact]
+        public void RestoredScriptSaveRefusesToOverwriteItsDeterministicDestination() {
+            string destination = Path.Combine(Path.GetTempPath(), "EventViewerX.Tests." + Guid.NewGuid().ToString("N"));
+            try {
+                EventObject eventObject = CreateEventObject();
+                SetSnapshotProperty(eventObject, nameof(EventObject.MachineName), "server");
+                SetSnapshotProperty(eventObject, nameof(EventObject.RecordId), (long?)1);
+                SetSnapshotProperty(eventObject, nameof(EventObject.LogName), "PowerShell");
+                SetSnapshotProperty(eventObject, nameof(EventObject.TimeCreated), DateTime.UtcNow);
+                var script = new RestoredPowerShellScript {
+                    ScriptBlockId = "block",
+                    Script = "Get-Date",
+                    Events = new[] { eventObject }
+                };
+
+                string savedPath = script.Save(destination, addComment: false);
+                Assert.Throws<IOException>(() => script.Save(destination, addComment: false));
+                Assert.Equal("Get-Date", File.ReadAllText(savedPath));
+            } finally {
+                if (Directory.Exists(destination)) {
+                    Directory.Delete(destination, recursive: true);
+                }
+            }
+        }
+
+        [Fact]
+        public void RestoredScriptSaveRefusesAPreexistingHardLink() {
+            string destination = Path.Combine(Path.GetTempPath(), "EventViewerX.Tests." + Guid.NewGuid().ToString("N"));
+            string outsidePath = Path.Combine(Path.GetTempPath(), "EventViewerX.Tests.Outside." + Guid.NewGuid().ToString("N") + ".ps1");
+            try {
+                EventObject eventObject = CreateEventObject();
+                SetSnapshotProperty(eventObject, nameof(EventObject.MachineName), "server");
+                SetSnapshotProperty(eventObject, nameof(EventObject.RecordId), (long?)1);
+                SetSnapshotProperty(eventObject, nameof(EventObject.LogName), "PowerShell");
+                SetSnapshotProperty(eventObject, nameof(EventObject.TimeCreated), DateTime.UtcNow);
+                var script = new RestoredPowerShellScript {
+                    ScriptBlockId = "block",
+                    Script = "Get-Date",
+                    Events = new[] { eventObject }
+                };
+
+                string savedPath = script.Save(destination, addComment: false, unblock: true);
+                File.Delete(savedPath);
+                File.WriteAllText(outsidePath, "sentinel");
+                if (!CreateHardLink(savedPath, outsidePath, IntPtr.Zero)) {
+                    throw new System.ComponentModel.Win32Exception(System.Runtime.InteropServices.Marshal.GetLastWin32Error());
+                }
+
+                Assert.Throws<IOException>(() => script.Save(destination, addComment: false, unblock: true));
+                Assert.Equal("sentinel", File.ReadAllText(outsidePath));
+            } finally {
+                if (Directory.Exists(destination)) {
+                    Directory.Delete(destination, recursive: true);
+                }
+                if (File.Exists(outsidePath)) {
+                    File.Delete(outsidePath);
+                }
+            }
+        }
+
         private static EventObject CreateEventObject() {
             return (EventObject)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(EventObject));
         }
+
+        [System.Runtime.InteropServices.DllImport("Kernel32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode, SetLastError = true)]
+        private static extern bool CreateHardLink(string fileName, string existingFileName, IntPtr securityAttributes);
 
         private static void SetSnapshotProperty<T>(EventObject eventObject, string propertyName, T value) {
             typeof(EventObject)

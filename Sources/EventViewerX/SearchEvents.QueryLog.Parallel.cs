@@ -18,7 +18,7 @@ public partial class SearchEvents : Settings {
     /// </summary>
     /// <remarks>
     /// <paramref name="maxEvents"/> is a global limit across all machines and filter chunks.
-    /// A positive limit uses a bounded global newest-first merge so producer arrival cannot change the selected set.
+    /// A positive limit uses a bounded global merge in the requested direction so producer arrival cannot change the selected set.
     /// Unlimited result order is intentionally unspecified when more than one query runs concurrently.
     /// </remarks>
     public static async IAsyncEnumerable<EventObject> QueryLogsParallel(
@@ -39,7 +39,57 @@ public partial class SearchEvents : Settings {
         int? sessionTimeoutMs = null,
         EventReadMode readMode = EventReadMode.Full,
         int bufferCapacity = 0,
-        Func<string?, long?>? minimumEventRecordIdExclusiveResolver = null) {
+        Func<string?, long?>? minimumEventRecordIdExclusiveResolver = null,
+        bool oldest = false) {
+
+        await foreach (EventObject result in QueryLogsParallelCore(
+                           logName,
+                           eventIds,
+                           machineNames,
+                           providerName,
+                           keywords,
+                           level,
+                           startTime,
+                           endTime,
+                           userId,
+                           maxEvents,
+                           maxThreads,
+                           eventRecordId,
+                           timePeriod,
+                           cancellationToken,
+                           sessionTimeoutMs,
+                           readMode,
+                           bufferCapacity,
+                           minimumEventRecordIdExclusiveResolver,
+                           oldest,
+                           resultPredicate: null,
+                           candidateObserver: null)) {
+            yield return result;
+        }
+    }
+
+    private static async IAsyncEnumerable<EventObject> QueryLogsParallelCore(
+        string logName,
+        List<int>? eventIds,
+        List<string?>? machineNames,
+        string? providerName,
+        Keywords? keywords,
+        Level? level,
+        DateTime? startTime,
+        DateTime? endTime,
+        string? userId,
+        int maxEvents,
+        int maxThreads,
+        List<long>? eventRecordId,
+        TimePeriod? timePeriod,
+        [EnumeratorCancellation] CancellationToken cancellationToken,
+        int? sessionTimeoutMs,
+        EventReadMode readMode,
+        int bufferCapacity,
+        Func<string?, long?>? minimumEventRecordIdExclusiveResolver,
+        bool oldest,
+        Func<EventObject, bool>? resultPredicate,
+        Action<EventObject>? candidateObserver) {
 
         ValidateParallelArguments(logName, maxEvents, maxThreads, bufferCapacity, sessionTimeoutMs);
         List<string?> targets = machineNames == null || machineNames.Count == 0
@@ -56,7 +106,13 @@ public partial class SearchEvents : Settings {
             SingleReader = true,
             SingleWriter = false
         });
-        using IEnumerator<QueryWorkItem> workItems = BuildQueryWorkItems(targets, eventIds, eventRecordId, fixedExpressionCount, minimumEventRecordIdExclusiveResolver).GetEnumerator();
+        using IEnumerator<QueryWorkItem> workItems = BuildQueryWorkItems(
+            targets,
+            eventIds,
+            eventRecordId,
+            fixedExpressionCount,
+            minimumEventRecordIdExclusiveResolver,
+            preserveSourceProgression: oldest && minimumEventRecordIdExclusiveResolver != null).GetEnumerator();
         var workItemSync = new object();
         var failures = new ConcurrentQueue<Exception>();
         var failedTargets = new ConcurrentDictionary<string, byte>(StringComparer.OrdinalIgnoreCase);
@@ -88,9 +144,14 @@ public partial class SearchEvents : Settings {
                                 cancellationToken: workerCancellation.Token,
                                 sessionTimeoutMs: sessionTimeoutMs ?? Settings.QuerySessionTimeoutMs,
                                 readMode: readMode,
-                                minimumEventRecordIdExclusive: workItem.MinimumEventRecordIdExclusive)).GetEnumerator();
+                                minimumEventRecordIdExclusive: workItem.MinimumEventRecordIdExclusive,
+                                oldest: oldest)).GetEnumerator();
                         int workItemResults = 0;
                         while (TryMoveNextParallelResult(queryResults, workItem, failedTargets, isolateRemoteFailures, out EventObject? result)) {
+                            candidateObserver?.Invoke(result!);
+                            if (resultPredicate != null && !resultPredicate(result!)) {
+                                continue;
+                            }
                             if (!results.Writer.TryWrite(result!)) {
                                 results.Writer.WriteAsync(result!, workerCancellation.Token).AsTask().GetAwaiter().GetResult();
                             }
@@ -131,7 +192,7 @@ public partial class SearchEvents : Settings {
                     candidates.Add(result!);
                     long trimThreshold = Math.Min((long)maxEvents * 2, (long)maxEvents + 1024);
                     if (candidates.Count >= trimThreshold) {
-                        SortAndTrim(candidates, maxEvents, oldest: false);
+                        SortAndTrim(candidates, maxEvents, oldest);
                     }
                 }
             }
@@ -143,7 +204,7 @@ public partial class SearchEvents : Settings {
             }
 
             if (candidates != null) {
-                candidates.Sort((left, right) => CompareEvents(left, right, oldest: false));
+                candidates.Sort((left, right) => CompareEvents(left, right, oldest));
                 int count = Math.Min(maxEvents, candidates.Count);
                 for (int index = 0; index < count; index++) {
                     cancellationToken.ThrowIfCancellationRequested();
@@ -160,6 +221,49 @@ public partial class SearchEvents : Settings {
                 }
             }
         }
+    }
+
+    internal static IAsyncEnumerable<EventObject> QueryLogsParallelMatching(
+        string logName,
+        List<int>? eventIds,
+        List<string?>? machineNames,
+        DateTime? startTime,
+        DateTime? endTime,
+        TimePeriod? timePeriod,
+        int maxEvents,
+        int maxThreads,
+        CancellationToken cancellationToken,
+        Func<EventObject, bool> resultPredicate,
+        Action<EventObject>? candidateObserver = null,
+        Func<string?, long?>? minimumEventRecordIdExclusiveResolver = null,
+        bool oldest = false) {
+
+        if (resultPredicate == null) {
+            throw new ArgumentNullException(nameof(resultPredicate));
+        }
+
+        return QueryLogsParallelCore(
+            logName: logName,
+            eventIds: eventIds,
+            machineNames: machineNames,
+            providerName: null,
+            keywords: null,
+            level: null,
+            startTime: startTime,
+            endTime: endTime,
+            userId: null,
+            maxEvents: maxEvents,
+            maxThreads: maxThreads,
+            eventRecordId: null,
+            timePeriod: timePeriod,
+            cancellationToken: cancellationToken,
+            sessionTimeoutMs: null,
+            readMode: EventReadMode.Full,
+            bufferCapacity: 0,
+            minimumEventRecordIdExclusiveResolver: minimumEventRecordIdExclusiveResolver,
+            oldest: oldest,
+            resultPredicate: resultPredicate,
+            candidateObserver: candidateObserver);
     }
 
     internal static bool ShouldSkipFailedTarget(
@@ -237,11 +341,12 @@ public partial class SearchEvents : Settings {
         int? sessionTimeoutMs = null,
         EventReadMode readMode = EventReadMode.Full,
         int bufferCapacity = 0,
-        Func<string?, long?>? minimumEventRecordIdExclusiveResolver = null) {
+        Func<string?, long?>? minimumEventRecordIdExclusiveResolver = null,
+        bool oldest = false) {
 
         var results = new List<EventObject>();
         try {
-            await foreach (EventObject ev in QueryLogsParallel(logName, eventIds, machineNames, providerName, keywords, level, startTime, endTime, userId, maxEvents, maxThreads, eventRecordId, timePeriod, cancellationToken, sessionTimeoutMs, readMode, bufferCapacity, minimumEventRecordIdExclusiveResolver)) {
+            await foreach (EventObject ev in QueryLogsParallel(logName, eventIds, machineNames, providerName, keywords, level, startTime, endTime, userId, maxEvents, maxThreads, eventRecordId, timePeriod, cancellationToken, sessionTimeoutMs, readMode, bufferCapacity, minimumEventRecordIdExclusiveResolver, oldest)) {
                 results.Add(ev);
             }
         } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
@@ -269,9 +374,10 @@ public partial class SearchEvents : Settings {
         int? sessionTimeoutMs = null,
         EventReadMode readMode = EventReadMode.Full,
         int bufferCapacity = 0,
-        Func<string?, long?>? minimumEventRecordIdExclusiveResolver = null) {
+        Func<string?, long?>? minimumEventRecordIdExclusiveResolver = null,
+        bool oldest = false) {
 
-        return QueryLogsParallel(LogNameToString(logName), eventIds, machineNames, providerName, keywords, level, startTime, endTime, userId, maxEvents, maxThreads, eventRecordId, timePeriod, cancellationToken, sessionTimeoutMs, readMode, bufferCapacity, minimumEventRecordIdExclusiveResolver);
+        return QueryLogsParallel(LogNameToString(logName), eventIds, machineNames, providerName, keywords, level, startTime, endTime, userId, maxEvents, maxThreads, eventRecordId, timePeriod, cancellationToken, sessionTimeoutMs, readMode, bufferCapacity, minimumEventRecordIdExclusiveResolver, oldest);
     }
 
     /// <summary>Materializes events from a known log through the bounded parallel query pipeline.</summary>
@@ -293,9 +399,10 @@ public partial class SearchEvents : Settings {
         int? sessionTimeoutMs = null,
         EventReadMode readMode = EventReadMode.Full,
         int bufferCapacity = 0,
-        Func<string?, long?>? minimumEventRecordIdExclusiveResolver = null) {
+        Func<string?, long?>? minimumEventRecordIdExclusiveResolver = null,
+        bool oldest = false) {
 
-        return QueryLogsParallelAsync(LogNameToString(logName), eventIds, machineNames, providerName, keywords, level, startTime, endTime, userId, maxEvents, maxThreads, eventRecordId, timePeriod, cancellationToken, sessionTimeoutMs, readMode, bufferCapacity, minimumEventRecordIdExclusiveResolver);
+        return QueryLogsParallelAsync(LogNameToString(logName), eventIds, machineNames, providerName, keywords, level, startTime, endTime, userId, maxEvents, maxThreads, eventRecordId, timePeriod, cancellationToken, sessionTimeoutMs, readMode, bufferCapacity, minimumEventRecordIdExclusiveResolver, oldest);
     }
 
     /// <summary>
@@ -319,9 +426,10 @@ public partial class SearchEvents : Settings {
         int? sessionTimeoutMs = null,
         EventReadMode readMode = EventReadMode.Full,
         int bufferCapacity = 0,
-        Func<string?, long?>? minimumEventRecordIdExclusiveResolver = null) {
+        Func<string?, long?>? minimumEventRecordIdExclusiveResolver = null,
+        bool oldest = false) {
 
-        IAsyncEnumerator<EventObject> enumerator = QueryLogsParallel(logName, eventIds, machineNames, providerName, keywords, level, startTime, endTime, userId, maxEvents, maxThreads, eventRecordId, cancellationToken: cancellationToken, sessionTimeoutMs: sessionTimeoutMs, readMode: readMode, bufferCapacity: bufferCapacity, minimumEventRecordIdExclusiveResolver: minimumEventRecordIdExclusiveResolver).GetAsyncEnumerator(cancellationToken);
+        IAsyncEnumerator<EventObject> enumerator = QueryLogsParallel(logName, eventIds, machineNames, providerName, keywords, level, startTime, endTime, userId, maxEvents, maxThreads, eventRecordId, cancellationToken: cancellationToken, sessionTimeoutMs: sessionTimeoutMs, readMode: readMode, bufferCapacity: bufferCapacity, minimumEventRecordIdExclusiveResolver: minimumEventRecordIdExclusiveResolver, oldest: oldest).GetAsyncEnumerator(cancellationToken);
         try {
             while (enumerator.MoveNextAsync().AsTask().GetAwaiter().GetResult()) {
                 yield return enumerator.Current;
@@ -350,9 +458,10 @@ public partial class SearchEvents : Settings {
         int? sessionTimeoutMs = null,
         EventReadMode readMode = EventReadMode.Full,
         int bufferCapacity = 0,
-        Func<string?, long?>? minimumEventRecordIdExclusiveResolver = null) {
+        Func<string?, long?>? minimumEventRecordIdExclusiveResolver = null,
+        bool oldest = false) {
 
-        return QueryLogsParallelForEach(LogNameToString(logName), eventIds, machineNames, providerName, keywords, level, startTime, endTime, userId, maxEvents, maxThreads, eventRecordId, cancellationToken, sessionTimeoutMs, readMode, bufferCapacity, minimumEventRecordIdExclusiveResolver);
+        return QueryLogsParallelForEach(LogNameToString(logName), eventIds, machineNames, providerName, keywords, level, startTime, endTime, userId, maxEvents, maxThreads, eventRecordId, cancellationToken, sessionTimeoutMs, readMode, bufferCapacity, minimumEventRecordIdExclusiveResolver, oldest);
     }
 
     internal static IEnumerable<QueryWorkItem> BuildQueryWorkItems(
@@ -360,7 +469,8 @@ public partial class SearchEvents : Settings {
         List<int>? eventIds,
         List<long>? eventRecordIds,
         int fixedExpressionCount,
-        Func<string?, long?>? minimumEventRecordIdExclusiveResolver = null) {
+        Func<string?, long?>? minimumEventRecordIdExclusiveResolver = null,
+        bool preserveSourceProgression = false) {
 
         int effectiveFixedExpressionCount = fixedExpressionCount + (minimumEventRecordIdExclusiveResolver != null ? 1 : 0);
         if (effectiveFixedExpressionCount < 0 || effectiveFixedExpressionCount > MaxXPathExpressionCount) {
@@ -381,6 +491,46 @@ public partial class SearchEvents : Settings {
         if (availableExpressions == 0 && (hasEventIds || hasEventRecordIds)) {
             throw new ArgumentException($"The fixed filter consumes all {MaxXPathExpressionCount} XPath expressions; no capacity remains for event or record IDs.");
         }
+
+        if (preserveSourceProgression) {
+            List<int>? progressionNativeEventIds = eventIds;
+            List<long>? progressionNativeEventRecordIds = eventRecordIds;
+            HashSet<int>? progressionManagedEventIds = null;
+            HashSet<long>? progressionManagedEventRecordIds = null;
+            int eventExpressionCount = eventIds?.Count ?? 0;
+            int recordExpressionCount = eventRecordIds?.Count ?? 0;
+            if (eventExpressionCount + recordExpressionCount > availableExpressions) {
+                progressionNativeEventIds = null;
+                progressionNativeEventRecordIds = null;
+                progressionManagedEventIds = hasEventIds ? new HashSet<int>(eventIds!) : null;
+                progressionManagedEventRecordIds = hasEventRecordIds ? new HashSet<long>(eventRecordIds!) : null;
+
+                if (hasEventIds && eventExpressionCount <= availableExpressions &&
+                    (!hasEventRecordIds || eventExpressionCount <= recordExpressionCount)) {
+                    progressionNativeEventIds = eventIds;
+                    progressionManagedEventIds = null;
+                } else if (hasEventRecordIds && recordExpressionCount <= availableExpressions) {
+                    progressionNativeEventRecordIds = eventRecordIds;
+                    progressionManagedEventRecordIds = null;
+                }
+            }
+
+            foreach (string? machineName in machineNames) {
+                long? minimumEventRecordIdExclusive = minimumEventRecordIdExclusiveResolver?.Invoke(machineName);
+                if (minimumEventRecordIdExclusive < 0) {
+                    throw new ArgumentOutOfRangeException(nameof(minimumEventRecordIdExclusiveResolver), "Minimum event record ID must be greater than or equal to zero.");
+                }
+                yield return new QueryWorkItem(
+                    machineName,
+                    progressionNativeEventIds,
+                    progressionNativeEventRecordIds,
+                    progressionManagedEventIds,
+                    progressionManagedEventRecordIds,
+                    minimumEventRecordIdExclusive);
+            }
+            yield break;
+        }
+
         // Record IDs are exact and normally the more selective native filter. Keep event IDs managed
         // when both dimensions are supplied so large lists produce O(record chunks), not a chunk cross-product.
         HashSet<int>? managedEventIds = hasEventIds && hasEventRecordIds
@@ -401,7 +551,7 @@ public partial class SearchEvents : Settings {
             }
             foreach (List<int>? eventIdChunk in EnumerateChunks(nativeEventIds, eventIdChunkSize)) {
                 foreach (List<long>? eventRecordIdChunk in EnumerateChunks(eventRecordIds, eventRecordIdChunkSize)) {
-                    yield return new QueryWorkItem(machineName, eventIdChunk, eventRecordIdChunk, managedEventIds, minimumEventRecordIdExclusive);
+                    yield return new QueryWorkItem(machineName, eventIdChunk, eventRecordIdChunk, managedEventIds, null, minimumEventRecordIdExclusive);
                 }
             }
         }
@@ -409,7 +559,10 @@ public partial class SearchEvents : Settings {
 
     private static IEnumerable<EventObject> FilterQueryWorkItemResults(QueryWorkItem workItem, IEnumerable<EventObject> events) {
         foreach (EventObject eventObject in events) {
-            if (workItem.ManagedEventIds == null || workItem.ManagedEventIds.Contains(eventObject.Id)) {
+            bool eventIdMatches = workItem.ManagedEventIds == null || workItem.ManagedEventIds.Contains(eventObject.Id);
+            bool recordIdMatches = workItem.ManagedEventRecordIds == null ||
+                                   (eventObject.RecordId.HasValue && workItem.ManagedEventRecordIds.Contains(eventObject.RecordId.Value));
+            if (eventIdMatches && recordIdMatches) {
                 yield return eventObject;
             }
         }
@@ -497,11 +650,13 @@ public partial class SearchEvents : Settings {
             List<int>? eventIds,
             List<long>? eventRecordIds,
             HashSet<int>? managedEventIds = null,
+            HashSet<long>? managedEventRecordIds = null,
             long? minimumEventRecordIdExclusive = null) {
             MachineName = machineName;
             EventIds = eventIds;
             EventRecordIds = eventRecordIds;
             ManagedEventIds = managedEventIds;
+            ManagedEventRecordIds = managedEventRecordIds;
             MinimumEventRecordIdExclusive = minimumEventRecordIdExclusive;
         }
 
@@ -509,6 +664,7 @@ public partial class SearchEvents : Settings {
         internal List<int>? EventIds { get; }
         internal List<long>? EventRecordIds { get; }
         internal HashSet<int>? ManagedEventIds { get; }
+        internal HashSet<long>? ManagedEventRecordIds { get; }
         internal long? MinimumEventRecordIdExclusive { get; }
     }
 }

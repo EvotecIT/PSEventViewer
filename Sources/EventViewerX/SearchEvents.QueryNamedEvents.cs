@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
@@ -24,6 +25,7 @@ namespace EventViewerX {
         /// <param name="executionInfo">Optional progress object populated while the query is enumerated.</param>
         /// <param name="minimumEventRecordIdExclusiveResolver">Optional per-machine/per-log native checkpoint resolver.</param>
         /// <param name="candidateObserver">Optional observer invoked for every native candidate before named-event projection.</param>
+        /// <param name="oldest">Whether to enumerate candidates and select results from oldest to newest.</param>
         /// <returns>Asynchronous sequence of simplified events.</returns>
         public static async IAsyncEnumerable<EventObjectSlim> FindEventsByNamedEvents(
             List<NamedEvents> typeEventsList,
@@ -37,7 +39,8 @@ namespace EventViewerX {
             int maxEventsScanned = 0,
             NamedEventsQueryExecutionInfo? executionInfo = null,
             Func<string?, string, long?>? minimumEventRecordIdExclusiveResolver = null,
-            Action<EventObject>? candidateObserver = null) {
+            Action<EventObject>? candidateObserver = null,
+            bool oldest = false) {
 
             if (typeEventsList == null) {
                 throw new ArgumentNullException(nameof(typeEventsList));
@@ -70,13 +73,14 @@ namespace EventViewerX {
                                        maxThreads,
                                        candidateLimit,
                                        cancellationToken,
-                                       minimumEventRecordIdExclusiveResolver)) {
+                                       minimumEventRecordIdExclusiveResolver,
+                                       oldest)) {
                         candidates.Add(foundEvent);
-                        TrimNamedCandidates(candidates, candidateLimit);
+                        TrimNamedCandidates(candidates, candidateLimit, oldest);
                     }
                 }
 
-                candidates.Sort((left, right) => CompareEvents(left, right, oldest: false));
+                candidates.Sort((left, right) => CompareEvents(left, right, oldest));
                 foreach (EventObject foundEvent in candidates) {
                     if (!queryInfo.TryRecordCandidate()) {
                         yield break;
@@ -101,51 +105,41 @@ namespace EventViewerX {
             if (maxEvents > 0) {
                 var matches = new List<NamedEventMatch>(Math.Min(maxEvents, 256));
                 foreach (KeyValuePair<string, HashSet<int>> entry in eventInfo) {
-                    int candidateLimit = maxEvents;
-                    List<EventObject> logCandidates;
-                    List<NamedEventMatch> logMatches;
-                    while (true) {
-                        logCandidates = new List<EventObject>(Math.Min(candidateLimit, 256));
-                        await foreach (EventObject foundEvent in QueryNamedEventCandidates(
-                                           entry,
-                                           machineNames,
-                                           startTime,
-                                           endTime,
-                                           timePeriod,
-                                           maxThreads,
-                                           candidateLimit,
-                                           cancellationToken,
-                                           minimumEventRecordIdExclusiveResolver)) {
-                            logCandidates.Add(foundEvent);
+                    long scanned = 0;
+                    object observerSync = new();
+                    var projections = new ConcurrentDictionary<EventObject, EventObjectSlim>();
+                    await foreach (EventObject foundEvent in QueryNamedEventMatches(
+                                       entry,
+                                       machineNames,
+                                       startTime,
+                                       endTime,
+                                       timePeriod,
+                                       maxThreads,
+                                       maxEvents,
+                                       cancellationToken,
+                                       minimumEventRecordIdExclusiveResolver,
+                                       oldest,
+                                       candidate => {
+                                           Interlocked.Increment(ref scanned);
+                                           if (candidateObserver != null) {
+                                               lock (observerSync) {
+                                                   candidateObserver(candidate);
+                                               }
+                                           }
+                                       },
+                                       candidate => {
+                                           EventObjectSlim? projection = BuildTargetEvents(candidate, typeEventsList);
+                                           return projection != null && projections.TryAdd(candidate, projection);
+                                       })) {
+                        if (projections.TryRemove(foundEvent, out EventObjectSlim? targetEvent)) {
+                            matches.Add(new NamedEventMatch(foundEvent, targetEvent));
                         }
-
-                        logMatches = new List<NamedEventMatch>(Math.Min(maxEvents, logCandidates.Count));
-                        foreach (EventObject foundEvent in logCandidates) {
-                            EventObjectSlim? targetEvent = BuildTargetEvents(foundEvent, typeEventsList);
-                            if (targetEvent != null) {
-                                logMatches.Add(new NamedEventMatch(foundEvent, targetEvent));
-                                if (logMatches.Count >= maxEvents) {
-                                    break;
-                                }
-                            }
-                        }
-
-                        if (logMatches.Count >= maxEvents || logCandidates.Count < candidateLimit || candidateLimit == int.MaxValue) {
-                            break;
-                        }
-
-                        candidateLimit = candidateLimit > int.MaxValue / 2 ? int.MaxValue : candidateLimit * 2;
                     }
-
-                    foreach (EventObject foundEvent in logCandidates) {
-                        queryInfo.TryRecordCandidate();
-                        candidateObserver?.Invoke(foundEvent);
-                    }
-                    matches.AddRange(logMatches);
-                    TrimNamedMatches(matches, maxEvents);
+                    queryInfo.EventsScanned += scanned;
+                    TrimNamedMatches(matches, maxEvents, oldest);
                 }
 
-                matches.Sort(static (left, right) => CompareEvents(left.Source, right.Source, oldest: false));
+                matches.Sort((left, right) => CompareEvents(left.Source, right.Source, oldest));
                 int count = Math.Min(maxEvents, matches.Count);
                 for (int index = 0; index < count; index++) {
                     cancellationToken.ThrowIfCancellationRequested();
@@ -166,7 +160,8 @@ namespace EventViewerX {
                                    maxThreads,
                                    maxEvents: 0,
                                    cancellationToken,
-                                   minimumEventRecordIdExclusiveResolver)) {
+                                   minimumEventRecordIdExclusiveResolver,
+                                   oldest)) {
                     queryInfo.TryRecordCandidate();
 
                     candidateObserver?.Invoke(foundEvent);
@@ -192,7 +187,8 @@ namespace EventViewerX {
             int maxThreads,
             int maxEvents,
             CancellationToken cancellationToken,
-            Func<string?, string, long?>? minimumEventRecordIdExclusiveResolver) {
+            Func<string?, string, long?>? minimumEventRecordIdExclusiveResolver,
+            bool oldest) {
 
             return QueryLogsParallel(
                 entry.Key,
@@ -207,23 +203,56 @@ namespace EventViewerX {
                 readMode: EventReadMode.Full,
                 minimumEventRecordIdExclusiveResolver: minimumEventRecordIdExclusiveResolver == null
                     ? null
-                    : machineName => minimumEventRecordIdExclusiveResolver(machineName, entry.Key));
+                    : machineName => minimumEventRecordIdExclusiveResolver(machineName, entry.Key),
+                oldest: oldest);
         }
 
-        private static void TrimNamedCandidates(List<EventObject> candidates, int limit) {
+        private static IAsyncEnumerable<EventObject> QueryNamedEventMatches(
+            KeyValuePair<string, HashSet<int>> entry,
+            List<string?>? machineNames,
+            DateTime? startTime,
+            DateTime? endTime,
+            TimePeriod? timePeriod,
+            int maxThreads,
+            int maxEvents,
+            CancellationToken cancellationToken,
+            Func<string?, string, long?>? minimumEventRecordIdExclusiveResolver,
+            bool oldest,
+            Action<EventObject> candidateObserver,
+            Func<EventObject, bool> resultPredicate) {
+
+            return QueryLogsParallelMatching(
+                entry.Key,
+                entry.Value.ToList(),
+                machineNames,
+                startTime,
+                endTime,
+                timePeriod,
+                maxEvents,
+                maxThreads,
+                cancellationToken,
+                resultPredicate,
+                candidateObserver,
+                minimumEventRecordIdExclusiveResolver == null
+                    ? null
+                    : machineName => minimumEventRecordIdExclusiveResolver(machineName, entry.Key),
+                oldest);
+        }
+
+        private static void TrimNamedCandidates(List<EventObject> candidates, int limit, bool oldest) {
             long trimThreshold = Math.Min((long)limit * 2, (long)limit + 1024);
             if (candidates.Count >= trimThreshold) {
-                SortAndTrim(candidates, limit, oldest: false);
+                SortAndTrim(candidates, limit, oldest);
             }
         }
 
-        private static void TrimNamedMatches(List<NamedEventMatch> matches, int limit) {
+        private static void TrimNamedMatches(List<NamedEventMatch> matches, int limit, bool oldest) {
             long trimThreshold = Math.Min((long)limit * 2, (long)limit + 1024);
             if (matches.Count < trimThreshold) {
                 return;
             }
 
-            matches.Sort(static (left, right) => CompareEvents(left.Source, right.Source, oldest: false));
+            matches.Sort((left, right) => CompareEvents(left.Source, right.Source, oldest));
             if (matches.Count > limit) {
                 matches.RemoveRange(limit, matches.Count - limit);
             }

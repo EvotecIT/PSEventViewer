@@ -51,4 +51,37 @@ Describe 'Get-EVXEvent checkpoint compatibility' {
         $Persisted = Get-Content -LiteralPath $CheckpointPath -Raw | ConvertFrom-Json
         @($Persisted.PSObject.Properties).Count | Should -Be 2
     }
+
+    It 'advances capped polling through a contiguous oldest-first prefix' {
+        $CheckpointPath = Join-Path $TestDrive 'contiguous-checkpoint.json'
+
+        $First = @(Get-EVXEvent -LogName System -RecordIdFile $CheckpointPath -RecordIdKey 'contiguous' -MaxEvents 1 -ReadMode Metadata)
+        $Second = @(Get-EVXEvent -LogName System -RecordIdFile $CheckpointPath -RecordIdKey 'contiguous' -MaxEvents 1 -ReadMode Metadata)
+        if ($First.Count -eq 0 -or $Second.Count -eq 0) {
+            Set-ItResult -Skipped -Because 'The System event log did not contain two checkpointable events.'
+            return
+        }
+
+        [long] $Second[0].RecordId | Should -BeGreaterThan ([long] $First[0].RecordId)
+        $Persisted = Get-Content -LiteralPath $CheckpointPath -Raw | ConvertFrom-Json
+        [long] $Persisted.contiguous | Should -Be ([long] $Second[0].RecordId)
+    }
+
+    It 'creates a missing checkpoint parent without retrying it as lock contention' {
+        $CheckpointPath = Join-Path $TestDrive 'missing\parent\checkpoint.json'
+        $Elapsed = Measure-Command {
+            $null = @(Get-EVXEvent -LogName System -RecordIdFile $CheckpointPath -RecordIdKey 'nested' -MaxEvents 1 -ReadMode Metadata)
+        }
+
+        Test-Path -LiteralPath $CheckpointPath | Should -BeTrue
+        $Elapsed.TotalSeconds | Should -BeLessThan 5
+    }
+
+    It 'rejects corrupt checkpoint JSON instead of silently replaying the log' {
+        $CheckpointPath = Join-Path $TestDrive 'corrupt-checkpoint.json'
+        Set-Content -LiteralPath $CheckpointPath -Value 'not-json' -Encoding UTF8
+
+        { Get-EVXEvent -LogName System -RecordIdFile $CheckpointPath -MaxEvents 1 -ReadMode Metadata -ErrorAction Stop } |
+            Should -Throw
+    }
 }

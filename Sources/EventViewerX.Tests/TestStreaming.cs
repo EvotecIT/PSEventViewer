@@ -291,6 +291,27 @@ namespace EventViewerX.Tests {
         }
 
         [Fact]
+        public void ProgressionPreservingQueriesUseOneOrderedWorkItemPerSource() {
+            var eventIds = Enumerable.Range(1, 100).ToList();
+            var recordIds = Enumerable.Range(1, 100).Select(static value => (long)value).ToList();
+
+            List<SearchEvents.QueryWorkItem> workItems = SearchEvents.BuildQueryWorkItems(
+                new List<string?> { null, "server" },
+                eventIds,
+                recordIds,
+                fixedExpressionCount: 0,
+                preserveSourceProgression: true).ToList();
+
+            Assert.Equal(2, workItems.Count);
+            Assert.All(workItems, item => {
+                Assert.Null(item.EventIds);
+                Assert.Null(item.EventRecordIds);
+                Assert.True(item.ManagedEventIds!.SetEquals(eventIds));
+                Assert.True(item.ManagedEventRecordIds!.SetEquals(recordIds));
+            });
+        }
+
+        [Fact]
         public void QueryWorkItemsAvoidCartesianProductForLargeCombinedFilters() {
             var eventIds = Enumerable.Range(1, 5000).ToList();
             var recordIds = Enumerable.Range(1, 5000).Select(static value => (long)value).ToList();
