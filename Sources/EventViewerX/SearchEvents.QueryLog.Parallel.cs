@@ -49,7 +49,7 @@ public partial class SearchEvents : Settings {
         Action<EventObject>? candidateObserver = null,
         Action<EventLogQueryTargetFailure>? targetFailureObserver = null) {
 
-        if (oldest && minimumEventRecordIdExclusiveResolver != null) {
+        if (oldest && minimumEventRecordIdExclusiveResolver != null && maxEvents <= 0) {
             ValidateParallelArguments(logName, maxEvents, maxThreads, bufferCapacity, sessionTimeoutMs);
             foreach (EventObject result in QueryLogsSequential(
                          logName: logName,
@@ -131,29 +131,55 @@ public partial class SearchEvents : Settings {
 
         ValidateParallelArguments(logName, maxEvents, maxThreads, bufferCapacity, sessionTimeoutMs);
         if (maxEvents > 0) {
-            foreach (EventObject result in QueryLogsSequential(
-                         logName,
-                         eventIds,
-                         machineNames,
-                         providerName,
-                         keywords,
-                         level,
-                         startTime,
-                         endTime,
-                         userId,
-                         maxEvents,
-                         eventRecordId,
-                         timePeriod,
-                         cancellationToken,
-                         sessionTimeoutMs,
-                         readMode,
-                         minimumEventRecordIdExclusiveResolver,
-                         maxThreads,
-                         oldest,
-                         resultPredicate,
-                         candidateObserver,
-                         targetFailureObserver)) {
+            List<string?> boundedTargets = NormalizeQueryTargets(machineNames);
+            int boundedFixedExpressionCount = CountFixedQueryExpressions(providerName, keywords, level, startTime, endTime, userId, timePeriod);
+            bool isolateBoundedRemoteFailures = boundedTargets.Count > 1;
+            var boundedFailedTargets = new ConcurrentDictionary<string, byte>(StringComparer.OrdinalIgnoreCase);
+            var boundedWorkItems = new List<QueryWorkItem>(BuildQueryWorkItems(
+                boundedTargets,
+                eventIds,
+                eventRecordId,
+                boundedFixedExpressionCount,
+                minimumEventRecordIdExclusiveResolver,
+                reserveRecordIdPagingBoundary: !(oldest && minimumEventRecordIdExclusiveResolver != null)));
+            Func<QueryWorkItem, IEnumerator<EventObject>> createBoundedEnumerator = workItem => CreateSequentialQueryEnumerator(
+                workItem,
+                logName,
+                providerName,
+                keywords,
+                level,
+                startTime,
+                endTime,
+                userId,
+                timePeriod,
+                cancellationToken,
+                sessionTimeoutMs,
+                readMode,
+                oldest,
+                isolateBoundedRemoteFailures,
+                boundedFailedTargets,
+                resultPredicate,
+                candidateObserver,
+                targetFailureObserver);
+            int boundedPageSize = GetBoundedCandidatePageSize(boundedTargets.Count, maxEvents);
+            List<Func<int, IReadOnlyList<EventObject>>> boundedPageReaders = CreateRecordOrderedSourcePageReaders(
+                boundedWorkItems,
+                createBoundedEnumerator,
+                oldest,
+                cancellationToken,
+                boundedPageSize);
+            int returned = 0;
+            await foreach (EventObject result in MergePagedSourcesParallel(
+                               boundedPageReaders,
+                               (left, right) => CompareEvents(left, right, oldest),
+                               boundedPageSize,
+                               maxThreads,
+                               cancellationToken)) {
                 yield return result;
+                returned++;
+                if (returned >= maxEvents) {
+                    yield break;
+                }
             }
             yield break;
         }

@@ -235,6 +235,21 @@ public class TestEventLogDetailsResult {
             SearchEvents.MergeDiagnosticStatus(
                 EventLogDetailsStatus.LogConfigurationUnavailable,
                 EventLogDetailsStatus.EventTimesUnavailable));
+        Assert.Equal(
+            EventLogDetailsStatus.AccessDenied,
+            SearchEvents.MergeDiagnosticStatus(
+                EventLogDetailsStatus.Error,
+                EventLogDetailsStatus.AccessDenied));
+        Assert.Equal(
+            EventLogDetailsStatus.Timeout,
+            SearchEvents.MergeDiagnosticStatus(
+                EventLogDetailsStatus.Error,
+                EventLogDetailsStatus.Timeout));
+        Assert.Equal(
+            EventLogDetailsStatus.Error,
+            SearchEvents.MergeDiagnosticStatus(
+                EventLogDetailsStatus.LogInformationUnavailable,
+                EventLogDetailsStatus.Error));
     }
 
     [Fact]
@@ -305,6 +320,27 @@ public class TestEventLogDetailsResult {
             Assert.Empty(warnings);
         } finally {
             Settings._logger = previous;
+        }
+    }
+
+    [Fact]
+    public void DisplayEventLogResults_PreservesExactNamesWhenSessionFails() {
+        if (!OperatingSystem.IsWindows()) return;
+
+        const string host = "[";
+        SearchEvents.ClearHostCache(host);
+        try {
+            List<EventLogDetailsResult> results = SearchEvents.DisplayEventLogResults(
+                    new[] { "Application", "System", "Application" },
+                    host,
+                    timeoutMs: 100)
+                .ToList();
+
+            Assert.Equal(2, results.Count);
+            Assert.Equal(new[] { "Application", "System" }, results.Select(result => result.LogName));
+            Assert.All(results, result => Assert.Equal(EventLogDetailsStatus.HostUnavailable, result.Status));
+        } finally {
+            SearchEvents.ClearHostCache(host);
         }
     }
 }

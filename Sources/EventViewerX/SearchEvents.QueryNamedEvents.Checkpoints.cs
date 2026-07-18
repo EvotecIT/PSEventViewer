@@ -2,7 +2,9 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace EventViewerX;
 
@@ -128,6 +130,79 @@ public partial class SearchEvents : Settings {
             if (cursor.MoveNext(pageSize)) {
                 queue.Add(cursor);
             }
+        }
+    }
+
+    internal static async IAsyncEnumerable<T> MergePagedSourcesParallel<T>(
+        IReadOnlyList<Func<int, IReadOnlyList<T>>> sourcePageReaders,
+        Comparison<T> comparison,
+        int pageSize,
+        int maxConcurrency,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default) {
+
+        if (sourcePageReaders == null) {
+            throw new ArgumentNullException(nameof(sourcePageReaders));
+        }
+        if (comparison == null) {
+            throw new ArgumentNullException(nameof(comparison));
+        }
+        if (pageSize <= 0) {
+            throw new ArgumentOutOfRangeException(nameof(pageSize), "Page size must be positive.");
+        }
+        if (maxConcurrency <= 0 || maxConcurrency > MaximumParallelism) {
+            throw new ArgumentOutOfRangeException(
+                nameof(maxConcurrency),
+                $"Maximum concurrency must be between 1 and {MaximumParallelism}.");
+        }
+        if (sourcePageReaders.Count == 0) {
+            yield break;
+        }
+
+        using var concurrencyGate = new SemaphoreSlim(maxConcurrency, maxConcurrency);
+        var primeTasks = new Task<PagedSourceCursor<T>?>[sourcePageReaders.Count];
+        for (int index = 0; index < sourcePageReaders.Count; index++) {
+            primeTasks[index] = PrimePagedSourceCursorAsync(
+                index,
+                sourcePageReaders[index],
+                concurrencyGate,
+                cancellationToken);
+        }
+
+        PagedSourceCursor<T>?[] primedCursors = await Task.WhenAll(primeTasks).ConfigureAwait(false);
+        var queue = new SortedSet<PagedSourceCursor<T>>(new PagedSourceCursorComparer<T>(comparison));
+        foreach (PagedSourceCursor<T>? cursor in primedCursors) {
+            if (cursor != null) {
+                queue.Add(cursor);
+            }
+        }
+
+        while (queue.Count > 0) {
+            cancellationToken.ThrowIfCancellationRequested();
+            PagedSourceCursor<T> cursor = queue.Min!;
+            queue.Remove(cursor);
+            yield return cursor.Current;
+            bool hasNext = cursor.NeedsPage
+                ? await Task.Run(() => cursor.MoveNext(pageSize), cancellationToken).ConfigureAwait(false)
+                : cursor.MoveNext(pageSize);
+            if (hasNext) {
+                queue.Add(cursor);
+            }
+        }
+    }
+
+    private static async Task<PagedSourceCursor<T>?> PrimePagedSourceCursorAsync<T>(
+        int index,
+        Func<int, IReadOnlyList<T>> pageReader,
+        SemaphoreSlim concurrencyGate,
+        CancellationToken cancellationToken) {
+
+        await concurrencyGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try {
+            var cursor = new PagedSourceCursor<T>(index, pageReader);
+            bool hasCurrent = await Task.Run(() => cursor.MoveNext(requested: 1), cancellationToken).ConfigureAwait(false);
+            return hasCurrent ? cursor : null;
+        } finally {
+            concurrencyGate.Release();
         }
     }
 
@@ -323,6 +398,7 @@ public partial class SearchEvents : Settings {
 
         internal int Index { get; }
         internal T Current { get; private set; }
+        internal bool NeedsPage => _buffer.Count == 0 && !_exhausted;
 
         internal bool MoveNext(int requested) {
             if (_buffer.Count == 0 && !_exhausted) {

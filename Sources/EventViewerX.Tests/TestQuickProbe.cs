@@ -76,6 +76,35 @@ namespace EventViewerX.Tests {
         }
 
         [Fact]
+        public void ProbeLatestEvent_DoesNotWriteBoundaryDiagnostics() {
+            if (!OperatingSystem.IsWindows()) return;
+
+            const string host = "[";
+            InternalLogger previous = Settings._logger;
+            var logger = new InternalLogger();
+            var warnings = new List<string>();
+            var verboseMessages = new List<string>();
+            logger.OnWarningMessage += (_, args) => warnings.Add(args.FullMessage);
+            logger.OnVerboseMessage += (_, args) => verboseMessages.Add(args.FullMessage);
+            Settings._logger = logger;
+            SearchEvents.ClearHostCache(host);
+            try {
+                SearchEvents.QuickProbeResult result = SearchEvents.ProbeLatestEvent(
+                    "Application",
+                    machineName: host,
+                    timeout: TimeSpan.FromMilliseconds(100),
+                    maxEventsToScan: 1);
+
+                Assert.Equal(SearchEvents.QuickProbeStatus.HostUnavailable, result.Status);
+                Assert.Empty(warnings);
+                Assert.Empty(verboseMessages);
+            } finally {
+                SearchEvents.ClearHostCache(host);
+                Settings._logger = previous;
+            }
+        }
+
+        [Fact]
         public void NegativeCacheExpiresAndIsReevaluated() {
             if (!OperatingSystem.IsWindows()) return;
 

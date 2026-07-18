@@ -628,6 +628,36 @@ namespace EventViewerX.Tests {
         }
 
         [Fact]
+        public async Task ParallelPagedMergePrimesPhysicalSourcesConcurrently() {
+            using var bothSourcesStarted = new CountdownEvent(2);
+
+            Func<int, IReadOnlyList<int>> CreateReader(int value) {
+                int calls = 0;
+                return _ => {
+                    if (Interlocked.Increment(ref calls) > 1) {
+                        return Array.Empty<int>();
+                    }
+                    bothSourcesStarted.Signal();
+                    if (!bothSourcesStarted.Wait(TimeSpan.FromSeconds(2))) {
+                        throw new TimeoutException("Physical source heads were not acquired concurrently.");
+                    }
+                    return new[] { value };
+                };
+            }
+
+            var results = new List<int>();
+            await foreach (int result in SearchEvents.MergePagedSourcesParallel(
+                               new[] { CreateReader(2), CreateReader(1) },
+                               static (left, right) => left.CompareTo(right),
+                               pageSize: 1,
+                               maxConcurrency: 2)) {
+                results.Add(result);
+            }
+
+            Assert.Equal(new[] { 1, 2 }, results);
+        }
+
+        [Fact]
         public void QueryMergeRejectsConcurrencyAboveTheReusableCeiling() {
             var workItems = new[] {
                 new SearchEvents.QueryWorkItem(null, null, new List<long> { 1 }),

@@ -218,21 +218,21 @@ public partial class SearchEvents : Settings {
         EventLogDetailsStatus current,
         EventLogDetailsStatus candidate) {
 
-        if (current == EventLogDetailsStatus.Success) {
-            return candidate;
-        }
-        if (IsActionableDetailsStatus(current) || !IsActionableDetailsStatus(candidate)) {
-            return current;
-        }
-        return candidate;
+        return GetDetailsStatusPriority(candidate) > GetDetailsStatusPriority(current)
+            ? candidate
+            : current;
     }
 
-    private static bool IsActionableDetailsStatus(EventLogDetailsStatus status) {
-        return status == EventLogDetailsStatus.AccessDenied ||
-               status == EventLogDetailsStatus.Timeout ||
-               status == EventLogDetailsStatus.HostUnavailable ||
-               status == EventLogDetailsStatus.SessionUnavailable ||
-               status == EventLogDetailsStatus.Error;
+    private static int GetDetailsStatusPriority(EventLogDetailsStatus status) {
+        return status switch {
+            EventLogDetailsStatus.Success => -1,
+            EventLogDetailsStatus.Error => 1,
+            EventLogDetailsStatus.AccessDenied or
+            EventLogDetailsStatus.Timeout or
+            EventLogDetailsStatus.HostUnavailable or
+            EventLogDetailsStatus.SessionUnavailable => 2,
+            _ => 0
+        };
     }
 
     internal static EventLogDetailsStatus MapEventTimeFailureStatus(Exception failure) {
@@ -299,20 +299,25 @@ public partial class SearchEvents : Settings {
             throw new ArgumentOutOfRangeException(nameof(timeoutMs), "Timeout must be positive.");
         }
 
+        string[]? exactNames = listLog != null && listLog.Length > 0 &&
+                               listLog.All(name => name.IndexOf('*') < 0 && name.IndexOf('?') < 0)
+            ? listLog.Distinct(StringComparer.OrdinalIgnoreCase).ToArray()
+            : null;
         string hostName = string.IsNullOrWhiteSpace(machineName) ? GetFQDN() : machineName!;
         EventLogSessionOpenResult sessionResult = CreateSessionResult(machineName, "DisplayEventLogResults", "*", timeoutMs, emitDiagnostics: false);
         if (!sessionResult.Success || sessionResult.Session == null) {
-            yield return Failure("*", hostName, MapSessionFailureStatus(sessionResult.Status), sessionResult.ErrorMessage, timeoutMs, sessionResult.ErrorType);
+            string[] failedLogNames = exactNames ?? new[] { "*" };
+            foreach (string failedLogName in failedLogNames) {
+                yield return Failure(failedLogName, hostName, MapSessionFailureStatus(sessionResult.Status), sessionResult.ErrorMessage, timeoutMs, sessionResult.ErrorType);
+            }
             sessionResult.Dispose();
             yield break;
         }
 
         EventLogSession activeSession = sessionResult.Session;
         try {
-            bool hasOnlyExactNames = listLog != null && listLog.Length > 0 &&
-                                     listLog.All(name => name.IndexOf('*') < 0 && name.IndexOf('?') < 0);
-            if (hasOnlyExactNames) {
-                foreach (string exactName in listLog!.Distinct(StringComparer.OrdinalIgnoreCase)) {
+            if (exactNames != null) {
+                foreach (string exactName in exactNames) {
                     yield return SafeGetResult(exactName, activeSession, timeoutMs, hostName, includeEventTimes);
                 }
                 yield break;

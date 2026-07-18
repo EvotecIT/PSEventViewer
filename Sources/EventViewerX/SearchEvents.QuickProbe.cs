@@ -82,7 +82,8 @@ public partial class SearchEvents : Settings {
             machineName,
             "QuickProbe",
             logName,
-            (int)Math.Min(int.MaxValue, Math.Max(1, effectiveTimeout.TotalMilliseconds)));
+            (int)Math.Min(int.MaxValue, Math.Max(1, effectiveTimeout.TotalMilliseconds)),
+            emitDiagnostics: false);
         if (!sessionResult.Success || sessionResult.Session == null) {
             return new QuickProbeResult(
                 logName,
