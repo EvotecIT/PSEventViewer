@@ -487,7 +487,7 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
                         break;
                     }
                 }
-            } else if (ParallelOption == ParallelOption.Disabled || MaxEventsScanned > 0) {
+            } else if (ParallelOption == ParallelOption.Disabled || MaxEventsScanned > 0 || UsesCheckpoint) {
                 foreach (EventObject eventObject in SearchEvents.QueryLogsSequential(LogName, EventId, MachineName, ProviderName, Keywords, Level, StartTime, EndTime, UserId, GetQueryReadLimit(), EventRecordId, TimePeriod, token, SessionTimeoutMs, ReadMode, GetCheckpointResolver(LogName), oldest: EffectiveOldest)) {
                     token.ThrowIfCancellationRequested();
                     ProcessEventResult(eventObject, results);

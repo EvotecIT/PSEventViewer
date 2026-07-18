@@ -87,8 +87,14 @@ namespace EventViewerX {
                 throw new ArgumentException("At least one positive event ID is required.", nameof(eventId));
             }
 
+            CancellationTokenRegistration? previousRegistration;
             lock (_lifecycleSync) {
-                DisposeCore(disposeCancellationRegistration: true);
+                previousRegistration = DetachCancellationRegistration();
+                DisposeCore();
+            }
+            previousRegistration?.Dispose();
+
+            lock (_lifecycleSync) {
                 _watchEventIds = ids;
                 _eventAction = eventAction;
                 _machineName = string.IsNullOrWhiteSpace(machineName) ? Environment.MachineName : machineName;
@@ -116,17 +122,38 @@ namespace EventViewerX {
                     _eventLogWatcher = new EventLogWatcher(query);
                     _eventLogWatcher.EventRecordWritten += DetectEventsLogCallback;
                     _eventLogWatcher.Enabled = true;
-                    if (cancellationToken.CanBeCanceled) {
-                        _cancellationRegistration = cancellationToken.Register(CancelWatch);
-                        _hasCancellationRegistration = true;
-                        cancellationToken.ThrowIfCancellationRequested();
-                    }
-                    string eventIds = string.Join(",", ids.OrderBy(static id => id).Select(static id => id.ToString()));
-                    _instanceLogger.WriteVerbose("Created event log subscription to {0} for {1}.", _machineName ?? Environment.MachineName, eventIds);
                 } catch {
-                    DisposeCore(disposeCancellationRegistration: true);
+                    DisposeCore();
                     throw;
                 }
+            }
+
+            CancellationTokenRegistration? newRegistration = null;
+            try {
+                if (cancellationToken.CanBeCanceled) {
+                    newRegistration = cancellationToken.Register(CancelWatch);
+                    cancellationToken.ThrowIfCancellationRequested();
+                    lock (_lifecycleSync) {
+                        if (_eventLogWatcher == null) {
+                            cancellationToken.ThrowIfCancellationRequested();
+                            throw new InvalidOperationException("The event-log subscription stopped before cancellation registration completed.");
+                        }
+                        _cancellationRegistration = newRegistration.Value;
+                        _hasCancellationRegistration = true;
+                        newRegistration = null;
+                    }
+                }
+                string eventIds = string.Join(",", ids.OrderBy(static id => id).Select(static id => id.ToString()));
+                _instanceLogger.WriteVerbose("Created event log subscription to {0} for {1}.", _machineName ?? Environment.MachineName, eventIds);
+            } catch {
+                newRegistration?.Dispose();
+                CancellationTokenRegistration? failedRegistration;
+                lock (_lifecycleSync) {
+                    failedRegistration = DetachCancellationRegistration();
+                    DisposeCore();
+                }
+                failedRegistration?.Dispose();
+                throw;
             }
         }
 
@@ -165,25 +192,25 @@ namespace EventViewerX {
         }
 
         private void CancelWatch() {
+            CancellationTokenRegistration? registration;
             lock (_lifecycleSync) {
-                DisposeCore(disposeCancellationRegistration: false);
+                registration = DetachCancellationRegistration();
+                DisposeCore();
             }
+            registration?.Dispose();
         }
 
         /// <summary>Stops watching and releases native watcher/session resources.</summary>
         public void Dispose() {
+            CancellationTokenRegistration? registration;
             lock (_lifecycleSync) {
-                DisposeCore(disposeCancellationRegistration: true);
+                registration = DetachCancellationRegistration();
+                DisposeCore();
             }
+            registration?.Dispose();
         }
 
-        private void DisposeCore(bool disposeCancellationRegistration) {
-            if (disposeCancellationRegistration && _hasCancellationRegistration) {
-                _cancellationRegistration.Dispose();
-                _cancellationRegistration = default;
-                _hasCancellationRegistration = false;
-            }
-
+        private void DisposeCore() {
             if (_eventLogWatcher != null) {
                 _eventLogWatcher.EventRecordWritten -= DetectEventsLogCallback;
                 _eventLogWatcher.Enabled = false;
@@ -197,6 +224,17 @@ namespace EventViewerX {
             _eventAction = null;
             StagingEnabled = false;
             StagingEnabledBy = null;
+        }
+
+        private CancellationTokenRegistration? DetachCancellationRegistration() {
+            if (!_hasCancellationRegistration) {
+                return null;
+            }
+
+            CancellationTokenRegistration registration = _cancellationRegistration;
+            _cancellationRegistration = default;
+            _hasCancellationRegistration = false;
+            return registration;
         }
     }
 }

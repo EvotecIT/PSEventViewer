@@ -98,6 +98,38 @@ Describe 'Get-EVXEvent checkpoint compatibility' {
         [long] $Persisted.contiguous | Should -Be ([long] $Second[0].RecordId)
     }
 
+    It 'keeps a contiguous checkpoint across more than 22 native event-id chunks' {
+        $Recent = @(Get-EVXEvent -LogName System -MaxEvents 500 -ReadMode Metadata)
+        $PopularIds = @($Recent | Group-Object -Property Id | Sort-Object -Property Count -Descending | Select-Object -First 2 -ExpandProperty Name)
+        if ($PopularIds.Count -lt 2) {
+            Set-ItResult -Skipped -Because 'The System log did not contain two event IDs for a chunked checkpoint proof.'
+            return
+        }
+
+        $SparseIds = [Collections.Generic.List[int]]::new()
+        $SparseIds.Add([int] $PopularIds[0])
+        foreach ($Value in 100001..100020) {
+            $SparseIds.Add($Value)
+        }
+        $SparseIds.Add([int] $PopularIds[1])
+        foreach ($Value in 100021..100240) {
+            $SparseIds.Add($Value)
+        }
+
+        $CheckpointPath = Join-Path $TestDrive 'chunked-contiguous-checkpoint.json'
+        $First = @(Get-EVXEvent -LogName System -EventId $SparseIds -RecordIdFile $CheckpointPath -RecordIdKey 'chunked-contiguous' -MaxEvents 2 -ReadMode Metadata)
+        $Second = @(Get-EVXEvent -LogName System -EventId $SparseIds -RecordIdFile $CheckpointPath -RecordIdKey 'chunked-contiguous' -MaxEvents 2 -ReadMode Metadata)
+        if ($First.Count -lt 2 -or $Second.Count -lt 2) {
+            Set-ItResult -Skipped -Because 'The System log did not contain four events matching the chunked filter.'
+            return
+        }
+
+        [long] ($Second | Measure-Object -Property RecordId -Minimum).Minimum |
+            Should -BeGreaterThan ([long] ($First | Measure-Object -Property RecordId -Maximum).Maximum)
+        $Persisted = Get-Content -LiteralPath $CheckpointPath -Raw | ConvertFrom-Json
+        [long] $Persisted.'chunked-contiguous' | Should -Be ([long] ($Second | Measure-Object -Property RecordId -Maximum).Maximum)
+    }
+
     It 'creates a missing checkpoint parent without retrying it as lock contention' {
         $CheckpointPath = Join-Path $TestDrive 'missing\parent\checkpoint.json'
         $Elapsed = Measure-Command {

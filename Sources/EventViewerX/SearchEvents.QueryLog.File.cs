@@ -29,7 +29,8 @@ public partial class SearchEvents : Settings {
     /// <returns>Enumerable sequence of <see cref="EventObject"/> read from the file.</returns>
     /// <remarks>
     /// Unlimited queries that require multiple XPath chunks stream bounded chunk batches; ordering is preserved
-    /// within each batch. A positive <paramref name="maxEvents"/> keeps a bounded global merge in the requested direction.
+    /// within each batch. A positive <paramref name="maxEvents"/> preserves monotonic native record order across
+    /// XPath chunks. Provider timestamps are not used to reorder records within the EVTX source because they can move backwards.
     /// </remarks>
     public static IEnumerable<EventObject> QueryLogFile(string filePath, List<int>? eventIds = null, string? providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string? userId = null, int maxEvents = 0, List<long>? eventRecordId = null, TimePeriod? timePeriod = null, bool oldest = false, System.Collections.Hashtable? namedDataFilter = null, System.Collections.Hashtable? namedDataExcludeFilter = null, CancellationToken cancellationToken = default, EventReadMode readMode = EventReadMode.Full, long? minimumEventRecordIdExclusive = null) {
         if (string.IsNullOrWhiteSpace(filePath)) {

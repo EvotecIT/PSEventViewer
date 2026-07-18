@@ -14,7 +14,9 @@ public partial class SearchEvents {
     /// </summary>
     /// <remarks>
     /// Unlimited queries that require multiple XPath chunks stream bounded chunk batches; ordering is preserved
-    /// within each batch. A positive <paramref name="maxEvents"/> keeps a bounded global merge in the requested direction.
+    /// within each batch. A positive <paramref name="maxEvents"/> preserves monotonic native record order within
+    /// each physical source and compares the current source heads by timestamp. Because provider timestamps can move
+    /// backwards, multi-source results are not guaranteed to be a strict global timestamp sort.
     /// </remarks>
     public static IEnumerable<EventObject> QueryLogsSequential(
         string logName,

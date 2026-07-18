@@ -18,7 +18,9 @@ public partial class SearchEvents : Settings {
     /// </summary>
     /// <remarks>
     /// <paramref name="maxEvents"/> is a global limit across all machines and filter chunks.
-    /// A positive limit uses a bounded global merge in the requested direction so producer arrival cannot change the selected set.
+    /// A positive limit uses deterministic bounded selection across the native record prefixes returned by each source/chunk,
+    /// so producer arrival cannot change the selected set. Provider timestamps can move backwards, so a bounded multi-source
+    /// result is not guaranteed to be a strict global timestamp sort.
     /// Unlimited result order is intentionally unspecified when more than one query runs concurrently.
     /// </remarks>
     public static async IAsyncEnumerable<EventObject> QueryLogsParallel(

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
+using System.Threading.Tasks;
 using Xunit;
 
 namespace EventViewerX.Tests {
@@ -64,6 +65,28 @@ namespace EventViewerX.Tests {
                 new List<int> { 1 },
                 cancellationToken: cancellation.Token));
             Assert.Empty(GetIds(watcher));
+        }
+
+        [Fact]
+        public async Task CancellationAndDisposeCompleteWithoutDeadlock() {
+            for (int index = 0; index < 25; index++) {
+                var watcher = new WatchEvents();
+                using var cancellation = new System.Threading.CancellationTokenSource();
+                watcher.Watch(
+                    Environment.MachineName,
+                    "Application",
+                    new List<int> { 1 },
+                    cancellationToken: cancellation.Token);
+
+                Task cancel = Task.Run(cancellation.Cancel);
+                Task dispose = Task.Run(watcher.Dispose);
+                Task operations = Task.WhenAll(cancel, dispose);
+                Task completed = await Task.WhenAny(operations, Task.Delay(TimeSpan.FromSeconds(5)));
+
+                Assert.Same(operations, completed);
+                await operations;
+                Assert.Empty(GetIds(watcher));
+            }
         }
     }
 }
