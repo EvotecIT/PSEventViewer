@@ -250,13 +250,13 @@ namespace EventViewerX.Tests {
         [Fact]
         public void RemoteFailureIsolationCoversMultiplePhysicalSourcesAndTypedObservers() {
             Assert.False(SearchEvents.ShouldIsolateRemoteFailures(
-                physicalSourceCount: 1,
+                independentSourceCount: 1,
                 targetFailureObserver: null));
             Assert.True(SearchEvents.ShouldIsolateRemoteFailures(
-                physicalSourceCount: 2,
+                independentSourceCount: 2,
                 targetFailureObserver: null));
             Assert.True(SearchEvents.ShouldIsolateRemoteFailures(
-                physicalSourceCount: 1,
+                independentSourceCount: 1,
                 targetFailureObserver: static _ => { }));
         }
 
@@ -273,6 +273,15 @@ namespace EventViewerX.Tests {
                 new TimeoutException("local timeout"),
                 out EventLogRemoteQueryFailureKind localFailure));
             Assert.Equal(EventLogRemoteQueryFailureKind.None, localFailure);
+
+            string localFqdn = System.Net.Dns.GetHostEntry("").HostName;
+            foreach (string localAlias in new[] { ".", "localhost", Environment.MachineName, localFqdn }) {
+                Assert.False(EventLogRemoteQueryFailureClassifier.TryClassify(
+                    localAlias,
+                    new TimeoutException("local timeout"),
+                    out EventLogRemoteQueryFailureKind localAliasFailure));
+                Assert.Equal(EventLogRemoteQueryFailureKind.None, localAliasFailure);
+            }
 
             Assert.False(EventLogRemoteQueryFailureClassifier.TryClassify(
                 "server",

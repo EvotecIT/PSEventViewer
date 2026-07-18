@@ -341,7 +341,7 @@ public partial class SearchEvents : Settings
         }
     }
 
-    private static bool IsLocalMachine(string? machineName)
+    internal static bool IsLocalMachine(string? machineName)
     {
         if (string.IsNullOrWhiteSpace(machineName)) return true;
 

@@ -21,7 +21,7 @@ namespace EventViewerX {
         /// <param name="maxEvents">Global maximum number of matching rule results to return.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
         /// <param name="maxEventsScanned">Global maximum number of candidate event records to evaluate before rule filtering.</param>
-        /// <param name="executionInfo">Optional progress object populated while the query is enumerated.</param>
+        /// <param name="executionInfo">Optional progress and failure object populated while the query is enumerated. Supplying it opts single remote sources into typed partial-result reporting.</param>
         /// <param name="minimumEventRecordIdExclusiveResolver">Optional per-machine/per-log native checkpoint resolver.</param>
         /// <param name="candidateObserver">Optional observer invoked for every globally merged candidate delivered for named-event projection.</param>
         /// <param name="oldest">Whether to enumerate candidates and select results from oldest to newest.</param>
@@ -65,6 +65,9 @@ namespace EventViewerX {
                 sourceLogName,
                 sourceEventIds);
             NamedEventsQueryExecutionInfo queryInfo = executionInfo ?? new NamedEventsQueryExecutionInfo();
+            Action<EventLogQueryTargetFailure>? targetFailureObserver = executionInfo == null
+                ? null
+                : queryInfo.RecordTargetFailure;
             queryInfo.Reset(maxEventsScanned);
             int emitted = 0;
 
@@ -81,7 +84,7 @@ namespace EventViewerX {
                                    cancellationToken,
                                    minimumEventRecordIdExclusiveResolver,
                                    oldest,
-                                   queryInfo.RecordTargetFailure)) {
+                                   targetFailureObserver)) {
                     if (!queryInfo.TryRecordCandidate()) {
                         yield break;
                     }
@@ -114,7 +117,7 @@ namespace EventViewerX {
                                    cancellationToken,
                                    minimumEventRecordIdExclusiveResolver,
                                    oldest: true,
-                                   queryInfo.RecordTargetFailure)) {
+                                   targetFailureObserver)) {
                     queryInfo.TryRecordCandidate();
                     candidateObserver?.Invoke(foundEvent);
 
@@ -145,7 +148,7 @@ namespace EventViewerX {
                                    cancellationToken,
                                    minimumEventRecordIdExclusiveResolver,
                                    oldest,
-                                   queryInfo.RecordTargetFailure)) {
+                                   targetFailureObserver)) {
                     cancellationToken.ThrowIfCancellationRequested();
                     queryInfo.EventsScanned++;
                     candidateObserver?.Invoke(foundEvent);
@@ -177,7 +180,7 @@ namespace EventViewerX {
                                    cancellationToken,
                                    minimumEventRecordIdExclusiveResolver,
                                    oldest,
-                                   queryInfo.RecordTargetFailure)) {
+                                   targetFailureObserver)) {
                     queryInfo.TryRecordCandidate();
 
                     candidateObserver?.Invoke(foundEvent);

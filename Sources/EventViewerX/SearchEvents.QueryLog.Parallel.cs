@@ -141,7 +141,7 @@ public partial class SearchEvents : Settings {
                 minimumEventRecordIdExclusiveResolver,
                 reserveRecordIdPagingBoundary: !(oldest && minimumEventRecordIdExclusiveResolver != null)));
             bool isolateBoundedRemoteFailures = ShouldIsolateRemoteFailures(
-                boundedWorkItems.Count,
+                boundedTargets.Count,
                 targetFailureObserver);
             var boundedFailedTargets = new ConcurrentDictionary<string, byte>(StringComparer.OrdinalIgnoreCase);
             Func<QueryWorkItem, IEnumerator<EventObject>> createBoundedEnumerator = workItem => CreateSequentialQueryEnumerator(
@@ -306,10 +306,10 @@ public partial class SearchEvents : Settings {
     }
 
     internal static bool ShouldIsolateRemoteFailures(
-        int physicalSourceCount,
+        int independentSourceCount,
         Action<EventLogQueryTargetFailure>? targetFailureObserver) {
 
-        return physicalSourceCount > 1 || targetFailureObserver != null;
+        return independentSourceCount > 1 || targetFailureObserver != null;
     }
 
     private static bool TryMoveNextParallelResult(

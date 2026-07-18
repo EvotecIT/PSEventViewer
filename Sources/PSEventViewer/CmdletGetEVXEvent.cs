@@ -456,6 +456,7 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
                 // let's find the events prepared for search
                 List<NamedEvents> typeList = Type.ToList();
                 int namedEventThreads = ParallelOption == ParallelOption.Disabled ? 1 : NumberOfThreads;
+                var namedQueryInfo = new NamedEventsQueryExecutionInfo();
                 Func<EventObjectSlim, bool>? namedResultPredicate = MessageRegex == null
                     ? null
                     : eventObject => MessageMatches(eventObject.Event);
@@ -468,6 +469,7 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
                                    maxThreads: namedEventThreads,
                                    maxEvents: MaxEvents,
                                    maxEventsScanned: MaxEventsScanned,
+                                   executionInfo: namedQueryInfo,
                                    cancellationToken: token,
                                    minimumEventRecordIdExclusiveResolver: GetCheckpointLowerBound,
                                    candidateObserver: candidate => TrackCheckpointProgress(candidate),
