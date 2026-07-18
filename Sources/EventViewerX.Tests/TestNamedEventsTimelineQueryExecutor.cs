@@ -169,6 +169,23 @@ public class TestNamedEventsTimelineQueryExecutor {
         Assert.NotEqual(blankToken, literalToken);
     }
 
+    [Fact]
+    public void ApplyTargetFailuresMarksPartialReportsIncompleteAndTruncated() {
+        var queryInfo = new NamedEventsQueryExecutionInfo();
+        queryInfo.Reset(maxEventsScanned: 0);
+        queryInfo.RecordTargetFailure(
+            new EventLogQueryTargetFailure("AD2", EventLogRemoteQueryFailureKind.HostUnavailable, "offline"));
+        var result = new NamedEventsTimelineQueryResult();
+
+        NamedEventsTimelineQueryExecutor.ApplyTargetFailures(result, queryInfo);
+
+        Assert.True(result.Incomplete);
+        Assert.True(result.Truncated);
+        EventLogQueryTargetFailure failure = Assert.Single(result.TargetFailures);
+        Assert.Equal("AD2", failure.MachineName);
+        Assert.Equal(EventLogRemoteQueryFailureKind.HostUnavailable, failure.Kind);
+    }
+
     private sealed class PayloadTestSlim : EventObjectSlim {
         private PayloadTestSlim(EventObject eventObject) : base(eventObject) {
         }

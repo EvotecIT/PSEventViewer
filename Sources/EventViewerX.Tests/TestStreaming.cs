@@ -86,6 +86,17 @@ namespace EventViewerX.Tests {
             Assert.False(executionInfo.TryRecordCandidate());
             Assert.Equal(1, executionInfo.EventsScanned);
             Assert.True(executionInfo.ScanLimitReached);
+
+            executionInfo.RecordTargetFailure(
+                new EventLogQueryTargetFailure("SERVER", EventLogRemoteQueryFailureKind.Timeout, "timeout"));
+            executionInfo.RecordTargetFailure(
+                new EventLogQueryTargetFailure("server", EventLogRemoteQueryFailureKind.HostUnavailable, "duplicate"));
+            EventLogQueryTargetFailure failure = Assert.Single(executionInfo.TargetFailures);
+            Assert.Equal("SERVER", failure.MachineName);
+            Assert.Equal(EventLogRemoteQueryFailureKind.Timeout, failure.Kind);
+
+            executionInfo.Reset(maxEventsScanned: 0);
+            Assert.Empty(executionInfo.TargetFailures);
         }
 
         [Fact]
@@ -170,15 +181,24 @@ namespace EventViewerX.Tests {
         [Fact]
         public void QueryLogsParallelIsolatesRecoverableRemoteTargetFailures() {
             var failedTargets = new ConcurrentDictionary<string, byte>(StringComparer.OrdinalIgnoreCase);
+            var observedFailures = new List<EventLogQueryTargetFailure>();
             var remoteWorkItem = new SearchEvents.QueryWorkItem(" server ", null, null);
             EventObject placeholder = (EventObject)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(EventObject));
             using IEnumerator<EventObject> remoteResults = new[] { placeholder }
                 .Select<EventObject, EventObject>(_ => throw new TimeoutException("remote timeout"))
                 .GetEnumerator();
 
-            Assert.False(SearchEvents.TryMoveNextQueryWorkItem(remoteResults, remoteWorkItem, failedTargets, out EventObject? result));
+            Assert.False(SearchEvents.TryMoveNextQueryWorkItem(
+                remoteResults,
+                remoteWorkItem,
+                failedTargets,
+                out EventObject? result,
+                observedFailures.Add));
             Assert.Null(result);
             Assert.True(SearchEvents.ShouldSkipFailedTarget(new SearchEvents.QueryWorkItem("SERVER", null, null), failedTargets));
+            EventLogQueryTargetFailure observedFailure = Assert.Single(observedFailures);
+            Assert.Equal("server", observedFailure.MachineName);
+            Assert.Equal(EventLogRemoteQueryFailureKind.Timeout, observedFailure.Kind);
 
             using IEnumerator<EventObject> localResults = new[] { placeholder }
                 .Select<EventObject, EventObject>(_ => throw new TimeoutException("local timeout"))
@@ -423,6 +443,45 @@ namespace EventViewerX.Tests {
                 .ToList();
 
             Assert.Equal(new long[] { 1, 2, 3, 4, 5, 6 }, recordIds);
+        }
+
+        [Fact]
+        public void BoundedChunkSelectionDoesNotPrefetchTheGlobalLimitPerChunk() {
+            var reads = new Dictionary<int, int>();
+            var workItems = Enumerable.Range(0, 3)
+                .Select(index => new SearchEvents.QueryWorkItem(
+                    machineName: null,
+                    eventIds: new List<int> { index + 1 },
+                    eventRecordIds: null))
+                .ToList();
+            var sourceEvents = workItems.ToDictionary(
+                static item => item.EventIds![0],
+                static item => Enumerable.Range(0, 100)
+                    .Select(offset => CreateEventObject(
+                        300 - ((offset * 3) + item.EventIds![0] - 1),
+                        new DateTime(300 - ((offset * 3) + item.EventIds[0] - 1), DateTimeKind.Utc),
+                        item.EventIds[0],
+                        "System",
+                        "Test"))
+                    .ToArray());
+
+            List<Func<int, IReadOnlyList<EventObject>>> pageReaders = SearchEvents.CreateRecordOrderedSourcePageReaders(
+                workItems,
+                pageWorkItem => sourceEvents[pageWorkItem.EventIds![0]]
+                    .Where(eventObject => !pageWorkItem.MaximumEventRecordIdExclusive.HasValue ||
+                                          eventObject.RecordId < pageWorkItem.MaximumEventRecordIdExclusive)
+                    .Select(eventObject => {
+                        int key = pageWorkItem.EventIds[0];
+                        reads[key] = reads.TryGetValue(key, out int count) ? count + 1 : 1;
+                        return eventObject;
+                })
+                    .GetEnumerator(),
+                oldest: false,
+                boundedPageSize: 2);
+
+            Assert.Single(pageReaders);
+            Assert.Equal(new long[] { 300, 299 }, pageReaders[0](2).Select(static item => item.RecordId!.Value));
+            Assert.InRange(reads.Values.Sum(), 3, workItems.Count + 2);
         }
 
         [Fact]

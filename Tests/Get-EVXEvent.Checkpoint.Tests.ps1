@@ -107,14 +107,22 @@ Describe 'Get-EVXEvent checkpoint compatibility' {
         }
 
         $SparseIds = [Collections.Generic.List[int]]::new()
-        $SparseIds.Add([int] $PopularIds[0])
-        foreach ($Value in 100001..100020) {
-            $SparseIds.Add($Value)
+        $SeenIds = [Collections.Generic.HashSet[int]]::new()
+        foreach ($PopularId in $PopularIds) {
+            $Value = [int] $PopularId
+            if ($SeenIds.Add($Value)) {
+                $SparseIds.Add($Value)
+            }
         }
-        $SparseIds.Add([int] $PopularIds[1])
-        foreach ($Value in 100021..100240) {
-            $SparseIds.Add($Value)
+        $Value = 1000001
+        while ($SparseIds.Count -lt 463) {
+            if ($SeenIds.Add($Value)) {
+                $SparseIds.Add($Value)
+            }
+            $Value++
         }
+
+        $SparseIds.Count | Should -Be 463
 
         $CheckpointPath = Join-Path $TestDrive 'chunked-contiguous-checkpoint.json'
         $First = @(Get-EVXEvent -LogName System -EventId $SparseIds -RecordIdFile $CheckpointPath -RecordIdKey 'chunked-contiguous' -MaxEvents 2 -ReadMode Metadata)

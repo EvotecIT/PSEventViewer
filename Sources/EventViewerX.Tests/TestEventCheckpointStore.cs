@@ -185,6 +185,57 @@ public class TestEventCheckpointStore {
         }
     }
 
+    [Fact]
+    public void ResetStartsANewGenerationAndRejectsAnInFlightWriter() {
+        string root = CreateTemporaryDirectory();
+        try {
+            string path = Path.Combine(root, "checkpoint.json");
+            EventCheckpointSnapshot initial = EventCheckpointStore.Update(
+                path,
+                new[] { new EventCheckpointUpdate("System", 100, Guid.Empty, boundaryIdentity: "boundary-100") });
+            Guid oldGeneration = initial.Checkpoints["System"].GenerationId;
+
+            EventCheckpointSnapshot reset = EventCheckpointStore.Reset(path, "System");
+
+            Assert.DoesNotContain("System", reset.Records.Keys);
+            Assert.NotEqual(oldGeneration, reset.Checkpoints["System"].GenerationId);
+            Assert.Equal(Path.GetFullPath(path), reset.CheckpointPath);
+            Assert.Equal(Path.GetFullPath(path) + ".state.json", reset.StatePath);
+            Assert.Equal(Path.GetFullPath(path) + ".lock", reset.LockPath);
+
+            EventCheckpointSnapshot staleResult = EventCheckpointStore.Update(
+                path,
+                new[] { new EventCheckpointUpdate("System", 101, oldGeneration) });
+            Assert.DoesNotContain("System", staleResult.Records.Keys);
+        } finally {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void ResetAllPreservesOtherKeysAsGenerationTombstones() {
+        string root = CreateTemporaryDirectory();
+        try {
+            string path = Path.Combine(root, "checkpoint.json");
+            EventCheckpointSnapshot initial = EventCheckpointStore.Update(
+                path,
+                new[] {
+                    new EventCheckpointUpdate("System", 100, Guid.Empty),
+                    new EventCheckpointUpdate("Application", 200, Guid.Empty)
+                });
+
+            EventCheckpointSnapshot reset = EventCheckpointStore.Reset(path);
+
+            Assert.Empty(reset.Records);
+            Assert.Equal(2, reset.Checkpoints.Count);
+            Assert.All(reset.Checkpoints.Values, static value => Assert.Null(value.RecordId));
+            Assert.NotEqual(initial.Checkpoints["System"].GenerationId, reset.Checkpoints["System"].GenerationId);
+            Assert.NotEqual(initial.Checkpoints["Application"].GenerationId, reset.Checkpoints["Application"].GenerationId);
+        } finally {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
     private static string CreateTemporaryDirectory() {
         string path = Path.Combine(Path.GetTempPath(), "EventViewerX.Tests." + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(path);

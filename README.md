@@ -159,6 +159,9 @@ Get-EVXEvent -LogName Security -Type ADUserLogon, ADUserLogonFailed -TimePeriod 
 # Resume a long-running monitor
 Get-EVXEvent -LogName Security -EventId 4625 -RecordIdFile "$env:TEMP\evx.state" -RecordIdKey 'security-failures'
 
+# Reset one poller safely instead of deleting only the compatibility file
+Reset-EVXEventCheckpoint -Path "$env:TEMP\evx.state" -Key 'security-failures' -PassThru
+
 # Offline EVTX with include/exclude filters
 Get-EVXEvent -Path C:\Logs\DC01-Security.evtx -NamedDataFilter @{ TargetUserName = 'alice' } -NamedDataExcludeFilter @{ IpAddress = '10.0.0.1' }
 
@@ -175,6 +178,8 @@ Write-EVXEntry -LogName 'MyApp' -Source 'PSEventViewer' -Message 'Started' -Entr
 Clear-EVXLog -LogName 'MyApp'
 Remove-EVXLog -LogName 'MyApp'
 ```
+
+Checkpoint generation metadata is stored in the visible `<RecordIdFile>.state.json` companion file. `Reset-EVXEventCheckpoint` updates both representations under the shared file lock and prevents an in-flight query from restoring progress from the previous generation.
 
 ## Timeouts and long-running queries
 

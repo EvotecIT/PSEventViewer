@@ -17,6 +17,8 @@ public partial class SearchEvents {
     /// within each batch. A positive <paramref name="maxEvents"/> preserves monotonic native record order within
     /// each physical source and compares the current source heads by timestamp. Because provider timestamps can move
     /// backwards, multi-source results are not guaranteed to be a strict global timestamp sort.
+    /// An optional managed predicate is applied before the global result cap; observers can receive every native
+    /// candidate and every expected failure isolated to one remote target.
     /// </remarks>
     public static IEnumerable<EventObject> QueryLogsSequential(
         string logName,
@@ -36,7 +38,10 @@ public partial class SearchEvents {
         EventReadMode readMode = EventReadMode.Full,
         Func<string?, long?>? minimumEventRecordIdExclusiveResolver = null,
         int maxOpenQueries = MaxSequentialOpenQueries,
-        bool oldest = false) {
+        bool oldest = false,
+        Func<EventObject, bool>? resultPredicate = null,
+        Action<EventObject>? candidateObserver = null,
+        Action<EventLogQueryTargetFailure>? targetFailureObserver = null) {
 
         ValidateQueryArguments(logName, maxEvents, sessionTimeoutMs);
         if (maxOpenQueries <= 0 || maxOpenQueries > MaximumParallelism) {
@@ -70,7 +75,10 @@ public partial class SearchEvents {
             readMode,
             oldest,
             isolateRemoteFailures,
-            failedTargets);
+            failedTargets,
+            resultPredicate,
+            candidateObserver,
+            targetFailureObserver);
 
         if (maxEvents > 0 || (oldest && minimumEventRecordIdExclusiveResolver != null)) {
             List<QueryWorkItem> pagedWorkItems = workItems.ToList();
@@ -87,17 +95,21 @@ public partial class SearchEvents {
                 yield break;
             }
 
+            int boundedPageSize = maxEvents > 0
+                ? GetBoundedCandidatePageSize(targets.Count, maxEvents)
+                : 0;
             List<Func<int, IReadOnlyList<EventObject>>> pageReaders = CreateRecordOrderedSourcePageReaders(
                 pagedWorkItems,
                 createEnumerator,
                 oldest,
-                cancellationToken);
+                cancellationToken,
+                boundedPageSize);
             if (pageReaders.Count == 0) {
                 yield break;
             }
 
             int pageSize = maxEvents > 0
-                ? GetBoundedCandidatePageSize(pageReaders.Count, maxEvents)
+                ? boundedPageSize
                 : GetCheckpointCandidatePageSize(pageReaders.Count);
             int returned = 0;
             foreach (EventObject result in MergePagedSources(
@@ -140,7 +152,10 @@ public partial class SearchEvents {
         EventReadMode readMode,
         bool oldest,
         bool isolateRemoteFailures,
-        ConcurrentDictionary<string, byte> failedTargets) {
+        ConcurrentDictionary<string, byte> failedTargets,
+        Func<EventObject, bool>? resultPredicate,
+        Action<EventObject>? candidateObserver,
+        Action<EventLogQueryTargetFailure>? targetFailureObserver) {
 
         if (isolateRemoteFailures && ShouldSkipFailedTarget(workItem, failedTargets)) {
             return System.Linq.Enumerable.Empty<EventObject>().GetEnumerator();
@@ -167,19 +182,44 @@ public partial class SearchEvents {
                 minimumEventRecordIdExclusive: workItem.MinimumEventRecordIdExclusive,
                 maximumEventRecordIdExclusive: workItem.MaximumEventRecordIdExclusive,
                 oldest: oldest)).GetEnumerator();
-        return isolateRemoteFailures
-            ? EnumerateQueryWorkItemSafely(workItem, queryResults, failedTargets).GetEnumerator()
+        IEnumerator<EventObject> safeResults = isolateRemoteFailures
+            ? EnumerateQueryWorkItemSafely(workItem, queryResults, failedTargets, targetFailureObserver).GetEnumerator()
             : queryResults;
+        return resultPredicate == null && candidateObserver == null
+            ? safeResults
+            : ObserveAndFilterQueryResults(safeResults, resultPredicate, candidateObserver).GetEnumerator();
     }
 
     private static IEnumerable<EventObject> EnumerateQueryWorkItemSafely(
         QueryWorkItem workItem,
         IEnumerator<EventObject> queryResults,
-        ConcurrentDictionary<string, byte> failedTargets) {
+        ConcurrentDictionary<string, byte> failedTargets,
+        Action<EventLogQueryTargetFailure>? targetFailureObserver) {
 
         using (queryResults) {
-            while (TryMoveNextQueryWorkItem(queryResults, workItem, failedTargets, out EventObject? result)) {
+            while (TryMoveNextQueryWorkItem(
+                       queryResults,
+                       workItem,
+                       failedTargets,
+                       out EventObject? result,
+                       targetFailureObserver)) {
                 yield return result!;
+            }
+        }
+    }
+
+    private static IEnumerable<EventObject> ObserveAndFilterQueryResults(
+        IEnumerator<EventObject> queryResults,
+        Func<EventObject, bool>? resultPredicate,
+        Action<EventObject>? candidateObserver) {
+
+        using (queryResults) {
+            while (queryResults.MoveNext()) {
+                EventObject result = queryResults.Current;
+                candidateObserver?.Invoke(result);
+                if (resultPredicate == null || resultPredicate(result)) {
+                    yield return result;
+                }
             }
         }
     }

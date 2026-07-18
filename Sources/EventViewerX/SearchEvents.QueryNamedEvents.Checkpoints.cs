@@ -19,10 +19,17 @@ public partial class SearchEvents : Settings {
         int maxEvents,
         CancellationToken cancellationToken,
         Func<string?, string, long?>? minimumEventRecordIdExclusiveResolver,
-        bool oldest) {
+        bool oldest,
+        Action<EventLogQueryTargetFailure>? targetFailureObserver,
+        Action<EventObject>? candidateObserver = null,
+        Func<EventObject, bool>? resultPredicate = null) {
 
         List<string?> targets = NormalizeNamedCheckpointTargets(machineNames);
         var pageReaders = new List<Func<int, IReadOnlyList<EventObject>>>(eventInfo.Count * targets.Count);
+        int expectedSourceCount = eventInfo.Count * targets.Count;
+        int boundedPageSize = maxEvents > 0 && expectedSourceCount > 0
+            ? GetBoundedCandidatePageSize(expectedSourceCount, maxEvents)
+            : 0;
         foreach (KeyValuePair<string, HashSet<int>> entry in eventInfo) {
             string logName = entry.Key;
             Func<string?, long?>? minimumResolver = minimumEventRecordIdExclusiveResolver == null
@@ -61,12 +68,16 @@ public partial class SearchEvents : Settings {
                 EventReadMode.Full,
                 oldest,
                 isolateRemoteFailures,
-                failedTargets);
+                failedTargets,
+                resultPredicate,
+                candidateObserver,
+                targetFailureObserver);
             pageReaders.AddRange(CreateRecordOrderedSourcePageReaders(
                 workItems,
                 createEnumerator,
                 oldest,
-                cancellationToken));
+                cancellationToken,
+                boundedPageSize));
         }
 
         if (pageReaders.Count == 0) {
@@ -77,7 +88,7 @@ public partial class SearchEvents : Settings {
             pageReaders,
             (left, right) => CompareEvents(left, right, oldest),
             maxEvents > 0
-                ? GetBoundedCandidatePageSize(pageReaders.Count, maxEvents)
+                ? boundedPageSize
                 : GetCheckpointCandidatePageSize(pageReaders.Count),
             cancellationToken);
         return maxEvents > 0 ? merged.Take(maxEvents) : merged;
@@ -171,13 +182,17 @@ public partial class SearchEvents : Settings {
         IReadOnlyList<QueryWorkItem> workItems,
         Func<QueryWorkItem, IEnumerator<EventObject>> createEnumerator,
         bool oldest,
-        CancellationToken cancellationToken = default) {
+        CancellationToken cancellationToken = default,
+        int boundedPageSize = 0) {
 
         if (workItems == null) {
             throw new ArgumentNullException(nameof(workItems));
         }
         if (createEnumerator == null) {
             throw new ArgumentNullException(nameof(createEnumerator));
+        }
+        if (boundedPageSize < 0) {
+            throw new ArgumentOutOfRangeException(nameof(boundedPageSize), "Bounded page size cannot be negative.");
         }
 
         var sourceGroups = new List<List<QueryWorkItem>>();
@@ -204,6 +219,9 @@ public partial class SearchEvents : Settings {
 
             IEnumerator<EventObject>? mergedChunks = null;
             bool completed = false;
+            int chunkPageSize = boundedPageSize > 0
+                ? Math.Min(GetCheckpointCandidatePageSize(chunkPageReaders.Count), boundedPageSize)
+                : GetCheckpointCandidatePageSize(chunkPageReaders.Count);
             sourcePageReaders.Add(requested => {
                 if (requested <= 0) {
                     throw new ArgumentOutOfRangeException(nameof(requested), "Requested page size must be positive.");
@@ -215,7 +233,7 @@ public partial class SearchEvents : Settings {
                 mergedChunks ??= MergePagedSources(
                         chunkPageReaders,
                         (left, right) => CompareRecordOrderedEvents(left, right, oldest),
-                        GetCheckpointCandidatePageSize(chunkPageReaders.Count),
+                        chunkPageSize,
                         cancellationToken)
                     .GetEnumerator();
                 var page = new List<EventObject>(requested);

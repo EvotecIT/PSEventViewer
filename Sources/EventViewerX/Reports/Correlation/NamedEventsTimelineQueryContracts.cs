@@ -350,7 +350,7 @@ public sealed class NamedEventsTimelineQueryResult {
     public int BucketMinutes { get; set; }
 
     /// <summary>
-    /// Indicates either the output cap or candidate scan cap truncated the result.
+    /// Indicates an output/scan/per-name cap or an isolated target failure made the result incomplete.
     /// </summary>
     public bool Truncated { get; set; }
 
@@ -373,6 +373,17 @@ public sealed class NamedEventsTimelineQueryResult {
     /// Named-event categories that had additional rows beyond the per-name cap.
     /// </summary>
     public IReadOnlyList<string> TruncatedNamedEvents { get; set; } = Array.Empty<string>();
+
+    /// <summary>
+    /// Indicates that one or more requested remote targets could not be queried.
+    /// </summary>
+    public bool Incomplete { get; set; }
+
+    /// <summary>
+    /// Expected per-target failures isolated while other requested targets continued.
+    /// </summary>
+    public IReadOnlyList<EventLogQueryTargetFailure> TargetFailures { get; set; } =
+        Array.Empty<EventLogQueryTargetFailure>();
 
     /// <summary>
     /// Indicates correlation groups were truncated by max group cap.

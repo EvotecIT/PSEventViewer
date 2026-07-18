@@ -278,7 +278,7 @@ public static partial class NamedEventsTimelineQueryExecutor {
             })
             .ToArray();
 
-        return (new NamedEventsTimelineQueryResult {
+        var result = new NamedEventsTimelineQueryResult {
             RequestedNamedEvents = effectiveNamedEvents
                 .Select(static value => ToSnakeCase(value.ToString()))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -309,7 +309,25 @@ public static partial class NamedEventsTimelineQueryExecutor {
             Timeline = timelineRows,
             CorrelationGroups = groupRows,
             Buckets = bucketRows
-        }, null);
+        };
+        ApplyTargetFailures(result, queryInfo);
+        return (result, null);
+    }
+
+    internal static void ApplyTargetFailures(
+        NamedEventsTimelineQueryResult result,
+        NamedEventsQueryExecutionInfo queryInfo) {
+        if (result is null) {
+            throw new ArgumentNullException(nameof(result));
+        }
+        if (queryInfo is null) {
+            throw new ArgumentNullException(nameof(queryInfo));
+        }
+
+        IReadOnlyList<EventLogQueryTargetFailure> targetFailures = queryInfo.TargetFailures;
+        result.TargetFailures = targetFailures;
+        result.Incomplete = targetFailures.Count > 0;
+        result.Truncated |= result.Incomplete;
     }
 
     private static bool TryValidateRequest(

@@ -33,7 +33,10 @@ public sealed class EventCheckpointSnapshot {
     private readonly ReadOnlyDictionary<string, EventCheckpointValue> _checkpointView;
     private readonly ReadOnlyDictionary<string, long> _recordView;
 
-    internal EventCheckpointSnapshot(Dictionary<string, EventCheckpointValue> checkpoints) {
+    internal EventCheckpointSnapshot(string checkpointPath, Dictionary<string, EventCheckpointValue> checkpoints) {
+        CheckpointPath = checkpointPath;
+        StatePath = EventCheckpointStore.GetStateFilePath(checkpointPath);
+        LockPath = EventCheckpointStore.GetLockFilePath(checkpointPath);
         _checkpoints = new Dictionary<string, EventCheckpointValue>(checkpoints, StringComparer.OrdinalIgnoreCase);
         _records = checkpoints
             .Where(static entry => entry.Value.RecordId.HasValue)
@@ -47,6 +50,15 @@ public sealed class EventCheckpointSnapshot {
 
     /// <summary>Numeric checkpoint values mirrored to the compatibility JSON file on a best-effort basis.</summary>
     public IReadOnlyDictionary<string, long> Records => _recordView;
+
+    /// <summary>Requested compatibility checkpoint file used by PowerShell and legacy clients.</summary>
+    public string CheckpointPath { get; }
+
+    /// <summary>Authoritative generation-aware companion state file.</summary>
+    public string StatePath { get; }
+
+    /// <summary>Cross-process lock file used while loading, updating, or resetting the checkpoint.</summary>
+    public string LockPath { get; }
 
     /// <summary>All generation-aware checkpoints, including generations that have not emitted a record yet.</summary>
     public IReadOnlyDictionary<string, EventCheckpointValue> Checkpoints => _checkpointView;
@@ -177,19 +189,56 @@ public static class EventCheckpointStore {
             }
 
             WriteState(checkpointPath, values);
-            return new EventCheckpointSnapshot(values);
+            return new EventCheckpointSnapshot(checkpointPath, values);
+        }
+    }
+
+    /// <summary>
+    /// Atomically starts a new checkpoint generation for one key or every existing key.
+    /// </summary>
+    /// <remarks>
+    /// Use this method instead of deleting only the compatibility checkpoint file. Generation tombstones are retained
+    /// in the authoritative companion state so an in-flight writer from the previous generation cannot restore progress.
+    /// </remarks>
+    /// <param name="path">Compatibility checkpoint path supplied to event queries.</param>
+    /// <param name="key">Optional checkpoint key. Null resets every existing key.</param>
+    /// <param name="lockTimeout">Optional cross-process lock timeout.</param>
+    /// <returns>The persisted generation-aware checkpoint snapshot.</returns>
+    public static EventCheckpointSnapshot Reset(
+        string path,
+        string? key = null,
+        TimeSpan? lockTimeout = null) {
+
+        if (key != null && string.IsNullOrWhiteSpace(key)) {
+            throw new ArgumentException("Checkpoint key cannot be empty when supplied.", nameof(key));
+        }
+
+        string checkpointPath = NormalizePath(path);
+        EnsureParentDirectory(checkpointPath);
+        using (AcquireFileLock(checkpointPath, lockTimeout ?? DefaultLockTimeout)) {
+            Dictionary<string, EventCheckpointValue> values = LoadUnlocked(checkpointPath).CopyValues();
+            if (key == null) {
+                foreach (string existingKey in values.Keys.ToArray()) {
+                    values[existingKey] = CreateResetValue();
+                }
+            } else {
+                values[key.Trim()] = CreateResetValue();
+            }
+
+            WriteState(checkpointPath, values);
+            return new EventCheckpointSnapshot(checkpointPath, values);
         }
     }
 
     private static EventCheckpointSnapshot LoadUnlocked(string checkpointPath) {
-        string statePath = GetStatePath(checkpointPath);
+        string statePath = GetStateFilePath(checkpointPath);
         if (!File.Exists(statePath)) {
             Dictionary<string, EventCheckpointValue> legacyValues = ReadNumericFile(checkpointPath)
                 .ToDictionary(
                     static entry => entry.Key,
                     static entry => new EventCheckpointValue(entry.Value, Guid.Empty, boundaryIdentity: null),
                     StringComparer.OrdinalIgnoreCase);
-            return new EventCheckpointSnapshot(legacyValues);
+            return new EventCheckpointSnapshot(checkpointPath, legacyValues);
         }
 
         var values = new Dictionary<string, EventCheckpointValue>(StringComparer.OrdinalIgnoreCase);
@@ -215,7 +264,7 @@ public static class EventCheckpointStore {
                 entry.Value.BoundaryIdentity);
         }
 
-        return new EventCheckpointSnapshot(values);
+        return new EventCheckpointSnapshot(checkpointPath, values);
     }
 
     private static Dictionary<string, long> ReadNumericFile(string checkpointPath) {
@@ -258,7 +307,7 @@ public static class EventCheckpointStore {
                 static entry => entry.Value.RecordId!.Value,
                 StringComparer.OrdinalIgnoreCase);
 
-        AtomicWrite(GetStatePath(checkpointPath), JsonSerializer.Serialize(document));
+        AtomicWrite(GetStateFilePath(checkpointPath), JsonSerializer.Serialize(document));
         try {
             AtomicWrite(checkpointPath, JsonSerializer.Serialize(numeric));
         } catch (IOException ex) {
@@ -275,7 +324,7 @@ public static class EventCheckpointStore {
             throw new ArgumentOutOfRangeException(nameof(timeout), "Lock timeout must be greater than or equal to zero.");
         }
 
-        string lockPath = checkpointPath + ".lock";
+        string lockPath = GetLockFilePath(checkpointPath);
         DateTime deadline = DateTime.UtcNow.Add(timeout);
         while (true) {
             try {
@@ -319,8 +368,16 @@ public static class EventCheckpointStore {
         }
     }
 
-    private static string GetStatePath(string checkpointPath)
-        => checkpointPath + ".state.json";
+    /// <summary>Returns the authoritative companion state path for a compatibility checkpoint path.</summary>
+    public static string GetStateFilePath(string path)
+        => NormalizePath(path) + ".state.json";
+
+    /// <summary>Returns the cross-process lock path for a compatibility checkpoint path.</summary>
+    public static string GetLockFilePath(string path)
+        => NormalizePath(path) + ".lock";
+
+    private static EventCheckpointValue CreateResetValue()
+        => new(recordId: null, Guid.NewGuid(), boundaryIdentity: null);
 
     private sealed class CheckpointStateDocument {
         public int Version { get; set; }
