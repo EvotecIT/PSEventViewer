@@ -123,12 +123,12 @@ public partial class SearchEvents : Settings {
             }
 
             var details = new EventLogDetails(_logger, hostName, logConfig, logInfoObj);
-            if (includeEventTimes) {
-                ReadEventTimes(logName, session, timeoutMs, details);
-            }
-            if (logInfoObj == null)
-            {
-                return new EventLogDetailsResult
+            Exception? eventTimeFailure = includeEventTimes
+                ? ReadEventTimes(logName, session, timeoutMs, details)
+                : null;
+            EventLogDetailsResult result;
+            if (logInfoObj == null) {
+                result = new EventLogDetailsResult
                 {
                     LogName = logName,
                     MachineName = hostName,
@@ -137,16 +137,20 @@ public partial class SearchEvents : Settings {
                     ErrorMessage = "Event log configuration was collected, but runtime log information was unavailable.",
                     TimeoutMs = timeoutMs
                 };
+            } else {
+                result = new EventLogDetailsResult
+                {
+                    LogName = logName,
+                    MachineName = hostName,
+                    Status = EventLogDetailsStatus.Success,
+                    Details = details,
+                    TimeoutMs = timeoutMs
+                };
             }
-
-            return new EventLogDetailsResult
-            {
-                LogName = logName,
-                MachineName = hostName,
-                Status = EventLogDetailsStatus.Success,
-                Details = details,
-                TimeoutMs = timeoutMs
-            };
+            if (eventTimeFailure != null) {
+                ApplyEventTimeFailure(result, eventTimeFailure);
+            }
+            return result;
         }
         catch (Exception ex)
         {
@@ -158,7 +162,7 @@ public partial class SearchEvents : Settings {
         }
     }
 
-    private static void ReadEventTimes(string logName, EventLogSession session, int timeoutMs, EventLogDetails details) {
+    private static Exception? ReadEventTimes(string logName, EventLogSession session, int timeoutMs, EventLogDetails details) {
         try {
             var oldestQuery = new EventLogQuery(logName, PathType.LogName) { Session = session };
             using (EventLogReader oldestReader = CreateEventLogReader(oldestQuery, details.MachineName, timeoutMs)) {
@@ -174,9 +178,36 @@ public partial class SearchEvents : Settings {
                 using EventRecord? newest = ReadEventWithTimeout(newestReader, timeoutMs, $"Reading the newest event from '{logName}' on '{details.MachineName}'");
                 details.NewestEvent = newest?.TimeCreated;
             }
+            return null;
         } catch (Exception ex) {
             _logger.WriteVerbose($"Couldn't read oldest/newest event times for {logName} on {details.MachineName}: {ex.Message}");
+            return ex;
         }
+    }
+
+    internal static void ApplyEventTimeFailure(EventLogDetailsResult result, Exception failure) {
+        if (result == null) throw new ArgumentNullException(nameof(result));
+        if (failure == null) throw new ArgumentNullException(nameof(failure));
+
+        if (result.Status == EventLogDetailsStatus.Success) {
+            result.Status = MapEventTimeFailureStatus(failure);
+        }
+        string message = $"Oldest/newest event times could not be read: {failure.Message}";
+        result.ErrorMessage = string.IsNullOrWhiteSpace(result.ErrorMessage)
+            ? message
+            : $"{result.ErrorMessage} {message}";
+        result.ErrorType = failure.GetType().Name;
+    }
+
+    internal static EventLogDetailsStatus MapEventTimeFailureStatus(Exception failure) {
+        if (failure == null) throw new ArgumentNullException(nameof(failure));
+
+        return failure switch {
+            EventLogSessionException sessionException => MapSessionFailureStatus(sessionException.Status),
+            UnauthorizedAccessException => EventLogDetailsStatus.AccessDenied,
+            TimeoutException => EventLogDetailsStatus.Timeout,
+            _ => EventLogDetailsStatus.EventTimesUnavailable
+        };
     }
 
     private static EventLogDetailsResult Failure(
@@ -261,12 +292,13 @@ public partial class SearchEvents : Settings {
         }
     }
 
-    private static EventLogDetailsStatus MapSessionFailureStatus(EventLogSessionOpenStatus status) {
+    internal static EventLogDetailsStatus MapSessionFailureStatus(EventLogSessionOpenStatus status) {
         return status switch {
             EventLogSessionOpenStatus.AccessDenied => EventLogDetailsStatus.AccessDenied,
             EventLogSessionOpenStatus.Timeout => EventLogDetailsStatus.Timeout,
             EventLogSessionOpenStatus.NegativeCache => EventLogDetailsStatus.HostUnavailable,
             EventLogSessionOpenStatus.RpcUnavailable => EventLogDetailsStatus.HostUnavailable,
+            EventLogSessionOpenStatus.EventLogSessionUnavailable => EventLogDetailsStatus.HostUnavailable,
             _ => EventLogDetailsStatus.SessionUnavailable
         };
     }

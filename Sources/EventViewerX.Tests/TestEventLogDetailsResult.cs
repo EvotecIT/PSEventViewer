@@ -59,4 +59,58 @@ public class TestEventLogDetailsResult {
         Assert.Equal("UnitTest", result.Purpose);
         Assert.Equal("Application", result.LogName);
     }
+
+    [Fact]
+    public void MapSessionFailureStatus_SessionConstructionFailureIsHostUnavailable() {
+        Assert.Equal(
+            EventLogDetailsStatus.HostUnavailable,
+            SearchEvents.MapSessionFailureStatus(EventLogSessionOpenStatus.EventLogSessionUnavailable));
+    }
+
+    [Fact]
+    public void ApplyEventTimeFailure_ReportsTimeoutWithPartialDetailsStatus() {
+        var result = new EventLogDetailsResult { Status = EventLogDetailsStatus.Success };
+
+        SearchEvents.ApplyEventTimeFailure(result, new TimeoutException("event-time budget expired"));
+
+        Assert.Equal(EventLogDetailsStatus.Timeout, result.Status);
+        Assert.Equal(nameof(TimeoutException), result.ErrorType);
+        Assert.Contains("event-time budget expired", result.ErrorMessage, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ApplyEventTimeFailure_ReportsNonTimeoutReadFailure() {
+        var result = new EventLogDetailsResult { Status = EventLogDetailsStatus.Success };
+
+        SearchEvents.ApplyEventTimeFailure(result, new InvalidOperationException("event-time read failed"));
+
+        Assert.Equal(EventLogDetailsStatus.EventTimesUnavailable, result.Status);
+        Assert.Equal(nameof(InvalidOperationException), result.ErrorType);
+        Assert.Contains("event-time read failed", result.ErrorMessage, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ApplyEventTimeFailure_PreservesAccessDeniedClassification() {
+        var result = new EventLogDetailsResult { Status = EventLogDetailsStatus.Success };
+
+        SearchEvents.ApplyEventTimeFailure(result, new UnauthorizedAccessException("event-time access denied"));
+
+        Assert.Equal(EventLogDetailsStatus.AccessDenied, result.Status);
+        Assert.Equal(nameof(UnauthorizedAccessException), result.ErrorType);
+    }
+
+    [Fact]
+    public void ApplyEventTimeFailure_PreservesEarlierPartialStatusAndAppendsDiagnostic() {
+        var result = new EventLogDetailsResult {
+            Status = EventLogDetailsStatus.LogInformationUnavailable,
+            ErrorMessage = "Runtime information was unavailable."
+        };
+
+        SearchEvents.ApplyEventTimeFailure(result, new InvalidOperationException("event-time read failed"));
+
+        Assert.Equal(EventLogDetailsStatus.LogInformationUnavailable, result.Status);
+        Assert.Equal(nameof(InvalidOperationException), result.ErrorType);
+        Assert.Contains("Runtime information was unavailable.", result.ErrorMessage, StringComparison.Ordinal);
+        Assert.Contains("event-time read failed", result.ErrorMessage, StringComparison.Ordinal);
+    }
 }

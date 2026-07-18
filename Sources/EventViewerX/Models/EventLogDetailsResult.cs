@@ -18,6 +18,8 @@ public enum EventLogDetailsStatus {
     LogConfigurationUnavailable,
     /// <summary>The event log configuration was collected but runtime log information was unavailable.</summary>
     LogInformationUnavailable,
+    /// <summary>Event log details were collected but the requested oldest or newest event timestamp was unavailable.</summary>
+    EventTimesUnavailable,
     /// <summary>An unexpected error occurred while collecting event log details.</summary>
     Error
 }
