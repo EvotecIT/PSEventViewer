@@ -1,6 +1,7 @@
 ﻿using DnsClientX;
 
 using EventViewerX;
+using System.Net;
 
 namespace EventViewerX.Rules.ActiveDirectory;
 /// <summary>
@@ -24,6 +25,10 @@ public class SMBServerAudit : EventRuleBase {
     public string ClientAddress;
     /// <summary>Reverse DNS name for the client when resolved.</summary>
     public string ClientDNSName = string.Empty;
+    /// <summary>Outcome of optional reverse-DNS enrichment.</summary>
+    public ReverseDnsResolutionStatus ClientDnsResolutionStatus { get; private set; } = ReverseDnsResolutionStatus.NotRequested;
+    /// <summary>Diagnostic text for a failed reverse-DNS lookup.</summary>
+    public string ClientDnsResolutionError { get; private set; } = string.Empty;
     /// <summary>Timestamp of the SMB access.</summary>
     public DateTime When;
     /// <inheritdoc />
@@ -58,25 +63,102 @@ public class SMBServerAudit : EventRuleBase {
     /// Resolves and stores the client reverse-DNS name on demand.
     /// </summary>
     /// <returns>The resolved DNS name, or an empty string when no result is available.</returns>
-    public async Task<string> ResolveClientDnsNameAsync() {
-        ClientDNSName = await QueryDnsAsync(ClientAddress).ConfigureAwait(false) ?? string.Empty;
+    public Task<string> ResolveClientDnsNameAsync() {
+        return ResolveClientDnsNameAsync(CancellationToken.None);
+    }
+
+    /// <summary>
+    /// Resolves and stores the client reverse-DNS name on demand.
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token for the lookup.</param>
+    /// <returns>The resolved DNS name, or an empty string when no result is available.</returns>
+    public async Task<string> ResolveClientDnsNameAsync(CancellationToken cancellationToken) {
+        using var enricher = new NamedEventEnricher(new NamedEventEnrichmentOptions { ResolveDns = true });
+        await enricher.EnrichAsync(this, cancellationToken).ConfigureAwait(false);
         return ClientDNSName;
     }
 
-    private static async Task<string?> QueryDnsAsync(string clientAddress) {
-        if (string.IsNullOrEmpty(clientAddress)) {
-            return null;
+    internal async Task ResolveClientDnsNameAsync(
+        Func<string, CancellationToken, Task<DnsResponse>> resolver,
+        CancellationToken cancellationToken) {
+        if (resolver == null) {
+            throw new ArgumentNullException(nameof(resolver));
+        }
+
+        ClientDNSName = string.Empty;
+        ClientDnsResolutionError = string.Empty;
+        string normalizedAddress = NormalizeClientAddress(ClientAddress);
+        if (string.IsNullOrWhiteSpace(normalizedAddress)) {
+            ClientDnsResolutionStatus = ReverseDnsResolutionStatus.InvalidAddress;
+            return;
+        }
+        if (!IPAddress.TryParse(normalizedAddress, out _)) {
+            if (Uri.CheckHostName(normalizedAddress) == UriHostNameType.Dns) {
+                ClientDNSName = normalizedAddress.TrimEnd('.');
+                ClientDnsResolutionStatus = ReverseDnsResolutionStatus.AlreadyNamed;
+            } else {
+                ClientDnsResolutionStatus = ReverseDnsResolutionStatus.InvalidAddress;
+            }
+            return;
         }
 
         try {
-            Settings._logger.WriteVerbose($"Querying DNS for address: {clientAddress}");
-            var result = await ClientX.QueryDns(clientAddress, DnsRecordType.PTR).ConfigureAwait(false);
-            var resolvedNames = string.Join(", ", result.AnswersMinimal.Select(answer => answer.Data));
-            Settings._logger.WriteVerbose($"Resolved names: {resolvedNames}");
-            return resolvedNames;
+            Settings._logger.WriteVerbose($"Querying reverse DNS for address: {normalizedAddress}");
+            DnsResponse response = await resolver(normalizedAddress, cancellationToken).ConfigureAwait(false);
+            cancellationToken.ThrowIfCancellationRequested();
+            var resolvedNames = new List<string>();
+            var uniqueNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (DnsAnswer answer in response.Answers) {
+                if (answer.Type != DnsRecordType.PTR || string.IsNullOrWhiteSpace(answer.Data)) {
+                    continue;
+                }
+
+                string name = answer.Data.Trim().TrimEnd('.');
+                if (name.Length > 0 && uniqueNames.Add(name)) {
+                    resolvedNames.Add(name);
+                }
+            }
+
+            if (resolvedNames.Count > 0) {
+                ClientDNSName = string.Join(", ", resolvedNames);
+                ClientDnsResolutionStatus = ReverseDnsResolutionStatus.Resolved;
+                Settings._logger.WriteVerbose($"Resolved reverse DNS names: {ClientDNSName}");
+                return;
+            }
+
+            if (response.Status == DnsResponseCode.NoError || response.Status == DnsResponseCode.NXDomain) {
+                ClientDnsResolutionStatus = ReverseDnsResolutionStatus.NoRecord;
+                return;
+            }
+
+            ClientDnsResolutionStatus = ReverseDnsResolutionStatus.Failed;
+            ClientDnsResolutionError = string.IsNullOrWhiteSpace(response.Error)
+                ? $"DNS resolver returned {response.Status}."
+                : response.Error;
+        } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
+            ClientDnsResolutionStatus = ReverseDnsResolutionStatus.Cancelled;
+            throw;
+        } catch (OperationCanceledException ex) {
+            ClientDnsResolutionStatus = ReverseDnsResolutionStatus.TimedOut;
+            ClientDnsResolutionError = string.IsNullOrWhiteSpace(ex.Message)
+                ? "The DNS lookup timed out."
+                : ex.Message;
+        } catch (TimeoutException ex) {
+            ClientDnsResolutionStatus = ReverseDnsResolutionStatus.TimedOut;
+            ClientDnsResolutionError = ex.Message;
         } catch (Exception ex) {
-            Settings._logger.WriteWarning($"Querying DNS for address: {clientAddress} failed: {ex.Message}");
-            return null;
+            ClientDnsResolutionStatus = ReverseDnsResolutionStatus.Failed;
+            ClientDnsResolutionError = ex.Message;
+            Settings._logger.WriteVerbose($"Querying reverse DNS for address '{normalizedAddress}' failed: {ex.Message}");
         }
+    }
+
+    private static string NormalizeClientAddress(string? clientAddress) {
+        string value = clientAddress?.Trim() ?? string.Empty;
+        value = value.TrimStart('\\');
+        if (value.Length >= 2 && value[0] == '[' && value[value.Length - 1] == ']') {
+            value = value.Substring(1, value.Length - 2);
+        }
+        return value;
     }
 }

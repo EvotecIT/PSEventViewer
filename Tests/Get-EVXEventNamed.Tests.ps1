@@ -3,6 +3,20 @@ Describe 'Get-EVXEvent - Named Event' {
         (Get-Command Get-EVXEvent).Parameters['Type'].Aliases | Should -Contain 'NamedEvents'
     }
 
+    It 'exposes opt-in DNS enrichment only on the NamedEvents parameter set' {
+        $Command = Get-Command Get-EVXEvent
+        $Command.Parameters.Keys | Should -Contain 'ResolveDns'
+        $Command.Parameters.Keys | Should -Contain 'DnsTimeoutMs'
+        $Command.Parameters.Keys | Should -Contain 'DnsMaxConcurrency'
+
+        $ResolveDnsSets = @($Command.Parameters['ResolveDns'].ParameterSets.Keys)
+        $DnsTimeoutSets = @($Command.Parameters['DnsTimeoutMs'].ParameterSets.Keys)
+        $DnsConcurrencySets = @($Command.Parameters['DnsMaxConcurrency'].ParameterSets.Keys)
+        $ResolveDnsSets | Should -Be @('NamedEvents')
+        $DnsTimeoutSets | Should -Be @('NamedEvents')
+        $DnsConcurrencySets | Should -Be @('NamedEvents')
+    }
+
     It 'Returns ADUserLogon events when available' -Tag 'RequiresEvents' {
         $events = Get-EVXEvent -Type ADUserLogon -MaxEvents 1 -ErrorAction SilentlyContinue
         if ($events) {

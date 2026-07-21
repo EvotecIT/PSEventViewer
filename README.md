@@ -153,8 +153,12 @@ SearchEvents.WriteEvent("PSEventViewer", "Application", "Health check OK", Event
 Install-Module -Name PSEventViewer -Scope CurrentUser
 
 # Query AD logons in the last day and flatten payload
-Get-EVXEvent -LogName Security -Type ADUserLogon, ADUserLogonFailed -TimePeriod Last24Hours -Expand | \
+Get-EVXEvent -LogName Security -Type ADUserLogon, ADUserLogonFailed -TimePeriod Last24Hours -Expand | `
     Select-Object TimeCreated, MachineName, Id, TargetUserName, IpAddress
+
+# Opt in to bounded PTR enrichment for SMB audit events
+Get-EVXEvent -Type ADSMBServerAuditV1 -MachineName AD1,AD2 -ResolveDns -DnsTimeoutMs 1000 -DnsMaxConcurrency 8 | `
+    Select-Object When, Computer, ClientAddress, ClientDNSName, ClientDnsResolutionStatus
 
 # Resume a long-running monitor
 Get-EVXEvent -LogName Security -EventId 4625 -RecordIdFile "$env:TEMP\evx.state" -RecordIdKey 'security-failures'
@@ -180,6 +184,8 @@ Remove-EVXLog -LogName 'MyApp'
 ```
 
 Checkpoint generation metadata is stored in the visible `<RecordIdFile>.state.json` companion file. `Reset-EVXEventCheckpoint` updates both representations under the shared file lock and prevents an in-flight query from restoring progress from the previous generation.
+
+Reverse-DNS enrichment is disabled unless `-ResolveDns` is specified. `-DnsTimeoutMs` bounds the whole lookup, including resolver retries, while `-DnsMaxConcurrency` overlaps lookups without changing event or checkpoint order. A timeout, missing PTR record, or resolver failure is reported through `ClientDnsResolutionStatus` and `ClientDnsResolutionError`; it does not remove the SMB audit event or advance its checkpoint before projection completes.
 
 ## Timeouts and long-running queries
 

@@ -73,26 +73,7 @@ public class ADComputerChangeDetailed : EventRuleBase {
         // OverwriteByField logic
         ComputerObject = OverwriteByField(Action, "A directory service object was moved.", ComputerObject, _eventObject.GetValueFromDataDictionary("OldObjectDN"));
         FieldValue = OverwriteByField(Action, "A directory service object was moved.", FieldValue, _eventObject.GetValueFromDataDictionary("NewObjectDN"));
-
-        //ClientDNSName = QueryDnsAsync("1.1.1.1").ConfigureAwait(false).GetAwaiter().GetResult();
     }
-
-    //private static async Task<string> QueryDnsAsync(string clientAddress) {
-    //    if (string.IsNullOrEmpty(clientAddress)) {
-    //        return null;
-    //    }
-
-    //    try {
-    //        Settings._logger.WriteVerbose($"Querying DNS for address: {clientAddress}");
-    //        var result = await ClientX.QueryDns(clientAddress, DnsRecordType.PTR);
-    //        var resolvedNames = string.Join(", ", result.AnswersMinimal.Select(answer => answer.Data));
-    //        Settings._logger.WriteVerbose($"Resolved names: {resolvedNames}");
-    //        return resolvedNames;
-    //    } catch (Exception ex) {
-    //        Settings._logger.WriteWarning($"Querying DNS for address: {clientAddress} failed: {ex.Message}");
-    //        return null;
-    //    }
-    //}
 }
 
 

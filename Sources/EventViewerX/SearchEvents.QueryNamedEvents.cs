@@ -28,6 +28,7 @@ namespace EventViewerX {
         /// <param name="resultPredicate">Optional predicate applied to projected named-event results before enforcing <paramref name="maxEvents"/>.</param>
         /// <param name="sourceLogName">Optional exact log source filter applied before the candidate scan cap.</param>
         /// <param name="sourceEventIds">Optional event-ID source filter applied before the candidate scan cap.</param>
+        /// <param name="enrichmentOptions">Optional post-projection enrichment. Enrichment completes before checkpoint observation so failures cannot skip records.</param>
         /// <returns>Asynchronous sequence of simplified events.</returns>
         public static async IAsyncEnumerable<EventObjectSlim> FindEventsByNamedEvents(
             List<NamedEvents> typeEventsList,
@@ -45,7 +46,8 @@ namespace EventViewerX {
             bool oldest = false,
             Func<EventObjectSlim, bool>? resultPredicate = null,
             string? sourceLogName = null,
-            IReadOnlyCollection<int>? sourceEventIds = null) {
+            IReadOnlyCollection<int>? sourceEventIds = null,
+            NamedEventEnrichmentOptions? enrichmentOptions = null) {
 
             if (typeEventsList == null) {
                 throw new ArgumentNullException(nameof(typeEventsList));
@@ -59,6 +61,7 @@ namespace EventViewerX {
             if (maxEventsScanned < 0) {
                 throw new ArgumentOutOfRangeException(nameof(maxEventsScanned), "Maximum scanned events must be greater than or equal to zero.");
             }
+            enrichmentOptions?.Validate();
 
             Dictionary<string, HashSet<int>> eventInfo = RestrictNamedEventSources(
                 EventObjectSlim.GetEventInfoForNamedEvents(typeEventsList),
@@ -70,27 +73,29 @@ namespace EventViewerX {
                 : queryInfo.RecordTargetFailure;
             queryInfo.Reset(maxEventsScanned);
             int emitted = 0;
+            using var enricher = enrichmentOptions == null ? null : new NamedEventEnricher(enrichmentOptions);
 
             if (maxEventsScanned > 0) {
                 int candidateLimit = maxEventsScanned == int.MaxValue ? int.MaxValue : maxEventsScanned + 1;
-                await foreach (EventObject foundEvent in QueryNamedPagedCandidatesAsync(
-                                   eventInfo,
-                                   machineNames,
-                                   startTime,
-                                   endTime,
-                                   timePeriod,
-                                   candidateLimit,
-                                   maxThreads,
-                                   cancellationToken,
-                                   minimumEventRecordIdExclusiveResolver,
-                                   oldest,
-                                   targetFailureObserver)) {
-                    if (!queryInfo.TryRecordCandidate()) {
-                        yield break;
-                    }
-
-                    candidateObserver?.Invoke(foundEvent);
-                    EventObjectSlim? targetEvent = BuildTargetEvents(foundEvent, typeEventsList);
+                await foreach (NamedEventProjection projection in ProjectNamedCandidatesInOrderAsync(
+                                   QueryNamedPagedCandidatesAsync(
+                                       eventInfo,
+                                       machineNames,
+                                       startTime,
+                                       endTime,
+                                       timePeriod,
+                                       candidateLimit,
+                                       maxThreads,
+                                       cancellationToken,
+                                       minimumEventRecordIdExclusiveResolver,
+                                       oldest,
+                                       targetFailureObserver),
+                                   typeEventsList,
+                                   enricher,
+                                   queryInfo.TryRecordCandidate,
+                                   candidateObserver,
+                                   cancellationToken)) {
+                    EventObjectSlim? targetEvent = projection.Target;
                     if (targetEvent == null || (resultPredicate != null && !resultPredicate(targetEvent))) {
                         continue;
                     }
@@ -106,22 +111,25 @@ namespace EventViewerX {
             }
 
             if (oldest && minimumEventRecordIdExclusiveResolver != null) {
-                await foreach (EventObject foundEvent in QueryNamedPagedCandidatesAsync(
-                                   eventInfo,
-                                   machineNames,
-                                   startTime,
-                                   endTime,
-                                   timePeriod,
-                                   maxEvents: 0,
-                                   maxThreads,
-                                   cancellationToken,
-                                   minimumEventRecordIdExclusiveResolver,
-                                   oldest: true,
-                                   targetFailureObserver)) {
-                    queryInfo.TryRecordCandidate();
-                    candidateObserver?.Invoke(foundEvent);
-
-                    EventObjectSlim? targetEvent = BuildTargetEvents(foundEvent, typeEventsList);
+                await foreach (NamedEventProjection projection in ProjectNamedCandidatesInOrderAsync(
+                                   QueryNamedPagedCandidatesAsync(
+                                       eventInfo,
+                                       machineNames,
+                                       startTime,
+                                       endTime,
+                                       timePeriod,
+                                       maxEvents: 0,
+                                       maxThreads,
+                                       cancellationToken,
+                                       minimumEventRecordIdExclusiveResolver,
+                                       oldest: true,
+                                       targetFailureObserver),
+                                   typeEventsList,
+                                   enricher,
+                                   queryInfo.TryRecordCandidate,
+                                   candidateObserver,
+                                   cancellationToken)) {
+                    EventObjectSlim? targetEvent = projection.Target;
                     if (targetEvent == null || (resultPredicate != null && !resultPredicate(targetEvent))) {
                         continue;
                     }
@@ -137,22 +145,28 @@ namespace EventViewerX {
             }
 
             if (maxEvents > 0) {
-                await foreach (EventObject foundEvent in QueryNamedPagedCandidatesAsync(
-                                   eventInfo,
-                                   machineNames,
-                                   startTime,
-                                   endTime,
-                                   timePeriod,
-                                   maxEvents,
-                                   maxThreads,
-                                   cancellationToken,
-                                   minimumEventRecordIdExclusiveResolver,
-                                   oldest,
-                                   targetFailureObserver)) {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    queryInfo.EventsScanned++;
-                    candidateObserver?.Invoke(foundEvent);
-                    EventObjectSlim? targetEvent = BuildTargetEvents(foundEvent, typeEventsList);
+                await foreach (NamedEventProjection projection in ProjectNamedCandidatesInOrderAsync(
+                                   QueryNamedPagedCandidatesAsync(
+                                       eventInfo,
+                                       machineNames,
+                                       startTime,
+                                       endTime,
+                                       timePeriod,
+                                       maxEvents,
+                                       maxThreads,
+                                       cancellationToken,
+                                       minimumEventRecordIdExclusiveResolver,
+                                       oldest,
+                                       targetFailureObserver),
+                                   typeEventsList,
+                                   enricher,
+                                   () => {
+                                       queryInfo.EventsScanned++;
+                                       return true;
+                                   },
+                                   candidateObserver,
+                                   cancellationToken)) {
+                    EventObjectSlim? targetEvent = projection.Target;
                     if (targetEvent == null || (resultPredicate != null && !resultPredicate(targetEvent))) {
                         continue;
                     }
@@ -169,23 +183,25 @@ namespace EventViewerX {
 
             // Unlimited queries retain streaming/backpressure and do not need a cross-log selection buffer.
             foreach (KeyValuePair<string, HashSet<int>> entry in eventInfo) {
-                await foreach (EventObject foundEvent in QueryNamedEventCandidates(
-                                   entry,
-                                   machineNames,
-                                   startTime,
-                                   endTime,
-                                   timePeriod,
-                                   maxThreads,
-                                   maxEvents: 0,
-                                   cancellationToken,
-                                   minimumEventRecordIdExclusiveResolver,
-                                   oldest,
-                                   targetFailureObserver)) {
-                    queryInfo.TryRecordCandidate();
-
-                    candidateObserver?.Invoke(foundEvent);
-
-                    EventObjectSlim? targetEvent = BuildTargetEvents(foundEvent, typeEventsList);
+                await foreach (NamedEventProjection projection in ProjectNamedCandidatesInOrderAsync(
+                                   QueryNamedEventCandidates(
+                                       entry,
+                                       machineNames,
+                                       startTime,
+                                       endTime,
+                                       timePeriod,
+                                       maxThreads,
+                                       maxEvents: 0,
+                                       cancellationToken,
+                                       minimumEventRecordIdExclusiveResolver,
+                                       oldest,
+                                       targetFailureObserver),
+                                   typeEventsList,
+                                   enricher,
+                                   queryInfo.TryRecordCandidate,
+                                   candidateObserver,
+                                   cancellationToken)) {
+                    EventObjectSlim? targetEvent = projection.Target;
                     if (targetEvent == null || (resultPredicate != null && !resultPredicate(targetEvent))) {
                         continue;
                     }

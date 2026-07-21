@@ -324,6 +324,8 @@ public class EventObjectSlim {
     public static EventObjectSlim? CreateEventRule(EventObject eventObject, List<NamedEvents> targetNamedEvents) {
         var mode = _discoveryMode;
         EnsureInitialized();
+        List<string>? failedRuleNames = null;
+        List<Exception>? projectionErrors = null;
         string eventLog = !string.IsNullOrWhiteSpace(eventObject.ContainerLog)
             ? eventObject.ContainerLog
             : !string.IsNullOrWhiteSpace(eventObject.GatheredLogName)
@@ -349,7 +351,11 @@ public class EventObjectSlim {
                         continue;
                     }
                     return instance;
-                } catch {
+                } catch (Exception ex) {
+                    failedRuleNames ??= new List<string>();
+                    projectionErrors ??= new List<Exception>();
+                    failedRuleNames.Add(reg.RuleType?.FullName ?? namedEvent.ToString());
+                    projectionErrors.Add(ex);
                     continue;
                 }
             }
@@ -381,9 +387,19 @@ public class EventObjectSlim {
                 } else {
                     return instance;
                 }
-            } catch {
+            } catch (Exception ex) {
+                failedRuleNames ??= new List<string>();
+                projectionErrors ??= new List<Exception>();
+                failedRuleNames.Add(ruleType.FullName ?? ruleType.Name);
+                projectionErrors.Add(ex is TargetInvocationException { InnerException: not null }
+                    ? ex.InnerException
+                    : ex);
                 continue;
             }
+        }
+
+        if (projectionErrors != null && failedRuleNames != null) {
+            throw new EventRuleProjectionException(eventObject, failedRuleNames, projectionErrors);
         }
 
         return null;

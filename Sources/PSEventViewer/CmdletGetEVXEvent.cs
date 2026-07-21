@@ -204,6 +204,27 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
     public int MaxEventsScanned { get; set; }
 
     /// <summary>
+    /// Resolves reverse-DNS names for supported named events after projection. DNS failures remain visible on the
+    /// event and never remove the event from the pipeline.
+    /// </summary>
+    [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
+    public SwitchParameter ResolveDns { get; set; }
+
+    /// <summary>
+    /// Whole-request timeout in milliseconds for each optional reverse-DNS request, including dependency retries.
+    /// </summary>
+    [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
+    [ValidateRange(1, 60000)]
+    public int DnsTimeoutMs { get; set; } = 1000;
+
+    /// <summary>
+    /// Maximum number of reverse-DNS requests that may overlap. Results and checkpoints remain in event order.
+    /// </summary>
+    [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
+    [ValidateRange(1, 64)]
+    public int DnsMaxConcurrency { get; set; } = 8;
+
+    /// <summary>
     /// Controls whether each event includes metadata only, the formatted message, structured XML data, or all data.
     /// </summary>
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
@@ -460,6 +481,14 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
                 Func<EventObjectSlim, bool>? namedResultPredicate = MessageRegex == null
                     ? null
                     : eventObject => MessageMatches(eventObject.Event);
+                NamedEventEnrichmentOptions? enrichmentOptions = ResolveDns
+                    ? new NamedEventEnrichmentOptions {
+                        ResolveDns = true,
+                        DnsTimeoutMilliseconds = DnsTimeoutMs,
+                        DnsMaxConcurrency = DnsMaxConcurrency,
+                        RetryDnsOnTransient = false
+                    }
+                    : null;
                 await foreach (EventObjectSlim eventObject in SearchEvents.FindEventsByNamedEvents(
                                    typeList,
                                    MachineName,
@@ -474,7 +503,8 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
                                    minimumEventRecordIdExclusiveResolver: GetCheckpointLowerBound,
                                    candidateObserver: candidate => TrackCheckpointProgress(candidate),
                                    oldest: EffectiveOldest,
-                                   resultPredicate: namedResultPredicate)) {
+                                   resultPredicate: namedResultPredicate,
+                                   enrichmentOptions: enrichmentOptions)) {
                     token.ThrowIfCancellationRequested();
                     if (!TrackCheckpointProgress(eventObject.Event)) {
                         continue;
