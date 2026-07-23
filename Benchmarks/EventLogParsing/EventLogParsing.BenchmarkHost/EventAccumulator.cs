@@ -5,6 +5,9 @@ using EventViewerX;
 namespace EventLogParsing.BenchmarkHost;
 
 internal sealed class EventAccumulator {
+    private const long OrderModulus = 1_000_000_007;
+    private const long OrderMultiplier = 1_000_003;
+
     public long Count { get; private set; }
 
     public long IdSum { get; private set; }
@@ -12,6 +15,8 @@ internal sealed class EventAccumulator {
     public long RecordIdSum { get; private set; }
 
     public long TimeTicksXor { get; private set; }
+
+    public long OrderSignature { get; private set; }
 
     public long? FirstRecordId { get; private set; }
 
@@ -147,6 +152,12 @@ internal sealed class EventAccumulator {
             LastRecordId = recordId.Value;
         }
         TimeTicksXor ^= timeCreated.Ticks;
+        OrderSignature = (
+            (OrderSignature * OrderMultiplier)
+            + (recordId.GetValueOrDefault() % OrderModulus)
+            + ((id % OrderModulus) * 31L)
+            + ((timeCreated.Ticks % OrderModulus) * 17L)
+        ) % OrderModulus;
         MetadataTouch += providerName.Length;
         MetadataTouch += machineName.Length;
         MetadataTouch += logName.Length;

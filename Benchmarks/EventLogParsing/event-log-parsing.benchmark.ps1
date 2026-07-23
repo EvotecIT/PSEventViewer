@@ -4,6 +4,7 @@ $modulePath = input PSEventViewerPath (Join-Path $repositoryRoot 'Sources\PSEven
 $baselineHostPath = input BaselineHostPath
 $baselineModulePath = input BaselineModulePath
 $evtxECmdPath = input EvtxECmdPath
+$evtxMapsPath = input EvtxMapsPath
 $largeFixturePath = input LargeFixturePath
 $expectedLargeCount = inputInt ExpectedLargeCount 0
 $expensiveSampleCount = inputInt ExpensiveSampleCount 100000
@@ -13,7 +14,6 @@ $powerShellRunner = Join-Path $PSScriptRoot 'Invoke-PowerShellEventLogBenchmark.
 $evtxRunner = Join-Path $PSScriptRoot 'Invoke-EvtxECmdBenchmark.ps1'
 $benchmarkWrapper = Join-Path $PSScriptRoot 'Invoke-EventLogParsingBenchmark.ps1'
 $benchmarkSpec = Join-Path $PSScriptRoot 'event-log-parsing.benchmark.ps1'
-$mainReadmePath = Join-Path $repositoryRoot 'README.md'
 $pwshPath = [string] (Get-Command pwsh -ErrorAction Stop).Source
 $dotnetPath = [string] (Get-Command dotnet -ErrorAction Stop).Source
 if ($readmeTable -notin 'None', 'Common', 'EvtxNative') {
@@ -182,6 +182,30 @@ benchmark 'event-log-parsing' -out (Join-Path $repositoryRoot 'Ignore\Benchmarks
         metadata EvtxECmdVersion ([Diagnostics.FileVersionInfo]::GetVersionInfo([IO.Path]::GetFullPath($evtxECmdPath)).ProductVersion)
         metadata EvtxECmdSha256 (Get-FileHash -LiteralPath $evtxECmdPath -Algorithm SHA256).Hash
     }
+    if ($evtxMapsPath) {
+        $mapsFullPath = [IO.Path]::GetFullPath($evtxMapsPath)
+        [array] $mapManifest = Get-ChildItem -LiteralPath $mapsFullPath -Recurse -File |
+            Sort-Object FullName |
+            ForEach-Object {
+                [ordered] @{
+                    Path   = [IO.Path]::GetRelativePath($mapsFullPath, $_.FullName).Replace('\', '/')
+                    Bytes  = $_.Length
+                    Sha256 = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash
+                }
+            }
+        $mapManifestJson = [string] ($mapManifest | ConvertTo-Json -Compress)
+        $sha256 = [Security.Cryptography.SHA256]::Create()
+        try {
+            $mapManifestSha256 = [BitConverter]::ToString(
+                $sha256.ComputeHash([Text.Encoding]::UTF8.GetBytes($mapManifestJson))
+            ).Replace('-', '')
+        } finally {
+            $sha256.Dispose()
+        }
+        metadata EvtxMapsFileCount ([string] $mapManifest.Count)
+        metadata EvtxMapsManifestSha256 $mapManifestSha256
+        metadata EvtxMapsManifest $mapManifestJson
+    }
 
     policy -Warmup 0 -Iterations 1 -Order Rotated -OutlierMode None
     profile Current -Cleanup KeepOnFailure
@@ -216,7 +240,7 @@ benchmark 'event-log-parsing' -out (Join-Path $repositoryRoot 'Ignore\Benchmarks
 
         $definition = $caseDefinitions[$case.Scenario]
         if ($definition.Workload -like 'Evtx*') {
-            return $case.Engine -ne 'EvtxECmd' -or -not $evtxECmdPath
+            return $case.Engine -ne 'EvtxECmd' -or -not $evtxECmdPath -or -not $evtxMapsPath
         }
         if ($definition.Workload -eq 'MetadataCsv') {
             if ($case.Engine -eq 'PSEventViewerBaseline') {
@@ -445,6 +469,8 @@ benchmark 'event-log-parsing' -out (Join-Path $repositoryRoot 'Ignore\Benchmarks
                 $evtxRunner
                 '-ExecutablePath'
                 $evtxECmdPath
+                '-MapsPath'
+                $evtxMapsPath
                 '-Path'
                 $definition.FixturePath
                 '-ResultPath'
@@ -482,12 +508,19 @@ benchmark 'event-log-parsing' -out (Join-Path $repositoryRoot 'Ignore\Benchmarks
 
         $requiresOutput = $definition.Workload -eq 'MetadataCsv' -or
             ($definition.Workload -like 'Evtx*' -and $definition.Workload -ne 'EvtxNativeParse')
-        if ($requiresOutput -and ([long] $run.Result.OutputBytes -le 0)) {
-            throw "The $($definition.Workload) benchmark did not produce a non-empty output file."
-        }
-        if ($requiresOutput -and
-            [string]::IsNullOrWhiteSpace([string] $run.Result.OutputSha256)) {
-            throw "The $($definition.Workload) benchmark did not record its output SHA-256 hash."
+        if ($requiresOutput) {
+            assertPath $run.EventOutputPath
+            $outputFile = Get-Item -LiteralPath $run.EventOutputPath
+            if ($outputFile.Length -le 0) {
+                throw "The $($definition.Workload) benchmark did not produce a non-empty output file."
+            }
+            $run.Result.OutputBytes = [long] $outputFile.Length
+            $run.Result.OutputSha256 = [string] (Get-FileHash -LiteralPath $outputFile.FullName -Algorithm SHA256).Hash
+            [ordered] @{
+                FileName = $outputFile.Name
+                Bytes    = [long] $run.Result.OutputBytes
+                Sha256   = [string] $run.Result.OutputSha256
+            } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $run.OutputDirectory 'output-validation.json') -Encoding utf8
         }
 
         if ($definition.Workload -notlike 'Evtx*') {
@@ -500,11 +533,12 @@ benchmark 'event-log-parsing' -out (Join-Path $repositoryRoot 'Ignore\Benchmarks
 
             $readMode = if ($definition.Workload -eq 'MetadataCsv') { 'Metadata' } else { $definition.Workload }
             $identityKey = '{0}|{1}' -f $definition.Fixture, $definition.MaxEvents
-            $identitySignature = '{0}|{1}|{2}|{3}|{4}|{5}' -f
+            $identitySignature = '{0}|{1}|{2}|{3}|{4}|{5}|{6}' -f
                 [long] $run.Result.Count,
                 [long] $run.Result.IdSum,
                 [long] $run.Result.RecordIdSum,
                 [long] $run.Result.TimeTicksXor,
+                [long] $run.Result.OrderSignature,
                 [long] $run.Result.FirstRecordId,
                 [long] $run.Result.LastRecordId
             if ($commonIdentitySignatures.ContainsKey($identityKey)) {
@@ -528,6 +562,9 @@ benchmark 'event-log-parsing' -out (Join-Path $repositoryRoot 'Ignore\Benchmarks
                 assertValue -Actual ([long] $run.Result.XmlCharacters) -Expected ([long] 0) -Message 'Metadata mode must not materialize XML.'
                 assertValue -Actual ([long] $run.Result.PropertyCount) -Expected ([long] 0) -Message 'Metadata mode must not materialize event properties.'
             } elseif ($readMode -eq 'Message') {
+                if ([long] $run.Result.MessageCharacters -le 0) {
+                    throw 'Message mode did not format any provider messages.'
+                }
                 assertValue -Actual ([long] $run.Result.XmlCharacters) -Expected ([long] 0) -Message 'Message mode must not materialize XML.'
                 assertValue -Actual ([long] $run.Result.PropertyCount) -Expected ([long] 0) -Message 'Message mode must not materialize event properties.'
             } elseif ($readMode -eq 'StructuredData') {
@@ -535,9 +572,11 @@ benchmark 'event-log-parsing' -out (Join-Path $repositoryRoot 'Ignore\Benchmarks
                 if ([long] $run.Result.XmlCharacters -le 0 -or [long] $run.Result.PropertyCount -le 0) {
                     throw 'StructuredData mode did not materialize XML and event properties.'
                 }
-            } elseif ($readMode -eq 'Full' -and
-                ([long] $run.Result.XmlCharacters -le 0 -or [long] $run.Result.PropertyCount -le 0)) {
-                throw 'Full mode did not materialize XML and event properties.'
+            } elseif ($readMode -eq 'Full' -and (
+                [long] $run.Result.MessageCharacters -le 0 -or
+                [long] $run.Result.XmlCharacters -le 0 -or
+                [long] $run.Result.PropertyCount -le 0)) {
+                throw 'Full mode did not format messages or materialize XML and event properties.'
             }
         }
     }
@@ -574,6 +613,15 @@ benchmark 'event-log-parsing' -out (Join-Path $repositoryRoot 'Ignore\Benchmarks
         param($case, $run)
         if ($run.Result.PSObject.Properties.Name -contains 'RecordIdSum') {
             [long] $run.Result.RecordIdSum
+        } else {
+            0
+        }
+    }
+
+    metric OrderSignature {
+        param($case, $run)
+        if ($run.Result.PSObject.Properties.Name -contains 'OrderSignature') {
+            [long] $run.Result.OrderSignature
         } else {
             0
         }
@@ -671,10 +719,5 @@ benchmark 'event-log-parsing' -out (Join-Path $repositoryRoot 'Ignore\Benchmarks
     }
 
     comparison Engine -Baseline PSEventViewer -Metric MedianMs -TieTolerance 0.03
-    if ($readmeTable -eq 'Common') {
-        readme $mainReadmePath -Block 'event-log-common-benchmark' -Renderer ComparisonTable
-    } elseif ($readmeTable -eq 'EvtxNative') {
-        readme $mainReadmePath -Block 'event-log-evtx-native-benchmark' -Renderer SummaryTable
-    }
     artifacts Json, Csv, Markdown
 }

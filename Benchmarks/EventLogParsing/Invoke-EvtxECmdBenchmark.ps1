@@ -6,6 +6,9 @@ param(
     [string] $Path,
 
     [Parameter(Mandatory)]
+    [string] $MapsPath,
+
+    [Parameter(Mandatory)]
     [string] $ResultPath,
 
     [Parameter(Mandatory)]
@@ -28,6 +31,12 @@ $startInfo.RedirectStandardError = $true
 $startInfo.ArgumentList.Add('-f')
 $startInfo.ArgumentList.Add([IO.Path]::GetFullPath($Path))
 $startInfo.ArgumentList.Add('--met')
+$mapsFullPath = [IO.Path]::GetFullPath($MapsPath)
+if (-not (Test-Path -LiteralPath $mapsFullPath -PathType Container)) {
+    throw "EvtxECmd maps directory '$mapsFullPath' does not exist."
+}
+$startInfo.ArgumentList.Add('--maps')
+$startInfo.ArgumentList.Add($mapsFullPath)
 
 $outputFullPath = if ($OutputPath) {
     [IO.Path]::GetFullPath($OutputPath)
@@ -138,8 +147,8 @@ $result = [ordered] @{
     ElapsedMilliseconds  = $stopwatch.Elapsed.TotalMilliseconds
     StandardOutputBytes  = (Get-Item -LiteralPath $StandardOutputPath).Length
     OutputPath           = $outputFullPath
-    OutputBytes          = if ($outputFullPath) { (Get-Item -LiteralPath $outputFullPath).Length } else { 0 }
-    OutputSha256         = if ($outputFullPath) { (Get-FileHash -LiteralPath $outputFullPath -Algorithm SHA256).Hash } else { $null }
+    OutputBytes          = 0
+    OutputSha256         = $null
 }
 
 $resultDirectory = Split-Path -Parent ([IO.Path]::GetFullPath($ResultPath))

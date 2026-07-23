@@ -19,6 +19,8 @@ internal sealed class BenchmarkResult {
 
     public long TimeTicksXor { get; init; }
 
+    public long OrderSignature { get; init; }
+
     public long? FirstRecordId { get; init; }
 
     public long? LastRecordId { get; init; }

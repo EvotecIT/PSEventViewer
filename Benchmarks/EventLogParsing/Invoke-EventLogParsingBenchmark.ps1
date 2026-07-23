@@ -11,7 +11,7 @@ Large EVTX fixtures and competitor binaries remain external inputs.
 .\Invoke-EventLogParsingBenchmark.ps1 -Case Smoke-Common-Scan-Metadata -Engine DotNet, EventViewerX, GetWinEvent, PSEventViewer
 
 .EXAMPLE
-.\Invoke-EventLogParsingBenchmark.ps1 -LargeFixturePath C:\Temp\Security.evtx -ExpectedLargeCount 1000000 -EvtxECmdPath C:\Tools\EvtxECmd.exe -Case Large-Evtx-FullJson
+.\Invoke-EventLogParsingBenchmark.ps1 -LargeFixturePath C:\Temp\Security.evtx -ExpectedLargeCount 1000000 -EvtxECmdPath C:\Tools\EvtxECmd.exe -EvtxMapsPath C:\Tools\Maps -Case Large-Evtx-FullJson
 
 .EXAMPLE
 .\Invoke-EventLogParsingBenchmark.ps1 -LargeFixturePath C:\Temp\Security.evtx -ExpectedLargeCount 1000000 -ReadmeTable Common -IterationCount 3
@@ -31,6 +31,8 @@ param(
     [int] $ExpensiveSampleCount = 100000,
 
     [string] $EvtxECmdPath,
+
+    [string] $EvtxMapsPath,
 
     [string] $BaselineHostPath,
 
@@ -57,6 +59,10 @@ $specPath = Join-Path $PSScriptRoot 'event-log-parsing.benchmark.ps1'
 
 Import-Module PSPublishModule -MinimumVersion 3.0.76 -ErrorAction Stop
 
+if ([bool] $EvtxECmdPath -ne [bool] $EvtxMapsPath) {
+    throw 'EvtxECmdPath and EvtxMapsPath must be supplied together.'
+}
+
 if ($ReadmeTable -ne 'None') {
     if (-not $LargeFixturePath -or $ExpectedLargeCount -le 0) {
         throw 'ReadmeTable requires LargeFixturePath and a positive ExpectedLargeCount.'
@@ -78,8 +84,8 @@ if ($ReadmeTable -ne 'None') {
         )
         $Engine = 'DotNet', 'EventViewerX', 'PSEventViewer', 'GetWinEvent'
     } else {
-        if (-not $EvtxECmdPath) {
-            throw 'ReadmeTable EvtxNative requires EvtxECmdPath.'
+        if (-not $EvtxECmdPath -or -not $EvtxMapsPath) {
+            throw 'ReadmeTable EvtxNative requires EvtxECmdPath and EvtxMapsPath.'
         }
         $Case = @(
             'Large-Evtx-NativeParse'
@@ -111,6 +117,13 @@ if ($LargeFixturePath) {
 }
 if ($EvtxECmdPath) {
     $variables.EvtxECmdPath = [IO.Path]::GetFullPath($EvtxECmdPath)
+}
+if ($EvtxMapsPath) {
+    $mapsFullPath = [IO.Path]::GetFullPath($EvtxMapsPath)
+    if (-not (Test-Path -LiteralPath $mapsFullPath -PathType Container)) {
+        throw "EvtxECmd maps directory '$mapsFullPath' does not exist."
+    }
+    $variables.EvtxMapsPath = $mapsFullPath
 }
 if ($BaselineHostPath) {
     $variables.BaselineHostPath = [IO.Path]::GetFullPath($BaselineHostPath)
@@ -148,6 +161,23 @@ if (-not $Plan) {
             '{0}/{1}/iteration-{2}: {3}' -f $sample.Scenario, $sample.Engine, $sample.Iteration, $sample.Reason
         }
         throw "The benchmark completed with $($failedSamples.Count) failed sample(s):`n$($failureSummary -join "`n")"
+    }
+
+    $readmePath = Join-Path $repositoryRoot 'README.md'
+    if ($ReadmeTable -eq 'Common') {
+        Update-BenchmarkDocument `
+            -Path $readmePath `
+            -BlockId 'event-log-common-benchmark' `
+            -ComparisonPath $benchmarkResult.Artifacts['comparison.json'] `
+            -Renderer ComparisonTable `
+            -Confirm:$false | Out-Null
+    } elseif ($ReadmeTable -eq 'EvtxNative') {
+        Update-BenchmarkDocument `
+            -Path $readmePath `
+            -BlockId 'event-log-evtx-native-benchmark' `
+            -SummaryPath $benchmarkResult.Artifacts['summary.json'] `
+            -Renderer SummaryTable `
+            -Confirm:$false | Out-Null
     }
 }
 

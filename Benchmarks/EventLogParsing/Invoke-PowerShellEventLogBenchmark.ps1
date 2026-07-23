@@ -60,6 +60,9 @@ function Measure-EventPipeline {
         [long] $idSum = 0
         [long] $recordIdSum = 0
         [long] $timeTicksXor = 0
+        [long] $orderSignature = 0
+        [long] $orderModulus = 1000000007
+        [long] $orderMultiplier = 1000003
         [long] $metadataTouch = 0
         [long] $messageCharacters = 0
         [long] $xmlCharacters = 0
@@ -75,9 +78,11 @@ function Measure-EventPipeline {
         $eventRecord = $InputObject
         $count++
         $idSum += [long] $eventRecord.Id
+        [long] $recordIdForOrder = 0
 
         if ($null -ne $eventRecord.RecordId) {
             [long] $recordId = $eventRecord.RecordId
+            $recordIdForOrder = $recordId
             $recordIdSum += $recordId
             if ($null -eq $firstRecordId) {
                 $firstRecordId = $recordId
@@ -85,9 +90,17 @@ function Measure-EventPipeline {
             $lastRecordId = $recordId
         }
 
+        [long] $timeTicksForOrder = 0
         if ($null -ne $eventRecord.TimeCreated) {
-            $timeTicksXor = $timeTicksXor -bxor [long] $eventRecord.TimeCreated.Ticks
+            $timeTicksForOrder = [long] $eventRecord.TimeCreated.Ticks
+            $timeTicksXor = $timeTicksXor -bxor $timeTicksForOrder
         }
+        $orderSignature = (
+            ($orderSignature * $orderMultiplier) +
+            ($recordIdForOrder % $orderModulus) +
+            (([long] $eventRecord.Id % $orderModulus) * 31) +
+            (($timeTicksForOrder % $orderModulus) * 17)
+        ) % $orderModulus
 
         foreach ($text in $eventRecord.ProviderName, $eventRecord.MachineName, $eventRecord.LogName) {
             if ($null -ne $text) {
@@ -148,6 +161,7 @@ function Measure-EventPipeline {
             IdSum                = $idSum
             RecordIdSum          = $recordIdSum
             TimeTicksXor         = $timeTicksXor
+            OrderSignature       = $orderSignature
             FirstRecordId        = $firstRecordId
             LastRecordId         = $lastRecordId
             MetadataTouch        = $metadataTouch
@@ -242,6 +256,7 @@ $result = [ordered] @{
     IdSum                = $projection.IdSum
     RecordIdSum          = $projection.RecordIdSum
     TimeTicksXor         = $projection.TimeTicksXor
+    OrderSignature       = $projection.OrderSignature
     FirstRecordId        = $projection.FirstRecordId
     LastRecordId         = $projection.LastRecordId
     MetadataTouch        = $projection.MetadataTouch
@@ -258,8 +273,8 @@ $result = [ordered] @{
     Gen2Collections      = [GC]::CollectionCount(2) - $gen2Before
     ElapsedMilliseconds  = $stopwatch.Elapsed.TotalMilliseconds
     OutputPath           = $csvFullPath
-    OutputBytes          = if ($csvFullPath) { (Get-Item -LiteralPath $csvFullPath).Length } else { 0 }
-    OutputSha256         = if ($csvFullPath) { (Get-FileHash -LiteralPath $csvFullPath -Algorithm SHA256).Hash } else { $null }
+    OutputBytes          = 0
+    OutputSha256         = $null
 }
 
 $resultDirectory = Split-Path -Parent ([IO.Path]::GetFullPath($ResultPath))

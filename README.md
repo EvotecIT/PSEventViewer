@@ -191,9 +191,9 @@ Remove-EVXLog -LogName 'MyApp'
 | Read mode | Materialized data | Use it for |
 | --- | --- | --- |
 | `Metadata` | Core system fields only; no message, XML, attachments, or bookmark | Counting, filtering, timelines, IDs, providers, record-ID checkpoints, and large exports |
-| `Message` | Metadata and the provider-formatted message; `MessageData` is parsed only when accessed | Text search and readable provider messages |
-| `StructuredData` | Metadata, raw properties, XML, and the parsed `Data` dictionary; no formatted message | Named event fields, payload analysis, and `-Expand` |
-| `Full` | Message, structured data, attachments, and bookmark | Compatibility and workflows that need every representation |
+| `Message` | Metadata, provider display names, the provider-formatted message, and bookmark; `MessageData` is parsed only when accessed | Text search and readable provider messages |
+| `StructuredData` | Metadata, raw properties, XML, parsed `Data`, and bookmark; no formatted message or decoded attachments | Named event fields, payload analysis, and `-Expand` |
+| `Full` | Message and structured data together, including parsed message fields and decoded binary attachments | Compatibility and workflows that need every representation |
 
 Formatting a provider message is often the most expensive per-event operation. Filter by log, event ID, provider,
 time, record ID, level, keyword, user, or named data before choosing `Message` or `Full`.
@@ -218,16 +218,17 @@ The equivalent C# API accepts `readMode: EventReadMode.Metadata`, `Message`, `St
 
 The [PowerForge event log benchmark](Benchmarks/EventLogParsing/README.md) separates three kinds of evidence:
 
-| Comparison | Meaning |
+| Comparison class | Meaning |
 | --- | --- |
-| Exact output | The same events and selected fields produce a byte-identical CSV with the same SHA-256. |
-| Common public work | The APIs perform the same user-facing read job and validate the same event window and identity checks. Additional PSEventViewer projections remain visible in the metrics. |
-| EvtxECmd native | EvtxECmd runs its own parser, maps, and fixed output schemas. These rows describe a different forensic workflow and are not presented as interchangeable output. |
+| Apples to apples: exact output | The same events and selected fields produce a byte-identical CSV with the same SHA-256. |
+| Apples to apples: common user job | The APIs perform the same user-facing read job and validate the same event window, order, and identity checks. Additional PSEventViewer projections remain visible in the metrics. |
+| Apples to oranges: native output | EvtxECmd runs its own parser, maps, and fixed output schemas. These rows describe a different forensic workflow and are not presented as interchangeable output. |
 
 EvtxECmd's `--fj true` option is a full **raw-event JSON** export: it converts all available event XML to JSON. It is
 not equivalent to PSEventViewer `-ReadMode Full`, which also requests the Windows provider-formatted message and
-materializes PSEventViewer's parsed data, message fields, attachments, and bookmark. EvtxECmd's normal CSV is likewise
-a 25-column map-enriched forensic schema, not the five-column metadata export shown above.
+materializes PSEventViewer's parsed data, message fields, and attachments. PSEventViewer snapshots a bookmark for
+every non-metadata mode, so bookmark creation is not a `Full`-only distinction. EvtxECmd's normal CSV is likewise a
+25-column map-enriched forensic schema, not the five-column metadata export shown above.
 
 The common-work table is generated from validated PowerForge artifacts. The public refresh command requires at least
 three rotated iterations and owns its complete case/engine matrix. This snapshot was captured on July 23, 2026 with

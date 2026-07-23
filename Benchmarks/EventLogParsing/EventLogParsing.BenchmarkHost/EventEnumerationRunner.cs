@@ -1,7 +1,6 @@
 using System.Diagnostics;
 using System.Diagnostics.Eventing.Reader;
 using System.Globalization;
-using System.Security.Cryptography;
 using System.Text;
 using EventViewerX;
 
@@ -67,6 +66,7 @@ internal static class EventEnumerationRunner {
             IdSum = accumulator.IdSum,
             RecordIdSum = accumulator.RecordIdSum,
             TimeTicksXor = accumulator.TimeTicksXor,
+            OrderSignature = accumulator.OrderSignature,
             FirstRecordId = accumulator.FirstRecordId,
             LastRecordId = accumulator.LastRecordId,
             MetadataTouch = accumulator.MetadataTouch,
@@ -83,21 +83,9 @@ internal static class EventEnumerationRunner {
             Gen2Collections = GC.CollectionCount(2) - gen2Before,
             ElapsedMilliseconds = stopwatch.Elapsed.TotalMilliseconds,
             OutputPath = options.OutputPath,
-            OutputBytes = options.OutputPath is not null && File.Exists(options.OutputPath)
-                ? new FileInfo(options.OutputPath).Length
-                : 0,
-            OutputSha256 = CalculateOutputSha256(options.OutputPath)
+            OutputBytes = 0,
+            OutputSha256 = null
         };
-    }
-
-    private static string? CalculateOutputSha256(string? path) {
-        if (path is null || !File.Exists(path)) {
-            return null;
-        }
-
-        using FileStream stream = File.OpenRead(path);
-        using SHA256 sha256 = SHA256.Create();
-        return Convert.ToHexString(sha256.ComputeHash(stream));
     }
 
     private static void RunEventViewerX(BenchmarkOptions options, EventAccumulator accumulator) {

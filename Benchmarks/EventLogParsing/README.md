@@ -13,9 +13,9 @@ The suite keeps three kinds of evidence separate:
 
 | Class | What is held equal | What the result means |
 | --- | --- | --- |
-| Exact output | Same EVTX, event order, selected fields, CSV encoding, row count, byte count, and SHA-256 | A direct end-to-end comparison. `Get-EVXEvent`, `Get-WinEvent`, and the direct .NET lower bound must create the same metadata CSV. |
-| Common public work | Same EVTX, direction, maximum event count, read-mode category, streaming consumer, and event identity checks | A comparison of the natural public APIs for the same user job. PSEventViewer may return additional parsed fields, and those extra counters are reported. |
-| EvtxECmd native | Same EVTX and validated event count, but EvtxECmd uses its own parser, maps, schema, and output format | Competitor evidence, not an interchangeable projection or an unqualified speed ranking. |
+| Apples to apples: exact output | Same EVTX, event order, selected fields, CSV encoding, row count, byte count, and SHA-256 | A direct end-to-end comparison. `Get-EVXEvent`, `Get-WinEvent`, and the direct .NET lower bound must create the same metadata CSV. |
+| Apples to apples: common user job | Same EVTX, direction, maximum event count, read-mode category, streaming consumer, and event order and identity checks | A comparison of the natural public APIs for the same user job. PSEventViewer may return additional parsed fields, and those extra counters are reported. |
+| Apples to oranges: native output | Same EVTX and validated event count, but EvtxECmd uses its own parser, maps, schema, and output format | Competitor evidence, not an interchangeable projection or an unqualified speed ranking. |
 
 Do not combine rows from different classes into a single “faster than” claim. In particular, comparing a five-column
 metadata CSV with EvtxECmd's forensic CSV compares different work and different output volumes.
@@ -36,16 +36,19 @@ metadata CSV with EvtxECmd's forensic CSV compares different work and different 
 `Metadata`, `Message`, `StructuredData`, and `Full` are run through the same event window and streaming accumulator:
 
 - `Metadata` touches core system fields without messages, XML, properties, attachments, or bookmarks.
-- `Message` touches core metadata, the provider-formatted message, and provider display names.
-- `StructuredData` touches metadata, properties, and raw XML. PSEventViewer also parses its named `Data` dictionary.
-- `Full` requests message and structured data together. PSEventViewer additionally materializes its parsed message
-  fields, attachments, and bookmark representation.
+- `Message` touches core metadata, the provider-formatted message, and provider display names. PSEventViewer also
+  snapshots the event bookmark, as it does for every non-metadata mode.
+- `StructuredData` touches metadata, properties, and raw XML. PSEventViewer also parses its named `Data` dictionary,
+  and snapshots the bookmark. It does not format the message or decode binary attachments.
+- `Full` requests message and structured data together. PSEventViewer additionally materializes its parsed
+  `MessageData` fields and decodes binary attachments; bookmark work is already present in every non-metadata mode.
 - `MetadataCsv` writes the five fields shown in the public README. The three successful engines must produce the same
   row count, byte count, and SHA-256.
 
 The `Message`, `StructuredData`, and `Full` cases are therefore common-user-job comparisons rather than promises that
 every internal allocation or returned type is identical. Result artifacts expose message characters, XML characters,
-property count, structured-field count, message-field count, and attachment bytes so the extra work remains visible.
+property count, structured-field count, message-field count, and attachment bytes. Bookmark materialization is
+documented but is not currently a separate counter.
 
 ## What “full” means in EvtxECmd
 
@@ -67,18 +70,20 @@ reports them in a separate README table.
 ## Validation and provenance
 
 Every successful lane must process the expected event count with no parser errors. Common-work lanes also require
-non-empty event identity checks, first and last record IDs, and mode-specific materialization rules. Output lanes must
-create a non-empty file and record its SHA-256.
+non-empty event identity checks, an order-sensitive rolling signature, first and last record IDs, and mode-specific
+materialization rules. Output lanes must create a non-empty file and record its size and SHA-256 outside the timed
+operation in a retained `output-validation.json` sidecar.
 
 PowerForge records:
 
 - end-to-end duration and engine-reported duration;
 - events per second, managed allocation, and peak working set;
-- event identity sums and first/last record IDs;
+- event identity sums, order signature, and first/last record IDs;
 - message, XML, property, parsed-field, attachment, and output sizes;
 - repository head and dirty state;
 - fixture path, size, and SHA-256;
 - built host, module, EventViewerX, benchmark-script, optional baseline, and EvtxECmd hashes;
+- the explicit EvtxECmd map directory's sorted per-file manifest and aggregate manifest hash;
 - .NET, PowerShell, and EvtxECmd versions.
 
 Large public tables use at least three rotated iterations for common-work comparisons. EvtxECmd native exports may use
@@ -123,9 +128,12 @@ Generate the separate EvtxECmd-native table:
     -LargeFixturePath C:\Temp\Security.evtx `
     -ExpectedLargeCount 1000000 `
     -EvtxECmdPath C:\Tools\EvtxECmd.exe `
+    -EvtxMapsPath C:\Tools\Maps `
     -ReadmeTable EvtxNative
 ```
 
-`-ReadmeTable` owns its curated case and engine matrix so a partial run cannot silently replace a public table.
-Artifacts are written below `Ignore\Benchmarks\EventLogParsing\Runs` unless `-OutputRoot` is supplied. Keep the small
-summary and provenance needed for review, then delete large fixtures and generated CSV, JSON, and XML files.
+`-ReadmeTable` owns its curated case and engine matrix so a partial run cannot silently replace a public table. The
+wrapper calls PowerForge's document updater only after every measured sample succeeds; failed runs keep their
+diagnostic artifacts and leave the last validated table unchanged. Artifacts are written below
+`Ignore\Benchmarks\EventLogParsing\Runs` unless `-OutputRoot` is supplied. Keep the small summary and provenance needed
+for review, then delete large fixtures and generated CSV, JSON, and XML files.
