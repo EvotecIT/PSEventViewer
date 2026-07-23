@@ -6,29 +6,56 @@ using System.Threading;
 
 namespace EventViewerX.Native;
 
-internal static class WindowsEventFileReader {
+internal static class WindowsEventReader {
     private const int BatchSize = 64;
 
-    internal static IEnumerable<NativeEventMetadata> ReadMetadata(
-        string filePath,
-        string xpath,
-        bool oldest,
+    internal static IEnumerable<EventObject> Read(
+        NativeEventQuery query,
+        EventReadMode readMode,
+        string queriedMachine,
+        string containerLog,
         CancellationToken cancellationToken) {
 
-        return ReadMetadataIterator(filePath, xpath, oldest, cancellationToken);
+        switch (readMode) {
+            case EventReadMode.Metadata:
+                foreach (NativeEventMetadata metadata in ReadMetadata(query, cancellationToken)) {
+                    yield return new EventObject(metadata, queriedMachine, containerLog);
+                }
+                break;
+            case EventReadMode.Message:
+                foreach (NativeEventMessage message in ReadMessages(query, cancellationToken)) {
+                    yield return new EventObject(message, queriedMachine, containerLog);
+                }
+                break;
+            case EventReadMode.StructuredData:
+                foreach (NativeEventStructured structured in ReadStructured(query, cancellationToken)) {
+                    yield return new EventObject(structured, queriedMachine, containerLog);
+                }
+                break;
+            case EventReadMode.Full:
+                foreach (NativeEventFull full in ReadFull(query, cancellationToken)) {
+                    yield return new EventObject(full, queriedMachine, containerLog);
+                }
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(readMode), readMode, "Unsupported event read mode.");
+        }
+    }
+
+    internal static IEnumerable<NativeEventMetadata> ReadMetadata(
+        NativeEventQuery query,
+        CancellationToken cancellationToken) {
+
+        return ReadMetadataIterator(query, cancellationToken);
     }
 
     private static IEnumerable<NativeEventMetadata> ReadMetadataIterator(
-        string filePath,
-        string xpath,
-        bool oldest,
+        NativeEventQuery query,
         CancellationToken cancellationToken) {
 
         using var renderer = new WindowsEventSystemRenderer();
         foreach (NativeEventMetadata metadata in ReadEvents(
-                     filePath,
-                     xpath,
-                     oldest,
+                     query,
                      cancellationToken,
                      renderer.Render)) {
             yield return metadata;
@@ -36,44 +63,36 @@ internal static class WindowsEventFileReader {
     }
 
     internal static IEnumerable<NativeEventMessage> ReadMessages(
-        string filePath,
-        string xpath,
-        bool oldest,
+        NativeEventQuery query,
         CancellationToken cancellationToken) {
 
-        return ReadMessagesIterator(filePath, xpath, oldest, cancellationToken);
+        return ReadMessagesIterator(query, cancellationToken);
     }
 
     internal static IEnumerable<NativeEventStructured> ReadStructured(
-        string filePath,
-        string xpath,
-        bool oldest,
+        NativeEventQuery query,
         CancellationToken cancellationToken) {
 
-        return ReadStructuredIterator(filePath, xpath, oldest, cancellationToken);
+        return ReadStructuredIterator(query, cancellationToken);
     }
 
     internal static IEnumerable<NativeEventFull> ReadFull(
-        string filePath,
-        string xpath,
-        bool oldest,
+        NativeEventQuery query,
         CancellationToken cancellationToken) {
 
-        return ReadFullIterator(filePath, xpath, oldest, cancellationToken);
+        return ReadFullIterator(query, cancellationToken);
     }
 
     private static IEnumerable<NativeEventMessage> ReadMessagesIterator(
-        string filePath,
-        string xpath,
-        bool oldest,
+        NativeEventQuery query,
         CancellationToken cancellationToken) {
 
         using var systemRenderer = new WindowsEventSystemRenderer();
-        using var messageRenderer = new WindowsEventMessageRenderer(filePath);
+        using var messageRenderer = new WindowsEventMessageRenderer(
+            query.PublisherMetadataPath,
+            query.MessageLocale);
         foreach (NativeEventMessage message in ReadEvents(
-                     filePath,
-                     xpath,
-                     oldest,
+                     query,
                      cancellationToken,
                      eventHandle => {
                          NativeEventMetadata metadata = systemRenderer.Render(eventHandle);
@@ -84,17 +103,13 @@ internal static class WindowsEventFileReader {
     }
 
     private static IEnumerable<NativeEventStructured> ReadStructuredIterator(
-        string filePath,
-        string xpath,
-        bool oldest,
+        NativeEventQuery query,
         CancellationToken cancellationToken) {
 
         using var systemRenderer = new WindowsEventSystemRenderer();
         using var payloadRenderer = new WindowsEventPayloadRenderer();
         foreach (NativeEventStructured structured in ReadEvents(
-                     filePath,
-                     xpath,
-                     oldest,
+                     query,
                      cancellationToken,
                      eventHandle => {
                          NativeEventMetadata metadata = systemRenderer.Render(eventHandle);
@@ -105,18 +120,16 @@ internal static class WindowsEventFileReader {
     }
 
     private static IEnumerable<NativeEventFull> ReadFullIterator(
-        string filePath,
-        string xpath,
-        bool oldest,
+        NativeEventQuery query,
         CancellationToken cancellationToken) {
 
         using var systemRenderer = new WindowsEventSystemRenderer();
-        using var messageRenderer = new WindowsEventMessageRenderer(filePath);
+        using var messageRenderer = new WindowsEventMessageRenderer(
+            query.PublisherMetadataPath,
+            query.MessageLocale);
         using var payloadRenderer = new WindowsEventPayloadRenderer();
         foreach (NativeEventFull full in ReadEvents(
-                     filePath,
-                     xpath,
-                     oldest,
+                     query,
                      cancellationToken,
                      eventHandle => {
                          NativeEventMetadata metadata = systemRenderer.Render(eventHandle);
@@ -129,23 +142,19 @@ internal static class WindowsEventFileReader {
     }
 
     private static IEnumerable<T> ReadEvents<T>(
-        string filePath,
-        string xpath,
-        bool oldest,
+        NativeEventQuery eventQuery,
         CancellationToken cancellationToken,
         Func<IntPtr, T> projector) {
 
-        WindowsEventNativeMethods.QueryFlags flags = WindowsEventNativeMethods.QueryFlags.FilePath |
-            (oldest
-                ? WindowsEventNativeMethods.QueryFlags.ForwardDirection
-                : WindowsEventNativeMethods.QueryFlags.ReverseDirection);
         using WindowsEventNativeMethods.EventHandle query = WindowsEventNativeMethods.EvtQuery(
-            IntPtr.Zero,
-            filePath,
-            xpath,
-            flags);
+            eventQuery.Session,
+            eventQuery.Path,
+            eventQuery.XPath,
+            eventQuery.Flags);
         if (query.IsInvalid) {
-            throw new Win32Exception(Marshal.GetLastWin32Error(), $"Failed to query EVTX file '{filePath}'.");
+            throw new Win32Exception(
+                Marshal.GetLastWin32Error(),
+                $"Failed to query Windows event source '{eventQuery.DisplayName}'.");
         }
 
         var handles = new IntPtr[BatchSize];
@@ -165,7 +174,9 @@ internal static class WindowsEventFileReader {
                 if (error == WindowsEventNativeMethods.ErrorNoMoreItems) {
                     yield break;
                 }
-                throw new Win32Exception(error, $"Failed while reading EVTX file '{filePath}'.");
+                throw new Win32Exception(
+                    error,
+                    $"Failed while reading Windows event source '{eventQuery.DisplayName}'.");
             }
 
             int index = 0;

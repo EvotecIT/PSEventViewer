@@ -1,0 +1,41 @@
+using System;
+using System.Globalization;
+
+namespace EventViewerX;
+
+/// <summary>
+/// Defines a low-level, streaming query against an offline Windows event log.
+/// </summary>
+public sealed class EventLogFileQuery {
+    /// <summary>
+    /// Creates an offline event query.
+    /// </summary>
+    /// <param name="path">Path to an EVTX, EVT, or ETL event log file.</param>
+    public EventLogFileQuery(string path) {
+        if (string.IsNullOrWhiteSpace(path)) {
+            throw new ArgumentException("Event log path cannot be null or empty.", nameof(path));
+        }
+        Path = path;
+    }
+
+    /// <summary>Path to the offline event log.</summary>
+    public string Path { get; }
+
+    /// <summary>XPath expression applied by the Windows event query engine.</summary>
+    public string XPath { get; set; } = "*";
+
+    /// <summary>Whether records are returned from oldest to newest.</summary>
+    public bool Oldest { get; set; }
+
+    /// <summary>Amount of event data materialized for each record.</summary>
+    public EventReadMode ReadMode { get; set; } = EventReadMode.Full;
+
+    /// <summary>
+    /// Culture used for provider messages and display names. A null value uses
+    /// <see cref="CultureInfo.CurrentUICulture"/>.
+    /// </summary>
+    public CultureInfo? MessageCulture { get; set; }
+
+    /// <summary>Maximum number of records returned. Zero streams every match.</summary>
+    public int MaxEvents { get; set; }
+}

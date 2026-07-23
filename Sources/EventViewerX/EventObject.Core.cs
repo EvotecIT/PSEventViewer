@@ -72,6 +72,9 @@ public partial class EventObject {
     /// <summary>Provider-formatted event message, when requested by <see cref="ReadMode"/>.</summary>
     public string Message => _message;
 
+    /// <summary>Culture used to format <see cref="Message"/> and provider display names.</summary>
+    public string MessageCulture { get; } = string.Empty;
+
     /// <summary>Message split into CRLF/LF-delimited lines.</summary>
     /// <remarks>The split is created only when a caller requests the lines or parsed message fields.</remarks>
     public IReadOnlyList<string> MessageLines {
@@ -221,6 +224,7 @@ public partial class EventObject {
 
             if (readMode == EventReadMode.Message || readMode == EventReadMode.Full) {
                 _message = SafeFormatDescription(eventRecord);
+                MessageCulture = System.Globalization.CultureInfo.CurrentUICulture.Name;
             }
 
             if (readMode == EventReadMode.StructuredData || readMode == EventReadMode.Full) {

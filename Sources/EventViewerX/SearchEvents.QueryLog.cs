@@ -7,6 +7,7 @@ using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Collections.Concurrent;
 using System.Threading.Tasks;
+using EventViewerX.Native;
 
 namespace EventViewerX;
 
@@ -213,7 +214,7 @@ public partial class SearchEvents : Settings {
             TolerateQueryErrors = false
         };
         int effectiveTimeout = sessionTimeoutMs ?? Settings.QuerySessionTimeoutMs;
-        foreach (var ev in QueryLogFromQuery(query, machineName, action: "QueryLog", logName, maxEvents, cancellationToken, effectiveTimeout, readMode)) {
+        foreach (var ev in QueryLogFromQuery(query, queryString, oldest, machineName, action: "QueryLog", logName, maxEvents, cancellationToken, effectiveTimeout, readMode)) {
             yield return ev;
         }
     }
@@ -235,33 +236,57 @@ public partial class SearchEvents : Settings {
     /// <param name="readMode">Amount of provider data to materialize for each event.</param>
     public static IEnumerable<EventObject> QueryLogXPath(string logName, string? xpath = null, string? machineName = null, int maxEvents = 0, bool oldest = false, CancellationToken cancellationToken = default, int? sessionTimeoutMs = null, EventReadMode readMode = EventReadMode.Full) {
         ValidateQueryArguments(logName, maxEvents, sessionTimeoutMs);
-        if (string.IsNullOrWhiteSpace(xpath)) {
-            xpath = "*";
-        }
+        string effectiveXPath = string.IsNullOrWhiteSpace(xpath) ? "*" : xpath!;
 
-        var query = new EventLogQuery(logName, PathType.LogName, xpath) {
+        var query = new EventLogQuery(logName, PathType.LogName, effectiveXPath) {
             ReverseDirection = !oldest,
             TolerateQueryErrors = false
         };
 
         int effectiveTimeout = sessionTimeoutMs ?? Settings.QuerySessionTimeoutMs;
-        foreach (var ev in QueryLogFromQuery(query, machineName, action: "QueryLogXPath", logName, maxEvents, cancellationToken, effectiveTimeout, readMode)) {
+        foreach (var ev in QueryLogFromQuery(query, effectiveXPath, oldest, machineName, action: "QueryLogXPath", logName, maxEvents, cancellationToken, effectiveTimeout, readMode)) {
             yield return ev;
         }
     }
 
-    private static IEnumerable<EventObject> QueryLogFromQuery(EventLogQuery query, string? machineName, string action, string logName, int maxEvents, CancellationToken cancellationToken, int effectiveTimeout, EventReadMode readMode) {
-        EventLogSessionOpenResult? sessionResult = null;
-        if (!string.IsNullOrEmpty(machineName)) {
-            int sessionBudget = effectiveTimeout > 0 ? effectiveTimeout : Settings.SessionTimeoutMs;
-            sessionResult = CreateSessionResult(machineName, action, logName, sessionBudget);
-            if (!sessionResult.Success || sessionResult.Session == null) {
-                ThrowSessionFailure(sessionResult);
+    private static IEnumerable<EventObject> QueryLogFromQuery(EventLogQuery query, string xpath, bool oldest, string? machineName, string action, string logName, int maxEvents, CancellationToken cancellationToken, int effectiveTimeout, EventReadMode readMode) {
+        string queriedMachine = string.IsNullOrEmpty(machineName) ? GetFQDN() : machineName!;
+        if (string.IsNullOrEmpty(machineName)) {
+            WindowsEventNativeMethods.QueryFlags nativeFlags =
+                WindowsEventNativeMethods.QueryFlags.ChannelPath |
+                (!oldest
+                    ? WindowsEventNativeMethods.QueryFlags.ReverseDirection
+                    : WindowsEventNativeMethods.QueryFlags.ForwardDirection);
+            var nativeQuery = new NativeEventQuery(
+                IntPtr.Zero,
+                logName,
+                string.IsNullOrWhiteSpace(xpath) ? "*" : xpath,
+                nativeFlags,
+                logName);
+            int eventCount = 0;
+            foreach (EventObject eventObject in WindowsEventReader.Read(
+                         nativeQuery,
+                         readMode,
+                         queriedMachine,
+                         logName,
+                         cancellationToken)) {
+                yield return eventObject;
+                eventCount++;
+                if (maxEvents > 0 && eventCount >= maxEvents) {
+                    yield break;
+                }
             }
-            query.Session = sessionResult.Session;
+            yield break;
         }
 
-        string queriedMachine = string.IsNullOrEmpty(machineName) ? GetFQDN() : machineName!;
+        EventLogSessionOpenResult? sessionResult = null;
+        int sessionBudget = effectiveTimeout > 0 ? effectiveTimeout : Settings.SessionTimeoutMs;
+        sessionResult = CreateSessionResult(machineName, action, logName, sessionBudget);
+        if (!sessionResult.Success || sessionResult.Session == null) {
+            ThrowSessionFailure(sessionResult);
+        }
+        query.Session = sessionResult.Session;
+
         try {
             using (var reader = CreateEventLogReader(query, machineName, effectiveTimeout)) {
                 using CancellationTokenRegistration cancellationRegistration = RegisterReaderCancellation(reader, cancellationToken);

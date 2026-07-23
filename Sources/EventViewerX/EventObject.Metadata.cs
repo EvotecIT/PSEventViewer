@@ -157,6 +157,7 @@ public partial class EventObject {
         ReadMode = EventReadMode.Message;
         QueriedMachine = queriedMachine ?? string.Empty;
         _message = message.Message;
+        MessageCulture = message.CultureName;
         Id = metadata.Id;
         Qualifiers = metadata.Qualifiers?.ToString(CultureInfo.InvariantCulture);
         RecordId = metadata.RecordId;
@@ -243,6 +244,7 @@ public partial class EventObject {
         ReadMode = EventReadMode.Full;
         QueriedMachine = queriedMachine ?? string.Empty;
         _message = message.Message;
+        MessageCulture = message.CultureName;
         Id = metadata.Id;
         Qualifiers = metadata.Qualifiers?.ToString(CultureInfo.InvariantCulture);
         RecordId = metadata.RecordId;

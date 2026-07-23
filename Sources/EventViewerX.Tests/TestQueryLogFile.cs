@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics.Eventing.Reader;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using Xunit;
@@ -138,6 +139,35 @@ namespace EventViewerX.Tests {
 
             Assert.False(actualEnumerator.MoveNext());
             Assert.True(compared > 1);
+        }
+
+        [Fact]
+        public void PublicEngineProducesDeterministicRequestedCulture() {
+            if (!OperatingSystem.IsWindows()) return;
+            string relativePath = Path.Combine("..", "..", "..", "..", "..", "Tests", "Logs", "NamedFilterExamples.evtx");
+            string path = Path.GetFullPath(relativePath);
+            CultureInfo originalCulture = CultureInfo.CurrentUICulture;
+            try {
+                var query = new EventLogFileQuery(path) {
+                    Oldest = true,
+                    ReadMode = EventReadMode.Message,
+                    MessageCulture = CultureInfo.GetCultureInfo("en-US"),
+                    MaxEvents = 10
+                };
+
+                CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo("pl-PL");
+                List<EventObject> polishHost = EventLogEngine.ReadFile(query).ToList();
+                CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo("de-DE");
+                List<EventObject> germanHost = EventLogEngine.ReadFile(query).ToList();
+
+                Assert.Equal(10, polishHost.Count);
+                Assert.Equal(polishHost.Select(static item => item.RecordId), germanHost.Select(static item => item.RecordId));
+                Assert.Equal(polishHost.Select(static item => item.Message), germanHost.Select(static item => item.Message));
+                Assert.All(polishHost, static item => Assert.Equal("en-US", item.MessageCulture));
+                Assert.Contains(polishHost, static item => !string.IsNullOrEmpty(item.Message));
+            } finally {
+                CultureInfo.CurrentUICulture = originalCulture;
+            }
         }
 
         [Fact]

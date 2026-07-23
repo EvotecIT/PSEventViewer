@@ -11,7 +11,8 @@ internal readonly struct NativeEventMessage {
         string taskDisplayName,
         string opcodeDisplayName,
         IReadOnlyList<string> keywordDisplayNames,
-        EventBookmark? bookmark) {
+        EventBookmark? bookmark,
+        string cultureName) {
 
         Metadata = metadata;
         Message = message;
@@ -20,6 +21,7 @@ internal readonly struct NativeEventMessage {
         OpcodeDisplayName = opcodeDisplayName;
         KeywordDisplayNames = keywordDisplayNames;
         Bookmark = bookmark;
+        CultureName = cultureName;
     }
 
     internal NativeEventMetadata Metadata { get; }
@@ -29,4 +31,5 @@ internal readonly struct NativeEventMessage {
     internal string OpcodeDisplayName { get; }
     internal IReadOnlyList<string> KeywordDisplayNames { get; }
     internal EventBookmark? Bookmark { get; }
+    internal string CultureName { get; }
 }

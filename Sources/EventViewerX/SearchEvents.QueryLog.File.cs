@@ -1,5 +1,5 @@
-using System.Diagnostics.Eventing.Reader;
 using System.IO;
+using System.Globalization;
 using System.Linq;
 using System.Threading;
 using EventViewerX.Native;
@@ -29,13 +29,14 @@ public partial class SearchEvents : Settings {
     /// <param name="minimumEventRecordIdExclusive">Optional native record-ID lower bound.</param>
     /// <param name="resultPredicate">Optional managed predicate applied before <paramref name="maxEvents"/>.</param>
     /// <param name="candidateObserver">Optional observer invoked for every native candidate before managed filtering.</param>
+    /// <param name="messageCulture">Culture used to format provider messages and display names.</param>
     /// <returns>Enumerable sequence of <see cref="EventObject"/> read from the file.</returns>
     /// <remarks>
     /// Unlimited queries that require multiple XPath chunks stream bounded chunk batches; ordering is preserved
     /// within each batch. A positive <paramref name="maxEvents"/> preserves monotonic native record order across
     /// XPath chunks. Provider timestamps are not used to reorder records within the EVTX source because they can move backwards.
     /// </remarks>
-    public static IEnumerable<EventObject> QueryLogFile(string filePath, List<int>? eventIds = null, string? providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string? userId = null, int maxEvents = 0, List<long>? eventRecordId = null, TimePeriod? timePeriod = null, bool oldest = false, System.Collections.Hashtable? namedDataFilter = null, System.Collections.Hashtable? namedDataExcludeFilter = null, CancellationToken cancellationToken = default, EventReadMode readMode = EventReadMode.Full, long? minimumEventRecordIdExclusive = null, Func<EventObject, bool>? resultPredicate = null, Action<EventObject>? candidateObserver = null) {
+    public static IEnumerable<EventObject> QueryLogFile(string filePath, List<int>? eventIds = null, string? providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string? userId = null, int maxEvents = 0, List<long>? eventRecordId = null, TimePeriod? timePeriod = null, bool oldest = false, System.Collections.Hashtable? namedDataFilter = null, System.Collections.Hashtable? namedDataExcludeFilter = null, CancellationToken cancellationToken = default, EventReadMode readMode = EventReadMode.Full, long? minimumEventRecordIdExclusive = null, Func<EventObject, bool>? resultPredicate = null, Action<EventObject>? candidateObserver = null, CultureInfo? messageCulture = null) {
         if (string.IsNullOrWhiteSpace(filePath)) {
             throw new ArgumentException("File path cannot be null or empty.", nameof(filePath));
         }
@@ -93,7 +94,8 @@ public partial class SearchEvents : Settings {
                     cancellationToken,
                     readMode,
                     workItem.MinimumEventRecordIdExclusive,
-                    workItem.MaximumEventRecordIdExclusive)).GetEnumerator();
+                    workItem.MaximumEventRecordIdExclusive,
+                    messageCulture)).GetEnumerator();
             return resultPredicate == null && candidateObserver == null
                 ? queryResults
                 : ObserveAndFilterQueryResults(queryResults, resultPredicate, candidateObserver).GetEnumerator();
@@ -172,7 +174,8 @@ public partial class SearchEvents : Settings {
         CancellationToken cancellationToken,
         EventReadMode readMode,
         long? minimumEventRecordIdExclusive,
-        long? maximumEventRecordIdExclusive) {
+        long? maximumEventRecordIdExclusive,
+        CultureInfo? messageCulture) {
 
         string xpath = BuildWinEventFilter(
             id: eventIds?.Select(static id => id.ToString()).ToArray(),
@@ -190,146 +193,26 @@ public partial class SearchEvents : Settings {
             maximumEventRecordIdExclusive: maximumEventRecordIdExclusive);
 
         _logger.WriteVerbose($"QueryLogFile: path '{absolutePath}', xpath '{xpath}'");
-        if (readMode == EventReadMode.Metadata) {
-            foreach (NativeEventMetadata metadata in WindowsEventFileReader.ReadMetadata(
-                         absolutePath,
-                         xpath,
-                         oldest,
-                         cancellationToken)) {
-                yield return new EventObject(metadata, absolutePath, absolutePath);
-            }
-            yield break;
+        WindowsEventNativeMethods.QueryFlags nativeFlags =
+            WindowsEventNativeMethods.QueryFlags.FilePath |
+            (oldest
+                ? WindowsEventNativeMethods.QueryFlags.ForwardDirection
+                : WindowsEventNativeMethods.QueryFlags.ReverseDirection);
+        var nativeQuery = new NativeEventQuery(
+            IntPtr.Zero,
+            absolutePath,
+            xpath,
+            nativeFlags,
+            absolutePath,
+            absolutePath,
+            messageCulture?.LCID ?? 0);
+        foreach (EventObject eventObject in WindowsEventReader.Read(
+                     nativeQuery,
+                     readMode,
+                     absolutePath,
+                     absolutePath,
+                     cancellationToken)) {
+            yield return eventObject;
         }
-        if (readMode == EventReadMode.Message) {
-            foreach (NativeEventMessage message in WindowsEventFileReader.ReadMessages(
-                         absolutePath,
-                         xpath,
-                         oldest,
-                         cancellationToken)) {
-                yield return new EventObject(message, absolutePath, absolutePath);
-            }
-            yield break;
-        }
-        if (readMode == EventReadMode.StructuredData) {
-            foreach (NativeEventStructured structured in WindowsEventFileReader.ReadStructured(
-                         absolutePath,
-                         xpath,
-                         oldest,
-                         cancellationToken)) {
-                yield return new EventObject(structured, absolutePath, absolutePath);
-            }
-            yield break;
-        }
-        if (readMode == EventReadMode.Full) {
-            foreach (NativeEventFull full in WindowsEventFileReader.ReadFull(
-                         absolutePath,
-                         xpath,
-                         oldest,
-                         cancellationToken)) {
-                yield return new EventObject(full, absolutePath, absolutePath);
-            }
-            yield break;
-        }
-
-        var query = new EventLogQuery(absolutePath, PathType.FilePath, xpath) {
-            ReverseDirection = !oldest,
-            TolerateQueryErrors = false
-        };
-        var fallbackQuery = CreateFileFallbackQuery(absolutePath, xpath, oldest);
-        using EventLogPropertySelector? metadataSelector = readMode == EventReadMode.Metadata
-            ? EventObject.CreateMetadataPropertySelector()
-            : null;
-        EventLogReader? primaryReader;
-        try {
-            primaryReader = CreateEventLogReader(query, null);
-        } catch (EventLogException) {
-            primaryReader = null;
-        }
-
-        if (primaryReader == null) {
-            using var fallbackReader = CreateEventLogReader(fallbackQuery, null);
-            if (fallbackReader == null) {
-                yield break;
-            }
-            using CancellationTokenRegistration fallbackCancellation = RegisterReaderCancellation(fallbackReader, cancellationToken);
-
-            while (true) {
-                EventRecord? record = ReadEventWithCancellation(
-                    fallbackReader,
-                    timeoutMs: 0,
-                    $"Reading EVTX file '{absolutePath}'",
-                    cancellationToken);
-                if (record == null) {
-                    break;
-                }
-
-                yield return metadataSelector != null
-                    ? EventObject.CreateMetadata(record, metadataSelector, absolutePath, absolutePath)
-                    : new EventObject(record, absolutePath, readMode);
-            }
-
-            yield break;
-        }
-
-        using (primaryReader) {
-            using CancellationTokenRegistration primaryCancellation = RegisterReaderCancellation(primaryReader, cancellationToken);
-            // Some runtimes return a valid reader but yield no events for FilePath queries on specific EVTX files.
-            // If this happens, retry with the QueryList fallback.
-            EventRecord? record = ReadEventWithCancellation(
-                primaryReader,
-                timeoutMs: 0,
-                $"Reading EVTX file '{absolutePath}'",
-                cancellationToken);
-            if (record == null) {
-                using var fallbackReader = CreateEventLogReader(fallbackQuery, null);
-                if (fallbackReader == null) {
-                    yield break;
-                }
-                using CancellationTokenRegistration fallbackCancellation = RegisterReaderCancellation(fallbackReader, cancellationToken);
-
-                while (true) {
-                    record = ReadEventWithCancellation(
-                        fallbackReader,
-                        timeoutMs: 0,
-                        $"Reading EVTX file '{absolutePath}'",
-                        cancellationToken);
-                    if (record == null) {
-                        break;
-                    }
-
-                    yield return metadataSelector != null
-                        ? EventObject.CreateMetadata(record, metadataSelector, absolutePath, absolutePath)
-                        : new EventObject(record, absolutePath, readMode);
-                }
-
-                yield break;
-            }
-
-            while (true) {
-                yield return metadataSelector != null
-                    ? EventObject.CreateMetadata(record, metadataSelector, absolutePath, absolutePath)
-                    : new EventObject(record, absolutePath, readMode);
-
-                record = ReadEventWithCancellation(
-                    primaryReader,
-                    timeoutMs: 0,
-                    $"Reading EVTX file '{absolutePath}'",
-                    cancellationToken);
-                if (record == null) {
-                    break;
-                }
-            }
-        }
-    }
-
-    private static EventLogQuery CreateFileFallbackQuery(string absolutePath, string xpath, bool oldest) {
-        string escapedPath = EscapeXmlValue(absolutePath);
-        string escapedXPath = EscapeXmlValue(xpath);
-        string filePath = $"file://{escapedPath}";
-        string queryString = $"<QueryList><Query Id='0' Path='{filePath}'><Select Path='{filePath}'>{escapedXPath}</Select></Query></QueryList>";
-        return new EventLogQuery(null, PathType.LogName, queryString) {
-            ReverseDirection = !oldest,
-            TolerateQueryErrors = false
-        };
     }
 }

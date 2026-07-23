@@ -238,6 +238,13 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
     public EventReadMode ReadMode { get; set; } = EventReadMode.Full;
 
     /// <summary>
+    /// Culture used to format provider messages and display names for offline EVTX queries.
+    /// For example, use <c>en-US</c> for deterministic English output.
+    /// </summary>
+    [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
+    public CultureInfo? MessageCulture { get; set; }
+
+    /// <summary>
     /// Session and per-read timeout in milliseconds. Zero keeps the legacy unbounded read behavior.
     /// </summary>
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
@@ -393,6 +400,8 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
             MessageRegex == null ? string.Empty : ((int)MessageRegex.Options).ToString(CultureInfo.InvariantCulture),
             "MessageRegexCulture",
             MessageRegex == null ? string.Empty : CultureInfo.CurrentCulture.Name,
+            "MessageCulture",
+            MessageCulture?.Name ?? string.Empty,
             "Oldest",
             EffectiveOldest.ToString(CultureInfo.InvariantCulture)
         };
@@ -557,7 +566,7 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
         Func<EventObject, bool>? queryResultPredicate = UsesManagedOutputSelection
             ? MessageMatches
             : null;
-        foreach (EventObject eventObject in SearchEvents.QueryLogFile(Path, EventId, ProviderName, Keywords, Level, StartTime, EndTime, UserId, GetQueryReadLimit(), EventRecordId, TimePeriod, EffectiveOldest, NamedDataFilter, NamedDataExcludeFilter, token, ReadMode, GetCheckpointLowerBound(null, Path), queryResultPredicate)) {
+        foreach (EventObject eventObject in SearchEvents.QueryLogFile(Path, EventId, ProviderName, Keywords, Level, StartTime, EndTime, UserId, GetQueryReadLimit(), EventRecordId, TimePeriod, EffectiveOldest, NamedDataFilter, NamedDataExcludeFilter, token, ReadMode, GetCheckpointLowerBound(null, Path), queryResultPredicate, messageCulture: MessageCulture)) {
             token.ThrowIfCancellationRequested();
             ProcessEventResult(eventObject, results);
             if (OutputLimitReached) {

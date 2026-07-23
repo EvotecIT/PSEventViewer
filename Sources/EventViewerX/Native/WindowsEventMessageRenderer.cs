@@ -1,21 +1,27 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.Eventing.Reader;
+using System.Globalization;
 using System.Runtime.InteropServices;
 
 namespace EventViewerX.Native;
 
 internal sealed class WindowsEventMessageRenderer : IDisposable {
-    private readonly string _filePath;
+    private readonly string? _filePath;
     private readonly int _locale;
+    private readonly string _cultureName;
     private readonly NativeEventBuffer _messageBuffer = new();
     private readonly WindowsEventBookmarkRenderer _bookmarkRenderer = new();
     private readonly Dictionary<string, ProviderContext> _providers =
         new(StringComparer.OrdinalIgnoreCase);
 
-    internal WindowsEventMessageRenderer(string filePath, int locale = 0) {
+    internal WindowsEventMessageRenderer(string? filePath, int locale = 0) {
         _filePath = filePath;
-        _locale = locale;
+        CultureInfo culture = locale == 0
+            ? CultureInfo.CurrentUICulture
+            : CultureInfo.GetCultureInfo(locale);
+        _locale = culture.LCID;
+        _cultureName = culture.Name;
     }
 
     internal NativeEventMessage Render(
@@ -56,7 +62,8 @@ internal sealed class WindowsEventMessageRenderer : IDisposable {
             task,
             opcode,
             keywords,
-            includeBookmark ? _bookmarkRenderer.Render(eventHandle) : null);
+            includeBookmark ? _bookmarkRenderer.Render(eventHandle) : null,
+            _cultureName);
     }
 
     private ProviderContext GetProvider(string providerName) {

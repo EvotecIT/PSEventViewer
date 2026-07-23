@@ -11,6 +11,7 @@ internal static class WindowsEventNativeMethods {
 
     [Flags]
     internal enum QueryFlags : uint {
+        ChannelPath = 0x1,
         FilePath = 0x2,
         ForwardDirection = 0x100,
         ReverseDirection = 0x200
