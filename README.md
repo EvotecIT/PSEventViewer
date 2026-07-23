@@ -251,11 +251,30 @@ metadata CSV export was about 12 times faster. Message and full materialization 
 `Get-WinEvent`, while the raw .NET reader remained the fastest common-work implementation.
 
 The EvtxECmd-native table is generated separately because metrics-only parsing, its forensic CSV, XML, and full JSON
-perform different work and produce different output volumes.
+perform different work and produce different output volumes. This single-iteration operational snapshot used
+EvtxECmd `2026.5.0+bfc7f47ccbf65ffc9a3777cde5498db2fdd94664` (executable SHA-256
+`DE169B2AC7F6B1E54A684E0CDDDA30223651937B75941B21EA53A98F5A2502EE`) on the same complete fixture. The generated
+`Median`, `Mean`, and `P95` values are milliseconds; with one sample they are identical and should not be read as a
+statistical distribution.
 
 <!-- event-log-evtx-native-benchmark:start -->
-Run the documented EvtxECmd-native command to generate this table.
+| Scenario | Variables | Operation | Host | OS | RunMode | Engine | Samples | Failures | Median | Mean | P95 | StdDev | Status |
+| --- | --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| Large-Evtx-ForensicCsv |  | Scan | Core-7.6.4 | Windows | standard | EvtxECmd | 1 | 0 | 28052.6332 | 28052.6332 | 28052.6332 |  | Succeeded |
+| Large-Evtx-FullJson |  | Scan | Core-7.6.4 | Windows | standard | EvtxECmd | 1 | 0 | 41796.0055 | 41796.0055 | 41796.0055 |  | Succeeded |
+| Large-Evtx-NativeParse |  | Scan | Core-7.6.4 | Windows | standard | EvtxECmd | 1 | 0 | 26397.919 | 26397.919 | 26397.919 |  | Succeeded |
+| Large-Evtx-Xml |  | Scan | Core-7.6.4 | Windows | standard | EvtxECmd | 1 | 0 | 38638.6567 | 38638.6567 | 38638.6567 |  | Succeeded |
 <!-- event-log-evtx-native-benchmark:end -->
+
+The benchmark also validates event counts, zero reported errors, nonempty export files, and their SHA-256 hashes. The
+retained output sizes from this run make the workload differences concrete:
+
+| EvtxECmd workload | Retained output | Bytes | Meaning |
+| --- | --- | ---: | --- |
+| Native parse | None | 0 | Parses every payload and internally converts event XML to JSON; not metadata-only work. |
+| Forensic CSV | Fixed 25-column CSV | 279,913,929 | Core metadata, map fields, `PayloadData1`-`PayloadData6`, and payload. |
+| Full JSON | Raw-event JSON | 256,431,908 | All available event XML converted to JSON by `--fj true`; no provider-formatted message. |
+| XML | Raw-event XML | 293,136,957 | Exported event XML for all 197,285 records. |
 
 Checkpoint generation metadata is stored in the visible `<RecordIdFile>.state.json` companion file. `Reset-EVXEventCheckpoint` updates both representations under the shared file lock and prevents an in-flight query from restoring progress from the previous generation.
 
