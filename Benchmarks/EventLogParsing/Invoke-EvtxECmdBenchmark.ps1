@@ -11,7 +11,10 @@ param(
     [Parameter(Mandatory)]
     [string] $StandardOutputPath,
 
-    [string] $CsvOutputPath
+    [ValidateSet('NativeParse', 'ForensicCsv', 'FullJson', 'Xml')]
+    [string] $Workload = 'NativeParse',
+
+    [string] $OutputPath
 )
 
 $ErrorActionPreference = 'Stop'
@@ -25,14 +28,40 @@ $startInfo.RedirectStandardError = $true
 $startInfo.ArgumentList.Add('-f')
 $startInfo.ArgumentList.Add([IO.Path]::GetFullPath($Path))
 $startInfo.ArgumentList.Add('--met')
-if ($CsvOutputPath) {
-    $csvFullPath = [IO.Path]::GetFullPath($CsvOutputPath)
-    $csvDirectory = Split-Path -Parent $csvFullPath
-    New-Item -ItemType Directory -Force -Path $csvDirectory | Out-Null
-    $startInfo.ArgumentList.Add('--csv')
-    $startInfo.ArgumentList.Add($csvDirectory)
-    $startInfo.ArgumentList.Add('--csvf')
-    $startInfo.ArgumentList.Add((Split-Path -Leaf $csvFullPath))
+
+$outputFullPath = if ($OutputPath) {
+    [IO.Path]::GetFullPath($OutputPath)
+} else {
+    $null
+}
+if ($Workload -ne 'NativeParse' -and -not $outputFullPath) {
+    throw "OutputPath is required for the EvtxECmd workload '$Workload'."
+}
+if ($outputFullPath) {
+    $outputDirectory = Split-Path -Parent $outputFullPath
+    New-Item -ItemType Directory -Force -Path $outputDirectory | Out-Null
+    switch ($Workload) {
+        'ForensicCsv' {
+            $startInfo.ArgumentList.Add('--csv')
+            $startInfo.ArgumentList.Add($outputDirectory)
+            $startInfo.ArgumentList.Add('--csvf')
+            $startInfo.ArgumentList.Add((Split-Path -Leaf $outputFullPath))
+        }
+        'FullJson' {
+            $startInfo.ArgumentList.Add('--json')
+            $startInfo.ArgumentList.Add($outputDirectory)
+            $startInfo.ArgumentList.Add('--jsonf')
+            $startInfo.ArgumentList.Add((Split-Path -Leaf $outputFullPath))
+            $startInfo.ArgumentList.Add('--fj')
+            $startInfo.ArgumentList.Add('true')
+        }
+        'Xml' {
+            $startInfo.ArgumentList.Add('--xml')
+            $startInfo.ArgumentList.Add($outputDirectory)
+            $startInfo.ArgumentList.Add('--xmlf')
+            $startInfo.ArgumentList.Add((Split-Path -Leaf $outputFullPath))
+        }
+    }
 }
 
 $stopwatch = [Diagnostics.Stopwatch]::StartNew()
@@ -83,8 +112,8 @@ if (-not $totalMatch.Success -or -not $includedMatch.Success) {
 if ($exitCode -ne 0) {
     throw "EvtxECmd exited with code $exitCode. See '$StandardOutputPath'."
 }
-if ($CsvOutputPath -and -not (Test-Path -LiteralPath $csvFullPath -PathType Leaf)) {
-    throw "EvtxECmd did not create the expected CSV output '$csvFullPath'."
+if ($outputFullPath -and -not (Test-Path -LiteralPath $outputFullPath -PathType Leaf)) {
+    throw "EvtxECmd did not create the expected $Workload output '$outputFullPath'."
 }
 
 $totalRecords = [long] ($totalMatch.Groups[1].Value -replace '[^0-9]', '')
@@ -97,7 +126,7 @@ $errors = if ($errorMatch.Success) {
 
 $result = [ordered] @{
     Engine               = 'EvtxECmd'
-    ReadMode             = 'NativeParse'
+    ReadMode             = $Workload
     FixturePath          = [IO.Path]::GetFullPath($Path)
     RuntimeVersion       = [Environment]::Version.ToString()
     ProductVersion       = $productVersion
@@ -108,9 +137,9 @@ $result = [ordered] @{
     PeakWorkingSetBytes  = $peakWorkingSet
     ElapsedMilliseconds  = $stopwatch.Elapsed.TotalMilliseconds
     StandardOutputBytes  = (Get-Item -LiteralPath $StandardOutputPath).Length
-    OutputPath           = if ($CsvOutputPath) { $csvFullPath } else { $null }
-    OutputBytes          = if ($CsvOutputPath) { (Get-Item -LiteralPath $csvFullPath).Length } else { 0 }
-    OutputSha256         = if ($CsvOutputPath) { (Get-FileHash -LiteralPath $csvFullPath -Algorithm SHA256).Hash } else { $null }
+    OutputPath           = $outputFullPath
+    OutputBytes          = if ($outputFullPath) { (Get-Item -LiteralPath $outputFullPath).Length } else { 0 }
+    OutputSha256         = if ($outputFullPath) { (Get-FileHash -LiteralPath $outputFullPath -Algorithm SHA256).Hash } else { $null }
 }
 
 $resultDirectory = Split-Path -Parent ([IO.Path]::GetFullPath($ResultPath))

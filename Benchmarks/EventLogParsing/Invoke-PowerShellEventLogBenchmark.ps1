@@ -79,7 +79,7 @@ function Measure-EventPipeline {
         if ($null -ne $eventRecord.RecordId) {
             [long] $recordId = $eventRecord.RecordId
             $recordIdSum += $recordId
-            if (-not $firstRecordId.HasValue) {
+            if ($null -eq $firstRecordId) {
                 $firstRecordId = $recordId
             }
             $lastRecordId = $recordId

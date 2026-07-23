@@ -8,10 +8,13 @@ iteration order, validation, comparison, and artifacts to Invoke-BenchmarkSuite.
 Large EVTX fixtures and competitor binaries remain external inputs.
 
 .EXAMPLE
-.\Invoke-EventLogParsingBenchmark.ps1 -Case Smoke-Scan-Metadata -Engine DotNet, EventViewerX, GetWinEvent, PSEventViewer
+.\Invoke-EventLogParsingBenchmark.ps1 -Case Smoke-Common-Scan-Metadata -Engine DotNet, EventViewerX, GetWinEvent, PSEventViewer
 
 .EXAMPLE
-.\Invoke-EventLogParsingBenchmark.ps1 -LargeFixturePath C:\Temp\Security.evtx -ExpectedLargeCount 1000000 -EvtxECmdPath C:\Tools\EvtxECmd.exe -Case Large-Scan-Metadata
+.\Invoke-EventLogParsingBenchmark.ps1 -LargeFixturePath C:\Temp\Security.evtx -ExpectedLargeCount 1000000 -EvtxECmdPath C:\Tools\EvtxECmd.exe -Case Large-Evtx-FullJson
+
+.EXAMPLE
+.\Invoke-EventLogParsingBenchmark.ps1 -LargeFixturePath C:\Temp\Security.evtx -ExpectedLargeCount 1000000 -ReadmeTable Common -IterationCount 3
 #>
 [CmdletBinding()]
 param(
@@ -41,6 +44,9 @@ param(
     [ValidateRange(1, [int]::MaxValue)]
     [int] $IterationCount = 1,
 
+    [ValidateSet('None', 'Common', 'EvtxNative')]
+    [string] $ReadmeTable = 'None',
+
     [switch] $Plan
 )
 
@@ -50,6 +56,40 @@ $hostProject = Join-Path $PSScriptRoot 'EventLogParsing.BenchmarkHost\EventLogPa
 $specPath = Join-Path $PSScriptRoot 'event-log-parsing.benchmark.ps1'
 
 Import-Module PSPublishModule -MinimumVersion 3.0.76 -ErrorAction Stop
+
+if ($ReadmeTable -ne 'None') {
+    if (-not $LargeFixturePath -or $ExpectedLargeCount -le 0) {
+        throw 'ReadmeTable requires LargeFixturePath and a positive ExpectedLargeCount.'
+    }
+    if ($Case -or $Engine) {
+        throw 'ReadmeTable owns its curated Case and Engine matrix. Do not combine it with Case or Engine.'
+    }
+
+    if ($ReadmeTable -eq 'Common') {
+        if (-not $Plan -and $IterationCount -lt 3) {
+            throw 'The public common-work table requires at least three iterations.'
+        }
+        $Case = @(
+            'Large-Common-Scan-Metadata'
+            'Large-Common-Sample-Message'
+            'Large-Common-Sample-StructuredData'
+            'Large-Common-Sample-Full'
+            'Large-Exact-Export-MetadataCsv'
+        )
+        $Engine = 'DotNet', 'EventViewerX', 'PSEventViewer', 'GetWinEvent'
+    } else {
+        if (-not $EvtxECmdPath) {
+            throw 'ReadmeTable EvtxNative requires EvtxECmdPath.'
+        }
+        $Case = @(
+            'Large-Evtx-NativeParse'
+            'Large-Evtx-ForensicCsv'
+            'Large-Evtx-FullJson'
+            'Large-Evtx-Xml'
+        )
+        $Engine = 'EvtxECmd'
+    }
+}
 
 dotnet build $hostProject --configuration Release --framework net10.0-windows
 if ($LASTEXITCODE -ne 0) {
@@ -61,7 +101,9 @@ if ($LASTEXITCODE -ne 0) {
     throw "The PSEventViewer build failed with exit code $LASTEXITCODE."
 }
 
-$variables = @{}
+$variables = @{
+    ReadmeTable = $ReadmeTable
+}
 if ($LargeFixturePath) {
     $variables.LargeFixturePath = [IO.Path]::GetFullPath($LargeFixturePath)
     $variables.ExpectedLargeCount = $ExpectedLargeCount
@@ -94,4 +136,19 @@ if ($OutputRoot) {
     $parameters.OutputRoot = [IO.Path]::GetFullPath($OutputRoot)
 }
 
-Invoke-BenchmarkSuite @parameters
+$benchmarkResult = Invoke-BenchmarkSuite @parameters
+if (-not $Plan) {
+    [array] $failedSamples = foreach ($sample in $benchmarkResult.Samples) {
+        if ($sample.Status -eq 'Failed') {
+            $sample
+        }
+    }
+    if ($failedSamples.Count -gt 0) {
+        [array] $failureSummary = foreach ($sample in $failedSamples) {
+            '{0}/{1}/iteration-{2}: {3}' -f $sample.Scenario, $sample.Engine, $sample.Iteration, $sample.Reason
+        }
+        throw "The benchmark completed with $($failedSamples.Count) failed sample(s):`n$($failureSummary -join "`n")"
+    }
+}
+
+$benchmarkResult

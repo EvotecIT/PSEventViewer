@@ -213,8 +213,35 @@ Get-EVXEvent -Path C:\Logs\DC01-Security.evtx -EventId 4624 -ReadMode Structured
 ```
 
 The equivalent C# API accepts `readMode: EventReadMode.Metadata`, `Message`, `StructuredData`, or `Full`.
-Maintainers can reproduce first-event and full-scan comparisons with the
-[event log parsing benchmark](Benchmarks/EventLogParsing/README.md).
+
+### Reproducible parser comparison
+
+The [PowerForge event log benchmark](Benchmarks/EventLogParsing/README.md) separates three kinds of evidence:
+
+| Comparison | Meaning |
+| --- | --- |
+| Exact output | The same events and selected fields produce a byte-identical CSV with the same SHA-256. |
+| Common public work | The APIs perform the same user-facing read job and validate the same event window and identity checks. Additional PSEventViewer projections remain visible in the metrics. |
+| EvtxECmd native | EvtxECmd runs its own parser, maps, and fixed output schemas. These rows describe a different forensic workflow and are not presented as interchangeable output. |
+
+EvtxECmd's `--fj true` option is a full **raw-event JSON** export: it converts all available event XML to JSON. It is
+not equivalent to PSEventViewer `-ReadMode Full`, which also requests the Windows provider-formatted message and
+materializes PSEventViewer's parsed data, message fields, attachments, and bookmark. EvtxECmd's normal CSV is likewise
+a 25-column map-enriched forensic schema, not the five-column metadata export shown above.
+
+The common-work table is generated from validated PowerForge artifacts. The public refresh command requires at least
+three rotated iterations and owns its complete case/engine matrix.
+
+<!-- event-log-common-benchmark:start -->
+Run the documented large-fixture command to generate this table.
+<!-- event-log-common-benchmark:end -->
+
+The EvtxECmd-native table is generated separately because metrics-only parsing, its forensic CSV, XML, and full JSON
+perform different work and produce different output volumes.
+
+<!-- event-log-evtx-native-benchmark:start -->
+Run the documented EvtxECmd-native command to generate this table.
+<!-- event-log-evtx-native-benchmark:end -->
 
 Checkpoint generation metadata is stored in the visible `<RecordIdFile>.state.json` companion file. `Reset-EVXEventCheckpoint` updates both representations under the shared file lock and prevents an in-flight query from restoring progress from the previous generation.
 

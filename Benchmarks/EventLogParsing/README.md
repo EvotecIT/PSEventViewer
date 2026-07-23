@@ -1,65 +1,131 @@
 # Event Log Parsing Benchmark
 
-This suite measures event enumeration and projection costs against identical EVTX bytes. It replaces the old
-`Example.ComparePerformance.ps1` stopwatch comparison with PowerForge-managed cases, validation, metrics, and artifacts.
+This PowerForge suite measures event enumeration, projection, and export costs against identical EVTX bytes. It
+replaces the old `Example.ComparePerformance.ps1` stopwatch script with declared cases, rotated execution order,
+validation, provenance, normalized artifacts, and generated README tables.
 
-The committed smoke fixture contains 184 events. Large fixtures are intentionally external because real Security logs
-can exceed 1 GB and may contain sensitive data.
+The committed smoke fixture contains 184 events. Large fixtures remain external because real Security logs can exceed
+1 GB and may contain sensitive data.
+
+## Comparison contract
+
+The suite keeps three kinds of evidence separate:
+
+| Class | What is held equal | What the result means |
+| --- | --- | --- |
+| Exact output | Same EVTX, event order, selected fields, CSV encoding, row count, byte count, and SHA-256 | A direct end-to-end comparison. `Get-EVXEvent`, `Get-WinEvent`, and the direct .NET lower bound must create the same metadata CSV. |
+| Common public work | Same EVTX, direction, maximum event count, read-mode category, streaming consumer, and event identity checks | A comparison of the natural public APIs for the same user job. PSEventViewer may return additional parsed fields, and those extra counters are reported. |
+| EvtxECmd native | Same EVTX and validated event count, but EvtxECmd uses its own parser, maps, schema, and output format | Competitor evidence, not an interchangeable projection or an unqualified speed ranking. |
+
+Do not combine rows from different classes into a single “faster than” claim. In particular, comparing a five-column
+metadata CSV with EvtxECmd's forensic CSV compares different work and different output volumes.
 
 ## Engines
 
-- `DotNet`: direct `System.Diagnostics.Eventing.Reader.EventLogReader` enumeration.
+- `DotNet`: direct `System.Diagnostics.Eventing.Reader.EventLogReader` enumeration. This is a lower bound, not a
+  PowerShell-module surface.
 - `PropertySelector`: direct `EventLogPropertySelector` projection of eighteen core metadata fields.
 - `EventViewerX`: the reusable `SearchEvents.QueryLogFile` engine.
 - `PSEventViewer`: the public `Get-EVXEvent` cmdlet consumed by a streaming PowerShell process block.
 - `GetWinEvent`: `Get-WinEvent` consumed by the same streaming process-block shape.
-- `EvtxECmd`: the official command-line parser in metrics mode, with its own maps and parsing model.
-- Optional baseline engines run pinned pre-change EventViewerX/PSEventViewer binaries supplied by path.
+- `EvtxECmd`: Eric Zimmerman's parser, run as an external process with its version and SHA-256 captured.
+- Optional baseline engines use pinned pre-change EventViewerX or PSEventViewer binaries supplied by path.
 
-`EvtxECmd` is a separate `NativeParse` workload. Its parser and map-enrichment model are not equivalent to Windows
-`EventLogReader`, so its result is useful competitor evidence but not a drop-in semantic comparison.
+## Common public work
 
-## Workloads
+`Metadata`, `Message`, `StructuredData`, and `Full` are run through the same event window and streaming accumulator:
 
-- `Metadata`: core event metadata only.
-- `Message`: metadata plus provider display names and formatted message.
-- `StructuredData`: metadata, event properties, XML, and EventViewerX structured-data projection.
-- `Full`: message and structured-data work together.
-- `MetadataCsv`: the five-field metadata projection shown in the public README. `Get-EVXEvent` and `Get-WinEvent`
-  stream through PowerShell's `Export-Csv`; the direct .NET lane writes byte-equivalent CSV as a lower bound.
-- `NativeParse`: EvtxECmd's native parse/metrics path.
-- `EvtxCsv`: EvtxECmd's parser plus its fixed-schema CSV writer. This remains a competitor-specific workload.
+- `Metadata` touches core system fields without messages, XML, properties, attachments, or bookmarks.
+- `Message` touches core metadata, the provider-formatted message, and provider display names.
+- `StructuredData` touches metadata, properties, and raw XML. PSEventViewer also parses its named `Data` dictionary.
+- `Full` requests message and structured data together. PSEventViewer additionally materializes its parsed message
+  fields, attachments, and bookmark representation.
+- `MetadataCsv` writes the five fields shown in the public README. The three successful engines must produce the same
+  row count, byte count, and SHA-256.
 
-Each large fixture also gets deterministic `Sample` cases (100,000 events by default) for expensive message, XML,
-and full-projection comparisons. Complete `Scan` cases still cover the entire file.
+The `Message`, `StructuredData`, and `Full` cases are therefore common-user-job comparisons rather than promises that
+every internal allocation or returned type is identical. Result artifacts expose message characters, XML characters,
+property count, structured-field count, message-field count, and attachment bytes so the extra work remains visible.
 
-Every successful lane validates the event count. Additional metrics include internal query time, events per second,
-managed allocation, peak working set, message/XML characters, and property count. PowerForge also records end-to-end
-duration, which includes child-process startup for public command-line/PowerShell lanes. Run metadata records the
-repository head and dirty status, fixture size/hash, built host/module/EventViewerX hashes, every benchmark script
-hash, optional baseline binary/dependency hashes, and the EvtxECmd hash. Results therefore remain attributable even
-when a developer intentionally benchmarks uncommitted source.
+## What “full” means in EvtxECmd
+
+EvtxECmd does have a full export, but its term does not map to PSEventViewer's `Full` read mode:
+
+- `--json <directory> --jsonf <file> --fj true` exports all available raw event data by converting the event XML to
+  JSON. It does not add the Windows provider-formatted `Message` that PSEventViewer `Full` requests.
+- `--xml` writes the raw event XML representation.
+- The normal EvtxECmd CSV is a fixed 25-column forensic schema. It includes core metadata, map-derived fields such as
+  `MapDescription`, `UserName`, `RemoteHost`, `PayloadData1` through `PayloadData6`, and the payload.
+- A metrics-only EvtxECmd run still parses every record and converts its payload internally. It is not a metadata-only
+  equivalent to `-ReadMode Metadata`.
+
+These behaviors are visible in the
+[EvtxECmd source used by the pinned 2026.5.0 build](https://github.com/EricZimmerman/evtx/blob/bfc7f47ccbf65ffc9a3777cde5498db2fdd94664/EvtxECmd/Program.cs).
+The benchmark declares separate `Evtx-NativeParse`, `Evtx-ForensicCsv`, `Evtx-FullJson`, and `Evtx-Xml` cases and
+reports them in a separate README table.
+
+## Validation and provenance
+
+Every successful lane must process the expected event count with no parser errors. Common-work lanes also require
+non-empty event identity checks, first and last record IDs, and mode-specific materialization rules. Output lanes must
+create a non-empty file and record its SHA-256.
+
+PowerForge records:
+
+- end-to-end duration and engine-reported duration;
+- events per second, managed allocation, and peak working set;
+- event identity sums and first/last record IDs;
+- message, XML, property, parsed-field, attachment, and output sizes;
+- repository head and dirty state;
+- fixture path, size, and SHA-256;
+- built host, module, EventViewerX, benchmark-script, optional baseline, and EvtxECmd hashes;
+- .NET, PowerShell, and EvtxECmd versions.
+
+Large public tables use at least three rotated iterations for common-work comparisons. EvtxECmd native exports may use
+one iteration because each run can emit gigabytes; those rows are descriptive evidence rather than statistical
+rankings.
 
 ## Run
 
+Inspect the resolved smoke matrix:
+
 ```powershell
 .\Benchmarks\EventLogParsing\Invoke-EventLogParsingBenchmark.ps1 `
-    -Case Smoke-Scan-Metadata `
+    -Case Smoke-Common-Scan-Metadata `
+    -Engine DotNet, EventViewerX, GetWinEvent, PSEventViewer `
+    -Plan
+```
+
+Run a smoke comparison:
+
+```powershell
+.\Benchmarks\EventLogParsing\Invoke-EventLogParsingBenchmark.ps1 `
+    -Case Smoke-Common-Scan-Metadata, Smoke-Common-Scan-Message, Smoke-Exact-Export-MetadataCsv `
     -Engine DotNet, EventViewerX, GetWinEvent, PSEventViewer `
     -IterationCount 3
 ```
 
-Run a large external fixture and include EvtxECmd:
+Generate the common-work table in the main README from an external large fixture:
 
 ```powershell
 .\Benchmarks\EventLogParsing\Invoke-EventLogParsingBenchmark.ps1 `
     -LargeFixturePath C:\Temp\Security.evtx `
     -ExpectedLargeCount 1000000 `
     -ExpensiveSampleCount 100000 `
-    -EvtxECmdPath C:\Tools\EvtxECmd.exe `
-    -Case Large-Scan-Metadata, Large-Sample-Message, Large-Sample-StructuredData, Large-Sample-Full, Large-Export-MetadataCsv, Large-Export-EvtxCsv `
-    -IterationCount 1
+    -IterationCount 3 `
+    -ReadmeTable Common
 ```
 
-Use `-Plan` to inspect the resolved matrix. Artifacts are written under
-`Ignore\Benchmarks\EventLogParsing\Runs` unless `-OutputRoot` is supplied.
+Generate the separate EvtxECmd-native table:
+
+```powershell
+.\Benchmarks\EventLogParsing\Invoke-EventLogParsingBenchmark.ps1 `
+    -LargeFixturePath C:\Temp\Security.evtx `
+    -ExpectedLargeCount 1000000 `
+    -EvtxECmdPath C:\Tools\EvtxECmd.exe `
+    -ReadmeTable EvtxNative
+```
+
+`-ReadmeTable` owns its curated case and engine matrix so a partial run cannot silently replace a public table.
+Artifacts are written below `Ignore\Benchmarks\EventLogParsing\Runs` unless `-OutputRoot` is supplied. Keep the small
+summary and provenance needed for review, then delete large fixtures and generated CSV, JSON, and XML files.
