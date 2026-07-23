@@ -16,8 +16,8 @@ $benchmarkWrapper = Join-Path $PSScriptRoot 'Invoke-EventLogParsingBenchmark.ps1
 $benchmarkSpec = Join-Path $PSScriptRoot 'event-log-parsing.benchmark.ps1'
 $pwshPath = [string] (Get-Command pwsh -ErrorAction Stop).Source
 $dotnetPath = [string] (Get-Command dotnet -ErrorAction Stop).Source
-if ($readmeTable -notin 'None', 'Common', 'EvtxNative') {
-    throw "ReadmeTable must be None, Common, or EvtxNative. Received '$readmeTable'."
+if ($readmeTable -notin 'None', 'Common', 'ExactOutput', 'NativeOutput', 'EvtxNative') {
+    throw "ReadmeTable must be None, Common, ExactOutput, NativeOutput, or EvtxNative. Received '$readmeTable'."
 }
 
 [array] $fixtures = & {
@@ -82,6 +82,17 @@ if ($readmeTable -notin 'None', 'Common', 'EvtxNative') {
         Workload      = 'MetadataCsv'
     }
     [pscustomobject] @{
+        Name            = "$($fixture.Name)-Exact-Export-RawXml"
+        Fixture         = $fixture.Name
+        FixturePath     = $fixture.Path
+        ExpectedCount   = $fixture.ExpectedCount
+        MaxEvents       = 0
+        Workload        = 'ExactRawXml'
+        ReadMode        = 'StructuredData'
+        OutputFormat    = 'Xml'
+        OutputExtension = 'xml'
+    }
+    [pscustomobject] @{
         Name          = "$($fixture.Name)-Evtx-NativeParse"
         Fixture       = $fixture.Name
         FixturePath   = $fixture.Path
@@ -115,6 +126,39 @@ if ($readmeTable -notin 'None', 'Common', 'EvtxNative') {
         ExpectedCount   = $fixture.ExpectedCount
         MaxEvents       = 0
         Workload        = 'EvtxXml'
+        OutputExtension = 'xml'
+    }
+    [pscustomobject] @{
+        Name            = "$($fixture.Name)-Native-Output-Csv"
+        Fixture         = $fixture.Name
+        FixturePath     = $fixture.Path
+        ExpectedCount   = $fixture.ExpectedCount
+        MaxEvents       = 0
+        Workload        = 'NativeOutputCsv'
+        ReadMode        = 'Full'
+        OutputFormat    = 'Csv'
+        OutputExtension = 'csv'
+    }
+    [pscustomobject] @{
+        Name            = "$($fixture.Name)-Native-Output-FullJson"
+        Fixture         = $fixture.Name
+        FixturePath     = $fixture.Path
+        ExpectedCount   = $fixture.ExpectedCount
+        MaxEvents       = 0
+        Workload        = 'NativeOutputFullJson'
+        ReadMode        = 'Full'
+        OutputFormat    = 'JsonLines'
+        OutputExtension = 'jsonl'
+    }
+    [pscustomobject] @{
+        Name            = "$($fixture.Name)-Native-Output-Xml"
+        Fixture         = $fixture.Name
+        FixturePath     = $fixture.Path
+        ExpectedCount   = $fixture.ExpectedCount
+        MaxEvents       = 0
+        Workload        = 'NativeOutputXml'
+        ReadMode        = 'StructuredData'
+        OutputFormat    = 'Xml'
         OutputExtension = 'xml'
     }
 }
@@ -162,7 +206,7 @@ benchmark 'event-log-parsing' -out (Join-Path $repositoryRoot 'Ignore\Benchmarks
             }
         }
     ) | ConvertTo-Json -Compress))
-    metadata ComparisonContract 'Exact output, common public work, and EvtxECmd-native workflows are reported separately.'
+    metadata ComparisonContract 'Exact output, common public work, different-schema native output, and EvtxECmd-native workflows are reported separately.'
     metadata ReadmeTable $readmeTable
     if ($baselineHostPath) {
         metadata BaselineHostSha256 (Get-FileHash -LiteralPath $baselineHostPath -Algorithm SHA256).Hash
@@ -242,6 +286,15 @@ benchmark 'event-log-parsing' -out (Join-Path $repositoryRoot 'Ignore\Benchmarks
         if ($definition.Workload -like 'Evtx*') {
             return $case.Engine -ne 'EvtxECmd' -or -not $evtxECmdPath -or -not $evtxMapsPath
         }
+        if ($definition.Workload -like 'NativeOutput*') {
+            if ($case.Engine -eq 'EvtxECmd') {
+                return -not $evtxECmdPath -or -not $evtxMapsPath
+            }
+            return $case.Engine -ne 'EventViewerXExport'
+        }
+        if ($definition.Workload -eq 'ExactRawXml') {
+            return $case.Engine -notin 'DotNet', 'EventViewerXExport', 'PSEventViewer', 'GetWinEvent'
+        }
         if ($definition.Workload -eq 'MetadataCsv') {
             if ($case.Engine -eq 'PSEventViewerBaseline') {
                 return -not $baselineModulePath
@@ -268,7 +321,13 @@ benchmark 'event-log-parsing' -out (Join-Path $repositoryRoot 'Ignore\Benchmarks
             param($case, $run)
 
             $definition = $run.Definition
-            $readMode = if ($definition.Workload -eq 'MetadataCsv') { 'Metadata' } else { $definition.Workload }
+            $readMode = if ($definition.Workload -eq 'MetadataCsv') {
+                'Metadata'
+            } elseif ($definition.Workload -eq 'ExactRawXml') {
+                $definition.ReadMode
+            } else {
+                $definition.Workload
+            }
             [array] $arguments = @(
                 $hostDll
                 '--engine'
@@ -282,6 +341,11 @@ benchmark 'event-log-parsing' -out (Join-Path $repositoryRoot 'Ignore\Benchmarks
                 '--max-events'
                 $definition.MaxEvents
                 if ($definition.Workload -eq 'MetadataCsv') {
+                    '--output-path'
+                    $run.EventOutputPath
+                } elseif ($definition.Workload -eq 'ExactRawXml') {
+                    '--format'
+                    $definition.OutputFormat
                     '--output-path'
                     $run.EventOutputPath
                 }
@@ -327,6 +391,26 @@ benchmark 'event-log-parsing' -out (Join-Path $repositoryRoot 'Ignore\Benchmarks
         }
     }
 
+    engine EventViewerXExport {
+        operation Scan {
+            param($case, $run)
+
+            $definition = $run.Definition
+            & $dotnetPath $hostDll `
+                --engine eventviewerxexport `
+                --path $definition.FixturePath `
+                --mode $definition.ReadMode `
+                --format $definition.OutputFormat `
+                --output-path $run.EventOutputPath `
+                --culture en-US `
+                --result $run.ResultPath `
+                --max-events $definition.MaxEvents *> $run.StandardOutputPath
+            if ($LASTEXITCODE -ne 0) {
+                throw "EventViewerX direct-export benchmark host exited with code $LASTEXITCODE."
+            }
+        }
+    }
+
     engine EventViewerXBaseline {
         operation Scan {
             param($case, $run)
@@ -349,7 +433,13 @@ benchmark 'event-log-parsing' -out (Join-Path $repositoryRoot 'Ignore\Benchmarks
             param($case, $run)
 
             $definition = $run.Definition
-            $readMode = if ($definition.Workload -eq 'MetadataCsv') { 'Metadata' } else { $definition.Workload }
+            $readMode = if ($definition.Workload -eq 'MetadataCsv') {
+                'Metadata'
+            } elseif ($definition.Workload -eq 'ExactRawXml') {
+                $definition.ReadMode
+            } else {
+                $definition.Workload
+            }
             [array] $arguments = @(
                 '-NoLogo'
                 '-NoProfile'
@@ -364,12 +454,17 @@ benchmark 'event-log-parsing' -out (Join-Path $repositoryRoot 'Ignore\Benchmarks
                 $readMode
                 '-ResultPath'
                 $run.ResultPath
+                '-MessageCulture'
+                'en-US'
                 '-ModulePath'
                 $modulePath
                 '-MaxEvents'
                 $definition.MaxEvents
                 if ($definition.Workload -eq 'MetadataCsv') {
                     '-CsvOutputPath'
+                    $run.EventOutputPath
+                } elseif ($definition.Workload -eq 'ExactRawXml') {
+                    '-XmlOutputPath'
                     $run.EventOutputPath
                 }
             )
@@ -385,7 +480,13 @@ benchmark 'event-log-parsing' -out (Join-Path $repositoryRoot 'Ignore\Benchmarks
             param($case, $run)
 
             $definition = $run.Definition
-            $readMode = if ($definition.Workload -eq 'MetadataCsv') { 'Metadata' } else { $definition.Workload }
+            $readMode = if ($definition.Workload -eq 'MetadataCsv') {
+                'Metadata'
+            } elseif ($definition.Workload -eq 'ExactRawXml') {
+                $definition.ReadMode
+            } else {
+                $definition.Workload
+            }
             [array] $arguments = @(
                 '-NoLogo'
                 '-NoProfile'
@@ -400,12 +501,17 @@ benchmark 'event-log-parsing' -out (Join-Path $repositoryRoot 'Ignore\Benchmarks
                 $readMode
                 '-ResultPath'
                 $run.ResultPath
+                '-MessageCulture'
+                'en-US'
                 '-ModulePath'
                 $baselineModulePath
                 '-MaxEvents'
                 $definition.MaxEvents
                 if ($definition.Workload -eq 'MetadataCsv') {
                     '-CsvOutputPath'
+                    $run.EventOutputPath
+                } elseif ($definition.Workload -eq 'ExactRawXml') {
+                    '-XmlOutputPath'
                     $run.EventOutputPath
                 }
             )
@@ -421,7 +527,13 @@ benchmark 'event-log-parsing' -out (Join-Path $repositoryRoot 'Ignore\Benchmarks
             param($case, $run)
 
             $definition = $run.Definition
-            $readMode = if ($definition.Workload -eq 'MetadataCsv') { 'Metadata' } else { $definition.Workload }
+            $readMode = if ($definition.Workload -eq 'MetadataCsv') {
+                'Metadata'
+            } elseif ($definition.Workload -eq 'ExactRawXml') {
+                $definition.ReadMode
+            } else {
+                $definition.Workload
+            }
             [array] $arguments = @(
                 '-NoLogo'
                 '-NoProfile'
@@ -436,10 +548,15 @@ benchmark 'event-log-parsing' -out (Join-Path $repositoryRoot 'Ignore\Benchmarks
                 $readMode
                 '-ResultPath'
                 $run.ResultPath
+                '-MessageCulture'
+                'en-US'
                 '-MaxEvents'
                 $definition.MaxEvents
                 if ($definition.Workload -eq 'MetadataCsv') {
                     '-CsvOutputPath'
+                    $run.EventOutputPath
+                } elseif ($definition.Workload -eq 'ExactRawXml') {
+                    '-XmlOutputPath'
                     $run.EventOutputPath
                 }
             )
@@ -457,8 +574,11 @@ benchmark 'event-log-parsing' -out (Join-Path $repositoryRoot 'Ignore\Benchmarks
             $definition = $run.Definition
             $workload = switch ($definition.Workload) {
                 'EvtxForensicCsv' { 'ForensicCsv' }
+                'NativeOutputCsv' { 'ForensicCsv' }
                 'EvtxFullJson' { 'FullJson' }
+                'NativeOutputFullJson' { 'FullJson' }
                 'EvtxXml' { 'Xml' }
+                'NativeOutputXml' { 'Xml' }
                 default { 'NativeParse' }
             }
             [array] $arguments = @(
@@ -507,7 +627,9 @@ benchmark 'event-log-parsing' -out (Join-Path $repositoryRoot 'Ignore\Benchmarks
         }
 
         $requiresOutput = $definition.Workload -eq 'MetadataCsv' -or
-            ($definition.Workload -like 'Evtx*' -and $definition.Workload -ne 'EvtxNativeParse')
+            $definition.Workload -eq 'ExactRawXml' -or
+            ($definition.Workload -like 'Evtx*' -and $definition.Workload -ne 'EvtxNativeParse') -or
+            $definition.Workload -like 'NativeOutput*'
         if ($requiresOutput) {
             assertPath $run.EventOutputPath
             $outputFile = Get-Item -LiteralPath $run.EventOutputPath
@@ -523,7 +645,7 @@ benchmark 'event-log-parsing' -out (Join-Path $repositoryRoot 'Ignore\Benchmarks
             } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $run.OutputDirectory 'output-validation.json') -Encoding utf8
         }
 
-        if ($definition.Workload -notlike 'Evtx*') {
+        if ($definition.Workload -in 'Metadata', 'Message', 'StructuredData', 'Full', 'MetadataCsv') {
             if ([long] $run.Result.IdSum -le 0 -or [long] $run.Result.RecordIdSum -le 0) {
                 throw 'The common-work benchmark did not record non-empty event identity checks.'
             }
@@ -577,6 +699,16 @@ benchmark 'event-log-parsing' -out (Join-Path $repositoryRoot 'Ignore\Benchmarks
                 [long] $run.Result.XmlCharacters -le 0 -or
                 [long] $run.Result.PropertyCount -le 0)) {
                 throw 'Full mode did not format messages or materialize XML and event properties.'
+            }
+        }
+
+        if ($definition.Workload -eq 'ExactRawXml') {
+            $outputKey = '{0}|{1}|RawXml' -f $definition.Fixture, $definition.ExpectedCount
+            $outputHash = [string] $run.Result.OutputSha256
+            if ($exactOutputHashes.ContainsKey($outputKey)) {
+                assertValue -Actual $outputHash -Expected $exactOutputHashes[$outputKey] -Message 'Exact-output engines must produce byte-identical raw XML.'
+            } else {
+                $exactOutputHashes[$outputKey] = $outputHash
             }
         }
     }
@@ -718,6 +850,12 @@ benchmark 'event-log-parsing' -out (Join-Path $repositoryRoot 'Ignore\Benchmarks
         }
     }
 
-    comparison Engine -Baseline PSEventViewer -Metric MedianMs -TieTolerance 0.03
+    if ($readmeTable -eq 'Common' -or $readmeTable -eq 'ExactOutput') {
+        comparison Engine -Baseline PSEventViewer -Metric MedianMs -TieTolerance 0.03
+    } elseif ($readmeTable -eq 'NativeOutput') {
+        comparison Engine -Baseline EventViewerXExport -Metric MedianMs -TieTolerance 0.03
+    } elseif ($readmeTable -eq 'EvtxNative') {
+        comparison Engine -Baseline EvtxECmd -Metric MedianMs -TieTolerance 0.03
+    }
     artifacts Json, Csv, Markdown
 }

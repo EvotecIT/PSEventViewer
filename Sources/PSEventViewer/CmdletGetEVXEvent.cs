@@ -243,6 +243,7 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
     /// </summary>
     [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
     public CultureInfo? MessageCulture { get; set; }
 
     /// <summary>
@@ -506,7 +507,8 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
                                    candidateObserver: candidate => TrackCheckpointProgress(candidate),
                                    oldest: EffectiveOldest,
                                    resultPredicate: namedResultPredicate,
-                                   enrichmentOptions: enrichmentOptions)) {
+                                   enrichmentOptions: enrichmentOptions,
+                                   messageCulture: MessageCulture)) {
                     token.ThrowIfCancellationRequested();
                     if (!TrackCheckpointProgress(eventObject.Event)) {
                         continue;

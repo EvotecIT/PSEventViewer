@@ -7,8 +7,8 @@ namespace EventViewerX.Native;
 
 internal sealed class WindowsEventPayloadRenderer : IDisposable {
     private const uint VariantArrayFlag = 0x80;
-    private readonly NativeEventBuffer _xmlBuffer = new();
     private readonly NativeEventBuffer _valueBuffer = new();
+    private readonly WindowsEventXmlRenderer _xmlRenderer = new();
     private readonly WindowsEventBookmarkRenderer _bookmarkRenderer = new();
     private readonly WindowsEventNativeMethods.EventHandle _userContext;
 
@@ -27,40 +27,9 @@ internal sealed class WindowsEventPayloadRenderer : IDisposable {
     internal NativeEventStructured Render(IntPtr eventHandle, NativeEventMetadata metadata) {
         return new NativeEventStructured(
             metadata,
-            RenderXml(eventHandle),
+            _xmlRenderer.Render(eventHandle),
             RenderValues(eventHandle),
             _bookmarkRenderer.Render(eventHandle));
-    }
-
-    private string RenderXml(IntPtr eventHandle) {
-        if (!WindowsEventNativeMethods.EvtRenderRaw(
-                IntPtr.Zero,
-                eventHandle,
-                WindowsEventNativeMethods.RenderFlags.EventXml,
-                _xmlBuffer.Capacity,
-                _xmlBuffer.Pointer,
-                out int bufferUsed,
-                out _)) {
-
-            int error = Marshal.GetLastWin32Error();
-            if (error != WindowsEventNativeMethods.ErrorInsufficientBuffer) {
-                return string.Empty;
-            }
-
-            _xmlBuffer.EnsureCapacity(bufferUsed);
-            if (!WindowsEventNativeMethods.EvtRenderRaw(
-                    IntPtr.Zero,
-                    eventHandle,
-                    WindowsEventNativeMethods.RenderFlags.EventXml,
-                    _xmlBuffer.Capacity,
-                    _xmlBuffer.Pointer,
-                    out bufferUsed,
-                    out _)) {
-                return string.Empty;
-            }
-        }
-
-        return Marshal.PtrToStringUni(_xmlBuffer.Pointer) ?? string.Empty;
     }
 
     private IReadOnlyList<EventPropertyValue> RenderValues(IntPtr eventHandle) {
@@ -351,7 +320,7 @@ internal sealed class WindowsEventPayloadRenderer : IDisposable {
     public void Dispose() {
         _userContext.Dispose();
         _bookmarkRenderer.Dispose();
-        _xmlBuffer.Dispose();
+        _xmlRenderer.Dispose();
         _valueBuffer.Dispose();
     }
 }

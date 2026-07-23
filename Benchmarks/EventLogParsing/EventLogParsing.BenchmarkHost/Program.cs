@@ -6,6 +6,8 @@ internal static class Program {
     public static int Main(string[] args) {
         try {
             BenchmarkOptions options = BenchmarkOptions.Parse(args);
+            System.Globalization.CultureInfo.CurrentUICulture = options.MessageCulture;
+            System.Globalization.CultureInfo.DefaultThreadCurrentUICulture = options.MessageCulture;
             BenchmarkResult result = EventEnumerationRunner.Run(options);
             string? directory = Path.GetDirectoryName(options.ResultPath);
             if (!string.IsNullOrEmpty(directory)) {

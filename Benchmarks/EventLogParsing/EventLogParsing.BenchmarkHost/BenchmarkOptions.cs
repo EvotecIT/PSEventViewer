@@ -11,6 +11,10 @@ internal sealed class BenchmarkOptions {
 
     public string? OutputPath { get; init; }
 
+    public EventViewerX.EventExportFormat? OutputFormat { get; init; }
+
+    public required System.Globalization.CultureInfo MessageCulture { get; init; }
+
     public int MaxEvents { get; init; }
 
     public static BenchmarkOptions Parse(string[] args) {
@@ -34,8 +38,9 @@ internal sealed class BenchmarkOptions {
         string engine = GetRequired(values, "engine");
         if (!string.Equals(engine, "dotnet", StringComparison.OrdinalIgnoreCase) &&
             !string.Equals(engine, "propertyselector", StringComparison.OrdinalIgnoreCase) &&
-            !string.Equals(engine, "eventviewerx", StringComparison.OrdinalIgnoreCase)) {
-            throw new ArgumentException("--engine must be 'dotnet', 'propertyselector', or 'eventviewerx'.");
+            !string.Equals(engine, "eventviewerx", StringComparison.OrdinalIgnoreCase) &&
+            !string.Equals(engine, "eventviewerxexport", StringComparison.OrdinalIgnoreCase)) {
+            throw new ArgumentException("--engine must be 'dotnet', 'propertyselector', 'eventviewerx', or 'eventviewerxexport'.");
         }
 
         string path = System.IO.Path.GetFullPath(GetRequired(values, "path"));
@@ -53,14 +58,36 @@ internal sealed class BenchmarkOptions {
             throw new ArgumentException("--max-events must be a non-negative integer.");
         }
 
+        string? outputPath = values.TryGetValue("output-path", out string? suppliedOutputPath)
+            ? System.IO.Path.GetFullPath(suppliedOutputPath)
+            : null;
+        EventViewerX.EventExportFormat? outputFormat = null;
+        if (values.TryGetValue("format", out string? formatText)) {
+            if (!Enum.TryParse(
+                    formatText,
+                    ignoreCase: true,
+                    out EventViewerX.EventExportFormat parsedFormat)) {
+                throw new ArgumentException("--format must be Csv, JsonLines, or Xml.");
+            }
+            outputFormat = parsedFormat;
+        }
+        if (string.Equals(engine, "eventviewerxexport", StringComparison.OrdinalIgnoreCase) &&
+            (outputPath == null || outputFormat == null)) {
+            throw new ArgumentException(
+                "The eventviewerxexport engine requires --output-path and --format.");
+        }
+
+        string cultureName = values.TryGetValue("culture", out string? suppliedCulture)
+            ? suppliedCulture
+            : "en-US";
         return new BenchmarkOptions {
             Engine = engine,
             Path = path,
             ReadMode = readMode,
             ResultPath = System.IO.Path.GetFullPath(GetRequired(values, "result")),
-            OutputPath = values.TryGetValue("output-path", out string? outputPath)
-                ? System.IO.Path.GetFullPath(outputPath)
-                : null,
+            OutputPath = outputPath,
+            OutputFormat = outputFormat,
+            MessageCulture = System.Globalization.CultureInfo.GetCultureInfo(cultureName),
             MaxEvents = maxEvents
         };
     }

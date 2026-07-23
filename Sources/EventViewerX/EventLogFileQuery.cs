@@ -10,7 +10,7 @@ public sealed class EventLogFileQuery {
     /// <summary>
     /// Creates an offline event query.
     /// </summary>
-    /// <param name="path">Path to an EVTX, EVT, or ETL event log file.</param>
+    /// <param name="path">Path to an offline log accepted by the Windows Event Log API. EVTX is the validated format.</param>
     public EventLogFileQuery(string path) {
         if (string.IsNullOrWhiteSpace(path)) {
             throw new ArgumentException("Event log path cannot be null or empty.", nameof(path));

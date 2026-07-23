@@ -129,6 +129,15 @@ internal static class WindowsEventRemoteReader {
             workerCancellation.Cancel();
             if (producer.IsCompleted) {
                 results.Dispose();
+            } else {
+                _ = producer.ContinueWith(
+                    completed => {
+                        _ = completed.Exception;
+                        results.Dispose();
+                    },
+                    CancellationToken.None,
+                    TaskContinuationOptions.ExecuteSynchronously,
+                    TaskScheduler.Default);
             }
         }
     }

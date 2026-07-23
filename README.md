@@ -41,7 +41,7 @@ Author & Social
 
 ## Components
 
-- **EventViewerX (.NET library)** - Targets `net472`, `netstandard2.0`, `net8.0`, `net9.0`; Windows-only; ships the query engine, watcher manager, filter builder, and log management APIs.
+- **EventViewerX (.NET library)** - Targets `net472`, `net8.0-windows`, and `net10.0-windows`; ships the owned native query/projection/export engine, watcher manager, filter builder, and log management APIs.
 - **PSEventViewer (PowerShell module)** - Built on PowerShellStandard.Library 5.1; works on Windows PowerShell 5.1 and PowerShell 7+; exposes the EVX cmdlets and aliases for familiarity with native verbs.
 - **Examples** - PowerShell examples live in `Examples/`; C# samples in `Sources/EventViewerX.Examples/` show how to embed the library.
 
@@ -53,7 +53,7 @@ Coverage is uploaded from GitHub Actions test jobs to Codecov; the badge tracks 
 
 | Component | Target frameworks / Editions | Notes |
 | --- | --- | --- |
-| EventViewerX library | .NET Framework 4.7.2, .NET Standard 2.0, .NET 8, .NET 9 | Windows-only; uses `System.Diagnostics.EventLog` and `System.DirectoryServices`; depends on `DnsClientX` for DNS lookups used in helpers. |
+| EventViewerX library | .NET Framework 4.7.2, .NET 8 for Windows, .NET 10 for Windows | Windows-only. The high-throughput engine calls the Windows Event Log API directly and adds no parser dependency. Other library features use `System.Diagnostics.EventLog`, `System.DirectoryServices`, and `DnsClientX`. |
 | PSEventViewer module | Windows PowerShell 5.1, PowerShell 7+ | Ships compiled cmdlets; depends on `PSSharedGoods` plus Microsoft.PowerShell.Management/Utility/Diagnostics. |
 
 ## Capabilities at a glance
@@ -102,14 +102,13 @@ Coverage is uploaded from GitHub Actions test jobs to Codecov; the badge tracks 
 
 Tip: use `Get-EVXEvent -Type <NamedEvents>` to query any of the packs without remembering underlying event IDs. Combine multiple values to cover a scenario set.
 
-Tip: use `Get-EVXEvent -Type <NamedEvents>` to query any of the packs without remembering underlying event IDs. Combine multiple values to cover a scenario set.
-
 ## C# quick start (EventViewerX)
 
 ```csharp
 using EventViewerX;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 
 // Basic queries
 var events = SearchEvents.QueryLog("Security", new List<int> { 4624, 4625 }, machineName: "DC01");
@@ -127,6 +126,35 @@ await foreach (var ev in SearchEvents.QueryLogsParallel(
 var named = SearchEvents.FindEventsByNamedEvents(
     new List<NamedEvents> { NamedEvents.ADUserLockouts, NamedEvents.AADConnectPasswordSyncFailed },
     machineNames: new List<string?> { "AADSYNC01" });
+
+// Dependency-free, bounded native projection from an offline log
+var fileQuery = new EventLogFileQuery(@"C:\Logs\Security.evtx") {
+    Oldest = true,
+    ReadMode = EventReadMode.Message,
+    MessageCulture = CultureInfo.GetCultureInfo("en-US")
+};
+foreach (var ev in EventLogEngine.ReadFile(fileQuery)) {
+    Console.WriteLine($"{ev.RecordId}: {ev.Message}");
+}
+
+// The same engine reads local or remote channels
+var channelQuery = new EventLogChannelQuery("System") {
+    MachineName = "DC01",
+    XPath = "*[System[(Level=1 or Level=2)]]",
+    ReadMode = EventReadMode.Full,
+    MessageCulture = CultureInfo.GetCultureInfo("en-US"),
+    BufferCapacity = 64
+};
+foreach (var ev in EventLogEngine.ReadChannel(channelQuery)) {
+    Console.WriteLine($"{ev.TimeCreated:u} {ev.ProviderName} {ev.Id}");
+}
+
+// Bypass object-pipeline overhead for durable streaming output
+EventExportResult export = EventLogExporter.ExportFile(
+    fileQuery,
+    @"C:\Exports\Security.jsonl",
+    EventExportFormat.JsonLines,
+    overwrite: true);
 
 // Real-time watcher
 var watcher = WatcherManager.StartWatcher(
@@ -169,6 +197,18 @@ Reset-EVXEventCheckpoint -Path "$env:TEMP\evx.state" -Key 'security-failures' -P
 # Offline EVTX with include/exclude filters
 Get-EVXEvent -Path C:\Logs\DC01-Security.evtx -NamedDataFilter @{ TargetUserName = 'alice' } -NamedDataExcludeFilter @{ IpAddress = '10.0.0.1' }
 
+# Direct full export with deterministic English provider messages
+Export-EVXEvent -Path C:\Logs\DC01-Security.evtx -OutputPath C:\Exports\Security.jsonl `
+    -Format JsonLines -ReadMode Full -MessageCulture en-US -Oldest
+
+# Direct bounded remote export without a PowerShell object-to-file pipeline
+Export-EVXEvent -LogName System -MachineName DC01 -OutputPath C:\Exports\DC01-System.csv `
+    -Format Csv -ReadMode Message -MessageCulture en-US -BufferCapacity 64
+
+# Raw XML takes the shortest native path and is not affected by ReadMode
+Export-EVXEvent -Path C:\Logs\DC01-Security.evtx -OutputPath C:\Exports\Security.xml `
+    -Format Xml -Oldest
+
 # Build XPath for Event Viewer / Get-WinEvent
 Get-EVXFilter -LogName Security -ID 4624,4625 -UserID 'S-1-5-18' -StartTime (Get-Date).AddDays(-7)
 
@@ -183,100 +223,114 @@ Clear-EVXLog -LogName 'MyApp'
 Remove-EVXLog -LogName 'MyApp'
 ```
 
-## Reading large event logs
+## Reading and exporting large event logs
 
-`Get-EVXEvent` streams records, but the work performed for each record depends on `-ReadMode`. The default remains
-`Full` for compatibility. Choose a narrower mode when you do not need every representation of the event.
+`Get-EVXEvent` streams detached records as they are read. `Export-EVXEvent` takes the shorter path for durable output:
+the compiled cmdlet connects the shared C# engine directly to a streaming writer, without sending one PowerShell
+object per event through the pipeline. Both surfaces use the same query, projection, culture, and cancellation
+contracts.
+
+The default `ReadMode` remains `Full` for compatibility. Choose only the representations the caller needs:
 
 | Read mode | Materialized data | Use it for |
 | --- | --- | --- |
-| `Metadata` | Core system fields only; no message, XML, attachments, or bookmark | Counting, filtering, timelines, IDs, providers, record-ID checkpoints, and large exports |
-| `Message` | Metadata, provider display names, the provider-formatted message, and bookmark; `MessageData` is parsed only when accessed | Text search and readable provider messages |
-| `StructuredData` | Metadata, raw properties, XML, parsed `Data`, and bookmark; no formatted message or decoded attachments | Named event fields, payload analysis, and `-Expand` |
-| `Full` | Message and structured data together, including parsed message fields and decoded binary attachments | Compatibility and workflows that need every representation |
+| `Metadata` | Core system fields only; no provider message, XML, payload dictionary, attachments, or bookmark | Counting, filtering, timelines, IDs, providers, record-ID checkpoints, and compact exports |
+| `Message` | Metadata, provider display names, the provider-formatted message, and bookmark; `MessageData` is parsed only when accessed | Readable text, search, triage, and deterministic-language exports |
+| `StructuredData` | Metadata, typed raw properties, XML, parsed named `Data`, and bookmark; no formatted message or decoded attachments | Payload analysis, `-Expand`, and field-based automation |
+| `Full` | Message and structured data together, including parsed message fields and decoded binary attachments | Compatibility and consumers that genuinely need every projection |
 
-Formatting a provider message is often the most expensive per-event operation. Filter by log, event ID, provider,
-time, record ID, level, keyword, user, or named data before choosing `Message` or `Full`.
+Provider message rendering is normally the most expensive per-event operation. Filter in XPath by channel, event ID,
+provider, time, record ID, level, keyword, or user before requesting `Message` or `Full`. Use `-MessageCulture en-US`
+when automation needs deterministic English output instead of the current machine's UI culture. Each event exposes
+whether message rendering succeeded; a missing provider resource is not silently confused with an empty message.
 
 ```powershell
-# Fast bounded-memory scan: no provider message or XML work
+# Fast bounded-memory metadata scan
 Get-EVXEvent -Path C:\Logs\DC01-Security.evtx -Oldest -ReadMode Metadata |
-    Select-Object TimeCreated, RecordId, Id, ProviderName, MachineName |
-    Export-Csv C:\Logs\Security-metadata.csv -NoTypeInformation
+    Select-Object TimeCreated, RecordId, Id, ProviderName, MachineName
 
-# Format messages only for the event IDs that need them
-Get-EVXEvent -LogName Security -EventId 4624,4625 -TimePeriod Last24Hours -ReadMode Message |
-    Select-Object TimeCreated, Id, MachineName, Message
+# Read only English provider messages from a live channel
+Get-EVXEvent -LogName Security -EventId 4624,4625 -TimePeriod Last24Hours `
+    -ReadMode Message -MessageCulture en-US |
+    Select-Object TimeCreated, Id, MachineName, Message, MessageRenderStatus
 
-# Parse XML payload fields without paying for provider message formatting
-Get-EVXEvent -Path C:\Logs\DC01-Security.evtx -EventId 4624 -ReadMode StructuredData -Expand
+# Direct offline export: no PowerShell object-to-file pipeline
+Export-EVXEvent -Path C:\Logs\DC01-Security.evtx -OutputPath C:\Exports\Security.jsonl `
+    -Format JsonLines -ReadMode Full -MessageCulture en-US -Oldest
+
+# Direct local or remote channel export with bounded buffering
+Export-EVXEvent -LogName System -MachineName DC01 -OutputPath C:\Exports\DC01-System.csv `
+    -Format Csv -ReadMode Message -MessageCulture en-US -BufferCapacity 64
+
+# Fastest lossless interchange path: raw native event XML
+Export-EVXEvent -Path C:\Logs\DC01-Security.evtx -OutputPath C:\Exports\Security.xml `
+    -Format Xml -Oldest
 ```
 
-The equivalent C# API accepts `readMode: EventReadMode.Metadata`, `Message`, `StructuredData`, or `Full`.
+CSV and JSON Lines honor `ReadMode`. XML intentionally ignores it and streams raw native event XML inside one
+well-formed `Events` document. Exports write to a temporary file in the destination directory, flush it, and only then
+promote it; cancellation, corrupt input, or rendering failure does not replace an existing destination.
 
-### Reproducible parser comparison
+The native engine batches Windows event handles, reuses native and managed buffers, closes each handle promptly, and
+keeps remote buffering bounded. It does not load an EVTX file or export into memory. EventViewerX owns this engine and
+does not embed EvtxECmd, a Rust parser, or another EVTX parser package. On supported Windows systems it deliberately
+uses the operating system's authoritative `wevtapi` parser and provider resources, wrapped by our own projection,
+culture, error, streaming, and export contracts. Reimplementing the binary EVTX format would add a second correctness
+and maintenance burden without improving the supported Windows contract.
 
-The [PowerForge event log benchmark](Benchmarks/EventLogParsing/README.md) separates three kinds of evidence:
+### Reproducible performance and correctness comparisons
 
-| Comparison class | Meaning |
+The [PowerForge event log benchmark](Benchmarks/EventLogParsing/README.md) keeps unlike workloads separate:
+
+| Comparison class | What is proved |
 | --- | --- |
-| Apples to apples: exact output | The same events and selected fields produce a byte-identical CSV with the same SHA-256. |
-| Apples to apples: common user job | The APIs perform the same user-facing read job and validate the same event window, order, and identity checks. Additional PSEventViewer projections remain visible in the metrics. |
-| Apples to oranges: native output | EvtxECmd runs its own parser, maps, and fixed output schemas. These rows describe a different forensic workflow and are not presented as interchangeable output. |
+| Common public job | Each public API reads the same event window in the same order. Identity fields are validated, while each API's documented extra work remains visible. |
+| Exact raw XML output | DotNet, EventViewerX, PSEventViewer, and `Get-WinEvent` must produce byte-identical UTF-8 XML with the same SHA-256 before timing is accepted. |
+| Native output | EventViewerX and EvtxECmd each emit their native CSV, JSON, or XML schema. Event count/order are checked, but different fields and output sizes make this apples-to-oranges throughput evidence. |
+| EvtxECmd native workflows | EvtxECmd parse-only, forensic CSV, full JSON, and XML are recorded independently so its own workflow remains visible without pretending it matches a PSEventViewer mode. |
 
-EvtxECmd's `--fj true` option is a full **raw-event JSON** export: it converts all available event XML to JSON. It is
-not equivalent to PSEventViewer `-ReadMode Full`, which also requests the Windows provider-formatted message and
-materializes PSEventViewer's parsed data, message fields, and attachments. PSEventViewer snapshots a bookmark for
-every non-metadata mode, so bookmark creation is not a `Full`-only distinction. EvtxECmd's normal CSV is likewise a
-25-column map-enriched forensic schema, not the five-column metadata export shown above.
-
-The common-work table is generated from validated PowerForge artifacts. The public refresh command requires at least
-three rotated iterations and owns its complete case/engine matrix. This snapshot was captured on July 23, 2026 with
-PowerShell 7.6.4 and .NET 10 on Windows, using a 225,513,472-byte `ad.evotec.xyz` Security-log export containing
-197,716 events (SHA-256 `3B243CA8A627C99844D713345786B85EE680286DDAE392037387949F6F9FAFB1`). Metadata and exact
-export rows process the entire file; message, structured-data, and full rows process the same first 100,000 events.
-Times are end-to-end medians, lower is better, and ratios are relative to PSEventViewer.
+Every public table below is generated from validated PowerForge artifacts using three rotated iterations. The fixture
+is a real local `Microsoft-Windows-Hyper-V-Compute-Admin` export captured July 23, 2026: 61,935,616 bytes, 103,405
+events, SHA-256 `F933AB900D6B42E7A07A1AE63FC5EC6E4C967A5CFE8010F45B19FC9C3277FCAE`. Metadata, exact-output,
+native-output, and EvtxECmd-native cases process all events; common Message, StructuredData, and Full comparisons use
+the same first 100,000 events. Times are end-to-end medians and lower is better.
 
 <!-- event-log-common-benchmark:start -->
-| Scenario | Host | Operation | PSEventViewer | DotNet | EventViewerX | GetWinEvent | Result |
-| --- | --- | --- | ---: | ---: | ---: | ---: | --- |
-| Large-Common-Sample-Full | Core-7.6.4 | Scan | 1.00x (57.62s) | 0.87x (49.88s) | 0.93x (53.34s) | 0.97x (56.05s) | PSEventViewer slower than DotNet |
-| Large-Common-Sample-Message | Core-7.6.4 | Scan | 1.00x (55.29s) | 0.86x (47.70s) | 0.95x (52.65s) | 1.01x (55.94s) | PSEventViewer slower than DotNet |
-| Large-Common-Sample-StructuredData | Core-7.6.4 | Scan | 1.00x (5.68s) | 0.51x (2.91s) | 0.79x (4.51s) | 4.63x (26.28s) | PSEventViewer slower than DotNet |
-| Large-Common-Scan-Metadata | Core-7.6.4 | Scan | 1.00x (2.76s) | 0.74x (2.05s) | 0.79x (2.18s) | 16.54x (45.57s) | PSEventViewer slower than DotNet |
-| Large-Exact-Export-MetadataCsv | Core-7.6.4 | Scan | 1.00x (3.86s) | 0.59x (2.28s) | Skipped | 13.12x (50.71s) | PSEventViewer slower than DotNet |
+_Generated common-work benchmark pending final candidate validation._
 <!-- event-log-common-benchmark:end -->
 
-On this fixture, PSEventViewer metadata enumeration was about 16.5 times faster than `Get-WinEvent`; the byte-identical
-metadata CSV export was about 13.1 times faster. Message and full materialization were in the same general range as
-`Get-WinEvent`, while the raw .NET reader remained the fastest common-work implementation.
+`StructuredData` is intentionally richer than the raw .NET baseline: EventViewerX materializes typed raw properties,
+raw XML, a named payload dictionary, and a bookmark. `Message` and `Full` explicitly request `en-US`; the same
+provider-message contract and render status are used for offline, local, and remote reads.
 
-The EvtxECmd-native table is generated separately because metrics-only parsing, its forensic CSV, XML, and full JSON
-perform different work and produce different output volumes. This single-iteration operational snapshot used
-EvtxECmd `2026.5.0+bfc7f47ccbf65ffc9a3777cde5498db2fdd94664` (executable SHA-256
-`DE169B2AC7F6B1E54A684E0CDDDA30223651937B75941B21EA53A98F5A2502EE`) and its explicit 386-file map set (manifest
-SHA-256 `0A6057FCA0E5BD05767177628D4434D6591E1FE8B14B834EED853A07B8FDD9FB`) on the same complete fixture. The generated
-`Median`, `Mean`, and `P95` values are milliseconds; with one sample they are identical and should not be read as a
-statistical distribution.
+<!-- event-log-exact-output-benchmark:start -->
+_Generated byte-identical raw XML benchmark pending final candidate validation._
+<!-- event-log-exact-output-benchmark:end -->
+
+The exact-output validator rejects a run before comparison if any event count, record order, byte sequence, or output
+SHA-256 differs. This is the strongest apples-to-apples export comparison.
+
+<!-- event-log-native-output-benchmark:start -->
+_Generated native-schema export benchmark pending final candidate validation._
+<!-- event-log-native-output-benchmark:end -->
+
+EvtxECmd CSV is a map-enriched forensic schema and its `--fj true` output is raw-event JSON derived from XML.
+EventViewerX `Full` JSON also includes provider-formatted messages, typed properties, named payload fields, render
+status, and bookmark information. Native CSV/JSON timings therefore must be read together with output byte counts in
+the retained PowerForge artifacts; faster time alone does not imply equivalent content.
+
+The EvtxECmd comparison uses version `2026.5.0+bfc7f47ccbf65ffc9a3777cde5498db2fdd94664` (executable SHA-256
+`DE169B2AC7F6B1E54A684E0CDDDA30223651937B75941B21EA53A98F5A2502EE`) and its explicit 386-file map set
+(manifest SHA-256 `0A6057FCA0E5BD05767177628D4434D6591E1FE8B14B834EED853A07B8FDD9FB`). EvtxECmd is a benchmark
+target only; it is not a source, runtime, package, or release dependency.
 
 <!-- event-log-evtx-native-benchmark:start -->
-| Scenario | Variables | Operation | Host | OS | RunMode | Engine | Samples | Failures | Median | Mean | P95 | StdDev | Status |
-| --- | --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
-| Large-Evtx-ForensicCsv |  | Scan | Core-7.6.4 | Windows | standard | EvtxECmd | 1 | 0 | 26204.0017 | 26204.0017 | 26204.0017 |  | Succeeded |
-| Large-Evtx-FullJson |  | Scan | Core-7.6.4 | Windows | standard | EvtxECmd | 1 | 0 | 44270.1647 | 44270.1647 | 44270.1647 |  | Succeeded |
-| Large-Evtx-NativeParse |  | Scan | Core-7.6.4 | Windows | standard | EvtxECmd | 1 | 0 | 21123.9797 | 21123.9797 | 21123.9797 |  | Succeeded |
-| Large-Evtx-Xml |  | Scan | Core-7.6.4 | Windows | standard | EvtxECmd | 1 | 0 | 46317.1814 | 46317.1814 | 46317.1814 |  | Succeeded |
+_Generated EvtxECmd-native benchmark pending final candidate validation._
 <!-- event-log-evtx-native-benchmark:end -->
 
-The benchmark also validates event counts, zero reported errors, nonempty export files, and their SHA-256 hashes. The
-retained output sizes from this run make the workload differences concrete:
-
-| EvtxECmd workload | Retained output | Bytes | SHA-256 | Meaning |
-| --- | --- | ---: | --- | --- |
-| Native parse | None | 0 | — | Parses every payload and internally converts event XML to JSON; not metadata-only work. |
-| Forensic CSV | Fixed 25-column CSV | 280,292,810 | `DF6B79F89277C8B3037E36D11F83F0A7A12769C4CA3D2EA68756960C4F97B72A` | Core metadata, map fields, `PayloadData1`-`PayloadData6`, and payload. |
-| Full JSON | Raw-event JSON | 256,607,897 | `43DABE58496BC09E72C5592ADCFEC6EFE57529320F5DC814807C2309D9F9ED38` | All available event XML converted to JSON by `--fj true`; no provider-formatted message. |
-| XML | Raw-event XML | 293,390,357 | `37CC35D82536B37047B90BD90D128EA3C703E82EC4F91806C756D7B8868F6B4E` | Exported event XML for all 197,716 records. |
+All benchmark classes record exact repository state, harness and engine hashes, culture, runtime, fixture provenance,
+per-iteration order, event counts, output sizes, output hashes, elapsed time, allocation, and peak working set. Heavy
+EVTX and export files are temporary; the small summary and validation artifacts are the retained evidence.
 
 Checkpoint generation metadata is stored in the visible `<RecordIdFile>.state.json` companion file. `Reset-EVXEventCheckpoint` updates both representations under the shared file lock and prevents an in-flight query from restoring progress from the previous generation.
 

@@ -42,7 +42,29 @@ public static class EventLogEngine {
                 "RPC endpoint port must be between 1 and 65535.");
         }
 
-        return ReadChannelIterator(query, cancellationToken);
+        string machineName = query.MachineName?.Trim() ?? string.Empty;
+        string logName = query.LogName;
+        string xpath = string.IsNullOrWhiteSpace(query.XPath) ? "*" : query.XPath;
+        bool oldest = query.Oldest;
+        EventReadMode readMode = query.ReadMode;
+        int messageLocale = query.MessageCulture?.LCID ?? 0;
+        int maxEvents = query.MaxEvents;
+        int remoteTimeoutMilliseconds = query.RemoteTimeoutMilliseconds;
+        int bufferCapacity = query.BufferCapacity;
+        int rpcEndpointPort = query.RpcEndpointPort;
+
+        return ReadChannelIterator(
+            machineName,
+            logName,
+            xpath,
+            oldest,
+            readMode,
+            messageLocale,
+            maxEvents,
+            remoteTimeoutMilliseconds,
+            bufferCapacity,
+            rpcEndpointPort,
+            cancellationToken);
     }
 
     /// <summary>
@@ -55,16 +77,107 @@ public static class EventLogEngine {
         EventLogFileQuery query,
         CancellationToken cancellationToken = default) {
 
+        NativeEventQuery nativeQuery = CreateNativeFileQuery(
+            query,
+            out string path,
+            out int maxEvents,
+            out EventReadMode readMode);
+        return ReadFileIterator(
+            nativeQuery,
+            path,
+            maxEvents,
+            readMode,
+            cancellationToken);
+    }
+
+    internal static IEnumerable<string> ReadFileXml(
+        EventLogFileQuery query,
+        CancellationToken cancellationToken) {
+
+        NativeEventQuery nativeQuery = CreateNativeFileQuery(
+            query,
+            out _,
+            out int maxEvents,
+            out _);
+        return ReadFileXmlIterator(nativeQuery, maxEvents, cancellationToken);
+    }
+
+    internal static long CopyFileXml(
+        EventLogFileQuery query,
+        Stream destination,
+        CancellationToken cancellationToken) {
+
+        NativeEventQuery nativeQuery = CreateNativeFileQuery(
+            query,
+            out _,
+            out int maxEvents,
+            out _);
+        return WindowsEventReader.CopyXml(
+            nativeQuery,
+            destination,
+            maxEvents,
+            cancellationToken);
+    }
+
+    private static IEnumerable<EventObject> ReadFileIterator(
+        NativeEventQuery nativeQuery,
+        string path,
+        int maxEvents,
+        EventReadMode readMode,
+        CancellationToken cancellationToken) {
+
+        int returned = 0;
+        foreach (EventObject eventObject in WindowsEventReader.Read(
+                     nativeQuery,
+                     readMode,
+                     path,
+                     path,
+                     cancellationToken)) {
+            yield return eventObject;
+            returned++;
+            if (maxEvents > 0 && returned >= maxEvents) {
+                yield break;
+            }
+        }
+    }
+
+    private static IEnumerable<string> ReadFileXmlIterator(
+        NativeEventQuery nativeQuery,
+        int maxEvents,
+        CancellationToken cancellationToken) {
+
+        int returned = 0;
+        foreach (string xml in WindowsEventReader.ReadXml(
+                     nativeQuery,
+                     cancellationToken)) {
+            yield return xml;
+            returned++;
+            if (maxEvents > 0 && returned >= maxEvents) {
+                yield break;
+            }
+        }
+    }
+
+    private static NativeEventQuery CreateNativeFileQuery(
+        EventLogFileQuery query,
+        out string path,
+        out int maxEvents,
+        out EventReadMode readMode) {
+
         if (query == null) {
             throw new ArgumentNullException(nameof(query));
         }
         if (query.MaxEvents < 0) {
-            throw new ArgumentOutOfRangeException(nameof(query), "Maximum events must be greater than or equal to zero.");
+            throw new ArgumentOutOfRangeException(
+                nameof(query),
+                "Maximum events must be greater than or equal to zero.");
         }
 
-        string path = Path.GetFullPath(query.Path.Trim().Trim('"', '\''));
+        path = Path.GetFullPath(query.Path.Trim().Trim('"', '\''));
         if (!File.Exists(path)) {
-            throw new FileNotFoundException($"The event log file '{path}' does not exist.", path);
+            throw new FileNotFoundException(
+                $"The event log file '{path}' does not exist.",
+                path);
         }
         string xpath = string.IsNullOrWhiteSpace(query.XPath) ? "*" : query.XPath;
         WindowsEventNativeMethods.QueryFlags flags =
@@ -72,7 +185,9 @@ public static class EventLogEngine {
             (query.Oldest
                 ? WindowsEventNativeMethods.QueryFlags.ForwardDirection
                 : WindowsEventNativeMethods.QueryFlags.ReverseDirection);
-        var nativeQuery = new NativeEventQuery(
+        maxEvents = query.MaxEvents;
+        readMode = query.ReadMode;
+        return new NativeEventQuery(
             IntPtr.Zero,
             path,
             xpath,
@@ -80,71 +195,64 @@ public static class EventLogEngine {
             path,
             path,
             query.MessageCulture?.LCID ?? 0);
-
-        int returned = 0;
-        foreach (EventObject eventObject in WindowsEventReader.Read(
-                     nativeQuery,
-                     query.ReadMode,
-                     path,
-                     path,
-                     cancellationToken)) {
-            yield return eventObject;
-            returned++;
-            if (query.MaxEvents > 0 && returned >= query.MaxEvents) {
-                yield break;
-            }
-        }
     }
 
     private static IEnumerable<EventObject> ReadChannelIterator(
-        EventLogChannelQuery query,
+        string machineName,
+        string logName,
+        string xpath,
+        bool oldest,
+        EventReadMode readMode,
+        int messageLocale,
+        int maxEvents,
+        int remoteTimeoutMilliseconds,
+        int bufferCapacity,
+        int rpcEndpointPort,
         CancellationToken cancellationToken) {
 
-        string machineName = query.MachineName?.Trim() ?? string.Empty;
         bool remote = machineName.Length > 0 &&
             !string.Equals(machineName, ".", StringComparison.OrdinalIgnoreCase) &&
             !string.Equals(machineName, "localhost", StringComparison.OrdinalIgnoreCase) &&
             !string.Equals(machineName, Environment.MachineName, StringComparison.OrdinalIgnoreCase);
-        string xpath = string.IsNullOrWhiteSpace(query.XPath) ? "*" : query.XPath;
         WindowsEventNativeMethods.QueryFlags flags =
             WindowsEventNativeMethods.QueryFlags.ChannelPath |
-            (query.Oldest
+            (oldest
                 ? WindowsEventNativeMethods.QueryFlags.ForwardDirection
                 : WindowsEventNativeMethods.QueryFlags.ReverseDirection);
         if (remote) {
             foreach (EventObject eventObject in WindowsEventRemoteReader.Read(
                          machineName,
-                         query.LogName,
+                         logName,
                          xpath,
                          flags,
-                         query.ReadMode,
-                         query.MessageCulture?.LCID ?? 0,
-                         query.MaxEvents,
-                         query.RemoteTimeoutMilliseconds,
-                         query.BufferCapacity,
-                         query.RpcEndpointPort,
+                         readMode,
+                         messageLocale,
+                         maxEvents,
+                         remoteTimeoutMilliseconds,
+                         bufferCapacity,
+                         rpcEndpointPort,
                          cancellationToken)) {
                 yield return eventObject;
             }
         } else {
             var nativeQuery = new NativeEventQuery(
                 IntPtr.Zero,
-                query.LogName,
+                logName,
                 xpath,
                 flags,
-                query.LogName,
-                messageLocale: query.MessageCulture?.LCID ?? 0);
+                logName,
+                messageLocale: messageLocale);
 
             int returned = 0;
             foreach (EventObject eventObject in WindowsEventReader.Read(
                          nativeQuery,
-                         query.ReadMode,
+                         readMode,
                          Environment.MachineName,
-                         query.LogName,
+                         logName,
                          cancellationToken)) {
                 yield return eventObject;
                 returned++;
-                if (query.MaxEvents > 0 && returned >= query.MaxEvents) {
+                if (maxEvents > 0 && returned >= maxEvents) {
                     yield break;
                 }
             }

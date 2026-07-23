@@ -9,13 +9,14 @@ The committed smoke fixture contains 184 events. Large fixtures remain external 
 
 ## Comparison contract
 
-The suite keeps three kinds of evidence separate:
+The suite keeps four kinds of evidence separate:
 
 | Class | What is held equal | What the result means |
 | --- | --- | --- |
-| Apples to apples: exact output | Same EVTX, event order, selected fields, CSV encoding, row count, byte count, and SHA-256 | A direct end-to-end comparison. `Get-EVXEvent`, `Get-WinEvent`, and the direct .NET lower bound must create the same metadata CSV. |
+| Apples to apples: exact output | Same EVTX, event order, schema, encoding, row/event count, byte count, and SHA-256 | A direct end-to-end comparison. The engines must create the same metadata CSV or raw XML document byte for byte. |
 | Apples to apples: common user job | Same EVTX, direction, maximum event count, read-mode category, streaming consumer, and event order and identity checks | A comparison of the natural public APIs for the same user job. PSEventViewer may return additional parsed fields, and those extra counters are reported. |
-| Apples to oranges: native output | Same EVTX and validated event count, but EvtxECmd uses its own parser, maps, schema, and output format | Competitor evidence, not an interchangeable projection or an unqualified speed ranking. |
+| Apples to oranges: complete native output | Same EVTX, validated event count, and broadly similar output purpose, but EventViewerX and EvtxECmd use different schemas and output volumes | Useful operational evidence, but not an interchangeable-output or unqualified speed claim. |
+| EvtxECmd-native workflow | EvtxECmd's own parse and export modes, measured without pretending another engine performs the same work | A reproducible description of the external tool's native workflows. |
 
 Do not combine rows from different classes into a single “faster than” claim. In particular, comparing a five-column
 metadata CSV with EvtxECmd's forensic CSV compares different work and different output volumes.
@@ -25,7 +26,8 @@ metadata CSV with EvtxECmd's forensic CSV compares different work and different 
 - `DotNet`: direct `System.Diagnostics.Eventing.Reader.EventLogReader` enumeration. This is a lower bound, not a
   PowerShell-module surface.
 - `PropertySelector`: direct `EventLogPropertySelector` projection of eighteen core metadata fields.
-- `EventViewerX`: the reusable `SearchEvents.QueryLogFile` engine.
+- `EventViewerX`: the reusable `EventLogEngine.ReadFile` projection engine.
+- `EventViewerXExport`: the reusable `EventLogExporter` path, which writes directly without a PowerShell object pipeline.
 - `PSEventViewer`: the public `Get-EVXEvent` cmdlet consumed by a streaming PowerShell process block.
 - `GetWinEvent`: `Get-WinEvent` consumed by the same streaming process-block shape.
 - `EvtxECmd`: Eric Zimmerman's parser, run as an external process with its version and SHA-256 captured.
@@ -44,6 +46,8 @@ metadata CSV with EvtxECmd's forensic CSV compares different work and different 
   `MessageData` fields and decodes binary attachments; bookmark work is already present in every non-metadata mode.
 - `MetadataCsv` writes the five fields shown in the public README. The three successful engines must produce the same
   row count, byte count, and SHA-256.
+- `ExactRawXml` writes every native event XML fragment inside the same UTF-8 `Events` document. Raw .NET,
+  EventViewerX, `Export-EVXEvent`, and `Get-WinEvent` must produce the same bytes and SHA-256.
 
 The `Message`, `StructuredData`, and `Full` cases are therefore common-user-job comparisons rather than promises that
 every internal allocation or returned type is identical. Result artifacts expose message characters, XML characters,
@@ -67,6 +71,9 @@ These behaviors are visible in the
 The benchmark declares separate `Evtx-NativeParse`, `Evtx-ForensicCsv`, `Evtx-FullJson`, and `Evtx-Xml` cases and
 reports them in a separate README table.
 
+EvtxECmd is downloaded only as a pinned external benchmark executable. EventViewerX does not reference its parser,
+repository, packages, or Rust code.
+
 ## Validation and provenance
 
 Every successful lane must process the expected event count with no parser errors. Common-work lanes also require
@@ -86,9 +93,8 @@ PowerForge records:
 - the explicit EvtxECmd map directory's sorted per-file manifest and aggregate manifest hash;
 - .NET, PowerShell, and EvtxECmd versions.
 
-Large public tables use at least three rotated iterations for common-work comparisons. EvtxECmd native exports may use
-one iteration because each run can emit gigabytes; those rows are descriptive evidence rather than statistical
-rankings.
+Every generated public table requires at least three rotated iterations. A one-off diagnostic run remains useful while
+developing, but the wrapper refuses to publish it into the README.
 
 ## Run
 
@@ -105,8 +111,8 @@ Run a smoke comparison:
 
 ```powershell
 .\Benchmarks\EventLogParsing\Invoke-EventLogParsingBenchmark.ps1 `
-    -Case Smoke-Common-Scan-Metadata, Smoke-Common-Scan-Message, Smoke-Exact-Export-MetadataCsv `
-    -Engine DotNet, EventViewerX, GetWinEvent, PSEventViewer `
+    -Case Smoke-Common-Scan-Metadata, Smoke-Common-Scan-Message, Smoke-Exact-Export-RawXml `
+    -Engine DotNet, EventViewerX, EventViewerXExport, GetWinEvent, PSEventViewer `
     -IterationCount 3
 ```
 
@@ -121,7 +127,17 @@ Generate the common-work table in the main README from an external large fixture
     -ReadmeTable Common
 ```
 
-Generate the separate EvtxECmd-native table:
+Generate the byte-identical metadata CSV and raw XML table:
+
+```powershell
+.\Benchmarks\EventLogParsing\Invoke-EventLogParsingBenchmark.ps1 `
+    -LargeFixturePath C:\Temp\Security.evtx `
+    -ExpectedLargeCount 1000000 `
+    -IterationCount 3 `
+    -ReadmeTable ExactOutput
+```
+
+Generate the different-schema EventViewerX/EvtxECmd export table:
 
 ```powershell
 .\Benchmarks\EventLogParsing\Invoke-EventLogParsingBenchmark.ps1 `
@@ -129,6 +145,19 @@ Generate the separate EvtxECmd-native table:
     -ExpectedLargeCount 1000000 `
     -EvtxECmdPath C:\Tools\EvtxECmd.exe `
     -EvtxMapsPath C:\Tools\Maps `
+    -IterationCount 3 `
+    -ReadmeTable NativeOutput
+```
+
+Generate the separate EvtxECmd-native workflow table:
+
+```powershell
+.\Benchmarks\EventLogParsing\Invoke-EventLogParsingBenchmark.ps1 `
+    -LargeFixturePath C:\Temp\Security.evtx `
+    -ExpectedLargeCount 1000000 `
+    -EvtxECmdPath C:\Tools\EvtxECmd.exe `
+    -EvtxMapsPath C:\Tools\Maps `
+    -IterationCount 3 `
     -ReadmeTable EvtxNative
 ```
 

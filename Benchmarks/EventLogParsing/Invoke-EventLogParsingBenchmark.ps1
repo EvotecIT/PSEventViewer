@@ -15,6 +15,12 @@ Large EVTX fixtures and competitor binaries remain external inputs.
 
 .EXAMPLE
 .\Invoke-EventLogParsingBenchmark.ps1 -LargeFixturePath C:\Temp\Security.evtx -ExpectedLargeCount 1000000 -ReadmeTable Common -IterationCount 3
+
+.EXAMPLE
+.\Invoke-EventLogParsingBenchmark.ps1 -LargeFixturePath C:\Temp\Security.evtx -ExpectedLargeCount 1000000 -ReadmeTable ExactOutput -IterationCount 3
+
+.EXAMPLE
+.\Invoke-EventLogParsingBenchmark.ps1 -LargeFixturePath C:\Temp\Security.evtx -ExpectedLargeCount 1000000 -EvtxECmdPath C:\Tools\EvtxECmd.exe -EvtxMapsPath C:\Tools\Maps -ReadmeTable NativeOutput -IterationCount 3
 #>
 [CmdletBinding()]
 param(
@@ -46,7 +52,7 @@ param(
     [ValidateRange(1, [int]::MaxValue)]
     [int] $IterationCount = 1,
 
-    [ValidateSet('None', 'Common', 'EvtxNative')]
+    [ValidateSet('None', 'Common', 'ExactOutput', 'NativeOutput', 'EvtxNative')]
     [string] $ReadmeTable = 'None',
 
     [switch] $Plan
@@ -71,18 +77,34 @@ if ($ReadmeTable -ne 'None') {
         throw 'ReadmeTable owns its curated Case and Engine matrix. Do not combine it with Case or Engine.'
     }
 
+    if (-not $Plan -and $IterationCount -lt 3) {
+        throw "The public $ReadmeTable table requires at least three iterations."
+    }
+
     if ($ReadmeTable -eq 'Common') {
-        if (-not $Plan -and $IterationCount -lt 3) {
-            throw 'The public common-work table requires at least three iterations.'
-        }
         $Case = @(
             'Large-Common-Scan-Metadata'
             'Large-Common-Sample-Message'
             'Large-Common-Sample-StructuredData'
             'Large-Common-Sample-Full'
-            'Large-Exact-Export-MetadataCsv'
         )
         $Engine = 'DotNet', 'EventViewerX', 'PSEventViewer', 'GetWinEvent'
+    } elseif ($ReadmeTable -eq 'ExactOutput') {
+        $Case = @(
+            'Large-Exact-Export-MetadataCsv'
+            'Large-Exact-Export-RawXml'
+        )
+        $Engine = 'DotNet', 'EventViewerXExport', 'PSEventViewer', 'GetWinEvent'
+    } elseif ($ReadmeTable -eq 'NativeOutput') {
+        if (-not $EvtxECmdPath -or -not $EvtxMapsPath) {
+            throw 'ReadmeTable NativeOutput requires EvtxECmdPath and EvtxMapsPath.'
+        }
+        $Case = @(
+            'Large-Native-Output-Csv'
+            'Large-Native-Output-FullJson'
+            'Large-Native-Output-Xml'
+        )
+        $Engine = 'EventViewerXExport', 'EvtxECmd'
     } else {
         if (-not $EvtxECmdPath -or -not $EvtxMapsPath) {
             throw 'ReadmeTable EvtxNative requires EvtxECmdPath and EvtxMapsPath.'
@@ -168,6 +190,20 @@ if (-not $Plan) {
         Update-BenchmarkDocument `
             -Path $readmePath `
             -BlockId 'event-log-common-benchmark' `
+            -ComparisonPath $benchmarkResult.Artifacts['comparison.json'] `
+            -Renderer ComparisonTable `
+            -Confirm:$false | Out-Null
+    } elseif ($ReadmeTable -eq 'ExactOutput') {
+        Update-BenchmarkDocument `
+            -Path $readmePath `
+            -BlockId 'event-log-exact-output-benchmark' `
+            -ComparisonPath $benchmarkResult.Artifacts['comparison.json'] `
+            -Renderer ComparisonTable `
+            -Confirm:$false | Out-Null
+    } elseif ($ReadmeTable -eq 'NativeOutput') {
+        Update-BenchmarkDocument `
+            -Path $readmePath `
+            -BlockId 'event-log-native-output-benchmark' `
             -ComparisonPath $benchmarkResult.Artifacts['comparison.json'] `
             -Renderer ComparisonTable `
             -Confirm:$false | Out-Null

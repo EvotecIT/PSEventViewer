@@ -41,18 +41,23 @@ internal static class EventEnumerationRunner {
         int gen2Before = GC.CollectionCount(2);
         var accumulator = new EventAccumulator();
         var stopwatch = Stopwatch.StartNew();
+        ExportMeasurement? exportResult = null;
 
-        if (string.Equals(options.Engine, "eventviewerx", StringComparison.OrdinalIgnoreCase)) {
+        if (string.Equals(options.Engine, "eventviewerxexport", StringComparison.OrdinalIgnoreCase)) {
+            exportResult = RunEventViewerXExport(options);
+        } else if (string.Equals(options.Engine, "eventviewerx", StringComparison.OrdinalIgnoreCase)) {
             RunEventViewerX(options, accumulator);
         } else if (string.Equals(options.Engine, "propertyselector", StringComparison.OrdinalIgnoreCase)) {
             RunPropertySelector(options, accumulator);
+        } else if (options.OutputFormat == EventExportFormat.Xml) {
+            exportResult = RawXmlExport.Run(options);
         } else {
             RunDotNet(options, accumulator);
         }
 
         stopwatch.Stop();
         using Process process = Process.GetCurrentProcess();
-        string productVersion = string.Equals(options.Engine, "eventviewerx", StringComparison.OrdinalIgnoreCase)
+        string productVersion = options.Engine.StartsWith("eventviewerx", StringComparison.OrdinalIgnoreCase)
             ? typeof(SearchEvents).Assembly.GetName().Version?.ToString() ?? string.Empty
             : typeof(EventLogReader).Assembly.GetName().Version?.ToString() ?? string.Empty;
 
@@ -62,7 +67,7 @@ internal static class EventEnumerationRunner {
             FixturePath = options.Path,
             RuntimeVersion = Environment.Version.ToString(),
             ProductVersion = productVersion,
-            Count = accumulator.Count,
+            Count = exportResult?.EventCount ?? accumulator.Count,
             IdSum = accumulator.IdSum,
             RecordIdSum = accumulator.RecordIdSum,
             TimeTicksXor = accumulator.TimeTicksXor,
@@ -82,20 +87,40 @@ internal static class EventEnumerationRunner {
             Gen1Collections = GC.CollectionCount(1) - gen1Before,
             Gen2Collections = GC.CollectionCount(2) - gen2Before,
             ElapsedMilliseconds = stopwatch.Elapsed.TotalMilliseconds,
-            OutputPath = options.OutputPath,
-            OutputBytes = 0,
-            OutputSha256 = null
+            OutputPath = exportResult?.Path ?? options.OutputPath,
+            OutputBytes = exportResult?.Bytes ?? 0,
+            OutputSha256 = exportResult?.Sha256
         };
     }
 
     private static void RunEventViewerX(BenchmarkOptions options, EventAccumulator accumulator) {
-        foreach (EventObject eventObject in SearchEvents.QueryLogFile(
-                     options.Path,
-                     maxEvents: options.MaxEvents,
-                     oldest: true,
-                     readMode: options.ReadMode)) {
+        var query = new EventLogFileQuery(options.Path) {
+            MaxEvents = options.MaxEvents,
+            Oldest = true,
+            ReadMode = options.ReadMode,
+            MessageCulture = options.MessageCulture
+        };
+        foreach (EventObject eventObject in EventLogEngine.ReadFile(query)) {
             accumulator.Add(eventObject, options.ReadMode);
         }
+    }
+
+    private static ExportMeasurement RunEventViewerXExport(BenchmarkOptions options) {
+        var query = new EventLogFileQuery(options.Path) {
+            MaxEvents = options.MaxEvents,
+            Oldest = true,
+            ReadMode = options.ReadMode,
+            MessageCulture = options.MessageCulture
+        };
+        EventExportResult result = EventLogExporter.ExportFile(
+            query,
+            options.OutputPath!,
+            options.OutputFormat!.Value);
+        return new ExportMeasurement(
+            result.Path,
+            result.EventCount,
+            result.Bytes,
+            result.Sha256);
     }
 
     private static void RunDotNet(BenchmarkOptions options, EventAccumulator accumulator) {

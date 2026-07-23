@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
 
@@ -7,6 +8,7 @@ namespace EventViewerX.Exports;
 internal sealed class EventJsonLinesWriter : IEventExportWriter {
     private static readonly byte[] NewLine = { (byte)'\n' };
     private readonly Stream _stream;
+    private readonly List<string> _dataKeys = new();
     private readonly Utf8JsonWriter _writer;
 
     internal EventJsonLinesWriter(Stream stream) {
@@ -19,7 +21,9 @@ internal sealed class EventJsonLinesWriter : IEventExportWriter {
 
     public void Write(EventObject eventObject) {
         _writer.WriteStartObject();
-        _writer.WriteString("timeCreated", eventObject.TimeCreated);
+        if (eventObject.TimeCreated != DateTime.MinValue) {
+            _writer.WriteString("timeCreated", eventObject.TimeCreated.ToUniversalTime());
+        }
         if (eventObject.RecordId.HasValue) _writer.WriteNumber("recordId", eventObject.RecordId.Value);
         _writer.WriteNumber("id", eventObject.Id);
         _writer.WriteString("providerName", eventObject.ProviderName);
@@ -33,7 +37,7 @@ internal sealed class EventJsonLinesWriter : IEventExportWriter {
         _writer.WriteString("opcodeDisplayName", eventObject.OpcodeDisplayName);
         if (eventObject.Keywords.HasValue) _writer.WriteNumber("keywords", eventObject.Keywords.Value);
         _writer.WritePropertyName("keywordDisplayNames");
-        JsonSerializer.Serialize(_writer, eventObject.KeywordsDisplayNames);
+        EventJsonFields.WriteStrings(_writer, eventObject.KeywordsDisplayNames);
         if (eventObject.ProcessId.HasValue) _writer.WriteNumber("processId", eventObject.ProcessId.Value);
         if (eventObject.ThreadId.HasValue) _writer.WriteNumber("threadId", eventObject.ThreadId.Value);
         if (eventObject.UserId != null) _writer.WriteString("userId", eventObject.UserId.Value);
@@ -42,23 +46,11 @@ internal sealed class EventJsonLinesWriter : IEventExportWriter {
         _writer.WriteNumber("messageRenderErrorCode", eventObject.MessageRenderErrorCode);
         _writer.WriteString("message", eventObject.Message);
         _writer.WritePropertyName("properties");
-        _writer.WriteStartArray();
-        foreach (EventPropertyValue property in eventObject.Properties) {
-            if (property.Value == null) {
-                _writer.WriteNullValue();
-            } else {
-                JsonSerializer.Serialize(_writer, property.Value, property.Value.GetType());
-            }
-        }
-        _writer.WriteEndArray();
+        EventJsonFields.WriteProperties(_writer, eventObject.Properties);
         _writer.WritePropertyName("data");
-        JsonSerializer.Serialize(_writer, eventObject.Data);
+        EventJsonFields.WriteData(_writer, eventObject.Data, _dataKeys);
         _writer.WritePropertyName("attachments");
-        _writer.WriteStartArray();
-        foreach (byte[] attachment in eventObject.Attachments) {
-            _writer.WriteBase64StringValue(attachment);
-        }
-        _writer.WriteEndArray();
+        EventJsonFields.WriteAttachments(_writer, eventObject.Attachments);
         _writer.WriteString("xml", eventObject.XMLData);
         _writer.WriteEndObject();
         _writer.Flush();

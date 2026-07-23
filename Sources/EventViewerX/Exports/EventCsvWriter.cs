@@ -1,13 +1,12 @@
 using System;
 using System.Globalization;
 using System.IO;
-using System.Linq;
 using System.Text;
-using System.Text.Json;
 
 namespace EventViewerX.Exports;
 
 internal sealed class EventCsvWriter : IEventExportWriter {
+    private static readonly char[] QuotingCharacters = { ',', '"', '\r', '\n' };
     private static readonly string[] Header = {
         "TimeCreated",
         "RecordId",
@@ -37,6 +36,7 @@ internal sealed class EventCsvWriter : IEventExportWriter {
     };
 
     private readonly StreamWriter _writer;
+    private readonly ReusableJsonBuffer _json = new();
 
     internal EventCsvWriter(Stream stream) {
         _writer = new StreamWriter(
@@ -76,7 +76,7 @@ internal sealed class EventCsvWriter : IEventExportWriter {
         WriteSeparator();
         WriteField(eventObject.Keywords?.ToString(CultureInfo.InvariantCulture));
         WriteSeparator();
-        WriteField(JsonSerializer.Serialize(eventObject.KeywordsDisplayNames));
+        WriteField(_json.SerializeStrings(eventObject.KeywordsDisplayNames));
         WriteSeparator();
         WriteField(eventObject.ProcessId?.ToString(CultureInfo.InvariantCulture));
         WriteSeparator();
@@ -92,13 +92,11 @@ internal sealed class EventCsvWriter : IEventExportWriter {
         WriteSeparator();
         WriteField(eventObject.Message);
         WriteSeparator();
-        WriteField(JsonSerializer.Serialize(
-            eventObject.Properties.Select(static property => property.Value)));
+        WriteField(_json.SerializeProperties(eventObject.Properties));
         WriteSeparator();
-        WriteField(JsonSerializer.Serialize(eventObject.Data));
+        WriteField(_json.SerializeData(eventObject.Data));
         WriteSeparator();
-        WriteField(JsonSerializer.Serialize(
-            eventObject.Attachments.Select(Convert.ToBase64String)));
+        WriteField(_json.SerializeAttachments(eventObject.Attachments));
         WriteSeparator();
         WriteField(eventObject.XMLData);
         _writer.WriteLine();
@@ -113,7 +111,7 @@ internal sealed class EventCsvWriter : IEventExportWriter {
             return;
         }
 
-        bool quote = value.IndexOfAny(new[] { ',', '"', '\r', '\n' }) >= 0;
+        bool quote = value.IndexOfAny(QuotingCharacters) >= 0;
         if (!quote) {
             _writer.Write(value);
             return;
@@ -135,6 +133,7 @@ internal sealed class EventCsvWriter : IEventExportWriter {
     }
 
     public void Dispose() {
+        _json.Dispose();
         _writer.Dispose();
     }
 }

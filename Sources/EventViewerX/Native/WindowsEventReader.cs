@@ -1,14 +1,11 @@
 using System;
 using System.Collections.Generic;
-using System.ComponentModel;
-using System.Runtime.InteropServices;
+using System.IO;
 using System.Threading;
 
 namespace EventViewerX.Native;
 
 internal static class WindowsEventReader {
-    private const int BatchSize = 64;
-
     internal static IEnumerable<EventObject> Read(
         NativeEventQuery query,
         EventReadMode readMode,
@@ -83,6 +80,46 @@ internal static class WindowsEventReader {
         return ReadFullIterator(query, cancellationToken);
     }
 
+    internal static IEnumerable<string> ReadXml(
+        NativeEventQuery query,
+        CancellationToken cancellationToken) {
+
+        return ReadXmlIterator(query, cancellationToken);
+    }
+
+    internal static long CopyXml(
+        NativeEventQuery query,
+        Stream destination,
+        int maxEvents,
+        CancellationToken cancellationToken) {
+
+        if (destination == null) {
+            throw new ArgumentNullException(nameof(destination));
+        }
+
+        long count = 0;
+        using var renderer = new WindowsEventXmlRenderer();
+        using var events = new WindowsEventHandleEnumerator(query, cancellationToken);
+        while ((maxEvents == 0 || count < maxEvents) && events.MoveNext()) {
+            renderer.Write(events.Current, destination);
+            count++;
+        }
+        return count;
+    }
+
+    private static IEnumerable<string> ReadXmlIterator(
+        NativeEventQuery query,
+        CancellationToken cancellationToken) {
+
+        using var renderer = new WindowsEventXmlRenderer();
+        foreach (string xml in ReadEvents(
+                     query,
+                     cancellationToken,
+                     renderer.Render)) {
+            yield return xml;
+        }
+    }
+
     private static IEnumerable<NativeEventMessage> ReadMessagesIterator(
         NativeEventQuery query,
         CancellationToken cancellationToken) {
@@ -148,67 +185,13 @@ internal static class WindowsEventReader {
         CancellationToken cancellationToken,
         Func<IntPtr, T> projector) {
 
-        using WindowsEventNativeMethods.EventHandle query = WindowsEventNativeMethods.EvtQuery(
-            eventQuery.Session,
-            eventQuery.Path,
-            eventQuery.XPath,
-            eventQuery.Flags);
-        if (query.IsInvalid) {
-            throw new Win32Exception(
-                Marshal.GetLastWin32Error(),
-                $"Failed to query Windows event source '{eventQuery.DisplayName}'.");
-        }
-
-        var handles = new IntPtr[BatchSize];
-
-        while (true) {
-            cancellationToken.ThrowIfCancellationRequested();
-            Array.Clear(handles, 0, handles.Length);
-            if (!WindowsEventNativeMethods.EvtNext(
-                    query,
-                    handles.Length,
-                    handles,
-                    eventQuery.NextTimeoutMilliseconds > 0
-                        ? eventQuery.NextTimeoutMilliseconds
-                        : -1,
-                    0,
-                    out int returned)) {
-
-                int error = Marshal.GetLastWin32Error();
-                if (error == WindowsEventNativeMethods.ErrorNoMoreItems) {
-                    yield break;
-                }
-                if (error == WindowsEventNativeMethods.ErrorTimeout) {
-                    throw new TimeoutException(
-                        $"Timed out while reading Windows event source '{eventQuery.DisplayName}'.");
-                }
-                throw new Win32Exception(
-                    error,
-                    $"Failed while reading Windows event source '{eventQuery.DisplayName}'.");
-            }
-
-            int index = 0;
-            try {
-                for (; index < returned; index++) {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    IntPtr eventHandle = handles[index];
-                    T result;
-                    try {
-                        result = projector(eventHandle);
-                    } finally {
-                        WindowsEventNativeMethods.EvtClose(eventHandle);
-                        handles[index] = IntPtr.Zero;
-                    }
-                    yield return result;
-                }
-            } finally {
-                for (; index < returned; index++) {
-                    if (handles[index] != IntPtr.Zero) {
-                        WindowsEventNativeMethods.EvtClose(handles[index]);
-                        handles[index] = IntPtr.Zero;
-                    }
-                }
-            }
+        using var events = new WindowsEventHandleEnumerator(
+            eventQuery,
+            cancellationToken);
+        while (events.MoveNext()) {
+            T result = projector(events.Current);
+            events.ReleaseCurrent();
+            yield return result;
         }
     }
 }

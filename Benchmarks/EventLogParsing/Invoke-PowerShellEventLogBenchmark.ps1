@@ -17,11 +17,17 @@ param(
 
     [string] $CsvOutputPath,
 
+    [string] $XmlOutputPath,
+
     [ValidateRange(0, [int]::MaxValue)]
-    [int] $MaxEvents
+    [int] $MaxEvents,
+
+    [Globalization.CultureInfo] $MessageCulture = [Globalization.CultureInfo]::GetCultureInfo('en-US')
 )
 
 $ErrorActionPreference = 'Stop'
+[Globalization.CultureInfo]::CurrentUICulture = $MessageCulture
+[Globalization.CultureInfo]::DefaultThreadCurrentUICulture = $MessageCulture
 
 if ($Engine -eq 'PSEventViewer') {
     if (-not $ModulePath) {
@@ -198,17 +204,56 @@ if ($csvFullPath) {
     $csvDirectory = Split-Path -Parent $csvFullPath
     New-Item -ItemType Directory -Force -Path $csvDirectory | Out-Null
 }
+$xmlFullPath = if ($XmlOutputPath) {
+    [IO.Path]::GetFullPath($XmlOutputPath)
+} else {
+    $null
+}
+if ($xmlFullPath) {
+    $xmlDirectory = Split-Path -Parent $xmlFullPath
+    New-Item -ItemType Directory -Force -Path $xmlDirectory | Out-Null
+}
+if ($csvFullPath -and $xmlFullPath) {
+    throw 'CsvOutputPath and XmlOutputPath are mutually exclusive.'
+}
 
 if ($Engine -eq 'PSEventViewer') {
     $parameters = @{
-        Path     = $Path
-        ReadMode = $ReadMode
-        Oldest   = $true
+        Path           = $Path
+        ReadMode       = $ReadMode
+        Oldest         = $true
+        MessageCulture = $MessageCulture
     }
     if ($MaxEvents -gt 0) {
         $parameters.MaxEvents = $MaxEvents
     }
-    if ($csvFullPath) {
+    if ($xmlFullPath) {
+        $exportResult = Export-EVXEvent `
+            -Path $Path `
+            -OutputPath $xmlFullPath `
+            -Format Xml `
+            -ReadMode StructuredData `
+            -Oldest `
+            -MaxEvents $MaxEvents `
+            -MessageCulture $MessageCulture `
+            -Force
+        $projection = [pscustomobject] @{
+            Count                = [long] $exportResult.EventCount
+            IdSum                = 0
+            RecordIdSum          = 0
+            TimeTicksXor         = 0
+            OrderSignature       = 0
+            FirstRecordId        = $null
+            LastRecordId         = $null
+            MetadataTouch        = 0
+            MessageCharacters    = 0
+            XmlCharacters        = 0
+            PropertyCount        = 0
+            StructuredFieldCount = 0
+            MessageFieldCount    = 0
+            AttachmentBytes      = 0
+        }
+    } elseif ($csvFullPath) {
         $script:projection = $null
         Get-EVXEvent @parameters |
             Measure-EventPipeline -InputEngine PSEventViewer -Mode $ReadMode -PassThru |
@@ -227,7 +272,55 @@ if ($Engine -eq 'PSEventViewer') {
     if ($MaxEvents -gt 0) {
         $parameters.MaxEvents = $MaxEvents
     }
-    if ($csvFullPath) {
+    if ($xmlFullPath) {
+        $settings = [Xml.XmlWriterSettings]::new()
+        $settings.Encoding = [Text.UTF8Encoding]::new($false)
+        $settings.Indent = $false
+        $settings.CloseOutput = $false
+        $stream = [IO.FileStream]::new(
+            $xmlFullPath,
+            [IO.FileMode]::Create,
+            [IO.FileAccess]::Write,
+            [IO.FileShare]::None,
+            1MB,
+            [IO.FileOptions]::SequentialScan
+        )
+        $writer = [Xml.XmlWriter]::Create($stream, $settings)
+        [long] $script:xmlEventCount = 0
+        try {
+            $writer.WriteStartDocument()
+            $writer.WriteStartElement('Events')
+            Get-WinEvent @parameters | & {
+                process {
+                    $writer.WriteRaw($_.ToXml())
+                    $script:xmlEventCount++
+                }
+            }
+            $writer.WriteEndElement()
+            $writer.WriteEndDocument()
+            $writer.Flush()
+            $stream.Flush($true)
+        } finally {
+            $writer.Dispose()
+            $stream.Dispose()
+        }
+        $projection = [pscustomobject] @{
+            Count                = $script:xmlEventCount
+            IdSum                = 0
+            RecordIdSum          = 0
+            TimeTicksXor         = 0
+            OrderSignature       = 0
+            FirstRecordId        = $null
+            LastRecordId         = $null
+            MetadataTouch        = 0
+            MessageCharacters    = 0
+            XmlCharacters        = 0
+            PropertyCount        = 0
+            StructuredFieldCount = 0
+            MessageFieldCount    = 0
+            AttachmentBytes      = 0
+        }
+    } elseif ($csvFullPath) {
         $script:projection = $null
         Get-WinEvent @parameters |
             Measure-EventPipeline -InputEngine GetWinEvent -Mode $ReadMode -PassThru |
@@ -272,9 +365,13 @@ $result = [ordered] @{
     Gen1Collections      = [GC]::CollectionCount(1) - $gen1Before
     Gen2Collections      = [GC]::CollectionCount(2) - $gen2Before
     ElapsedMilliseconds  = $stopwatch.Elapsed.TotalMilliseconds
-    OutputPath           = $csvFullPath
-    OutputBytes          = 0
-    OutputSha256         = $null
+    OutputPath           = if ($csvFullPath) { $csvFullPath } else { $xmlFullPath }
+    OutputBytes          = if ($xmlFullPath) { (Get-Item -LiteralPath $xmlFullPath).Length } else { 0 }
+    OutputSha256         = if ($xmlFullPath) {
+        (Get-FileHash -LiteralPath $xmlFullPath -Algorithm SHA256).Hash
+    } else {
+        $null
+    }
 }
 
 $resultDirectory = Split-Path -Parent ([IO.Path]::GetFullPath($ResultPath))

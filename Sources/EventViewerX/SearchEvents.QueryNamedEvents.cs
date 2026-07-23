@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Threading;
 
@@ -29,6 +30,7 @@ namespace EventViewerX {
         /// <param name="sourceLogName">Optional exact log source filter applied before the candidate scan cap.</param>
         /// <param name="sourceEventIds">Optional event-ID source filter applied before the candidate scan cap.</param>
         /// <param name="enrichmentOptions">Optional post-projection enrichment. Enrichment completes before checkpoint observation so failures cannot skip records.</param>
+        /// <param name="messageCulture">Optional culture used for provider messages and display names.</param>
         /// <returns>Asynchronous sequence of simplified events.</returns>
         public static async IAsyncEnumerable<EventObjectSlim> FindEventsByNamedEvents(
             List<NamedEvents> typeEventsList,
@@ -47,7 +49,8 @@ namespace EventViewerX {
             Func<EventObjectSlim, bool>? resultPredicate = null,
             string? sourceLogName = null,
             IReadOnlyCollection<int>? sourceEventIds = null,
-            NamedEventEnrichmentOptions? enrichmentOptions = null) {
+            NamedEventEnrichmentOptions? enrichmentOptions = null,
+            CultureInfo? messageCulture = null) {
 
             if (typeEventsList == null) {
                 throw new ArgumentNullException(nameof(typeEventsList));
@@ -89,7 +92,8 @@ namespace EventViewerX {
                                        cancellationToken,
                                        minimumEventRecordIdExclusiveResolver,
                                        oldest,
-                                       targetFailureObserver),
+                                       targetFailureObserver,
+                                       messageCulture),
                                    typeEventsList,
                                    enricher,
                                    queryInfo.TryRecordCandidate,
@@ -123,7 +127,8 @@ namespace EventViewerX {
                                        cancellationToken,
                                        minimumEventRecordIdExclusiveResolver,
                                        oldest: true,
-                                       targetFailureObserver),
+                                       targetFailureObserver,
+                                       messageCulture),
                                    typeEventsList,
                                    enricher,
                                    queryInfo.TryRecordCandidate,
@@ -157,7 +162,8 @@ namespace EventViewerX {
                                        cancellationToken,
                                        minimumEventRecordIdExclusiveResolver,
                                        oldest,
-                                       targetFailureObserver),
+                                       targetFailureObserver,
+                                       messageCulture),
                                    typeEventsList,
                                    enricher,
                                    () => {
@@ -195,7 +201,8 @@ namespace EventViewerX {
                                        cancellationToken,
                                        minimumEventRecordIdExclusiveResolver,
                                        oldest,
-                                       targetFailureObserver),
+                                       targetFailureObserver,
+                                       messageCulture),
                                    typeEventsList,
                                    enricher,
                                    queryInfo.TryRecordCandidate,
@@ -260,7 +267,8 @@ namespace EventViewerX {
             CancellationToken cancellationToken,
             Func<string?, string, long?>? minimumEventRecordIdExclusiveResolver,
             bool oldest,
-            Action<EventLogQueryTargetFailure>? targetFailureObserver) {
+            Action<EventLogQueryTargetFailure>? targetFailureObserver,
+            CultureInfo? messageCulture) {
 
             return QueryLogsParallel(
                 entry.Key,
@@ -277,7 +285,8 @@ namespace EventViewerX {
                     ? null
                     : machineName => minimumEventRecordIdExclusiveResolver(machineName, entry.Key),
                 oldest: oldest,
-                targetFailureObserver: targetFailureObserver);
+                targetFailureObserver: targetFailureObserver,
+                messageCulture: messageCulture);
         }
 
     }

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -23,7 +24,8 @@ public partial class SearchEvents : Settings {
         [EnumeratorCancellation] CancellationToken cancellationToken,
         Func<string?, string, long?>? minimumEventRecordIdExclusiveResolver,
         bool oldest,
-        Action<EventLogQueryTargetFailure>? targetFailureObserver) {
+        Action<EventLogQueryTargetFailure>? targetFailureObserver,
+        CultureInfo? messageCulture) {
 
         List<string?> targets = NormalizeNamedCheckpointTargets(machineNames);
         var pageReaders = new List<Func<int, IReadOnlyList<EventObject>>>(eventInfo.Count * targets.Count);
@@ -75,7 +77,7 @@ public partial class SearchEvents : Settings {
                 resultPredicate: null,
                 candidateObserver: null,
                 targetFailureObserver: targetFailureObserver,
-                messageCulture: null);
+                messageCulture: messageCulture);
             pageReaders.AddRange(CreateRecordOrderedSourcePageReaders(
                 workItems,
                 createEnumerator,

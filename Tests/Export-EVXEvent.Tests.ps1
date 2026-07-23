@@ -68,4 +68,20 @@ Describe 'Export-EVXEvent direct streaming contract' {
 
         [System.IO.File]::Exists($OutputPath) | Should -BeFalse
     }
+
+    It 'exports a local channel through the same thin command surface' {
+        $OutputPath = [System.IO.Path]::Combine($OutputDirectory, 'system.jsonl')
+
+        $Result = Export-EVXEvent `
+            -LogName System `
+            -OutputPath $OutputPath `
+            -Format JsonLines `
+            -ReadMode Metadata `
+            -MaxEvents 2
+
+        $Lines = [System.IO.File]::ReadAllLines($OutputPath)
+        $Result.EventCount | Should -Be 2
+        $Lines.Count | Should -Be 2
+        ($Lines[0] | ConvertFrom-Json).providerName | Should -Not -BeNullOrEmpty
+    }
 }

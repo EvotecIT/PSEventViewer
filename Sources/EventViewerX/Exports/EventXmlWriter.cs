@@ -1,38 +1,60 @@
-using System;
+using System.Buffers;
 using System.IO;
 using System.Text;
-using System.Xml;
 
 namespace EventViewerX.Exports;
 
-internal sealed class EventXmlWriter : IEventExportWriter {
-    private readonly XmlWriter _writer;
+internal sealed class EventXmlWriter : IDisposable {
+    private static readonly byte[] Header =
+        Encoding.UTF8.GetBytes("<?xml version=\"1.0\" encoding=\"utf-8\"?><Events>");
+    private static readonly byte[] Footer = Encoding.UTF8.GetBytes("</Events>");
+    private readonly Stream _stream;
+    private byte[]? _utf8Buffer;
+    private bool _completed;
 
     internal EventXmlWriter(Stream stream) {
-        _writer = XmlWriter.Create(stream, new XmlWriterSettings {
-            Encoding = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false),
-            Indent = false,
-            CloseOutput = false
-        });
-        _writer.WriteStartDocument();
-        _writer.WriteStartElement("Events");
+        _stream = stream;
+        _stream.Write(Header, 0, Header.Length);
     }
 
-    public void Write(EventObject eventObject) {
-        if (string.IsNullOrEmpty(eventObject.XMLData)) {
-            throw new InvalidOperationException(
-                "XML export requires StructuredData or Full read mode.");
+    internal Stream EventStream => _stream;
+
+    internal void WriteXml(string xml) {
+        if (string.IsNullOrEmpty(xml)) {
+            throw new InvalidOperationException("The event did not contain raw XML.");
         }
-        _writer.WriteRaw(eventObject.XMLData);
+
+        int required = Encoding.UTF8.GetMaxByteCount(xml.Length);
+        if (_utf8Buffer == null || _utf8Buffer.Length < required) {
+            if (_utf8Buffer != null) {
+                ArrayPool<byte>.Shared.Return(_utf8Buffer);
+            }
+            _utf8Buffer = ArrayPool<byte>.Shared.Rent(required);
+        }
+        int written = Encoding.UTF8.GetBytes(
+            xml,
+            0,
+            xml.Length,
+            _utf8Buffer,
+            0);
+        _stream.Write(_utf8Buffer, 0, written);
     }
 
-    public void Complete() {
-        _writer.WriteEndElement();
-        _writer.WriteEndDocument();
-        _writer.Flush();
+    internal void Complete() {
+        if (_completed) {
+            return;
+        }
+        _stream.Write(Footer, 0, Footer.Length);
+        _completed = true;
     }
 
     public void Dispose() {
-        _writer.Dispose();
+        if (!_completed) {
+            Complete();
+        }
+        if (_utf8Buffer != null) {
+            ArrayPool<byte>.Shared.Return(_utf8Buffer);
+            _utf8Buffer = null;
+        }
     }
 }
