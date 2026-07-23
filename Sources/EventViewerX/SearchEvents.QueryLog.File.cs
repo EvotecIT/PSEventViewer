@@ -2,6 +2,7 @@ using System.Diagnostics.Eventing.Reader;
 using System.IO;
 using System.Linq;
 using System.Threading;
+using EventViewerX.Native;
 
 namespace EventViewerX;
 
@@ -189,6 +190,47 @@ public partial class SearchEvents : Settings {
             maximumEventRecordIdExclusive: maximumEventRecordIdExclusive);
 
         _logger.WriteVerbose($"QueryLogFile: path '{absolutePath}', xpath '{xpath}'");
+        if (readMode == EventReadMode.Metadata) {
+            foreach (NativeEventMetadata metadata in WindowsEventFileReader.ReadMetadata(
+                         absolutePath,
+                         xpath,
+                         oldest,
+                         cancellationToken)) {
+                yield return new EventObject(metadata, absolutePath, absolutePath);
+            }
+            yield break;
+        }
+        if (readMode == EventReadMode.Message) {
+            foreach (NativeEventMessage message in WindowsEventFileReader.ReadMessages(
+                         absolutePath,
+                         xpath,
+                         oldest,
+                         cancellationToken)) {
+                yield return new EventObject(message, absolutePath, absolutePath);
+            }
+            yield break;
+        }
+        if (readMode == EventReadMode.StructuredData) {
+            foreach (NativeEventStructured structured in WindowsEventFileReader.ReadStructured(
+                         absolutePath,
+                         xpath,
+                         oldest,
+                         cancellationToken)) {
+                yield return new EventObject(structured, absolutePath, absolutePath);
+            }
+            yield break;
+        }
+        if (readMode == EventReadMode.Full) {
+            foreach (NativeEventFull full in WindowsEventFileReader.ReadFull(
+                         absolutePath,
+                         xpath,
+                         oldest,
+                         cancellationToken)) {
+                yield return new EventObject(full, absolutePath, absolutePath);
+            }
+            yield break;
+        }
+
         var query = new EventLogQuery(absolutePath, PathType.FilePath, xpath) {
             ReverseDirection = !oldest,
             TolerateQueryErrors = false

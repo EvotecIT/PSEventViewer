@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics.Eventing.Reader;
 using System.Globalization;
 using System.Security.Principal;
+using EventViewerX.Native;
 
 namespace EventViewerX;
 
@@ -100,7 +101,7 @@ public partial class EventObject {
         UserId = values[16] as SecurityIdentifier;
         Version = ToByte(values[17]);
         Bookmark = bookmark;
-        Properties = Array.Empty<EventProperty>();
+        Properties = Array.Empty<EventPropertyValue>();
         TaskDisplayName = string.Empty;
         OpcodeDisplayName = string.Empty;
         KeywordsDisplayNames = Array.Empty<string>();
@@ -108,6 +109,176 @@ public partial class EventObject {
         ContainerLog = containerLog ?? string.Empty;
         GatheredFrom = string.IsNullOrEmpty(QueriedMachine) ? Environment.MachineName : QueriedMachine;
         GatheredLogName = LogName;
+    }
+
+    internal EventObject(
+        NativeEventMetadata metadata,
+        string queriedMachine,
+        string containerLog) {
+
+        ReadMode = EventReadMode.Metadata;
+        QueriedMachine = queriedMachine ?? string.Empty;
+        _message = string.Empty;
+        Id = metadata.Id;
+        Qualifiers = metadata.Qualifiers?.ToString(CultureInfo.InvariantCulture);
+        RecordId = metadata.RecordId;
+        TimeCreated = metadata.TimeCreated;
+        ProviderName = metadata.ProviderName;
+        ProviderId = metadata.ProviderId;
+        MachineName = metadata.MachineName;
+        LogName = metadata.LogName;
+        Level = metadata.Level;
+        Keywords = metadata.Keywords;
+        Task = metadata.Task;
+        Opcode = metadata.Opcode;
+        ProcessId = metadata.ProcessId;
+        ThreadId = metadata.ThreadId;
+        ActivityId = metadata.ActivityId;
+        RelatedActivityId = metadata.RelatedActivityId;
+        UserId = metadata.UserId;
+        Version = metadata.Version;
+        Bookmark = null;
+        Properties = Array.Empty<EventPropertyValue>();
+        TaskDisplayName = string.Empty;
+        OpcodeDisplayName = string.Empty;
+        KeywordsDisplayNames = Array.Empty<string>();
+        LevelDisplayName = LevelToDisplayName(Level);
+        ContainerLog = containerLog ?? string.Empty;
+        GatheredFrom = string.IsNullOrEmpty(QueriedMachine) ? Environment.MachineName : QueriedMachine;
+        GatheredLogName = LogName;
+    }
+
+    internal EventObject(
+        NativeEventMessage message,
+        string queriedMachine,
+        string containerLog) {
+
+        NativeEventMetadata metadata = message.Metadata;
+        ReadMode = EventReadMode.Message;
+        QueriedMachine = queriedMachine ?? string.Empty;
+        _message = message.Message;
+        Id = metadata.Id;
+        Qualifiers = metadata.Qualifiers?.ToString(CultureInfo.InvariantCulture);
+        RecordId = metadata.RecordId;
+        TimeCreated = metadata.TimeCreated;
+        ProviderName = metadata.ProviderName;
+        ProviderId = metadata.ProviderId;
+        MachineName = metadata.MachineName;
+        LogName = metadata.LogName;
+        Level = metadata.Level;
+        Keywords = metadata.Keywords;
+        Task = metadata.Task;
+        Opcode = metadata.Opcode;
+        ProcessId = metadata.ProcessId;
+        ThreadId = metadata.ThreadId;
+        ActivityId = metadata.ActivityId;
+        RelatedActivityId = metadata.RelatedActivityId;
+        UserId = metadata.UserId;
+        Version = metadata.Version;
+        Bookmark = message.Bookmark;
+        Properties = Array.Empty<EventPropertyValue>();
+        TaskDisplayName = message.TaskDisplayName;
+        OpcodeDisplayName = message.OpcodeDisplayName;
+        KeywordsDisplayNames = message.KeywordDisplayNames;
+        LevelDisplayName = message.LevelDisplayName;
+        ContainerLog = containerLog ?? string.Empty;
+        GatheredFrom = string.IsNullOrEmpty(QueriedMachine) ? Environment.MachineName : QueriedMachine;
+        GatheredLogName = LogName;
+    }
+
+    internal EventObject(
+        NativeEventStructured structured,
+        string queriedMachine,
+        string containerLog) {
+
+        NativeEventMetadata metadata = structured.Metadata;
+        ReadMode = EventReadMode.StructuredData;
+        QueriedMachine = queriedMachine ?? string.Empty;
+        _message = string.Empty;
+        Id = metadata.Id;
+        Qualifiers = metadata.Qualifiers?.ToString(CultureInfo.InvariantCulture);
+        RecordId = metadata.RecordId;
+        TimeCreated = metadata.TimeCreated;
+        ProviderName = metadata.ProviderName;
+        ProviderId = metadata.ProviderId;
+        MachineName = metadata.MachineName;
+        LogName = metadata.LogName;
+        Level = metadata.Level;
+        Keywords = metadata.Keywords;
+        Task = metadata.Task;
+        Opcode = metadata.Opcode;
+        ProcessId = metadata.ProcessId;
+        ThreadId = metadata.ThreadId;
+        ActivityId = metadata.ActivityId;
+        RelatedActivityId = metadata.RelatedActivityId;
+        UserId = metadata.UserId;
+        Version = metadata.Version;
+        Bookmark = structured.Bookmark;
+        Properties = structured.Properties;
+        TaskDisplayName = string.Empty;
+        OpcodeDisplayName = string.Empty;
+        KeywordsDisplayNames = Array.Empty<string>();
+        LevelDisplayName = LevelToDisplayName(Level);
+        ContainerLog = containerLog ?? string.Empty;
+        GatheredFrom = string.IsNullOrEmpty(QueriedMachine) ? Environment.MachineName : QueriedMachine;
+        GatheredLogName = LogName;
+        XMLData = structured.Xml;
+        ParseXmlPayload(
+            XMLData,
+            out Dictionary<string, string> data,
+            out _,
+            includeAttachments: false);
+        Data = data;
+        _nicIdentifiers = ExtractNicIdentifiers(data);
+    }
+
+    internal EventObject(
+        NativeEventFull full,
+        string queriedMachine,
+        string containerLog) {
+
+        NativeEventMessage message = full.Message;
+        NativeEventStructured structured = full.Structured;
+        NativeEventMetadata metadata = message.Metadata;
+        ReadMode = EventReadMode.Full;
+        QueriedMachine = queriedMachine ?? string.Empty;
+        _message = message.Message;
+        Id = metadata.Id;
+        Qualifiers = metadata.Qualifiers?.ToString(CultureInfo.InvariantCulture);
+        RecordId = metadata.RecordId;
+        TimeCreated = metadata.TimeCreated;
+        ProviderName = metadata.ProviderName;
+        ProviderId = metadata.ProviderId;
+        MachineName = metadata.MachineName;
+        LogName = metadata.LogName;
+        Level = metadata.Level;
+        Keywords = metadata.Keywords;
+        Task = metadata.Task;
+        Opcode = metadata.Opcode;
+        ProcessId = metadata.ProcessId;
+        ThreadId = metadata.ThreadId;
+        ActivityId = metadata.ActivityId;
+        RelatedActivityId = metadata.RelatedActivityId;
+        UserId = metadata.UserId;
+        Version = metadata.Version;
+        Bookmark = structured.Bookmark;
+        Properties = structured.Properties;
+        TaskDisplayName = message.TaskDisplayName;
+        OpcodeDisplayName = message.OpcodeDisplayName;
+        KeywordsDisplayNames = message.KeywordDisplayNames;
+        LevelDisplayName = message.LevelDisplayName;
+        ContainerLog = containerLog ?? string.Empty;
+        GatheredFrom = string.IsNullOrEmpty(QueriedMachine) ? Environment.MachineName : QueriedMachine;
+        GatheredLogName = LogName;
+        XMLData = structured.Xml;
+        ParseXmlPayload(
+            XMLData,
+            out Dictionary<string, string> data,
+            out IReadOnlyList<byte[]> attachments,
+            includeAttachments: true);
+        Data = data;
+        _nicIdentifiers = ExtractNicIdentifiers(data);
+        Attachments = attachments;
     }
 
     private static byte? ToByte(object? value) {

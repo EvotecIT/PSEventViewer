@@ -432,16 +432,12 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
         string machines = string.Join(",", MachineName ?? new List<string?>());
         return $"{queryIdentity}|{machines}";
     }
+
     /// <summary>
     /// Executes the event query based on provided parameters.
     /// </summary>
     protected override async Task ProcessRecordAsync() {
-        if (Expand && ReadMode != EventReadMode.StructuredData && ReadMode != EventReadMode.Full) {
-            throw new PSArgumentException("-Expand requires -ReadMode StructuredData or Full.");
-        }
-        if (MessageRegex != null && ReadMode != EventReadMode.Message && ReadMode != EventReadMode.Full) {
-            throw new PSArgumentException("-MessageRegex requires -ReadMode Message or Full.");
-        }
+        ValidateRecordOptions();
 
         CancellationToken token;
 #if NET8_0_OR_GREATER
@@ -452,11 +448,7 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
 #endif
         List<object>? results = AsArray ? new List<object>() : null;
 
-        if (DisableParallel.IsPresent) {
-            ParallelOption = ParallelOption.Disabled;
-        }
-
-        PrepareCheckpointBounds(token);
+        PrepareRecordProcessing(token);
         Func<EventObject, bool>? queryResultPredicate = UsesManagedOutputSelection
             ? MessageMatches
             : null;
@@ -471,13 +463,7 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
                 }
             }
         } else if (ParameterSetName == "PathEvents") {
-            foreach (EventObject eventObject in SearchEvents.QueryLogFile(Path, EventId, ProviderName, Keywords, Level, StartTime, EndTime, UserId, GetQueryReadLimit(), EventRecordId, TimePeriod, EffectiveOldest, NamedDataFilter, NamedDataExcludeFilter, token, ReadMode, GetCheckpointLowerBound(null, Path), queryResultPredicate)) {
-                token.ThrowIfCancellationRequested();
-                ProcessEventResult(eventObject, results);
-                if (OutputLimitReached) {
-                    break;
-                }
-            }
+            ProcessPathEvents(token, results);
         } else {
             if (ParameterSetName == "NamedEvents") {
                 // let's find the events prepared for search
@@ -547,11 +533,43 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
             }
         }
 
-        // If AsArray is specified, output all results as an array
+        WriteArrayResult(results);
+    }
+
+    private void ValidateRecordOptions() {
+        if (Expand && ReadMode != EventReadMode.StructuredData && ReadMode != EventReadMode.Full) {
+            throw new PSArgumentException("-Expand requires -ReadMode StructuredData or Full.");
+        }
+        if (MessageRegex != null && ReadMode != EventReadMode.Message && ReadMode != EventReadMode.Full) {
+            throw new PSArgumentException("-MessageRegex requires -ReadMode Message or Full.");
+        }
+    }
+
+    private void PrepareRecordProcessing(CancellationToken token) {
+        if (DisableParallel.IsPresent) {
+            ParallelOption = ParallelOption.Disabled;
+        }
+
+        PrepareCheckpointBounds(token);
+    }
+
+    private void ProcessPathEvents(CancellationToken token, List<object>? results) {
+        Func<EventObject, bool>? queryResultPredicate = UsesManagedOutputSelection
+            ? MessageMatches
+            : null;
+        foreach (EventObject eventObject in SearchEvents.QueryLogFile(Path, EventId, ProviderName, Keywords, Level, StartTime, EndTime, UserId, GetQueryReadLimit(), EventRecordId, TimePeriod, EffectiveOldest, NamedDataFilter, NamedDataExcludeFilter, token, ReadMode, GetCheckpointLowerBound(null, Path), queryResultPredicate)) {
+            token.ThrowIfCancellationRequested();
+            ProcessEventResult(eventObject, results);
+            if (OutputLimitReached) {
+                break;
+            }
+        }
+    }
+
+    private void WriteArrayResult(List<object>? results) {
         if (AsArray && results != null) {
             WriteObject(results.ToArray(), false);
         }
-
     }
 
     private bool TrackCheckpointProgress(EventObject eventObject) {

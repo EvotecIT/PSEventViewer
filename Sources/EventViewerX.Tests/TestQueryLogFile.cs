@@ -25,29 +25,119 @@ namespace EventViewerX.Tests {
                 oldest: true,
                 readMode: EventReadMode.Metadata));
 
-            Assert.Equal(expected.TimeCreated, actual.TimeCreated);
-            Assert.Equal(expected.Id, actual.Id);
-            Assert.Equal(expected.RecordId, actual.RecordId);
-            Assert.Equal(expected.LogName, actual.LogName);
-            Assert.Equal(expected.ContainerLog, actual.ContainerLog);
-            Assert.Equal(expected.MachineName, actual.MachineName);
-            Assert.Equal(expected.ProviderName, actual.ProviderName);
-            Assert.Equal(expected.Qualifiers, actual.Qualifiers);
-            Assert.Equal(expected.Opcode, actual.Opcode);
-            Assert.Equal(expected.ProviderId, actual.ProviderId);
-            Assert.Equal(expected.RelatedActivityId, actual.RelatedActivityId);
-            Assert.Equal(expected.ActivityId, actual.ActivityId);
-            Assert.Equal(expected.UserId?.Value, actual.UserId?.Value);
+            AssertMetadataEqual(expected, actual);
             Assert.Null(actual.Bookmark);
-            Assert.Equal(expected.Keywords, actual.Keywords);
-            Assert.Equal(expected.Level, actual.Level);
-            Assert.Equal(expected.Version, actual.Version);
-            Assert.Equal(expected.Task, actual.Task);
-            Assert.Equal(expected.ProcessId, actual.ProcessId);
-            Assert.Equal(expected.ThreadId, actual.ThreadId);
-            Assert.Equal(expected.LevelDisplayName, actual.LevelDisplayName);
-            Assert.Equal(expected.GatheredFrom, actual.GatheredFrom);
-            Assert.Equal(expected.GatheredLogName, actual.GatheredLogName);
+        }
+
+        [Fact]
+        public void MetadataProjectionMatchesEveryDirectRecordInBothDirections() {
+            if (!OperatingSystem.IsWindows()) return;
+            string relativePath = Path.Combine("..", "..", "..", "..", "..", "Tests", "Logs", "Active Directory Web Services.evtx");
+            string path = Path.GetFullPath(relativePath);
+
+            foreach (bool oldest in new[] { true, false }) {
+                var query = new EventLogQuery(path, PathType.FilePath, "*") {
+                    ReverseDirection = !oldest,
+                    TolerateQueryErrors = false
+                };
+                using var reader = new EventLogReader(query);
+                using var expectedEnumerator = ReadManagedMetadata(reader, path).GetEnumerator();
+                using var actualEnumerator = SearchEvents.QueryLogFile(
+                    path,
+                    oldest: oldest,
+                    readMode: EventReadMode.Metadata).GetEnumerator();
+
+                int compared = 0;
+                while (expectedEnumerator.MoveNext()) {
+                    Assert.True(actualEnumerator.MoveNext());
+                    AssertMetadataEqual(expectedEnumerator.Current, actualEnumerator.Current);
+                    compared++;
+                }
+
+                Assert.False(actualEnumerator.MoveNext());
+                Assert.True(compared > 1);
+            }
+        }
+
+        [Fact]
+        public void MessageProjectionMatchesEveryDirectRecord() {
+            if (!OperatingSystem.IsWindows()) return;
+            string relativePath = Path.Combine("..", "..", "..", "..", "..", "Tests", "Logs", "NamedFilterExamples.evtx");
+            string path = Path.GetFullPath(relativePath);
+            var query = new EventLogQuery(path, PathType.FilePath, "*") {
+                ReverseDirection = false,
+                TolerateQueryErrors = false
+            };
+            using var reader = new EventLogReader(query);
+            using var expectedEnumerator = ReadManaged(reader, path, EventReadMode.Message).GetEnumerator();
+            using var actualEnumerator = SearchEvents.QueryLogFile(
+                path,
+                oldest: true,
+                readMode: EventReadMode.Message).GetEnumerator();
+
+            int compared = 0;
+            while (expectedEnumerator.MoveNext()) {
+                Assert.True(actualEnumerator.MoveNext());
+                EventObject expected = expectedEnumerator.Current;
+                EventObject actual = actualEnumerator.Current;
+                AssertMetadataEqual(expected, actual);
+                Assert.Equal(expected.Message, actual.Message);
+                Assert.Equal(expected.LevelDisplayName, actual.LevelDisplayName);
+                Assert.Equal(expected.TaskDisplayName, actual.TaskDisplayName);
+                Assert.Equal(expected.OpcodeDisplayName, actual.OpcodeDisplayName);
+                Assert.Equal(expected.KeywordsDisplayNames, actual.KeywordsDisplayNames);
+                Assert.Equal(expected.Bookmark == null, actual.Bookmark == null);
+                compared++;
+            }
+
+            Assert.False(actualEnumerator.MoveNext());
+            Assert.True(compared > 1);
+        }
+
+        [Theory]
+        [InlineData(EventReadMode.StructuredData)]
+        [InlineData(EventReadMode.Full)]
+        public void PayloadProjectionMatchesEveryDirectRecord(EventReadMode readMode) {
+            if (!OperatingSystem.IsWindows()) return;
+            string relativePath = Path.Combine("..", "..", "..", "..", "..", "Tests", "Logs", "NamedFilterExamples.evtx");
+            string path = Path.GetFullPath(relativePath);
+            var query = new EventLogQuery(path, PathType.FilePath, "*") {
+                ReverseDirection = false,
+                TolerateQueryErrors = false
+            };
+            using var reader = new EventLogReader(query);
+            using var expectedEnumerator = ReadManaged(reader, path, readMode).GetEnumerator();
+            using var actualEnumerator = SearchEvents.QueryLogFile(
+                path,
+                oldest: true,
+                readMode: readMode).GetEnumerator();
+
+            int compared = 0;
+            while (expectedEnumerator.MoveNext()) {
+                Assert.True(actualEnumerator.MoveNext());
+                EventObject expected = expectedEnumerator.Current;
+                EventObject actual = actualEnumerator.Current;
+                AssertMetadataEqual(expected, actual);
+                Assert.Equal(expected.XMLData, actual.XMLData);
+                Assert.Equal(expected.Data, actual.Data);
+                Assert.Equal(expected.Properties.Count, actual.Properties.Count);
+                for (int index = 0; index < expected.Properties.Count; index++) {
+                    AssertPropertyValueEqual(
+                        expected.Properties[index].Value,
+                        actual.Properties[index].Value);
+                }
+                Assert.Equal(
+                    expected.Attachments.Select(Convert.ToBase64String),
+                    actual.Attachments.Select(Convert.ToBase64String));
+                if (readMode == EventReadMode.Full) {
+                    Assert.Equal(expected.Message, actual.Message);
+                    Assert.Equal(expected.MessageData, actual.MessageData);
+                }
+                compared++;
+            }
+
+            Assert.False(actualEnumerator.MoveNext());
+            Assert.True(compared > 1);
         }
 
         [Fact]
@@ -148,6 +238,57 @@ namespace EventViewerX.Tests {
                 readMode: EventReadMode.Metadata).ToList();
 
             Assert.Empty(recent);
+        }
+
+        private static IEnumerable<EventObject> ReadManagedMetadata(EventLogReader reader, string path) {
+            return ReadManaged(reader, path, EventReadMode.Metadata);
+        }
+
+        private static IEnumerable<EventObject> ReadManaged(
+            EventLogReader reader,
+            string path,
+            EventReadMode readMode) {
+
+            while (reader.ReadEvent() is EventRecord record) {
+                yield return new EventObject(record, path, readMode);
+            }
+        }
+
+        private static void AssertMetadataEqual(EventObject expected, EventObject actual) {
+            Assert.Equal(expected.TimeCreated, actual.TimeCreated);
+            Assert.Equal(expected.Id, actual.Id);
+            Assert.Equal(expected.RecordId, actual.RecordId);
+            Assert.Equal(expected.LogName, actual.LogName);
+            Assert.Equal(expected.ContainerLog, actual.ContainerLog);
+            Assert.Equal(expected.MachineName, actual.MachineName);
+            Assert.Equal(expected.ProviderName, actual.ProviderName);
+            Assert.Equal(expected.Qualifiers, actual.Qualifiers);
+            Assert.Equal(expected.Opcode, actual.Opcode);
+            Assert.Equal(expected.ProviderId, actual.ProviderId);
+            Assert.Equal(expected.RelatedActivityId, actual.RelatedActivityId);
+            Assert.Equal(expected.ActivityId, actual.ActivityId);
+            Assert.Equal(expected.UserId?.Value, actual.UserId?.Value);
+            Assert.Equal(expected.Keywords, actual.Keywords);
+            Assert.Equal(expected.Level, actual.Level);
+            Assert.Equal(expected.Version, actual.Version);
+            Assert.Equal(expected.Task, actual.Task);
+            Assert.Equal(expected.ProcessId, actual.ProcessId);
+            Assert.Equal(expected.ThreadId, actual.ThreadId);
+            Assert.Equal(expected.LevelDisplayName, actual.LevelDisplayName);
+            Assert.Equal(expected.GatheredFrom, actual.GatheredFrom);
+            Assert.Equal(expected.GatheredLogName, actual.GatheredLogName);
+        }
+
+        private static void AssertPropertyValueEqual(object? expected, object? actual) {
+            if (expected is Array expectedArray && actual is Array actualArray) {
+                Assert.Equal(
+                    expectedArray.Cast<object?>().Select(static value => value?.ToString()),
+                    actualArray.Cast<object?>().Select(static value => value?.ToString()));
+                return;
+            }
+
+            Assert.Equal(expected?.GetType(), actual?.GetType());
+            Assert.Equal(expected?.ToString(), actual?.ToString());
         }
     }
 }

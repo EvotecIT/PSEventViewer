@@ -17,6 +17,8 @@ public partial class EventObject {
     private Dictionary<string, string>? _data;
     private readonly string _message;
     private Dictionary<string, string>? _messageData;
+    private string[]? _messageLines;
+    private string? _messageSubject;
     private List<string>? _nicIdentifiers;
 
     /// <summary>Time and date when the event was created.</summary>
@@ -71,7 +73,11 @@ public partial class EventObject {
     public string Message => _message;
 
     /// <summary>Message split into CRLF/LF-delimited lines.</summary>
-    public IReadOnlyList<string> MessageLines { get; private set; } = Array.Empty<string>();
+    /// <remarks>The split is created only when a caller requests the lines or parsed message fields.</remarks>
+    public IReadOnlyList<string> MessageLines {
+        get => _messageLines ??= SplitMessageLines(_message);
+        private set => _messageLines = value as string[] ?? value?.ToArray() ?? Array.Empty<string>();
+    }
 
     /// <summary>Display name of the task.</summary>
     public string TaskDisplayName { get; }
@@ -104,7 +110,7 @@ public partial class EventObject {
     public string MachineName { get; }
 
     /// <summary>Event property values copied from the native record.</summary>
-    public IList<EventProperty> Properties { get; }
+    public IReadOnlyList<EventPropertyValue> Properties { get; }
 
     /// <summary>Structured event data parsed from XML.</summary>
     public Dictionary<string, string> Data {
@@ -127,7 +133,11 @@ public partial class EventObject {
     }
 
     /// <summary>First non-empty line of the formatted message.</summary>
-    public string MessageSubject { get; set; } = string.Empty;
+    /// <remarks>The subject is derived lazily so message-only scans do not split every formatted message.</remarks>
+    public string MessageSubject {
+        get => _messageSubject ??= GetMessageSubject(MessageLines);
+        set => _messageSubject = value ?? string.Empty;
+    }
 
     /// <summary>Binary attachments extracted from structured event data.</summary>
     public IReadOnlyList<byte[]> Attachments { get; private set; } = Array.Empty<byte[]>();
@@ -184,7 +194,7 @@ public partial class EventObject {
             ThreadId = eventRecord.ThreadId;
             Properties = readMode == EventReadMode.StructuredData || readMode == EventReadMode.Full
                 ? SnapshotProperties(eventRecord)
-                : Array.Empty<EventProperty>();
+                : Array.Empty<EventPropertyValue>();
             bool includeProviderDisplayNames = readMode == EventReadMode.Message || readMode == EventReadMode.Full;
             TaskDisplayName = includeProviderDisplayNames
                 ? SafeReadDisplayName(() => eventRecord.TaskDisplayName)
@@ -211,11 +221,6 @@ public partial class EventObject {
 
             if (readMode == EventReadMode.Message || readMode == EventReadMode.Full) {
                 _message = SafeFormatDescription(eventRecord);
-                string[] messageLines = SplitMessageLines(_message);
-                MessageLines = messageLines;
-                if (messageLines.Length > 0) {
-                    MessageSubject = GetMessageSubject(messageLines);
-                }
             }
 
             if (readMode == EventReadMode.StructuredData || readMode == EventReadMode.Full) {
@@ -234,12 +239,14 @@ public partial class EventObject {
         }
     }
 
-    private static IList<EventProperty> SnapshotProperties(EventRecord eventRecord) {
+    private static IReadOnlyList<EventPropertyValue> SnapshotProperties(EventRecord eventRecord) {
         try {
-            return eventRecord.Properties?.ToArray() ?? Array.Empty<EventProperty>();
+            return eventRecord.Properties?
+                .Select(static property => new EventPropertyValue(property.Value))
+                .ToArray() ?? Array.Empty<EventPropertyValue>();
         } catch (EventLogException ex) {
             Settings._logger.WriteVerbose("Failed to snapshot event properties. ({0})", ex.Message);
-            return Array.Empty<EventProperty>();
+            return Array.Empty<EventPropertyValue>();
         }
     }
 
