@@ -38,6 +38,8 @@ internal sealed class EventJsonLinesWriter : IEventExportWriter {
         if (eventObject.ThreadId.HasValue) _writer.WriteNumber("threadId", eventObject.ThreadId.Value);
         if (eventObject.UserId != null) _writer.WriteString("userId", eventObject.UserId.Value);
         _writer.WriteString("messageCulture", eventObject.MessageCulture);
+        _writer.WriteString("messageRenderStatus", eventObject.MessageRenderStatus.ToString());
+        _writer.WriteNumber("messageRenderErrorCode", eventObject.MessageRenderErrorCode);
         _writer.WriteString("message", eventObject.Message);
         _writer.WritePropertyName("properties");
         _writer.WriteStartArray();

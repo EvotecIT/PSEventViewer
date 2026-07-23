@@ -7,6 +7,11 @@ namespace EventViewerX.Native;
 internal static class WindowsEventNativeMethods {
     internal const int ErrorInsufficientBuffer = 122;
     internal const int ErrorNoMoreItems = 259;
+    internal const int ErrorTimeout = 1460;
+    internal const int ErrorEvtPublisherMetadataNotFound = 15002;
+    internal const int ErrorEvtMessageNotFound = 15027;
+    internal const int ErrorEvtMessageIdNotFound = 15028;
+    internal const int ErrorEvtMessageLocaleNotFound = 15033;
     internal const int SystemPropertyCount = 18;
 
     [Flags]
@@ -34,6 +39,25 @@ internal static class WindowsEventNativeMethods {
         Task = 3,
         Opcode = 4,
         Keyword = 5
+    }
+
+    internal enum LoginClass {
+        RpcLogin = 1
+    }
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    internal struct RpcLogin {
+        [MarshalAs(UnmanagedType.LPWStr)]
+        internal string Server;
+
+        [MarshalAs(UnmanagedType.LPWStr)]
+        internal string? User;
+
+        [MarshalAs(UnmanagedType.LPWStr)]
+        internal string? Domain;
+
+        internal IntPtr Password;
+        internal int Flags;
     }
 
     internal enum VariantType : uint {
@@ -107,6 +131,18 @@ internal static class WindowsEventNativeMethods {
         internal VariantType ScalarType => (VariantType)(Type & 0x7f);
     }
 
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct SystemTime {
+        internal ushort Year;
+        internal ushort Month;
+        internal ushort DayOfWeek;
+        internal ushort Day;
+        internal ushort Hour;
+        internal ushort Minute;
+        internal ushort Second;
+        internal ushort Milliseconds;
+    }
+
     internal sealed class EventHandle : SafeHandleZeroOrMinusOneIsInvalid {
         internal EventHandle()
             : base(true) {
@@ -123,6 +159,13 @@ internal static class WindowsEventNativeMethods {
         string path,
         string query,
         QueryFlags flags);
+
+    [DllImport("wevtapi.dll", SetLastError = true)]
+    internal static extern EventHandle EvtOpenSession(
+        LoginClass loginClass,
+        ref RpcLogin login,
+        int timeout,
+        int flags);
 
     [DllImport("wevtapi.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]

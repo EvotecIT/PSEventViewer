@@ -114,137 +114,124 @@ public partial class EventObject {
     internal EventObject(
         NativeEventMetadata metadata,
         string queriedMachine,
-        string containerLog) {
-
-        ReadMode = EventReadMode.Metadata;
-        QueriedMachine = queriedMachine ?? string.Empty;
-        _message = string.Empty;
-        Id = metadata.Id;
-        Qualifiers = metadata.Qualifiers?.ToString(CultureInfo.InvariantCulture);
-        RecordId = metadata.RecordId;
-        TimeCreated = metadata.TimeCreated;
-        ProviderName = metadata.ProviderName;
-        ProviderId = metadata.ProviderId;
-        MachineName = metadata.MachineName;
-        LogName = metadata.LogName;
-        Level = metadata.Level;
-        Keywords = metadata.Keywords;
-        Task = metadata.Task;
-        Opcode = metadata.Opcode;
-        ProcessId = metadata.ProcessId;
-        ThreadId = metadata.ThreadId;
-        ActivityId = metadata.ActivityId;
-        RelatedActivityId = metadata.RelatedActivityId;
-        UserId = metadata.UserId;
-        Version = metadata.Version;
-        Bookmark = null;
-        Properties = Array.Empty<EventPropertyValue>();
-        TaskDisplayName = string.Empty;
-        OpcodeDisplayName = string.Empty;
-        KeywordsDisplayNames = Array.Empty<string>();
-        LevelDisplayName = LevelToDisplayName(Level);
-        ContainerLog = containerLog ?? string.Empty;
-        GatheredFrom = string.IsNullOrEmpty(QueriedMachine) ? Environment.MachineName : QueriedMachine;
-        GatheredLogName = LogName;
+        string containerLog)
+        : this(
+            metadata,
+            EventReadMode.Metadata,
+            queriedMachine,
+            containerLog,
+            string.Empty,
+            string.Empty,
+            EventMessageRenderStatus.NotRequested,
+            0,
+            null,
+            Array.Empty<EventPropertyValue>(),
+            LevelToDisplayName(metadata.Level),
+            string.Empty,
+            string.Empty,
+            Array.Empty<string>(),
+            string.Empty,
+            parsePayload: false,
+            includeAttachments: false) {
     }
 
     internal EventObject(
         NativeEventMessage message,
         string queriedMachine,
-        string containerLog) {
-
-        NativeEventMetadata metadata = message.Metadata;
-        ReadMode = EventReadMode.Message;
-        QueriedMachine = queriedMachine ?? string.Empty;
-        _message = message.Message;
-        MessageCulture = message.CultureName;
-        Id = metadata.Id;
-        Qualifiers = metadata.Qualifiers?.ToString(CultureInfo.InvariantCulture);
-        RecordId = metadata.RecordId;
-        TimeCreated = metadata.TimeCreated;
-        ProviderName = metadata.ProviderName;
-        ProviderId = metadata.ProviderId;
-        MachineName = metadata.MachineName;
-        LogName = metadata.LogName;
-        Level = metadata.Level;
-        Keywords = metadata.Keywords;
-        Task = metadata.Task;
-        Opcode = metadata.Opcode;
-        ProcessId = metadata.ProcessId;
-        ThreadId = metadata.ThreadId;
-        ActivityId = metadata.ActivityId;
-        RelatedActivityId = metadata.RelatedActivityId;
-        UserId = metadata.UserId;
-        Version = metadata.Version;
-        Bookmark = message.Bookmark;
-        Properties = Array.Empty<EventPropertyValue>();
-        TaskDisplayName = message.TaskDisplayName;
-        OpcodeDisplayName = message.OpcodeDisplayName;
-        KeywordsDisplayNames = message.KeywordDisplayNames;
-        LevelDisplayName = message.LevelDisplayName;
-        ContainerLog = containerLog ?? string.Empty;
-        GatheredFrom = string.IsNullOrEmpty(QueriedMachine) ? Environment.MachineName : QueriedMachine;
-        GatheredLogName = LogName;
+        string containerLog)
+        : this(
+            message.Metadata,
+            EventReadMode.Message,
+            queriedMachine,
+            containerLog,
+            message.Message,
+            message.CultureName,
+            message.RenderStatus,
+            message.RenderErrorCode,
+            message.Bookmark,
+            Array.Empty<EventPropertyValue>(),
+            message.LevelDisplayName,
+            message.TaskDisplayName,
+            message.OpcodeDisplayName,
+            message.KeywordDisplayNames,
+            string.Empty,
+            parsePayload: false,
+            includeAttachments: false) {
     }
 
     internal EventObject(
         NativeEventStructured structured,
         string queriedMachine,
-        string containerLog) {
-
-        NativeEventMetadata metadata = structured.Metadata;
-        ReadMode = EventReadMode.StructuredData;
-        QueriedMachine = queriedMachine ?? string.Empty;
-        _message = string.Empty;
-        Id = metadata.Id;
-        Qualifiers = metadata.Qualifiers?.ToString(CultureInfo.InvariantCulture);
-        RecordId = metadata.RecordId;
-        TimeCreated = metadata.TimeCreated;
-        ProviderName = metadata.ProviderName;
-        ProviderId = metadata.ProviderId;
-        MachineName = metadata.MachineName;
-        LogName = metadata.LogName;
-        Level = metadata.Level;
-        Keywords = metadata.Keywords;
-        Task = metadata.Task;
-        Opcode = metadata.Opcode;
-        ProcessId = metadata.ProcessId;
-        ThreadId = metadata.ThreadId;
-        ActivityId = metadata.ActivityId;
-        RelatedActivityId = metadata.RelatedActivityId;
-        UserId = metadata.UserId;
-        Version = metadata.Version;
-        Bookmark = structured.Bookmark;
-        Properties = structured.Properties;
-        TaskDisplayName = string.Empty;
-        OpcodeDisplayName = string.Empty;
-        KeywordsDisplayNames = Array.Empty<string>();
-        LevelDisplayName = LevelToDisplayName(Level);
-        ContainerLog = containerLog ?? string.Empty;
-        GatheredFrom = string.IsNullOrEmpty(QueriedMachine) ? Environment.MachineName : QueriedMachine;
-        GatheredLogName = LogName;
-        XMLData = structured.Xml;
-        ParseXmlPayload(
-            XMLData,
-            out Dictionary<string, string> data,
-            out _,
-            includeAttachments: false);
-        Data = data;
-        _nicIdentifiers = ExtractNicIdentifiers(data);
+        string containerLog)
+        : this(
+            structured.Metadata,
+            EventReadMode.StructuredData,
+            queriedMachine,
+            containerLog,
+            string.Empty,
+            string.Empty,
+            EventMessageRenderStatus.NotRequested,
+            0,
+            structured.Bookmark,
+            structured.Properties,
+            LevelToDisplayName(structured.Metadata.Level),
+            string.Empty,
+            string.Empty,
+            Array.Empty<string>(),
+            structured.Xml,
+            parsePayload: true,
+            includeAttachments: false) {
     }
 
     internal EventObject(
         NativeEventFull full,
         string queriedMachine,
-        string containerLog) {
+        string containerLog)
+        : this(
+            full.Message.Metadata,
+            EventReadMode.Full,
+            queriedMachine,
+            containerLog,
+            full.Message.Message,
+            full.Message.CultureName,
+            full.Message.RenderStatus,
+            full.Message.RenderErrorCode,
+            full.Structured.Bookmark,
+            full.Structured.Properties,
+            full.Message.LevelDisplayName,
+            full.Message.TaskDisplayName,
+            full.Message.OpcodeDisplayName,
+            full.Message.KeywordDisplayNames,
+            full.Structured.Xml,
+            parsePayload: true,
+            includeAttachments: true) {
+    }
 
-        NativeEventMessage message = full.Message;
-        NativeEventStructured structured = full.Structured;
-        NativeEventMetadata metadata = message.Metadata;
-        ReadMode = EventReadMode.Full;
+    private EventObject(
+        NativeEventMetadata metadata,
+        EventReadMode readMode,
+        string queriedMachine,
+        string containerLog,
+        string message,
+        string messageCulture,
+        EventMessageRenderStatus messageRenderStatus,
+        int messageRenderErrorCode,
+        EventBookmark? bookmark,
+        IReadOnlyList<EventPropertyValue> properties,
+        string levelDisplayName,
+        string taskDisplayName,
+        string opcodeDisplayName,
+        IReadOnlyList<string> keywordDisplayNames,
+        string xml,
+        bool parsePayload,
+        bool includeAttachments) {
+
+        ReadMode = readMode;
         QueriedMachine = queriedMachine ?? string.Empty;
-        _message = message.Message;
-        MessageCulture = message.CultureName;
+        _message = message;
+        MessageCulture = messageCulture;
+        MessageRenderStatus = messageRenderStatus;
+        MessageRenderErrorCode = messageRenderErrorCode;
         Id = metadata.Id;
         Qualifiers = metadata.Qualifiers?.ToString(CultureInfo.InvariantCulture);
         RecordId = metadata.RecordId;
@@ -263,24 +250,27 @@ public partial class EventObject {
         RelatedActivityId = metadata.RelatedActivityId;
         UserId = metadata.UserId;
         Version = metadata.Version;
-        Bookmark = structured.Bookmark;
-        Properties = structured.Properties;
-        TaskDisplayName = message.TaskDisplayName;
-        OpcodeDisplayName = message.OpcodeDisplayName;
-        KeywordsDisplayNames = message.KeywordDisplayNames;
-        LevelDisplayName = message.LevelDisplayName;
+        Bookmark = bookmark;
+        Properties = properties;
+        TaskDisplayName = taskDisplayName;
+        OpcodeDisplayName = opcodeDisplayName;
+        KeywordsDisplayNames = keywordDisplayNames;
+        LevelDisplayName = levelDisplayName;
         ContainerLog = containerLog ?? string.Empty;
         GatheredFrom = string.IsNullOrEmpty(QueriedMachine) ? Environment.MachineName : QueriedMachine;
         GatheredLogName = LogName;
-        XMLData = structured.Xml;
-        ParseXmlPayload(
-            XMLData,
-            out Dictionary<string, string> data,
-            out IReadOnlyList<byte[]> attachments,
-            includeAttachments: true);
-        Data = data;
-        _nicIdentifiers = ExtractNicIdentifiers(data);
-        Attachments = attachments;
+        XMLData = xml;
+
+        if (parsePayload) {
+            ParseXmlPayload(
+                XMLData,
+                out Dictionary<string, string> data,
+                out IReadOnlyList<byte[]> attachments,
+                includeAttachments);
+            Data = data;
+            _nicIdentifiers = ExtractNicIdentifiers(data);
+            Attachments = attachments;
+        }
     }
 
     private static byte? ToByte(object? value) {

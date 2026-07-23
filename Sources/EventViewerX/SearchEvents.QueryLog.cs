@@ -5,18 +5,14 @@ using System.IO;
 using System.Net;
 using System.Runtime.CompilerServices;
 using System.Threading;
-using System.Collections.Concurrent;
-using System.Threading.Tasks;
 using EventViewerX.Native;
 
 namespace EventViewerX;
 
 public partial class SearchEvents : Settings {
     /// <summary>Maximum number of abandonment-safe native calls that may own dedicated timeout threads.</summary>
-    internal const int MaximumConcurrentTimedNativeOperations = 16;
-    private static readonly SemaphoreSlim TimedNativeOperationSlots = new(
-        MaximumConcurrentTimedNativeOperations,
-        MaximumConcurrentTimedNativeOperations);
+    internal const int MaximumConcurrentTimedNativeOperations =
+        BoundedNativeOperation.MaximumConcurrentOperations;
 
     /// <summary>
     /// Initialize the EventSearching class with an internal logger
@@ -54,66 +50,11 @@ public partial class SearchEvents : Settings {
 
     /// <summary>Runs a native operation within the shared dedicated-thread and timeout budget.</summary>
     internal static T ExecuteWithTimeout<T>(Func<T> operation, int timeoutMs, string timeoutMessage, Action<T>? lateResultCleanup = null) {
-        if (timeoutMs <= 0) {
-            return operation();
-        }
-
-        var timeoutBudget = Stopwatch.StartNew();
-        if (!TimedNativeOperationSlots.Wait(timeoutMs)) {
-            throw new TimeoutException(timeoutMessage);
-        }
-
-        int remainingTimeoutMs = timeoutMs - (int)Math.Min(timeoutBudget.ElapsedMilliseconds, timeoutMs);
-        if (remainingTimeoutMs <= 0) {
-            TimedNativeOperationSlots.Release();
-            throw new TimeoutException(timeoutMessage);
-        }
-
-        Task<T> task;
-        try {
-            task = Task.Factory.StartNew(
-                () => {
-                    try {
-                        return operation();
-                    } finally {
-                        TimedNativeOperationSlots.Release();
-                    }
-                },
-                CancellationToken.None,
-                TaskCreationOptions.DenyChildAttach | TaskCreationOptions.LongRunning,
-                TaskScheduler.Default);
-        } catch {
-            TimedNativeOperationSlots.Release();
-            throw;
-        }
-
-        bool completedWithinTimeout;
-        try {
-            completedWithinTimeout = task.Wait(remainingTimeoutMs);
-        } catch (AggregateException) {
-            return task.GetAwaiter().GetResult();
-        }
-
-        if (completedWithinTimeout) {
-            return task.GetAwaiter().GetResult();
-        }
-
-        _ = task.ContinueWith(
-            completedTask => {
-                if (completedTask.Status == TaskStatus.RanToCompletion) {
-                    try {
-                        lateResultCleanup?.Invoke(completedTask.Result);
-                    } catch (Exception ex) {
-                        _logger.WriteVerbose($"Late native-operation cleanup failed: {ex.Message}");
-                    }
-                } else if (completedTask.IsFaulted) {
-                    _ = completedTask.Exception;
-                }
-            },
-            CancellationToken.None,
-            TaskContinuationOptions.ExecuteSynchronously,
-            TaskScheduler.Default);
-        throw new TimeoutException(timeoutMessage);
+        return BoundedNativeOperation.Execute(
+            operation,
+            timeoutMs,
+            timeoutMessage,
+            lateResultCleanup);
     }
 
     private static EventRecord? ReadEventWithTimeout(EventLogReader reader, int timeoutMs, string operation) {
@@ -182,7 +123,8 @@ public partial class SearchEvents : Settings {
     /// <param name="minimumEventRecordIdExclusive">Optional native record-ID lower bound.</param>
     /// <param name="maximumEventRecordIdExclusive">Optional native record-ID upper bound.</param>
     /// <param name="oldest">Whether to enumerate matching records from oldest to newest.</param>
-    private static IEnumerable<EventObject> QueryLogEnumerable(string logName, List<int>? eventIds = null, string? machineName = null, string? providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string? userId = null, int maxEvents = 0, List<long>? eventRecordId = null, TimePeriod? timePeriod = null, CancellationToken cancellationToken = default, int? sessionTimeoutMs = null, EventReadMode readMode = EventReadMode.Full, long? minimumEventRecordIdExclusive = null, long? maximumEventRecordIdExclusive = null, bool oldest = false) {
+    /// <param name="messageCulture">Culture requested for provider messages and display names.</param>
+    private static IEnumerable<EventObject> QueryLogEnumerable(string logName, List<int>? eventIds = null, string? machineName = null, string? providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string? userId = null, int maxEvents = 0, List<long>? eventRecordId = null, TimePeriod? timePeriod = null, CancellationToken cancellationToken = default, int? sessionTimeoutMs = null, EventReadMode readMode = EventReadMode.Full, long? minimumEventRecordIdExclusive = null, long? maximumEventRecordIdExclusive = null, bool oldest = false, CultureInfo? messageCulture = null) {
         ValidateQueryArguments(logName, maxEvents, sessionTimeoutMs);
         if (eventIds != null && eventIds.Any(id => id <= 0)) {
             throw new ArgumentException("Event IDs must be positive.", nameof(eventIds));
@@ -208,13 +150,17 @@ public partial class SearchEvents : Settings {
 
         _logger.WriteVerbose($"Querying log '{logName}' on '{machineName} with query: {queryString}");
 
-        EventLogQuery query = new EventLogQuery(logName, PathType.LogName, queryString)
-        {
-            ReverseDirection = !oldest,
-            TolerateQueryErrors = false
-        };
         int effectiveTimeout = sessionTimeoutMs ?? Settings.QuerySessionTimeoutMs;
-        foreach (var ev in QueryLogFromQuery(query, queryString, oldest, machineName, action: "QueryLog", logName, maxEvents, cancellationToken, effectiveTimeout, readMode)) {
+        foreach (var ev in QueryLogFromQuery(
+                     queryString,
+                     oldest,
+                     machineName,
+                     logName,
+                     maxEvents,
+                     cancellationToken,
+                     effectiveTimeout,
+                     readMode,
+                     messageCulture)) {
             yield return ev;
         }
     }
@@ -234,88 +180,53 @@ public partial class SearchEvents : Settings {
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <param name="sessionTimeoutMs">Session open/read timeout (ms); null uses defaults.</param>
     /// <param name="readMode">Amount of provider data to materialize for each event.</param>
-    public static IEnumerable<EventObject> QueryLogXPath(string logName, string? xpath = null, string? machineName = null, int maxEvents = 0, bool oldest = false, CancellationToken cancellationToken = default, int? sessionTimeoutMs = null, EventReadMode readMode = EventReadMode.Full) {
+    /// <param name="messageCulture">Culture requested for provider messages and display names.</param>
+    public static IEnumerable<EventObject> QueryLogXPath(string logName, string? xpath = null, string? machineName = null, int maxEvents = 0, bool oldest = false, CancellationToken cancellationToken = default, int? sessionTimeoutMs = null, EventReadMode readMode = EventReadMode.Full, CultureInfo? messageCulture = null) {
         ValidateQueryArguments(logName, maxEvents, sessionTimeoutMs);
         string effectiveXPath = string.IsNullOrWhiteSpace(xpath) ? "*" : xpath!;
 
-        var query = new EventLogQuery(logName, PathType.LogName, effectiveXPath) {
-            ReverseDirection = !oldest,
-            TolerateQueryErrors = false
-        };
-
         int effectiveTimeout = sessionTimeoutMs ?? Settings.QuerySessionTimeoutMs;
-        foreach (var ev in QueryLogFromQuery(query, effectiveXPath, oldest, machineName, action: "QueryLogXPath", logName, maxEvents, cancellationToken, effectiveTimeout, readMode)) {
+        foreach (var ev in QueryLogFromQuery(
+                     effectiveXPath,
+                     oldest,
+                     machineName,
+                     logName,
+                     maxEvents,
+                     cancellationToken,
+                     effectiveTimeout,
+                     readMode,
+                     messageCulture)) {
             yield return ev;
         }
     }
 
-    private static IEnumerable<EventObject> QueryLogFromQuery(EventLogQuery query, string xpath, bool oldest, string? machineName, string action, string logName, int maxEvents, CancellationToken cancellationToken, int effectiveTimeout, EventReadMode readMode) {
-        string queriedMachine = string.IsNullOrEmpty(machineName) ? GetFQDN() : machineName!;
-        if (string.IsNullOrEmpty(machineName)) {
-            WindowsEventNativeMethods.QueryFlags nativeFlags =
-                WindowsEventNativeMethods.QueryFlags.ChannelPath |
-                (!oldest
-                    ? WindowsEventNativeMethods.QueryFlags.ReverseDirection
-                    : WindowsEventNativeMethods.QueryFlags.ForwardDirection);
-            var nativeQuery = new NativeEventQuery(
-                IntPtr.Zero,
-                logName,
-                string.IsNullOrWhiteSpace(xpath) ? "*" : xpath,
-                nativeFlags,
-                logName);
-            int eventCount = 0;
-            foreach (EventObject eventObject in WindowsEventReader.Read(
-                         nativeQuery,
-                         readMode,
-                         queriedMachine,
-                         logName,
-                         cancellationToken)) {
-                yield return eventObject;
-                eventCount++;
-                if (maxEvents > 0 && eventCount >= maxEvents) {
-                    yield break;
-                }
-            }
-            yield break;
-        }
+    private static IEnumerable<EventObject> QueryLogFromQuery(
+        string xpath,
+        bool oldest,
+        string? machineName,
+        string logName,
+        int maxEvents,
+        CancellationToken cancellationToken,
+        int effectiveTimeout,
+        EventReadMode readMode,
+        CultureInfo? messageCulture) {
 
-        EventLogSessionOpenResult? sessionResult = null;
-        int sessionBudget = effectiveTimeout > 0 ? effectiveTimeout : Settings.SessionTimeoutMs;
-        sessionResult = CreateSessionResult(machineName, action, logName, sessionBudget);
-        if (!sessionResult.Success || sessionResult.Session == null) {
-            ThrowSessionFailure(sessionResult);
-        }
-        query.Session = sessionResult.Session;
-
-        try {
-            using (var reader = CreateEventLogReader(query, machineName, effectiveTimeout)) {
-                using CancellationTokenRegistration cancellationRegistration = RegisterReaderCancellation(reader, cancellationToken);
-                using EventLogPropertySelector? metadataSelector = readMode == EventReadMode.Metadata
-                    ? EventObject.CreateMetadataPropertySelector()
-                    : null;
-                int eventCount = 0;
-                while (true) {
-                    EventRecord? next = ReadEventWithCancellation(
-                        reader,
-                        effectiveTimeout,
-                        $"Reading '{logName}' on '{queriedMachine}'",
-                        cancellationToken);
-                    if (next == null) {
-                        break;
-                    }
-
-                    EventObject eventObject = metadataSelector != null
-                        ? EventObject.CreateMetadata(next, metadataSelector, queriedMachine, logName)
-                        : new EventObject(next, queriedMachine, readMode);
-                    yield return eventObject;
-                    eventCount++;
-                    if (maxEvents > 0 && eventCount >= maxEvents) {
-                        break;
-                    }
-                }
-            }
-        } finally {
-            sessionResult?.Dispose();
+        var query = new EventLogChannelQuery(logName) {
+            XPath = xpath,
+            Oldest = oldest,
+            MachineName = machineName,
+            MaxEvents = maxEvents,
+            ReadMode = readMode,
+            MessageCulture = messageCulture,
+            RemoteTimeoutMilliseconds = effectiveTimeout > 0
+                ? effectiveTimeout
+                : Settings.SessionTimeoutMs,
+            RpcEndpointPort = Settings.RpcProbePort
+        };
+        foreach (EventObject eventObject in EventLogEngine.ReadChannel(
+                     query,
+                     cancellationToken)) {
+            yield return eventObject;
         }
     }
 
@@ -365,17 +276,18 @@ public partial class SearchEvents : Settings {
     /// <param name="readMode">Amount of provider data to materialize for each event.</param>
     /// <param name="minimumEventRecordIdExclusive">Optional native record-ID lower bound.</param>
     /// <param name="oldest">Whether to enumerate matching records from oldest to newest.</param>
+    /// <param name="messageCulture">Culture requested for provider messages and display names.</param>
     /// <returns>Enumerable collection of matching events.</returns>
-    public static IEnumerable<EventObject> QueryLog(string logName, List<int>? eventIds = null, string? machineName = null, string? providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string? userId = null, int maxEvents = 0, List<long>? eventRecordId = null, TimePeriod? timePeriod = null, CancellationToken cancellationToken = default, int? sessionTimeoutMs = null, EventReadMode readMode = EventReadMode.Full, long? minimumEventRecordIdExclusive = null, bool oldest = false) {
+    public static IEnumerable<EventObject> QueryLog(string logName, List<int>? eventIds = null, string? machineName = null, string? providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string? userId = null, int maxEvents = 0, List<long>? eventRecordId = null, TimePeriod? timePeriod = null, CancellationToken cancellationToken = default, int? sessionTimeoutMs = null, EventReadMode readMode = EventReadMode.Full, long? minimumEventRecordIdExclusive = null, bool oldest = false, CultureInfo? messageCulture = null) {
         Func<string?, long?>? resolver = minimumEventRecordIdExclusive.HasValue ? _ => minimumEventRecordIdExclusive : null;
-        return QueryLogsSequential(logName, eventIds, new List<string?> { machineName }, providerName, keywords, level, startTime, endTime, userId, maxEvents, eventRecordId, timePeriod, cancellationToken, sessionTimeoutMs ?? Settings.QuerySessionTimeoutMs, readMode, resolver, oldest: oldest);
+        return QueryLogsSequential(logName, eventIds, new List<string?> { machineName }, providerName, keywords, level, startTime, endTime, userId, maxEvents, eventRecordId, timePeriod, cancellationToken, sessionTimeoutMs ?? Settings.QuerySessionTimeoutMs, readMode, resolver, oldest: oldest, messageCulture: messageCulture);
     }
 
     /// <summary>
     /// Queries a Windows event log by known-log enum with optional filters.
     /// </summary>
-    public static IEnumerable<EventObject> QueryLog(KnownLog logName, List<int>? eventIds = null, string? machineName = null, string? providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string? userId = null, int maxEvents = 0, List<long>? eventRecordId = null, TimePeriod? timePeriod = null, CancellationToken cancellationToken = default, int? sessionTimeoutMs = null, EventReadMode readMode = EventReadMode.Full, long? minimumEventRecordIdExclusive = null, bool oldest = false) {
-        return QueryLog(LogNameToString(logName), eventIds, machineName, providerName, keywords, level, startTime, endTime, userId, maxEvents, eventRecordId, timePeriod, cancellationToken, sessionTimeoutMs ?? Settings.QuerySessionTimeoutMs, readMode, minimumEventRecordIdExclusive, oldest);
+    public static IEnumerable<EventObject> QueryLog(KnownLog logName, List<int>? eventIds = null, string? machineName = null, string? providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string? userId = null, int maxEvents = 0, List<long>? eventRecordId = null, TimePeriod? timePeriod = null, CancellationToken cancellationToken = default, int? sessionTimeoutMs = null, EventReadMode readMode = EventReadMode.Full, long? minimumEventRecordIdExclusive = null, bool oldest = false, CultureInfo? messageCulture = null) {
+        return QueryLog(LogNameToString(logName), eventIds, machineName, providerName, keywords, level, startTime, endTime, userId, maxEvents, eventRecordId, timePeriod, cancellationToken, sessionTimeoutMs ?? Settings.QuerySessionTimeoutMs, readMode, minimumEventRecordIdExclusive, oldest, messageCulture);
     }
 
     /// <summary>
@@ -383,9 +295,9 @@ public partial class SearchEvents : Settings {
     /// </summary>
     /// <remarks>This compatibility API materializes every result. Prefer the streaming APIs for large logs.</remarks>
     [Obsolete("Use QueryLog for synchronous streaming or QueryLogsParallel for bounded asynchronous streaming.")]
-    public static async Task<IEnumerable<EventObject>> QueryLogAsync(string logName, List<int>? eventIds = null, string? machineName = null, string? providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string? userId = null, int maxEvents = 0, List<long>? eventRecordId = null, TimePeriod? timePeriod = null, CancellationToken cancellationToken = default, int? sessionTimeoutMs = null, EventReadMode readMode = EventReadMode.Full, long? minimumEventRecordIdExclusive = null, bool oldest = false) {
+    public static async Task<IEnumerable<EventObject>> QueryLogAsync(string logName, List<int>? eventIds = null, string? machineName = null, string? providerName = null, Keywords? keywords = null, Level? level = null, DateTime? startTime = null, DateTime? endTime = null, string? userId = null, int maxEvents = 0, List<long>? eventRecordId = null, TimePeriod? timePeriod = null, CancellationToken cancellationToken = default, int? sessionTimeoutMs = null, EventReadMode readMode = EventReadMode.Full, long? minimumEventRecordIdExclusive = null, bool oldest = false, CultureInfo? messageCulture = null) {
         int timeout = sessionTimeoutMs ?? Settings.QuerySessionTimeoutMs;
-        return await Task.Run(() => QueryLog(logName, eventIds, machineName, providerName, keywords, level, startTime, endTime, userId, maxEvents, eventRecordId, timePeriod, cancellationToken, timeout, readMode, minimumEventRecordIdExclusive, oldest).ToList().AsEnumerable(), cancellationToken);
+        return await Task.Run(() => QueryLog(logName, eventIds, machineName, providerName, keywords, level, startTime, endTime, userId, maxEvents, eventRecordId, timePeriod, cancellationToken, timeout, readMode, minimumEventRecordIdExclusive, oldest, messageCulture).ToList().AsEnumerable(), cancellationToken);
     }
 
     /// <summary>

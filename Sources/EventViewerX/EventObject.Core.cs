@@ -75,6 +75,12 @@ public partial class EventObject {
     /// <summary>Culture used to format <see cref="Message"/> and provider display names.</summary>
     public string MessageCulture { get; } = string.Empty;
 
+    /// <summary>Outcome of provider message rendering for this snapshot.</summary>
+    public EventMessageRenderStatus MessageRenderStatus { get; }
+
+    /// <summary>Windows or runtime error code when message rendering did not succeed; otherwise zero.</summary>
+    public int MessageRenderErrorCode { get; }
+
     /// <summary>Message split into CRLF/LF-delimited lines.</summary>
     /// <remarks>The split is created only when a caller requests the lines or parsed message fields.</remarks>
     public IReadOnlyList<string> MessageLines {
@@ -223,8 +229,13 @@ public partial class EventObject {
             GatheredLogName = LogName;
 
             if (readMode == EventReadMode.Message || readMode == EventReadMode.Full) {
-                _message = SafeFormatDescription(eventRecord);
+                _message = SafeFormatDescription(
+                    eventRecord,
+                    out EventMessageRenderStatus renderStatus,
+                    out int renderErrorCode);
                 MessageCulture = System.Globalization.CultureInfo.CurrentUICulture.Name;
+                MessageRenderStatus = renderStatus;
+                MessageRenderErrorCode = renderErrorCode;
             }
 
             if (readMode == EventReadMode.StructuredData || readMode == EventReadMode.Full) {
@@ -270,17 +281,30 @@ public partial class EventObject {
         }
     }
 
-    private static string SafeFormatDescription(EventRecord eventRecord) {
+    private static string SafeFormatDescription(
+        EventRecord eventRecord,
+        out EventMessageRenderStatus renderStatus,
+        out int renderErrorCode) {
+
         try {
-            return eventRecord.FormatDescription() ?? string.Empty;
+            string message = eventRecord.FormatDescription() ?? string.Empty;
+            renderStatus = EventMessageRenderStatus.Rendered;
+            renderErrorCode = 0;
+            return message;
         } catch (EventLogNotFoundException ex) {
             Settings._logger.WriteWarning("Failed to format event description due to missing provider metadata. ({0})", ex.Message);
+            renderStatus = EventMessageRenderStatus.ProviderMetadataUnavailable;
+            renderErrorCode = ex.HResult;
             return string.Empty;
         } catch (EventLogException ex) {
             Settings._logger.WriteWarning("Failed to format event description. ({0})", ex.Message);
+            renderStatus = EventMessageRenderStatus.Failed;
+            renderErrorCode = ex.HResult;
             return string.Empty;
         } catch (Exception ex) {
             Settings._logger.WriteWarning("Unexpected error while formatting event description. ({0})", ex.Message);
+            renderStatus = EventMessageRenderStatus.Failed;
+            renderErrorCode = ex.HResult;
             return string.Empty;
         }
     }

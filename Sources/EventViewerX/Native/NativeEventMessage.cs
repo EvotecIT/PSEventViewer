@@ -12,7 +12,9 @@ internal readonly struct NativeEventMessage {
         string opcodeDisplayName,
         IReadOnlyList<string> keywordDisplayNames,
         EventBookmark? bookmark,
-        string cultureName) {
+        string cultureName,
+        EventMessageRenderStatus renderStatus,
+        int renderErrorCode) {
 
         Metadata = metadata;
         Message = message;
@@ -22,6 +24,8 @@ internal readonly struct NativeEventMessage {
         KeywordDisplayNames = keywordDisplayNames;
         Bookmark = bookmark;
         CultureName = cultureName;
+        RenderStatus = renderStatus;
+        RenderErrorCode = renderErrorCode;
     }
 
     internal NativeEventMetadata Metadata { get; }
@@ -32,4 +36,6 @@ internal readonly struct NativeEventMessage {
     internal IReadOnlyList<string> KeywordDisplayNames { get; }
     internal EventBookmark? Bookmark { get; }
     internal string CultureName { get; }
+    internal EventMessageRenderStatus RenderStatus { get; }
+    internal int RenderErrorCode { get; }
 }

@@ -88,6 +88,12 @@ namespace EventViewerX.Tests {
                 Assert.Equal(expected.OpcodeDisplayName, actual.OpcodeDisplayName);
                 Assert.Equal(expected.KeywordsDisplayNames, actual.KeywordsDisplayNames);
                 Assert.Equal(expected.Bookmark == null, actual.Bookmark == null);
+                Assert.NotEqual(EventMessageRenderStatus.NotRequested, actual.MessageRenderStatus);
+                if (actual.MessageRenderStatus == EventMessageRenderStatus.Rendered) {
+                    Assert.Equal(0, actual.MessageRenderErrorCode);
+                } else {
+                    Assert.NotEqual(0, actual.MessageRenderErrorCode);
+                }
                 compared++;
             }
 
@@ -164,6 +170,8 @@ namespace EventViewerX.Tests {
                 Assert.Equal(polishHost.Select(static item => item.RecordId), germanHost.Select(static item => item.RecordId));
                 Assert.Equal(polishHost.Select(static item => item.Message), germanHost.Select(static item => item.Message));
                 Assert.All(polishHost, static item => Assert.Equal("en-US", item.MessageCulture));
+                Assert.All(polishHost, static item =>
+                    Assert.NotEqual(EventMessageRenderStatus.NotRequested, item.MessageRenderStatus));
                 Assert.Contains(polishHost, static item => !string.IsNullOrEmpty(item.Message));
             } finally {
                 CultureInfo.CurrentUICulture = originalCulture;

@@ -349,14 +349,19 @@ namespace EventViewerX.Tests {
             if (!OperatingSystem.IsWindows()) return;
             if (!TestEnv.CanReadLog("System")) return;
 
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
             List<EventObject> events = SearchEvents.QueryLogsSequential(
                 "System",
                 machineNames: new List<string?> { "203.0.113.1", null },
                 maxEvents: 1,
                 sessionTimeoutMs: 500,
                 readMode: EventReadMode.Metadata).ToList();
+            stopwatch.Stop();
 
             Assert.Single(events);
+            Assert.True(
+                stopwatch.Elapsed < TimeSpan.FromSeconds(5),
+                $"Unreachable remote isolation took {stopwatch.Elapsed.TotalMilliseconds:F0} ms.");
         }
 
         [Fact]

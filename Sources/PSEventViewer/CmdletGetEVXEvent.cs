@@ -242,6 +242,7 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
     /// For example, use <c>en-US</c> for deterministic English output.
     /// </summary>
     [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
     public CultureInfo? MessageCulture { get; set; }
 
     /// <summary>
@@ -524,7 +525,7 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
                     }
                 }
             } else if (ParallelOption == ParallelOption.Disabled || MaxEventsScanned > 0 || UsesCheckpoint) {
-                foreach (EventObject eventObject in SearchEvents.QueryLogsSequential(LogName, EventId, MachineName, ProviderName, Keywords, Level, StartTime, EndTime, UserId, GetQueryReadLimit(), EventRecordId, TimePeriod, token, SessionTimeoutMs, ReadMode, GetCheckpointResolver(LogName), oldest: EffectiveOldest, resultPredicate: queryResultPredicate)) {
+                foreach (EventObject eventObject in SearchEvents.QueryLogsSequential(LogName, EventId, MachineName, ProviderName, Keywords, Level, StartTime, EndTime, UserId, GetQueryReadLimit(), EventRecordId, TimePeriod, token, SessionTimeoutMs, ReadMode, GetCheckpointResolver(LogName), oldest: EffectiveOldest, resultPredicate: queryResultPredicate, messageCulture: MessageCulture)) {
                     token.ThrowIfCancellationRequested();
                     ProcessEventResult(eventObject, results);
                     if (OutputLimitReached) {
@@ -532,7 +533,7 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
                     }
                 }
             } else {
-                await foreach (EventObject eventObject in SearchEvents.QueryLogsParallel(LogName, EventId, MachineName, ProviderName, Keywords, Level, StartTime, EndTime, UserId, GetQueryReadLimit(), NumberOfThreads, EventRecordId, TimePeriod, token, SessionTimeoutMs, ReadMode, BufferCapacity, GetCheckpointResolver(LogName), oldest: EffectiveOldest, resultPredicate: queryResultPredicate)) {
+                await foreach (EventObject eventObject in SearchEvents.QueryLogsParallel(LogName, EventId, MachineName, ProviderName, Keywords, Level, StartTime, EndTime, UserId, GetQueryReadLimit(), NumberOfThreads, EventRecordId, TimePeriod, token, SessionTimeoutMs, ReadMode, BufferCapacity, GetCheckpointResolver(LogName), oldest: EffectiveOldest, resultPredicate: queryResultPredicate, messageCulture: MessageCulture)) {
                     token.ThrowIfCancellationRequested();
                     ProcessEventResult(eventObject, results);
                     if (OutputLimitReached) {

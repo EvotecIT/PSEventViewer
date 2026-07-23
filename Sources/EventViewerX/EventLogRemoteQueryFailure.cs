@@ -1,4 +1,5 @@
 using System;
+using System.ComponentModel;
 using System.Diagnostics.Eventing.Reader;
 
 namespace EventViewerX;
@@ -53,6 +54,18 @@ public static class EventLogRemoteQueryFailureClassifier {
             Reports.QueryHelpers.QueryFailureHelpers.IsInvalidEventQuery(eventLogException)) {
             failureKind = EventLogRemoteQueryFailureKind.None;
             return false;
+        }
+
+        if (exception is Win32Exception win32Exception) {
+            failureKind = win32Exception.NativeErrorCode switch {
+                15001 => EventLogRemoteQueryFailureKind.None,
+                5 => EventLogRemoteQueryFailureKind.AccessDenied,
+                121 or 1460 => EventLogRemoteQueryFailureKind.Timeout,
+                53 or 64 or 1231 or 1722 or 1726 or 1818 =>
+                    EventLogRemoteQueryFailureKind.HostUnavailable,
+                _ => EventLogRemoteQueryFailureKind.EventLogError
+            };
+            return failureKind != EventLogRemoteQueryFailureKind.None;
         }
 
         failureKind = exception switch {

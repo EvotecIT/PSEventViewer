@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Threading;
 
@@ -41,7 +42,8 @@ public partial class SearchEvents {
         bool oldest = false,
         Func<EventObject, bool>? resultPredicate = null,
         Action<EventObject>? candidateObserver = null,
-        Action<EventLogQueryTargetFailure>? targetFailureObserver = null) {
+        Action<EventLogQueryTargetFailure>? targetFailureObserver = null,
+        CultureInfo? messageCulture = null) {
 
         ValidateQueryArguments(logName, maxEvents, sessionTimeoutMs);
         if (maxOpenQueries <= 0 || maxOpenQueries > MaximumParallelism) {
@@ -78,7 +80,8 @@ public partial class SearchEvents {
             failedTargets,
             resultPredicate,
             candidateObserver,
-            targetFailureObserver);
+            targetFailureObserver,
+            messageCulture);
 
         if (maxEvents > 0 || (oldest && minimumEventRecordIdExclusiveResolver != null)) {
             List<QueryWorkItem> pagedWorkItems = workItems.ToList();
@@ -155,7 +158,8 @@ public partial class SearchEvents {
         ConcurrentDictionary<string, byte> failedTargets,
         Func<EventObject, bool>? resultPredicate,
         Action<EventObject>? candidateObserver,
-        Action<EventLogQueryTargetFailure>? targetFailureObserver) {
+        Action<EventLogQueryTargetFailure>? targetFailureObserver,
+        CultureInfo? messageCulture) {
 
         if (isolateRemoteFailures && ShouldSkipFailedTarget(workItem, failedTargets)) {
             return System.Linq.Enumerable.Empty<EventObject>().GetEnumerator();
@@ -181,7 +185,8 @@ public partial class SearchEvents {
                 readMode: readMode,
                 minimumEventRecordIdExclusive: workItem.MinimumEventRecordIdExclusive,
                 maximumEventRecordIdExclusive: workItem.MaximumEventRecordIdExclusive,
-                oldest: oldest)).GetEnumerator();
+                oldest: oldest,
+                messageCulture: messageCulture)).GetEnumerator();
         IEnumerator<EventObject> safeResults = isolateRemoteFailures
             ? EnumerateQueryWorkItemSafely(workItem, queryResults, failedTargets, targetFailureObserver, logName).GetEnumerator()
             : queryResults;

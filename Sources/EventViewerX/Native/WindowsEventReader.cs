@@ -89,6 +89,7 @@ internal static class WindowsEventReader {
 
         using var systemRenderer = new WindowsEventSystemRenderer();
         using var messageRenderer = new WindowsEventMessageRenderer(
+            query.Session,
             query.PublisherMetadataPath,
             query.MessageLocale);
         foreach (NativeEventMessage message in ReadEvents(
@@ -125,6 +126,7 @@ internal static class WindowsEventReader {
 
         using var systemRenderer = new WindowsEventSystemRenderer();
         using var messageRenderer = new WindowsEventMessageRenderer(
+            query.Session,
             query.PublisherMetadataPath,
             query.MessageLocale);
         using var payloadRenderer = new WindowsEventPayloadRenderer();
@@ -166,13 +168,19 @@ internal static class WindowsEventReader {
                     query,
                     handles.Length,
                     handles,
-                    -1,
+                    eventQuery.NextTimeoutMilliseconds > 0
+                        ? eventQuery.NextTimeoutMilliseconds
+                        : -1,
                     0,
                     out int returned)) {
 
                 int error = Marshal.GetLastWin32Error();
                 if (error == WindowsEventNativeMethods.ErrorNoMoreItems) {
                     yield break;
+                }
+                if (error == WindowsEventNativeMethods.ErrorTimeout) {
+                    throw new TimeoutException(
+                        $"Timed out while reading Windows event source '{eventQuery.DisplayName}'.");
                 }
                 throw new Win32Exception(
                     error,

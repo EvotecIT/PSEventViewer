@@ -74,7 +74,8 @@ public partial class SearchEvents : Settings {
                 failedTargets,
                 resultPredicate: null,
                 candidateObserver: null,
-                targetFailureObserver: targetFailureObserver);
+                targetFailureObserver: targetFailureObserver,
+                messageCulture: null);
             pageReaders.AddRange(CreateRecordOrderedSourcePageReaders(
                 workItems,
                 createEnumerator,

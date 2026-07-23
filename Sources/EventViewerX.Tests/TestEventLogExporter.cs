@@ -36,6 +36,8 @@ public sealed class TestEventLogExporter {
             Assert.Equal(JsonValueKind.Array,
                 document.RootElement.GetProperty("properties").ValueKind);
             Assert.Equal(JsonValueKind.String,
+                document.RootElement.GetProperty("messageRenderStatus").ValueKind);
+            Assert.Equal(JsonValueKind.String,
                 document.RootElement.GetProperty("xml").ValueKind);
         }
     }
@@ -56,7 +58,7 @@ public sealed class TestEventLogExporter {
         Assert.Equal(7, result.EventCount);
         Assert.Equal(8, lines.Length);
         Assert.Equal(
-            "TimeCreated,RecordId,Id,ProviderName,MachineName,LogName,Level,LevelDisplayName,Task,TaskDisplayName,Opcode,OpcodeDisplayName,Keywords,KeywordDisplayNames,ProcessId,ThreadId,UserId,MessageCulture,Message,Properties,Data,Attachments,Xml",
+            "TimeCreated,RecordId,Id,ProviderName,MachineName,LogName,Level,LevelDisplayName,Task,TaskDisplayName,Opcode,OpcodeDisplayName,Keywords,KeywordDisplayNames,ProcessId,ThreadId,UserId,MessageCulture,MessageRenderStatus,MessageRenderErrorCode,Message,Properties,Data,Attachments,Xml",
             lines[0]);
         Assert.All(lines.Skip(1), static line => Assert.False(string.IsNullOrWhiteSpace(line)));
     }

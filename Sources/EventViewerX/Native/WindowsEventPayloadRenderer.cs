@@ -106,7 +106,7 @@ internal sealed class WindowsEventPayloadRenderer : IDisposable {
         return values;
     }
 
-    private static object? ReadValue(WindowsEventNativeMethods.EventVariant value) {
+    internal static object? ReadValue(WindowsEventNativeMethods.EventVariant value) {
         if (value.ScalarType == WindowsEventNativeMethods.VariantType.Null) {
             return null;
         }
@@ -125,12 +125,14 @@ internal sealed class WindowsEventPayloadRenderer : IDisposable {
             WindowsEventNativeMethods.VariantType.Byte => value.ByteValue,
             WindowsEventNativeMethods.VariantType.Int16 => value.Int16Value,
             WindowsEventNativeMethods.VariantType.UInt16 => value.UInt16Value,
-            WindowsEventNativeMethods.VariantType.Int32 or WindowsEventNativeMethods.VariantType.HexInt32 =>
+            WindowsEventNativeMethods.VariantType.Int32 =>
                 value.Int32Value,
-            WindowsEventNativeMethods.VariantType.UInt32 => value.UInt32Value,
-            WindowsEventNativeMethods.VariantType.Int64 or WindowsEventNativeMethods.VariantType.HexInt64 =>
+            WindowsEventNativeMethods.VariantType.UInt32 or WindowsEventNativeMethods.VariantType.HexInt32 =>
+                value.UInt32Value,
+            WindowsEventNativeMethods.VariantType.Int64 =>
                 value.Int64Value,
-            WindowsEventNativeMethods.VariantType.UInt64 => value.UInt64Value,
+            WindowsEventNativeMethods.VariantType.UInt64 or WindowsEventNativeMethods.VariantType.HexInt64 =>
+                value.UInt64Value,
             WindowsEventNativeMethods.VariantType.Single => value.SingleValue,
             WindowsEventNativeMethods.VariantType.Double => value.DoubleValue,
             WindowsEventNativeMethods.VariantType.Boolean => value.UInt32Value != 0,
@@ -140,8 +142,11 @@ internal sealed class WindowsEventPayloadRenderer : IDisposable {
             WindowsEventNativeMethods.VariantType.SizeT => value.PointerValue,
             WindowsEventNativeMethods.VariantType.FileTime =>
                 DateTime.FromFileTimeUtc(unchecked((long)value.UInt64Value)).ToLocalTime(),
+            WindowsEventNativeMethods.VariantType.SystemTime =>
+                ReadSystemTime(value.PointerValue),
             WindowsEventNativeMethods.VariantType.Sid =>
                 value.PointerValue == IntPtr.Zero ? null : new SecurityIdentifier(value.PointerValue),
+            WindowsEventNativeMethods.VariantType.EventHandle => value.PointerValue,
             _ => value.PointerValue
         };
     }
@@ -155,13 +160,29 @@ internal sealed class WindowsEventPayloadRenderer : IDisposable {
         return value.ScalarType switch {
             WindowsEventNativeMethods.VariantType.String or WindowsEventNativeMethods.VariantType.Xml =>
                 ReadStringArray(value.PointerValue, count),
+            WindowsEventNativeMethods.VariantType.AnsiString =>
+                ReadAnsiStringArray(value.PointerValue, count),
+            WindowsEventNativeMethods.VariantType.SByte =>
+                ReadSByteArray(value.PointerValue, count),
             WindowsEventNativeMethods.VariantType.Byte or WindowsEventNativeMethods.VariantType.Binary =>
                 CopyBytes(value.PointerValue, value.Count),
+            WindowsEventNativeMethods.VariantType.Int16 => ReadInt16Array(value.PointerValue, count),
             WindowsEventNativeMethods.VariantType.UInt16 => ReadUInt16Array(value.PointerValue, count),
-            WindowsEventNativeMethods.VariantType.UInt32 => ReadUInt32Array(value.PointerValue, count),
+            WindowsEventNativeMethods.VariantType.Int32 => ReadInt32Array(value.PointerValue, count),
+            WindowsEventNativeMethods.VariantType.UInt32 or WindowsEventNativeMethods.VariantType.HexInt32 =>
+                ReadUInt32Array(value.PointerValue, count),
             WindowsEventNativeMethods.VariantType.Int64 => ReadInt64Array(value.PointerValue, count),
-            WindowsEventNativeMethods.VariantType.UInt64 => ReadUInt64Array(value.PointerValue, count),
+            WindowsEventNativeMethods.VariantType.UInt64 or WindowsEventNativeMethods.VariantType.HexInt64 =>
+                ReadUInt64Array(value.PointerValue, count),
+            WindowsEventNativeMethods.VariantType.Single => ReadSingleArray(value.PointerValue, count),
+            WindowsEventNativeMethods.VariantType.Double => ReadDoubleArray(value.PointerValue, count),
+            WindowsEventNativeMethods.VariantType.Boolean => ReadBooleanArray(value.PointerValue, count),
             WindowsEventNativeMethods.VariantType.Guid => ReadGuidArray(value.PointerValue, count),
+            WindowsEventNativeMethods.VariantType.SizeT or WindowsEventNativeMethods.VariantType.EventHandle =>
+                ReadIntPtrArray(value.PointerValue, count),
+            WindowsEventNativeMethods.VariantType.FileTime => ReadFileTimeArray(value.PointerValue, count),
+            WindowsEventNativeMethods.VariantType.SystemTime => ReadSystemTimeArray(value.PointerValue, count),
+            WindowsEventNativeMethods.VariantType.Sid => ReadSidArray(value.PointerValue, count),
             _ => Array.Empty<object>()
         };
     }
@@ -184,6 +205,29 @@ internal sealed class WindowsEventPayloadRenderer : IDisposable {
         return result;
     }
 
+    private static string?[] ReadAnsiStringArray(IntPtr source, int count) {
+        var result = new string?[count];
+        for (int index = 0; index < count; index++) {
+            IntPtr item = Marshal.ReadIntPtr(source, index * IntPtr.Size);
+            result[index] = item == IntPtr.Zero ? null : Marshal.PtrToStringAnsi(item);
+        }
+        return result;
+    }
+
+    private static sbyte[] ReadSByteArray(IntPtr source, int count) {
+        var result = new sbyte[count];
+        for (int index = 0; index < count; index++) {
+            result[index] = unchecked((sbyte)Marshal.ReadByte(source, index));
+        }
+        return result;
+    }
+
+    private static short[] ReadInt16Array(IntPtr source, int count) {
+        var result = new short[count];
+        Marshal.Copy(source, result, 0, count);
+        return result;
+    }
+
     private static ushort[] ReadUInt16Array(IntPtr source, int count) {
         var result = new ushort[count];
         for (int index = 0; index < count; index++) {
@@ -197,6 +241,12 @@ internal sealed class WindowsEventPayloadRenderer : IDisposable {
         for (int index = 0; index < count; index++) {
             result[index] = unchecked((uint)Marshal.ReadInt32(source, index * sizeof(uint)));
         }
+        return result;
+    }
+
+    private static int[] ReadInt32Array(IntPtr source, int count) {
+        var result = new int[count];
+        Marshal.Copy(source, result, 0, count);
         return result;
     }
 
@@ -221,6 +271,79 @@ internal sealed class WindowsEventPayloadRenderer : IDisposable {
         int size = Marshal.SizeOf<Guid>();
         for (int index = 0; index < count; index++) {
             result[index] = Marshal.PtrToStructure<Guid>(IntPtr.Add(source, index * size));
+        }
+        return result;
+    }
+
+    private static float[] ReadSingleArray(IntPtr source, int count) {
+        var result = new float[count];
+        Marshal.Copy(source, result, 0, count);
+        return result;
+    }
+
+    private static double[] ReadDoubleArray(IntPtr source, int count) {
+        var result = new double[count];
+        Marshal.Copy(source, result, 0, count);
+        return result;
+    }
+
+    private static bool[] ReadBooleanArray(IntPtr source, int count) {
+        var result = new bool[count];
+        for (int index = 0; index < count; index++) {
+            result[index] = Marshal.ReadInt32(source, index * sizeof(uint)) != 0;
+        }
+        return result;
+    }
+
+    private static IntPtr[] ReadIntPtrArray(IntPtr source, int count) {
+        var result = new IntPtr[count];
+        Marshal.Copy(source, result, 0, count);
+        return result;
+    }
+
+    private static DateTime[] ReadFileTimeArray(IntPtr source, int count) {
+        long[] values = ReadInt64Array(source, count);
+        var result = new DateTime[count];
+        for (int index = 0; index < count; index++) {
+            result[index] = DateTime.FromFileTimeUtc(values[index]).ToLocalTime();
+        }
+        return result;
+    }
+
+    private static DateTime ReadSystemTime(IntPtr source) {
+        if (source == IntPtr.Zero) {
+            return DateTime.MinValue;
+        }
+        WindowsEventNativeMethods.SystemTime value =
+            Marshal.PtrToStructure<WindowsEventNativeMethods.SystemTime>(source);
+        if (value.Year == 0 || value.Month == 0 || value.Day == 0) {
+            return DateTime.MinValue;
+        }
+        return new DateTime(
+            value.Year,
+            value.Month,
+            value.Day,
+            value.Hour,
+            value.Minute,
+            value.Second,
+            value.Milliseconds,
+            DateTimeKind.Utc).ToLocalTime();
+    }
+
+    private static DateTime[] ReadSystemTimeArray(IntPtr source, int count) {
+        var result = new DateTime[count];
+        int size = Marshal.SizeOf<WindowsEventNativeMethods.SystemTime>();
+        for (int index = 0; index < count; index++) {
+            result[index] = ReadSystemTime(IntPtr.Add(source, index * size));
+        }
+        return result;
+    }
+
+    private static SecurityIdentifier?[] ReadSidArray(IntPtr source, int count) {
+        var result = new SecurityIdentifier?[count];
+        for (int index = 0; index < count; index++) {
+            IntPtr item = Marshal.ReadIntPtr(source, index * IntPtr.Size);
+            result[index] = item == IntPtr.Zero ? null : new SecurityIdentifier(item);
         }
         return result;
     }

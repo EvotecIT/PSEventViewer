@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Channels;
@@ -47,7 +48,8 @@ public partial class SearchEvents : Settings {
         bool oldest = false,
         Func<EventObject, bool>? resultPredicate = null,
         Action<EventObject>? candidateObserver = null,
-        Action<EventLogQueryTargetFailure>? targetFailureObserver = null) {
+        Action<EventLogQueryTargetFailure>? targetFailureObserver = null,
+        CultureInfo? messageCulture = null) {
 
         if (oldest && minimumEventRecordIdExclusiveResolver != null && maxEvents <= 0) {
             ValidateParallelArguments(logName, maxEvents, maxThreads, bufferCapacity, sessionTimeoutMs);
@@ -72,7 +74,8 @@ public partial class SearchEvents : Settings {
                          oldest: true,
                          resultPredicate: resultPredicate,
                          candidateObserver: candidateObserver,
-                         targetFailureObserver: targetFailureObserver)) {
+                         targetFailureObserver: targetFailureObserver,
+                         messageCulture: messageCulture)) {
                 yield return result;
             }
             yield break;
@@ -100,7 +103,8 @@ public partial class SearchEvents : Settings {
                            oldest,
                            resultPredicate,
                            candidateObserver,
-                           targetFailureObserver)) {
+                           targetFailureObserver,
+                           messageCulture)) {
             yield return result;
         }
     }
@@ -127,7 +131,8 @@ public partial class SearchEvents : Settings {
         bool oldest,
         Func<EventObject, bool>? resultPredicate,
         Action<EventObject>? candidateObserver,
-        Action<EventLogQueryTargetFailure>? targetFailureObserver) {
+        Action<EventLogQueryTargetFailure>? targetFailureObserver,
+        CultureInfo? messageCulture) {
 
         ValidateParallelArguments(logName, maxEvents, maxThreads, bufferCapacity, sessionTimeoutMs);
         if (maxEvents > 0) {
@@ -162,7 +167,8 @@ public partial class SearchEvents : Settings {
                 boundedFailedTargets,
                 resultPredicate,
                 candidateObserver,
-                targetFailureObserver);
+                targetFailureObserver,
+                messageCulture);
             int boundedPageSize = GetBoundedCandidatePageSize(boundedTargets.Count, maxEvents);
             List<Func<int, IReadOnlyList<EventObject>>> boundedPageReaders = CreateRecordOrderedSourcePageReaders(
                 boundedWorkItems,
@@ -237,7 +243,8 @@ public partial class SearchEvents : Settings {
                                 readMode: readMode,
                                 minimumEventRecordIdExclusive: workItem.MinimumEventRecordIdExclusive,
                                 maximumEventRecordIdExclusive: workItem.MaximumEventRecordIdExclusive,
-                                oldest: oldest)).GetEnumerator();
+                                oldest: oldest,
+                                messageCulture: messageCulture)).GetEnumerator();
                         while (TryMoveNextParallelResult(
                                    queryResults,
                                    workItem,

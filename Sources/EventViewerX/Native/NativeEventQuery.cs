@@ -10,7 +10,8 @@ internal readonly struct NativeEventQuery {
         WindowsEventNativeMethods.QueryFlags flags,
         string displayName,
         string? publisherMetadataPath = null,
-        int messageLocale = 0) {
+        int messageLocale = 0,
+        int nextTimeoutMilliseconds = 0) {
 
         Session = session;
         Path = path;
@@ -19,6 +20,7 @@ internal readonly struct NativeEventQuery {
         DisplayName = displayName;
         PublisherMetadataPath = publisherMetadataPath;
         MessageLocale = messageLocale;
+        NextTimeoutMilliseconds = nextTimeoutMilliseconds;
     }
 
     internal IntPtr Session { get; }
@@ -28,4 +30,5 @@ internal readonly struct NativeEventQuery {
     internal string DisplayName { get; }
     internal string? PublisherMetadataPath { get; }
     internal int MessageLocale { get; }
+    internal int NextTimeoutMilliseconds { get; }
 }

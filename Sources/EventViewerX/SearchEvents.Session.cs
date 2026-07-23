@@ -2,9 +2,8 @@ using System;
 using System.Diagnostics;
 using System.Diagnostics.Eventing.Reader;
 using System.Collections.Concurrent;
-using System.Net.Sockets;
-using System.Threading.Tasks;
 using System.Threading;
+using EventViewerX.Native;
 
 namespace EventViewerX;
 
@@ -248,32 +247,14 @@ public partial class SearchEvents : Settings
     }
 
     private static bool RpcProbe(string host, int timeoutMs, bool emitDiagnostics) {
-        try {
-            using var tcp = new TcpClient();
-            Task connectTask = tcp.ConnectAsync(host, Settings.RpcProbePort);
-            bool connectedWithinTimeout;
-            try {
-                connectedWithinTimeout = connectTask.Wait(timeoutMs);
-            } catch (AggregateException) {
-                connectTask.GetAwaiter().GetResult();
-                return false;
-            }
-
-            if (!connectedWithinTimeout || !tcp.Connected) {
-                _ = connectTask.ContinueWith(
-                    t => _ = t.Exception,
-                    CancellationToken.None,
-                    TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
-                    TaskScheduler.Default);
-                return false;
-            }
-            return true;
-        } catch (Exception ex) {
-            if (emitDiagnostics) {
-                _logger.WriteVerbose($"Session: RPC probe failed for '{host}': {ex.Message}");
-            }
-            return false;
+        bool connected = RpcEndpointProbe.TryConnect(
+            host,
+            Settings.RpcProbePort,
+            timeoutMs);
+        if (!connected && emitDiagnostics) {
+            _logger.WriteVerbose($"Session: RPC probe failed for '{host}'.");
         }
+        return connected;
     }
 
     private static bool IsHostNegativeCached(string host)

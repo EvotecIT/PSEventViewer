@@ -27,6 +27,8 @@ internal sealed class EventCsvWriter : IEventExportWriter {
         "ThreadId",
         "UserId",
         "MessageCulture",
+        "MessageRenderStatus",
+        "MessageRenderErrorCode",
         "Message",
         "Properties",
         "Data",
@@ -83,6 +85,10 @@ internal sealed class EventCsvWriter : IEventExportWriter {
         WriteField(eventObject.UserId?.Value);
         WriteSeparator();
         WriteField(eventObject.MessageCulture);
+        WriteSeparator();
+        WriteField(eventObject.MessageRenderStatus.ToString());
+        WriteSeparator();
+        WriteField(eventObject.MessageRenderErrorCode.ToString(CultureInfo.InvariantCulture));
         WriteSeparator();
         WriteField(eventObject.Message);
         WriteSeparator();
