@@ -233,22 +233,22 @@ every non-metadata mode, so bookmark creation is not a `Full`-only distinction. 
 The common-work table is generated from validated PowerForge artifacts. The public refresh command requires at least
 three rotated iterations and owns its complete case/engine matrix. This snapshot was captured on July 23, 2026 with
 PowerShell 7.6.4 and .NET 10 on Windows, using a 225,513,472-byte `ad.evotec.xyz` Security-log export containing
-197,285 events (SHA-256 `EB731BDA923F4AF0CBF2028B972029139FE6FCFB0C92B32A38F078995873F3C2`). Metadata and exact
+197,716 events (SHA-256 `3B243CA8A627C99844D713345786B85EE680286DDAE392037387949F6F9FAFB1`). Metadata and exact
 export rows process the entire file; message, structured-data, and full rows process the same first 100,000 events.
 Times are end-to-end medians, lower is better, and ratios are relative to PSEventViewer.
 
 <!-- event-log-common-benchmark:start -->
 | Scenario | Host | Operation | PSEventViewer | DotNet | EventViewerX | GetWinEvent | Result |
 | --- | --- | --- | ---: | ---: | ---: | ---: | --- |
-| Large-Common-Sample-Full | Core-7.6.4 | Scan | 1.00x (60.93s) | 0.88x (53.59s) | 0.93x (56.47s) | 0.99x (60.37s) | PSEventViewer slower than DotNet |
-| Large-Common-Sample-Message | Core-7.6.4 | Scan | 1.00x (53.71s) | 0.90x (48.09s) | 0.94x (50.23s) | 1.00x (53.58s) | PSEventViewer slower than DotNet |
-| Large-Common-Sample-StructuredData | Core-7.6.4 | Scan | 1.00x (6.26s) | 0.49x (3.07s) | 0.75x (4.70s) | 4.52x (28.31s) | PSEventViewer slower than DotNet |
-| Large-Common-Scan-Metadata | Core-7.6.4 | Scan | 1.00x (3.05s) | 0.69x (2.12s) | 0.82x (2.51s) | 15.06x (45.94s) | PSEventViewer slower than DotNet |
-| Large-Exact-Export-MetadataCsv | Core-7.6.4 | Scan | 1.00x (4.12s) | 0.62x (2.54s) | Skipped | 12.36x (50.87s) | PSEventViewer slower than DotNet |
+| Large-Common-Sample-Full | Core-7.6.4 | Scan | 1.00x (57.62s) | 0.87x (49.88s) | 0.93x (53.34s) | 0.97x (56.05s) | PSEventViewer slower than DotNet |
+| Large-Common-Sample-Message | Core-7.6.4 | Scan | 1.00x (55.29s) | 0.86x (47.70s) | 0.95x (52.65s) | 1.01x (55.94s) | PSEventViewer slower than DotNet |
+| Large-Common-Sample-StructuredData | Core-7.6.4 | Scan | 1.00x (5.68s) | 0.51x (2.91s) | 0.79x (4.51s) | 4.63x (26.28s) | PSEventViewer slower than DotNet |
+| Large-Common-Scan-Metadata | Core-7.6.4 | Scan | 1.00x (2.76s) | 0.74x (2.05s) | 0.79x (2.18s) | 16.54x (45.57s) | PSEventViewer slower than DotNet |
+| Large-Exact-Export-MetadataCsv | Core-7.6.4 | Scan | 1.00x (3.86s) | 0.59x (2.28s) | Skipped | 13.12x (50.71s) | PSEventViewer slower than DotNet |
 <!-- event-log-common-benchmark:end -->
 
-On this fixture, PSEventViewer metadata enumeration was about 15 times faster than `Get-WinEvent`; the byte-identical
-metadata CSV export was about 12 times faster. Message and full materialization were in the same general range as
+On this fixture, PSEventViewer metadata enumeration was about 16.5 times faster than `Get-WinEvent`; the byte-identical
+metadata CSV export was about 13.1 times faster. Message and full materialization were in the same general range as
 `Get-WinEvent`, while the raw .NET reader remained the fastest common-work implementation.
 
 The EvtxECmd-native table is generated separately because metrics-only parsing, its forensic CSV, XML, and full JSON
