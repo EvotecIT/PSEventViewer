@@ -183,6 +183,39 @@ Clear-EVXLog -LogName 'MyApp'
 Remove-EVXLog -LogName 'MyApp'
 ```
 
+## Reading large event logs
+
+`Get-EVXEvent` streams records, but the work performed for each record depends on `-ReadMode`. The default remains
+`Full` for compatibility. Choose a narrower mode when you do not need every representation of the event.
+
+| Read mode | Materialized data | Use it for |
+| --- | --- | --- |
+| `Metadata` | Core system fields only; no message, XML, attachments, or bookmark | Counting, filtering, timelines, IDs, providers, record-ID checkpoints, and large exports |
+| `Message` | Metadata and the provider-formatted message; `MessageData` is parsed only when accessed | Text search and readable provider messages |
+| `StructuredData` | Metadata, raw properties, XML, and the parsed `Data` dictionary; no formatted message | Named event fields, payload analysis, and `-Expand` |
+| `Full` | Message, structured data, attachments, and bookmark | Compatibility and workflows that need every representation |
+
+Formatting a provider message is often the most expensive per-event operation. Filter by log, event ID, provider,
+time, record ID, level, keyword, user, or named data before choosing `Message` or `Full`.
+
+```powershell
+# Fast bounded-memory scan: no provider message or XML work
+Get-EVXEvent -Path C:\Logs\DC01-Security.evtx -Oldest -ReadMode Metadata |
+    Select-Object TimeCreated, RecordId, Id, ProviderName, MachineName |
+    Export-Csv C:\Logs\Security-metadata.csv -NoTypeInformation
+
+# Format messages only for the event IDs that need them
+Get-EVXEvent -LogName Security -EventId 4624,4625 -TimePeriod Last24Hours -ReadMode Message |
+    Select-Object TimeCreated, Id, MachineName, Message
+
+# Parse XML payload fields without paying for provider message formatting
+Get-EVXEvent -Path C:\Logs\DC01-Security.evtx -EventId 4624 -ReadMode StructuredData -Expand
+```
+
+The equivalent C# API accepts `readMode: EventReadMode.Metadata`, `Message`, `StructuredData`, or `Full`.
+Maintainers can reproduce first-event and full-scan comparisons with the
+[event log parsing benchmark](Benchmarks/EventLogParsing/README.md).
+
 Checkpoint generation metadata is stored in the visible `<RecordIdFile>.state.json` companion file. `Reset-EVXEventCheckpoint` updates both representations under the shared file lock and prevents an in-flight query from restoring progress from the previous generation.
 
 Reverse-DNS enrichment is disabled unless `-ResolveDns` is specified. `-DnsTimeoutMs` bounds the whole lookup, including resolver retries, while `-DnsMaxConcurrency` overlaps lookups without changing event or checkpoint order. A timeout, missing PTR record, or resolver failure is reported through `ClientDnsResolutionStatus` and `ClientDnsResolutionError`; it does not remove the SMB audit event or advance its checkpoint before projection completes.

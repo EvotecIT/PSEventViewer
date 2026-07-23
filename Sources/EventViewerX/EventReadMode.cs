@@ -5,7 +5,8 @@ namespace EventViewerX;
 /// </summary>
 public enum EventReadMode {
     /// <summary>
-    /// Captures event metadata only. Provider message formatting and XML parsing are skipped.
+    /// Captures core event metadata only. Provider message formatting, XML parsing, and native bookmark
+    /// materialization are skipped.
     /// </summary>
     Metadata,
 

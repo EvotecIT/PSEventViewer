@@ -41,6 +41,11 @@ namespace PSEventViewer;
 ///   <code>Get-EVXEvent -LogName Security -MachineName DC1,DC2 -EventId 4740 -Parallel</code>
 ///   <para>Retrieves account lockouts from multiple domain controllers concurrently.</para>
 /// </example>
+/// <example>
+///   <summary>Stream core metadata from a large EVTX file</summary>
+///   <code>Get-EVXEvent -Path C:\Logs\Security.evtx -Oldest -ReadMode Metadata | Select-Object TimeCreated, RecordId, Id, ProviderName, MachineName | Export-Csv C:\Logs\Security-metadata.csv -NoTypeInformation</code>
+///   <para>Skips provider message formatting, XML parsing, attachments, and bookmarks while streaming every record.</para>
+/// </example>
 [OutputType(typeof(EventObject), ParameterSetName = new string[] { "GenericEvents" })]
 [OutputType(typeof(EventObject), ParameterSetName = new string[] { "PathEvents" })]
 [OutputType(typeof(EventObjectSlim), ParameterSetName = new string[] { "NamedEvents" })]
@@ -225,7 +230,8 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
     public int DnsMaxConcurrency { get; set; } = 8;
 
     /// <summary>
-    /// Controls whether each event includes metadata only, the formatted message, structured XML data, or all data.
+    /// Controls per-event materialization. Metadata skips provider messages, XML, attachments, and bookmarks;
+    /// Message formats the provider message; StructuredData parses XML without formatting the message; Full includes all data.
     /// </summary>
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]

@@ -265,6 +265,9 @@ public partial class SearchEvents : Settings {
         try {
             using (var reader = CreateEventLogReader(query, machineName, effectiveTimeout)) {
                 using CancellationTokenRegistration cancellationRegistration = RegisterReaderCancellation(reader, cancellationToken);
+                using EventLogPropertySelector? metadataSelector = readMode == EventReadMode.Metadata
+                    ? EventObject.CreateMetadataPropertySelector()
+                    : null;
                 int eventCount = 0;
                 while (true) {
                     EventRecord? next = ReadEventWithCancellation(
@@ -276,7 +279,9 @@ public partial class SearchEvents : Settings {
                         break;
                     }
 
-                    EventObject eventObject = new EventObject(next, queriedMachine, readMode);
+                    EventObject eventObject = metadataSelector != null
+                        ? EventObject.CreateMetadata(next, metadataSelector, queriedMachine, logName)
+                        : new EventObject(next, queriedMachine, readMode);
                     yield return eventObject;
                     eventCount++;
                     if (maxEvents > 0 && eventCount >= maxEvents) {

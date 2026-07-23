@@ -868,7 +868,6 @@ namespace EventViewerX.Tests {
             SetSnapshotProperty(eventObject, nameof(EventObject.LogName), logName);
             SetSnapshotProperty(eventObject, nameof(EventObject.ProviderName), providerName);
             SetSnapshotProperty(eventObject, nameof(EventObject.MachineName), "test-machine");
-            SetSnapshotProperty(eventObject, nameof(EventObject.Data), new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase));
             eventObject.ContainerLog = logName;
             eventObject.QueriedMachine = "test-machine";
             return eventObject;

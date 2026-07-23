@@ -14,7 +14,10 @@ namespace EventViewerX;
 /// copying the requested data. This keeps large and long-running queries from retaining native event handles.
 /// </remarks>
 public partial class EventObject {
+    private Dictionary<string, string>? _data;
     private readonly string _message;
+    private Dictionary<string, string>? _messageData;
+    private List<string>? _nicIdentifiers;
 
     /// <summary>Time and date when the event was created.</summary>
     public DateTime TimeCreated { get; }
@@ -58,7 +61,10 @@ public partial class EventObject {
     /// <summary>Security identifier associated with the event.</summary>
     public SecurityIdentifier? UserId { get; }
 
-    /// <summary>Bookmark that can be used to resume a query.</summary>
+    /// <summary>
+    /// Bookmark that can be used to resume a query. Metadata-only snapshots omit bookmarks to preserve
+    /// the low-allocation path; use another <see cref="EventReadMode"/> when the native bookmark is required.
+    /// </summary>
     public EventBookmark? Bookmark { get; }
 
     /// <summary>Provider-formatted event message, when requested by <see cref="ReadMode"/>.</summary>
@@ -101,13 +107,24 @@ public partial class EventObject {
     public IList<EventProperty> Properties { get; }
 
     /// <summary>Structured event data parsed from XML.</summary>
-    public Dictionary<string, string> Data { get; private set; } = new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, string> Data {
+        get => _data ??= new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        private set => _data = value;
+    }
 
     /// <summary>NIC-related identifiers extracted from structured event data.</summary>
-    public List<string> NicIdentifiers { get; private set; } = new();
+    public List<string> NicIdentifiers {
+        get => _nicIdentifiers ??= new List<string>();
+        private set => _nicIdentifiers = value;
+    }
 
     /// <summary>Key/value pairs parsed from the formatted message.</summary>
-    public Dictionary<string, string> MessageData { get; private set; } = new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, string> MessageData {
+        get => _messageData ??= MessageLines.Count > 0
+            ? ParseMessage(MessageLines)
+            : new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        private set => _messageData = value;
+    }
 
     /// <summary>First non-empty line of the formatted message.</summary>
     public string MessageSubject { get; set; } = string.Empty;
@@ -158,7 +175,7 @@ public partial class EventObject {
             RelatedActivityId = eventRecord.RelatedActivityId;
             ActivityId = eventRecord.ActivityId;
             UserId = eventRecord.UserId;
-            Bookmark = eventRecord.Bookmark;
+            Bookmark = readMode == EventReadMode.Metadata ? null : eventRecord.Bookmark;
             Keywords = eventRecord.Keywords;
             Level = eventRecord.Level;
             Version = eventRecord.Version;
@@ -194,8 +211,11 @@ public partial class EventObject {
 
             if (readMode == EventReadMode.Message || readMode == EventReadMode.Full) {
                 _message = SafeFormatDescription(eventRecord);
-                MessageLines = SplitMessageLines(_message);
-                MessageData = ParseMessage<Dictionary<string, string>>(_message);
+                string[] messageLines = SplitMessageLines(_message);
+                MessageLines = messageLines;
+                if (messageLines.Length > 0) {
+                    MessageSubject = GetMessageSubject(messageLines);
+                }
             }
 
             if (readMode == EventReadMode.StructuredData || readMode == EventReadMode.Full) {
@@ -203,10 +223,10 @@ public partial class EventObject {
                 ParseXmlPayload(
                     XMLData,
                     out Dictionary<string, string> data,
-                    out List<byte[]> attachments,
+                    out IReadOnlyList<byte[]> attachments,
                     includeAttachments: readMode == EventReadMode.Full);
                 Data = data;
-                NicIdentifiers = ExtractNicIdentifiers();
+                _nicIdentifiers = ExtractNicIdentifiers(data);
                 Attachments = attachments;
             }
         } finally {

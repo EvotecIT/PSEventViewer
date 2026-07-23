@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Xml.Linq;
+using System.Xml;
 
 namespace EventViewerX {
     public partial class EventObject {
@@ -18,24 +17,18 @@ namespace EventViewerX {
         /// <summary>
         /// Parses the message of the event record into a dictionary converting it into a key value pair
         /// </summary>
-        /// <param name="message"></param>
+        /// <param name="lines">Provider-formatted message lines.</param>
         /// <returns></returns>
-        private T ParseMessage<T>(string message) where T : IDictionary<string, string>, new() {
-            message ??= string.Empty;
-            T data = typeof(T) == typeof(Dictionary<string, string>)
-                ? (T)(object)new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-                : new();
-
-            string[] lines = SplitMessageLines(message);
-            int firstNonEmptyLineIndex = Array.FindIndex(lines, line => !string.IsNullOrWhiteSpace(line));
+        private Dictionary<string, string> ParseMessage(IReadOnlyList<string> lines) {
+            var data = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            int firstNonEmptyLineIndex = FindFirstMessageLine(lines);
             if (firstNonEmptyLineIndex >= 0) {
                 string firstLine = lines[firstNonEmptyLineIndex].Trim();
                 data["Message"] = firstLine;
-                MessageSubject = firstLine;
             }
 
             // Process remaining lines (after the subject) into key:value pairs.
-            for (int i = firstNonEmptyLineIndex + 1; i < lines.Length; i++) {
+            for (int i = firstNonEmptyLineIndex + 1; i < lines.Count; i++) {
                 string line = lines[i].Trim();
 
                 // Skip empty lines
@@ -56,35 +49,85 @@ namespace EventViewerX {
             return data;
         }
 
+        private static string GetMessageSubject(IReadOnlyList<string> lines) {
+            int index = FindFirstMessageLine(lines);
+            return index >= 0 ? lines[index].Trim() : string.Empty;
+        }
+
+        private static int FindFirstMessageLine(IReadOnlyList<string> lines) {
+            for (int i = 0; i < lines.Count; i++) {
+                if (!string.IsNullOrWhiteSpace(lines[i])) {
+                    return i;
+                }
+            }
+            return -1;
+        }
+
         /// <summary>
         /// Parses lines containing colon separated key/value pairs.
         /// </summary>
+        /// <param name="data">Dictionary that receives keys that are not already present.</param>
         /// <param name="text">Text to parse</param>
-        /// <returns>Dictionary with parsed key value pairs</returns>
-        private static Dictionary<string, string> ParseColonSeparatedLines(string text) {
-            Dictionary<string, string> data = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        private static void AddColonSeparatedLines(Dictionary<string, string> data, string text) {
             if (string.IsNullOrEmpty(text)) {
-                return data;
+                return;
+            }
+            if (text.IndexOf(':') < 0) {
+                return;
             }
 
-            string[] lines = text.Split(NewLineSeparators, StringSplitOptions.None);
-            foreach (string rawLine in lines) {
-                string line = rawLine.Trim();
-                if (string.IsNullOrEmpty(line)) {
-                    continue;
+            Dictionary<string, string>? parsed = null;
+            int lineStart = 0;
+            while (lineStart < text.Length) {
+                int newLineIndex = text.IndexOf('\n', lineStart);
+                int lineEnd = newLineIndex >= 0 ? newLineIndex : text.Length;
+                if (lineEnd > lineStart && text[lineEnd - 1] == '\r') {
+                    lineEnd--;
                 }
 
-                int index = line.IndexOf(':');
-                if (index > -1) {
-                    string key = line.Substring(0, index).Trim();
-                    string value = line.Substring(index + 1).Trim();
-                    if (!string.IsNullOrEmpty(key)) {
-                        data[key] = value;
+                int contentStart = lineStart;
+                while (contentStart < lineEnd && char.IsWhiteSpace(text[contentStart])) {
+                    contentStart++;
+                }
+                while (lineEnd > contentStart && char.IsWhiteSpace(text[lineEnd - 1])) {
+                    lineEnd--;
+                }
+
+                int colonIndex = contentStart < lineEnd
+                    ? text.IndexOf(':', contentStart, lineEnd - contentStart)
+                    : -1;
+                if (colonIndex >= 0) {
+                    int keyEnd = colonIndex;
+                    while (keyEnd > contentStart && char.IsWhiteSpace(text[keyEnd - 1])) {
+                        keyEnd--;
+                    }
+
+                    int valueStart = colonIndex + 1;
+                    while (valueStart < lineEnd && char.IsWhiteSpace(text[valueStart])) {
+                        valueStart++;
+                    }
+
+                    if (keyEnd > contentStart) {
+                        string key = text.Substring(contentStart, keyEnd - contentStart);
+                        parsed ??= new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                        parsed[key] = text.Substring(valueStart, lineEnd - valueStart);
                     }
                 }
+
+                if (newLineIndex < 0) {
+                    break;
+                }
+                lineStart = newLineIndex + 1;
             }
 
-            return data;
+            if (parsed == null) {
+                return;
+            }
+            foreach (KeyValuePair<string, string> field in parsed) {
+                if (!data.ContainsKey(field.Key)) {
+                    data[field.Key] = field.Value;
+                }
+            }
         }
 
         /// <summary>
@@ -97,59 +140,144 @@ namespace EventViewerX {
         private static void ParseXmlPayload(
             string xmlData,
             out Dictionary<string, string> data,
-            out List<byte[]> attachments,
+            out IReadOnlyList<byte[]> attachments,
             bool includeAttachments) {
 
             data = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            attachments = new List<byte[]>();
-
-            XElement root;
-            try {
-                root = XElement.Parse(xmlData);
-            } catch (Exception ex) {
-                Settings._logger.WriteWarning($"Failed to parse event XML. Error: {ex.Message}");
+            attachments = Array.Empty<byte[]>();
+            if (string.IsNullOrEmpty(xmlData)) {
                 return;
             }
 
-            XNamespace ns = root.GetDefaultNamespace();
+            try {
+                using var stringReader = new StringReader(xmlData);
+                using XmlReader reader = XmlReader.Create(stringReader, new XmlReaderSettings {
+                    DtdProcessing = DtdProcessing.Prohibit,
+                    IgnoreComments = true,
+                    XmlResolver = null
+                });
 
-            XElement? eventData = root.Element(ns + "EventData");
-            if (eventData == null) {
-                eventData = root.Element(ns + "UserData")?.Elements().FirstOrDefault();
-            }
-
-            if (eventData != null) {
-                int noNameIndex = 0;
-                foreach (XElement dataElement in eventData.Elements()) {
-                    string value = dataElement.Value;
-                    string? name = dataElement.Attribute("Name")?.Value;
-                    if (string.IsNullOrEmpty(name)) {
-                        if (dataElement.Name.LocalName == "Data") {
-                            if (string.IsNullOrEmpty(value)) {
-                                continue;
-                            }
-                            name = $"NoNameA{noNameIndex++}";
-                        } else {
-                            name = dataElement.Name.LocalName;
-                        }
-                    }
-                    if (string.IsNullOrEmpty(name)) {
+                List<byte[]>? decodedAttachments = null;
+                while (reader.Read()) {
+                    if (reader.NodeType != XmlNodeType.Element) {
                         continue;
                     }
-                    data[name!] = value;
-                    foreach (var kv in ParseColonSeparatedLines(value)) {
-                        if (!data.ContainsKey(kv.Key)) {
-                            data[kv.Key] = kv.Value;
-                        }
+                    if (string.Equals(reader.LocalName, "EventData", StringComparison.Ordinal)) {
+                        ParsePayloadContainer(reader, data, ref decodedAttachments, includeAttachments);
+                        break;
                     }
-
-                    bool isBinaryElement = string.Equals(dataElement.Name.LocalName, "Binary", StringComparison.OrdinalIgnoreCase);
-                    bool isBinaryData = string.Equals(dataElement.Attribute("Type")?.Value, "Binary", StringComparison.OrdinalIgnoreCase);
-                    if (includeAttachments && (isBinaryElement || isBinaryData) && TryDecodeBinary(value, out byte[] bytes)) {
-                        attachments.Add(bytes);
+                    if (string.Equals(reader.LocalName, "UserData", StringComparison.Ordinal)) {
+                        ParseUserData(reader, data, ref decodedAttachments, includeAttachments);
+                        break;
                     }
                 }
+                if (decodedAttachments != null) {
+                    attachments = decodedAttachments;
+                }
+            } catch (Exception ex) {
+                Settings._logger.WriteWarning($"Failed to parse event XML. Error: {ex.Message}");
             }
+        }
+
+        private static void ParseUserData(
+            XmlReader reader,
+            Dictionary<string, string> data,
+            ref List<byte[]>? attachments,
+            bool includeAttachments) {
+
+            int userDataDepth = reader.Depth;
+            if (reader.IsEmptyElement) {
+                return;
+            }
+
+            while (reader.Read()) {
+                if (reader.NodeType == XmlNodeType.EndElement && reader.Depth == userDataDepth) {
+                    break;
+                }
+                if (reader.NodeType == XmlNodeType.Element && reader.Depth == userDataDepth + 1) {
+                    ParsePayloadContainer(reader, data, ref attachments, includeAttachments);
+                    break;
+                }
+            }
+        }
+
+        private static void ParsePayloadContainer(
+            XmlReader reader,
+            Dictionary<string, string> data,
+            ref List<byte[]>? attachments,
+            bool includeAttachments) {
+
+            int containerDepth = reader.Depth;
+            int noNameIndex = 0;
+            if (reader.IsEmptyElement) {
+                return;
+            }
+
+            while (reader.Read()) {
+                if (reader.NodeType == XmlNodeType.EndElement && reader.Depth == containerDepth) {
+                    break;
+                }
+                if (reader.NodeType != XmlNodeType.Element || reader.Depth != containerDepth + 1) {
+                    continue;
+                }
+
+                string localName = reader.LocalName;
+                string? name = reader.GetAttribute("Name");
+                string? type = reader.GetAttribute("Type");
+                string value = ReadElementText(reader);
+                if (string.IsNullOrEmpty(name)) {
+                    if (string.Equals(localName, "Data", StringComparison.Ordinal)) {
+                        if (string.IsNullOrEmpty(value)) {
+                            continue;
+                        }
+                        name = $"NoNameA{noNameIndex++}";
+                    } else {
+                        name = localName;
+                    }
+                }
+                if (string.IsNullOrEmpty(name)) {
+                    continue;
+                }
+
+                data[name] = value;
+                AddColonSeparatedLines(data, value);
+
+                bool isBinaryElement = string.Equals(localName, "Binary", StringComparison.OrdinalIgnoreCase);
+                bool isBinaryData = string.Equals(type, "Binary", StringComparison.OrdinalIgnoreCase);
+                if (includeAttachments && (isBinaryElement || isBinaryData) && TryDecodeBinary(value, out byte[] bytes)) {
+                    attachments ??= new List<byte[]>();
+                    attachments.Add(bytes);
+                }
+            }
+        }
+
+        private static string ReadElementText(XmlReader reader) {
+            if (reader.IsEmptyElement) {
+                return string.Empty;
+            }
+
+            int elementDepth = reader.Depth;
+            string? singleValue = null;
+            StringBuilder? builder = null;
+            while (reader.Read()) {
+                if (reader.NodeType == XmlNodeType.EndElement && reader.Depth == elementDepth) {
+                    break;
+                }
+                if (reader.NodeType != XmlNodeType.Text &&
+                    reader.NodeType != XmlNodeType.CDATA &&
+                    reader.NodeType != XmlNodeType.Whitespace &&
+                    reader.NodeType != XmlNodeType.SignificantWhitespace) {
+                    continue;
+                }
+
+                if (singleValue == null && builder == null) {
+                    singleValue = reader.Value;
+                } else {
+                    builder ??= new StringBuilder(singleValue);
+                    builder.Append(reader.Value);
+                }
+            }
+            return builder?.ToString() ?? singleValue ?? string.Empty;
         }
 
         private T ParseXML<T>(string xmlData) where T : IDictionary<string, string>, new() {
@@ -165,9 +293,9 @@ namespace EventViewerX {
             return result;
         }
 
-        private List<string> ExtractNicIdentifiers() {
-            var nics = new List<string>();
-            foreach (var kvp in Data) {
+        private static List<string>? ExtractNicIdentifiers(IReadOnlyDictionary<string, string> data) {
+            List<string>? nics = null;
+            foreach (KeyValuePair<string, string> kvp in data) {
                 var key = kvp.Key;
                 if (key.IndexOf("nic", StringComparison.OrdinalIgnoreCase) >= 0 ||
                     key.IndexOf("nasidentifier", StringComparison.OrdinalIgnoreCase) >= 0 ||
@@ -175,6 +303,7 @@ namespace EventViewerX {
                     key.IndexOf("callingstationid", StringComparison.OrdinalIgnoreCase) >= 0 ||
                     key.IndexOf("mac", StringComparison.OrdinalIgnoreCase) >= 0) {
                     if (!string.IsNullOrEmpty(kvp.Value)) {
+                        nics ??= new List<string>();
                         nics.Add(kvp.Value);
                     }
                 }
@@ -233,4 +362,3 @@ namespace EventViewerX {
         }
     }
 }
-

@@ -194,6 +194,9 @@ public partial class SearchEvents : Settings {
             TolerateQueryErrors = false
         };
         var fallbackQuery = CreateFileFallbackQuery(absolutePath, xpath, oldest);
+        using EventLogPropertySelector? metadataSelector = readMode == EventReadMode.Metadata
+            ? EventObject.CreateMetadataPropertySelector()
+            : null;
         EventLogReader? primaryReader;
         try {
             primaryReader = CreateEventLogReader(query, null);
@@ -218,7 +221,9 @@ public partial class SearchEvents : Settings {
                     break;
                 }
 
-                yield return new EventObject(record, absolutePath, readMode);
+                yield return metadataSelector != null
+                    ? EventObject.CreateMetadata(record, metadataSelector, absolutePath, absolutePath)
+                    : new EventObject(record, absolutePath, readMode);
             }
 
             yield break;
@@ -250,14 +255,18 @@ public partial class SearchEvents : Settings {
                         break;
                     }
 
-                    yield return new EventObject(record, absolutePath, readMode);
+                    yield return metadataSelector != null
+                        ? EventObject.CreateMetadata(record, metadataSelector, absolutePath, absolutePath)
+                        : new EventObject(record, absolutePath, readMode);
                 }
 
                 yield break;
             }
 
             while (true) {
-                yield return new EventObject(record, absolutePath, readMode);
+                yield return metadataSelector != null
+                    ? EventObject.CreateMetadata(record, metadataSelector, absolutePath, absolutePath)
+                    : new EventObject(record, absolutePath, readMode);
 
                 record = ReadEventWithCancellation(
                     primaryReader,

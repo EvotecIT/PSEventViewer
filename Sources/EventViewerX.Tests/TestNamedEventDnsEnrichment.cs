@@ -324,7 +324,9 @@ public class TestNamedEventDnsEnrichment {
         SetSnapshotProperty(eventObject, nameof(EventObject.LogName), logName);
         SetSnapshotProperty(eventObject, nameof(EventObject.ProviderName), providerName);
         SetSnapshotProperty(eventObject, nameof(EventObject.MachineName), "test-machine");
-        SetSnapshotProperty(eventObject, nameof(EventObject.Data), data);
+        foreach (KeyValuePair<string, string> field in data) {
+            eventObject.Data[field.Key] = field.Value;
+        }
         eventObject.ContainerLog = logName;
         eventObject.QueriedMachine = "test-machine";
         eventObject.MessageSubject = "SMB audit";

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.Eventing.Reader;
+using System.Reflection;
 using System.Security.Principal;
 using Xunit;
 
@@ -16,12 +17,45 @@ public class TestEventObjectReadMode {
         Assert.True(record.Disposed);
         Assert.Equal(0, record.FormatDescriptionCalls);
         Assert.Equal(0, record.ToXmlCalls);
+        Assert.Equal(0, record.BookmarkCalls);
         Assert.Equal(42, snapshot.Id);
         Assert.Equal(1234, snapshot.RecordId);
         Assert.Equal("System", snapshot.LogName);
         Assert.Equal("testhost", snapshot.GatheredFrom);
         Assert.Empty(snapshot.Message);
         Assert.Empty(snapshot.XMLData);
+    }
+
+    [Fact]
+    public void MetadataModeDefersOptionalMutableCollectionsUntilRequested() {
+        var snapshot = new EventObject(new TrackingEventRecord(), "testhost", EventReadMode.Metadata);
+        const BindingFlags Flags = BindingFlags.Instance | BindingFlags.NonPublic;
+
+        Assert.Null(typeof(EventObject).GetField("_data", Flags)!.GetValue(snapshot));
+        Assert.Null(typeof(EventObject).GetField("_messageData", Flags)!.GetValue(snapshot));
+        Assert.Null(typeof(EventObject).GetField("_nicIdentifiers", Flags)!.GetValue(snapshot));
+
+        snapshot.Data["Field"] = "Value";
+        snapshot.MessageData["Message"] = "Subject";
+        snapshot.NicIdentifiers.Add("nic");
+
+        Assert.Equal("Value", snapshot.Data["field"]);
+        Assert.Equal("Subject", snapshot.MessageData["message"]);
+        Assert.Equal("nic", Assert.Single(snapshot.NicIdentifiers));
+    }
+
+    [Fact]
+    public void DeferredCollectionsAreNotSharedBetweenSnapshots() {
+        var first = new EventObject(new TrackingEventRecord(), "testhost", EventReadMode.Metadata);
+        var second = new EventObject(new TrackingEventRecord(), "testhost", EventReadMode.Metadata);
+
+        first.Data["Field"] = "Value";
+        first.MessageData["Message"] = "Subject";
+        first.NicIdentifiers.Add("nic");
+
+        Assert.Empty(second.Data);
+        Assert.Empty(second.MessageData);
+        Assert.Empty(second.NicIdentifiers);
     }
 
     [Fact]
@@ -36,6 +70,20 @@ public class TestEventObjectReadMode {
         Assert.Equal("Subject", snapshot.MessageSubject);
         Assert.Equal("Value", snapshot.MessageData["Key"]);
         Assert.Empty(snapshot.Data);
+    }
+
+    [Fact]
+    public void MessageModeDefersKeyValueProjectionUntilRequested() {
+        var snapshot = new EventObject(new TrackingEventRecord(), "testhost", EventReadMode.Message);
+        const BindingFlags Flags = BindingFlags.Instance | BindingFlags.NonPublic;
+
+        Assert.Equal("Subject", snapshot.MessageSubject);
+        Assert.Null(typeof(EventObject).GetField("_messageData", Flags)!.GetValue(snapshot));
+
+        snapshot.MessageSubject = "Override";
+        Assert.Equal("Value", snapshot.MessageData["Key"]);
+        Assert.Equal("Override", snapshot.MessageSubject);
+        Assert.NotNull(typeof(EventObject).GetField("_messageData", Flags)!.GetValue(snapshot));
     }
 
     [Fact]
@@ -66,6 +114,7 @@ public class TestEventObjectReadMode {
         internal bool Disposed { get; private set; }
         internal int FormatDescriptionCalls { get; private set; }
         internal int ToXmlCalls { get; private set; }
+        internal int BookmarkCalls { get; private set; }
 
         public override string ProviderName => "TestProvider";
         public override string LogName => "System";
@@ -90,7 +139,12 @@ public class TestEventObjectReadMode {
         public override long? RecordId => 1234;
         public override byte? Version => 1;
         public override SecurityIdentifier UserId => null!;
-        public override EventBookmark Bookmark => null!;
+        public override EventBookmark Bookmark {
+            get {
+                BookmarkCalls++;
+                return null!;
+            }
+        }
 
         public override string FormatDescription() {
             FormatDescriptionCalls++;

@@ -1,10 +1,55 @@
 using System;
+using System.Diagnostics.Eventing.Reader;
 using System.IO;
 using System.Linq;
 using Xunit;
 
 namespace EventViewerX.Tests {
     public class TestQueryLogFile {
+        [Fact]
+        public void MetadataProjectionMatchesDirectEventRecordSnapshot() {
+            if (!OperatingSystem.IsWindows()) return;
+            string relativePath = Path.Combine("..", "..", "..", "..", "..", "Tests", "Logs", "NamedFilterExamples.evtx");
+            string path = Path.GetFullPath(relativePath);
+            var query = new EventLogQuery(path, PathType.FilePath, "*") {
+                ReverseDirection = false,
+                TolerateQueryErrors = false
+            };
+            using var reader = new EventLogReader(query);
+            EventRecord record = Assert.IsAssignableFrom<EventRecord>(reader.ReadEvent());
+            var expected = new EventObject(record, path, EventReadMode.Metadata);
+
+            EventObject actual = Assert.Single(SearchEvents.QueryLogFile(
+                path,
+                maxEvents: 1,
+                oldest: true,
+                readMode: EventReadMode.Metadata));
+
+            Assert.Equal(expected.TimeCreated, actual.TimeCreated);
+            Assert.Equal(expected.Id, actual.Id);
+            Assert.Equal(expected.RecordId, actual.RecordId);
+            Assert.Equal(expected.LogName, actual.LogName);
+            Assert.Equal(expected.ContainerLog, actual.ContainerLog);
+            Assert.Equal(expected.MachineName, actual.MachineName);
+            Assert.Equal(expected.ProviderName, actual.ProviderName);
+            Assert.Equal(expected.Qualifiers, actual.Qualifiers);
+            Assert.Equal(expected.Opcode, actual.Opcode);
+            Assert.Equal(expected.ProviderId, actual.ProviderId);
+            Assert.Equal(expected.RelatedActivityId, actual.RelatedActivityId);
+            Assert.Equal(expected.ActivityId, actual.ActivityId);
+            Assert.Equal(expected.UserId?.Value, actual.UserId?.Value);
+            Assert.Null(actual.Bookmark);
+            Assert.Equal(expected.Keywords, actual.Keywords);
+            Assert.Equal(expected.Level, actual.Level);
+            Assert.Equal(expected.Version, actual.Version);
+            Assert.Equal(expected.Task, actual.Task);
+            Assert.Equal(expected.ProcessId, actual.ProcessId);
+            Assert.Equal(expected.ThreadId, actual.ThreadId);
+            Assert.Equal(expected.LevelDisplayName, actual.LevelDisplayName);
+            Assert.Equal(expected.GatheredFrom, actual.GatheredFrom);
+            Assert.Equal(expected.GatheredLogName, actual.GatheredLogName);
+        }
+
         [Fact]
         public void QueryLogFileSanitizesPath() {
             if (!OperatingSystem.IsWindows()) return;

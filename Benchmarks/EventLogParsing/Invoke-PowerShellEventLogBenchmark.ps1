@@ -1,0 +1,267 @@
+param(
+    [Parameter(Mandatory)]
+    [ValidateSet('PSEventViewer', 'GetWinEvent')]
+    [string] $Engine,
+
+    [Parameter(Mandatory)]
+    [string] $Path,
+
+    [Parameter(Mandatory)]
+    [ValidateSet('Metadata', 'Message', 'StructuredData', 'Full')]
+    [string] $ReadMode,
+
+    [Parameter(Mandatory)]
+    [string] $ResultPath,
+
+    [string] $ModulePath,
+
+    [string] $CsvOutputPath,
+
+    [ValidateRange(0, [int]::MaxValue)]
+    [int] $MaxEvents
+)
+
+$ErrorActionPreference = 'Stop'
+
+if ($Engine -eq 'PSEventViewer') {
+    if (-not $ModulePath) {
+        throw 'ModulePath is required for the PSEventViewer engine.'
+    }
+    Import-Module -Name $ModulePath -Force -ErrorAction Stop
+}
+
+function Measure-EventPipeline {
+    <#
+    .SYNOPSIS
+    Consumes event records without accumulating them and records equivalent projection metrics.
+
+    .DESCRIPTION
+    Uses a pipeline process block so the benchmark includes normal PowerShell streaming overhead
+    without adding ForEach-Object or retaining a million event objects in memory.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory, ValueFromPipeline)]
+        [object] $InputObject,
+
+        [Parameter(Mandatory)]
+        [ValidateSet('PSEventViewer', 'GetWinEvent')]
+        [string] $InputEngine,
+
+        [Parameter(Mandatory)]
+        [ValidateSet('Metadata', 'Message', 'StructuredData', 'Full')]
+        [string] $Mode,
+
+        [switch] $PassThru
+    )
+
+    begin {
+        [long] $count = 0
+        [long] $idSum = 0
+        [long] $recordIdSum = 0
+        [long] $timeTicksXor = 0
+        [long] $metadataTouch = 0
+        [long] $messageCharacters = 0
+        [long] $xmlCharacters = 0
+        [long] $propertyCount = 0
+        [long] $structuredFieldCount = 0
+        [long] $messageFieldCount = 0
+        [long] $attachmentBytes = 0
+        [Nullable[long]] $firstRecordId = $null
+        [Nullable[long]] $lastRecordId = $null
+    }
+
+    process {
+        $eventRecord = $InputObject
+        $count++
+        $idSum += [long] $eventRecord.Id
+
+        if ($null -ne $eventRecord.RecordId) {
+            [long] $recordId = $eventRecord.RecordId
+            $recordIdSum += $recordId
+            if (-not $firstRecordId.HasValue) {
+                $firstRecordId = $recordId
+            }
+            $lastRecordId = $recordId
+        }
+
+        if ($null -ne $eventRecord.TimeCreated) {
+            $timeTicksXor = $timeTicksXor -bxor [long] $eventRecord.TimeCreated.Ticks
+        }
+
+        foreach ($text in $eventRecord.ProviderName, $eventRecord.MachineName, $eventRecord.LogName) {
+            if ($null -ne $text) {
+                $metadataTouch += ([string] $text).Length
+            }
+        }
+
+        foreach ($number in $eventRecord.Level, $eventRecord.Keywords, $eventRecord.Task,
+                 $eventRecord.Opcode, $eventRecord.ProcessId, $eventRecord.ThreadId) {
+            if ($null -ne $number) {
+                $metadataTouch++
+            }
+        }
+
+        if ($Mode -eq 'Message' -or $Mode -eq 'Full') {
+            $message = [string] $eventRecord.Message
+            $messageCharacters += $message.Length
+            foreach ($displayName in $eventRecord.LevelDisplayName, $eventRecord.TaskDisplayName,
+                     $eventRecord.OpcodeDisplayName) {
+                if ($null -ne $displayName) {
+                    $metadataTouch += ([string] $displayName).Length
+                }
+            }
+            if ($null -ne $eventRecord.KeywordsDisplayNames) {
+                $metadataTouch += @($eventRecord.KeywordsDisplayNames).Count
+            }
+        }
+
+        if ($Mode -eq 'StructuredData' -or $Mode -eq 'Full') {
+            if ($null -ne $eventRecord.Properties) {
+                $propertyCount += $eventRecord.Properties.Count
+            }
+
+            if ($InputEngine -eq 'PSEventViewer') {
+                $xml = [string] $eventRecord.XMLData
+                $xmlCharacters += $xml.Length
+                $structuredFieldCount += $eventRecord.Data.Count
+                if ($Mode -eq 'Full') {
+                    $messageFieldCount += $eventRecord.MessageData.Count
+                }
+                foreach ($attachment in $eventRecord.Attachments) {
+                    $attachmentBytes += $attachment.LongLength
+                }
+            } else {
+                $xml = [string] $eventRecord.ToXml()
+                $xmlCharacters += $xml.Length
+            }
+        }
+
+        if ($PassThru) {
+            $InputObject
+        }
+    }
+
+    end {
+        $metrics = [pscustomobject] @{
+            Count                = $count
+            IdSum                = $idSum
+            RecordIdSum          = $recordIdSum
+            TimeTicksXor         = $timeTicksXor
+            FirstRecordId        = $firstRecordId
+            LastRecordId         = $lastRecordId
+            MetadataTouch        = $metadataTouch
+            MessageCharacters    = $messageCharacters
+            XmlCharacters        = $xmlCharacters
+            PropertyCount        = $propertyCount
+            StructuredFieldCount = $structuredFieldCount
+            MessageFieldCount    = $messageFieldCount
+            AttachmentBytes      = $attachmentBytes
+        }
+        if ($PassThru) {
+            $script:projection = $metrics
+        } else {
+            $metrics
+        }
+    }
+}
+
+[GC]::Collect()
+[GC]::WaitForPendingFinalizers()
+[GC]::Collect()
+[long] $allocatedBefore = [GC]::GetTotalAllocatedBytes($false)
+[int] $gen0Before = [GC]::CollectionCount(0)
+[int] $gen1Before = [GC]::CollectionCount(1)
+[int] $gen2Before = [GC]::CollectionCount(2)
+$stopwatch = [Diagnostics.Stopwatch]::StartNew()
+
+$csvFullPath = if ($CsvOutputPath) {
+    [IO.Path]::GetFullPath($CsvOutputPath)
+} else {
+    $null
+}
+if ($csvFullPath) {
+    $csvDirectory = Split-Path -Parent $csvFullPath
+    New-Item -ItemType Directory -Force -Path $csvDirectory | Out-Null
+}
+
+if ($Engine -eq 'PSEventViewer') {
+    $parameters = @{
+        Path     = $Path
+        ReadMode = $ReadMode
+        Oldest   = $true
+    }
+    if ($MaxEvents -gt 0) {
+        $parameters.MaxEvents = $MaxEvents
+    }
+    if ($csvFullPath) {
+        $script:projection = $null
+        Get-EVXEvent @parameters |
+            Measure-EventPipeline -InputEngine PSEventViewer -Mode $ReadMode -PassThru |
+            Select-Object TimeCreated, RecordId, Id, ProviderName, MachineName |
+            Export-Csv -LiteralPath $csvFullPath -NoTypeInformation
+        $projection = $script:projection
+    } else {
+        $projection = Get-EVXEvent @parameters |
+            Measure-EventPipeline -InputEngine PSEventViewer -Mode $ReadMode
+    }
+} else {
+    $parameters = @{
+        Path   = $Path
+        Oldest = $true
+    }
+    if ($MaxEvents -gt 0) {
+        $parameters.MaxEvents = $MaxEvents
+    }
+    if ($csvFullPath) {
+        $script:projection = $null
+        Get-WinEvent @parameters |
+            Measure-EventPipeline -InputEngine GetWinEvent -Mode $ReadMode -PassThru |
+            Select-Object TimeCreated, RecordId, Id, ProviderName, MachineName |
+            Export-Csv -LiteralPath $csvFullPath -NoTypeInformation
+        $projection = $script:projection
+    } else {
+        $projection = Get-WinEvent @parameters |
+            Measure-EventPipeline -InputEngine GetWinEvent -Mode $ReadMode
+    }
+}
+
+$stopwatch.Stop()
+$process = [Diagnostics.Process]::GetCurrentProcess()
+$result = [ordered] @{
+    Engine               = $Engine
+    ReadMode             = $ReadMode
+    FixturePath          = [IO.Path]::GetFullPath($Path)
+    RuntimeVersion       = [Environment]::Version.ToString()
+    ProductVersion       = if ($Engine -eq 'PSEventViewer') {
+        [Diagnostics.FileVersionInfo]::GetVersionInfo([IO.Path]::GetFullPath($ModulePath)).ProductVersion
+    } else {
+        $PSVersionTable.PSVersion.ToString()
+    }
+    Count                = $projection.Count
+    IdSum                = $projection.IdSum
+    RecordIdSum          = $projection.RecordIdSum
+    TimeTicksXor         = $projection.TimeTicksXor
+    FirstRecordId        = $projection.FirstRecordId
+    LastRecordId         = $projection.LastRecordId
+    MetadataTouch        = $projection.MetadataTouch
+    MessageCharacters    = $projection.MessageCharacters
+    XmlCharacters        = $projection.XmlCharacters
+    PropertyCount        = $projection.PropertyCount
+    StructuredFieldCount = $projection.StructuredFieldCount
+    MessageFieldCount    = $projection.MessageFieldCount
+    AttachmentBytes      = $projection.AttachmentBytes
+    AllocatedBytes       = [GC]::GetTotalAllocatedBytes($false) - $allocatedBefore
+    PeakWorkingSetBytes  = $process.PeakWorkingSet64
+    Gen0Collections      = [GC]::CollectionCount(0) - $gen0Before
+    Gen1Collections      = [GC]::CollectionCount(1) - $gen1Before
+    Gen2Collections      = [GC]::CollectionCount(2) - $gen2Before
+    ElapsedMilliseconds  = $stopwatch.Elapsed.TotalMilliseconds
+    OutputPath           = $csvFullPath
+    OutputBytes          = if ($csvFullPath) { (Get-Item -LiteralPath $csvFullPath).Length } else { 0 }
+    OutputSha256         = if ($csvFullPath) { (Get-FileHash -LiteralPath $csvFullPath -Algorithm SHA256).Hash } else { $null }
+}
+
+$resultDirectory = Split-Path -Parent ([IO.Path]::GetFullPath($ResultPath))
+New-Item -ItemType Directory -Force -Path $resultDirectory | Out-Null
+$result | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $ResultPath -Encoding utf8
