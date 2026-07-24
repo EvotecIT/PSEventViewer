@@ -313,8 +313,8 @@ provider-message contract and render status are used for offline, local, and rem
 <!-- event-log-exact-output-benchmark:start -->
 | Scenario | Host | Operation | PSEventViewer | DotNet | EventViewerXExport | GetWinEvent | Result |
 | --- | --- | --- | ---: | ---: | ---: | ---: | --- |
-| Large-Exact-Export-MetadataCsv | Core-7.6.4 | Scan | 1.00x (2.50s) | 0.49x (1.21s) | Skipped | 7.77x (19.43s) | PSEventViewer slower than DotNet |
-| Large-Exact-Export-RawXml | Core-7.6.4 | Scan | 1.00x (2.20s) | 0.67x (1.47s) | 0.49x (1.09s) | 8.91x (19.63s) | PSEventViewer slower than EventViewerXExport |
+| Large-Exact-Export-MetadataCsv | Core-7.6.4 | Scan | 1.00x (2.54s) | 0.48x (1.23s) | Skipped | 7.62x (19.33s) | PSEventViewer slower than DotNet |
+| Large-Exact-Export-RawXml | Core-7.6.4 | Scan | 1.00x (1.31s) | 0.97x (1.27s) | 0.77x (1.01s) | 14.35x (18.79s) | PSEventViewer slower than EventViewerXExport |
 <!-- event-log-exact-output-benchmark:end -->
 
 The exact-output validator rejects a run before comparison if any event count, record order, byte sequence, or output
