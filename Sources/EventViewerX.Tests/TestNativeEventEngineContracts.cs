@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Net;
 using System.Text.Json;
 using System.Xml.Linq;
 using Xunit;
@@ -52,6 +53,30 @@ public sealed class TestNativeEventEngineContracts {
         EventObject[] actual = events.ToArray();
         Assert.Equal(2, actual.Length);
         Assert.All(actual, static item => Assert.Equal(EventReadMode.Metadata, item.ReadMode));
+    }
+
+    [Fact]
+    public void LocalFqdnUsesTheLocalChannelPath() {
+        if (!OperatingSystem.IsWindows()) return;
+        string fqdn;
+        try {
+            fqdn = Dns.GetHostEntry("").HostName;
+        } catch {
+            return;
+        }
+        if (string.Equals(fqdn, Environment.MachineName, StringComparison.OrdinalIgnoreCase)) {
+            return;
+        }
+
+        var query = new EventLogChannelQuery("System") {
+            MachineName = fqdn,
+            MaxEvents = 1,
+            ReadMode = EventReadMode.Metadata
+        };
+
+        EventObject actual = Assert.Single(EventLogEngine.ReadChannel(query));
+
+        Assert.Equal(Environment.MachineName, actual.GatheredFrom);
     }
 
     [Fact]

@@ -219,10 +219,7 @@ public static class EventLogEngine {
         int rpcEndpointPort,
         CancellationToken cancellationToken) {
 
-        bool remote = machineName.Length > 0 &&
-            !string.Equals(machineName, ".", StringComparison.OrdinalIgnoreCase) &&
-            !string.Equals(machineName, "localhost", StringComparison.OrdinalIgnoreCase) &&
-            !string.Equals(machineName, Environment.MachineName, StringComparison.OrdinalIgnoreCase);
+        bool remote = !SearchEvents.IsLocalMachine(machineName);
         WindowsEventNativeMethods.QueryFlags flags =
             WindowsEventNativeMethods.QueryFlags.ChannelPath |
             (oldest
