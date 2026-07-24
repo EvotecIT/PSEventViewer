@@ -11,13 +11,20 @@ namespace EventViewerX;
 internal sealed class NamedEventEnricher : IDisposable {
     private readonly NamedEventEnrichmentOptions _options;
     private readonly Func<string, CancellationToken, Task<DnsResponse>>? _rawDnsResolver;
+    private readonly Func<string, Task<IPHostEntry>>? _systemDnsResolver;
     private readonly ConcurrentDictionary<string, Lazy<Task<DnsResponse>>> _pendingDnsRequests =
         new(StringComparer.OrdinalIgnoreCase);
     private readonly SemaphoreSlim? _dnsConcurrency;
+    private readonly object _dnsLifetimeSync = new();
+    private int _deferredDnsLeases;
+    private bool _disposeRequested;
+    private bool _dnsConcurrencyDisposed;
 
     internal NamedEventEnricher(
         NamedEventEnrichmentOptions options,
-        Func<string, CancellationToken, Task<DnsResponse>>? dnsResolver = null) {
+        Func<string, CancellationToken, Task<DnsResponse>>? dnsResolver = null,
+        Func<string, Task<IPHostEntry>>? systemDnsResolver = null) {
+
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _options.Validate();
 
@@ -27,6 +34,7 @@ internal sealed class NamedEventEnricher : IDisposable {
 
         _dnsConcurrency = new SemaphoreSlim(_options.DnsMaxConcurrency, _options.DnsMaxConcurrency);
         _rawDnsResolver = dnsResolver;
+        _systemDnsResolver = systemDnsResolver;
     }
 
     /// <summary>
@@ -65,6 +73,7 @@ internal sealed class NamedEventEnricher : IDisposable {
 
     private async Task<DnsResponse> RunDnsQueryAsync(string address, CancellationToken cancellationToken) {
         bool entered = false;
+        bool releaseDeferred = false;
         CancellationTokenSource? lookupCancellation = null;
         try {
             await _dnsConcurrency!.WaitAsync(cancellationToken).ConfigureAwait(false);
@@ -82,13 +91,20 @@ internal sealed class NamedEventEnricher : IDisposable {
                 throw new TimeoutException($"The reverse-DNS lookup exceeded {_options.DnsTimeoutMilliseconds} ms.");
             }
             return response;
+        } catch (PendingSystemDnsLookupException exception) {
+            releaseDeferred = true;
+            DeferDnsLeaseRelease(exception.Lookup);
+            if (cancellationToken.IsCancellationRequested) {
+                throw new OperationCanceledException(cancellationToken);
+            }
+            throw new TimeoutException($"The reverse-DNS lookup exceeded {_options.DnsTimeoutMilliseconds} ms.");
         } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
             throw new OperationCanceledException(cancellationToken);
         } catch (OperationCanceledException) when (lookupCancellation?.IsCancellationRequested == true) {
             throw new TimeoutException($"The reverse-DNS lookup exceeded {_options.DnsTimeoutMilliseconds} ms.");
         } finally {
             lookupCancellation?.Dispose();
-            if (entered) {
+            if (entered && !releaseDeferred) {
                 _dnsConcurrency!.Release();
             }
         }
@@ -101,7 +117,10 @@ internal sealed class NamedEventEnricher : IDisposable {
         int attempts = _options.RetryDnsOnTransient ? 2 : 1;
         for (int attempt = 1; attempt <= attempts; attempt++) {
             try {
-                Task<IPHostEntry> lookup = Dns.GetHostEntryAsync(address);
+                Task<IPHostEntry> lookup =
+                    _systemDnsResolver == null
+                        ? Dns.GetHostEntryAsync(address)
+                        : _systemDnsResolver(address);
                 Task cancelled = Task.Delay(
                     Timeout.Infinite,
                     cancellationToken);
@@ -109,7 +128,9 @@ internal sealed class NamedEventEnricher : IDisposable {
                     lookup,
                     cancelled).ConfigureAwait(false);
                 if (!ReferenceEquals(completed, lookup)) {
-                    throw new OperationCanceledException(cancellationToken);
+                    throw new PendingSystemDnsLookupException(
+                        lookup,
+                        cancellationToken);
                 }
                 IPHostEntry entry = await lookup.ConfigureAwait(false);
                 string hostName = entry.HostName?.Trim().TrimEnd('.') ??
@@ -141,8 +162,71 @@ internal sealed class NamedEventEnricher : IDisposable {
         };
     }
 
+    private void DeferDnsLeaseRelease(Task lookup) {
+        lock (_dnsLifetimeSync) {
+            _deferredDnsLeases++;
+        }
+        _ = lookup.ContinueWith(
+            static (completed, state) =>
+                ((NamedEventEnricher)state!)
+                .CompleteDeferredDnsLease(completed),
+            this,
+            CancellationToken.None,
+            TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default);
+    }
+
+    private void CompleteDeferredDnsLease(Task completed) {
+        _ = completed.Exception;
+        _dnsConcurrency!.Release();
+        bool disposeConcurrency = false;
+        lock (_dnsLifetimeSync) {
+            _deferredDnsLeases--;
+            if (_disposeRequested &&
+                _deferredDnsLeases == 0 &&
+                !_dnsConcurrencyDisposed) {
+                _dnsConcurrencyDisposed = true;
+                disposeConcurrency = true;
+            }
+        }
+        if (disposeConcurrency) {
+            _dnsConcurrency.Dispose();
+        }
+    }
+
     /// <inheritdoc />
     public void Dispose() {
-        _dnsConcurrency?.Dispose();
+        bool disposeConcurrency = false;
+        lock (_dnsLifetimeSync) {
+            if (_disposeRequested) {
+                return;
+            }
+            _disposeRequested = true;
+            if (_dnsConcurrency != null &&
+                _deferredDnsLeases == 0 &&
+                !_dnsConcurrencyDisposed) {
+                _dnsConcurrencyDisposed = true;
+                disposeConcurrency = true;
+            }
+        }
+        if (disposeConcurrency) {
+            _dnsConcurrency!.Dispose();
+        }
+    }
+
+    private sealed class PendingSystemDnsLookupException
+        : OperationCanceledException {
+
+        internal PendingSystemDnsLookupException(
+            Task lookup,
+            CancellationToken cancellationToken)
+            : base(
+                "The system DNS lookup is still running.",
+                cancellationToken) {
+
+            Lookup = lookup;
+        }
+
+        internal Task Lookup { get; }
     }
 }

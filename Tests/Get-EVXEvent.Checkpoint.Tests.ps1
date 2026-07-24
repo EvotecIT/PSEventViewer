@@ -29,6 +29,37 @@ Describe 'Get-EVXEvent checkpoint compatibility' {
         $Events.Id | Should -Not -Contain $Latest.Id
     }
 
+    It 'uses each offline file path as its multi-source checkpoint identity' {
+        $Fixture = Join-Path $PSScriptRoot 'Logs\NamedFilterExamples.evtx'
+        $FirstPath = Join-Path $TestDrive 'first.evtx'
+        $SecondPath = Join-Path $TestDrive 'second.evtx'
+        Copy-Item -LiteralPath $Fixture -Destination $FirstPath
+        Copy-Item -LiteralPath $Fixture -Destination $SecondPath
+        $FirstPath = [IO.Path]::GetFullPath($FirstPath)
+        $SecondPath = [IO.Path]::GetFullPath($SecondPath)
+        $CheckpointPath = Join-Path $TestDrive 'multi-file-checkpoint.json'
+        $Checkpoint = @{}
+        $Checkpoint["multi-file|$FirstPath|$FirstPath"] = [long]::MaxValue
+        $Checkpoint["multi-file|$SecondPath|$SecondPath"] = [long]::MaxValue
+        $Checkpoint | ConvertTo-Json -Compress |
+            Set-Content -LiteralPath $CheckpointPath -Encoding UTF8
+
+        $Events = @(
+            Get-EVXEvent `
+                -Path $FirstPath, $SecondPath `
+                -RecordIdFile $CheckpointPath `
+                -RecordIdKey 'multi-file' `
+                -MaxEvents 2 `
+                -ReadMode Metadata `
+                -WarningAction SilentlyContinue
+        )
+
+        $Events.Count | Should -Be 2
+        foreach ($Event in $Events) {
+            $Event.RecordId | Should -BeLessThan ([long]::MaxValue)
+        }
+    }
+
     It 'honors legacy default keys instead of replaying records after upgrade' {
         $Latest = Get-EVXEvent -LogName System -MaxEvents 1 -ReadMode Metadata | Select-Object -First 1
         if (-not $Latest -or -not $Latest.RecordId) {

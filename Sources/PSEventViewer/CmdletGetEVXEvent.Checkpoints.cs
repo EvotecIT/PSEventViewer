@@ -296,12 +296,34 @@ public sealed partial class CmdletGetEVXEvent {
         return $"{_recordIdKey}|{source}|{eventObject.ContainerLog}";
     }
 
-    private long? GetCheckpointLowerBound(string? machineName, string logName) {
+    private long? GetCheckpointLowerBound(
+        string? machineName,
+        string logName) {
+
+        return GetCheckpointLowerBound(
+            machineName,
+            logName,
+            sourceIsFile: false);
+    }
+
+    private long? GetCheckpointLowerBound(
+        string? machineName,
+        string logName,
+        bool sourceIsFile) {
+
         if (string.IsNullOrWhiteSpace(RecordIdFile)) {
             return null;
         }
 
-        return TryGetCheckpoint(machineName, logName, out _, out long checkpoint)
+        string? sourceIdentity =
+            sourceIsFile
+                ? logName
+                : machineName;
+        return TryGetCheckpoint(
+                sourceIdentity,
+                logName,
+                out _,
+                out long checkpoint)
             ? checkpoint
             : null;
     }
@@ -346,7 +368,7 @@ public sealed partial class CmdletGetEVXEvent {
     }
 
     private IReadOnlyList<string?> GetEffectiveCheckpointMachines()
-        => _effectiveCheckpointMachines ??= EventLogTarget.NormalizeMachineNames(MachineName);
+        => EventLogTarget.NormalizeMachineNames(MachineName);
 
     private void PrepareCheckpointBounds(CancellationToken cancellationToken) {
         if (string.IsNullOrWhiteSpace(RecordIdFile) || _recordMap.Count == 0) {
@@ -357,7 +379,11 @@ public sealed partial class CmdletGetEVXEvent {
             GetCheckpointSources(out bool usesFiles);
         if (usesFiles) {
             foreach (string path in checkpointSources) {
-                if (!TryGetCheckpoint(null, path, out string checkpointKey, out long checkpoint)) {
+                if (!TryGetCheckpoint(
+                        path,
+                        path,
+                        out string checkpointKey,
+                        out long checkpoint)) {
                     continue;
                 }
                 EventObject? boundaryEvent = checkpoint > 0

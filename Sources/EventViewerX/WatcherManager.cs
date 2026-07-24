@@ -311,29 +311,9 @@ namespace EventViewerX {
                    existing.BufferCapacity == requested.BufferCapacity &&
                    existing.RemoteConnectionTimeoutMilliseconds ==
                        requested.RemoteConnectionTimeoutMilliseconds &&
-                   CredentialIdentityEquals(
+                   EventLogCredentialIdentity.AreEqual(
                        existing.Credential,
                        requested.Credential);
-        }
-
-        private static bool CredentialIdentityEquals(
-            System.Net.NetworkCredential? left,
-            System.Net.NetworkCredential? right) {
-
-            if (ReferenceEquals(left, right)) {
-                return true;
-            }
-            if (left == null || right == null) {
-                return false;
-            }
-            return string.Equals(
-                       left.Domain,
-                       right.Domain,
-                       StringComparison.OrdinalIgnoreCase) &&
-                   string.Equals(
-                       left.UserName,
-                       right.UserName,
-                       StringComparison.OrdinalIgnoreCase);
         }
 
         private static void RemoveStoppedWatcher(object? sender, EventArgs args) {

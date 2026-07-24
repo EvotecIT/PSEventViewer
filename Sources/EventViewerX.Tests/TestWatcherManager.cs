@@ -4,6 +4,7 @@ using System.Reflection;
 using System.Collections.Concurrent;
 using System.Threading.Tasks;
 using System.Runtime.Serialization;
+using System.Net;
 using Xunit;
 
 namespace EventViewerX.Tests {
@@ -137,6 +138,77 @@ namespace EventViewerX.Tests {
                     "unit-mismatch", Environment.MachineName, "Application", new List<int> { 2 }, new List<NamedEvents>(), action, false, false, 0, null));
 
                 Assert.Contains("different configuration", exception.Message, StringComparison.OrdinalIgnoreCase);
+            } finally {
+                WatcherManager.StopAll();
+            }
+        }
+
+        [Fact]
+        public void StartWatcherRejectsRotatedPasswordForNamedRemoteConfiguration() {
+            WatcherManager.StopAll();
+            const string watcherName = "unit-password-rotation";
+            const string machineName = "server.example.test";
+            Action<EventObject> action = _ => { };
+            var existingQuery = new EventLogSubscriptionQuery(
+                "Application") {
+                MachineName = machineName,
+                Credential = new NetworkCredential(
+                    "watcher-user",
+                    "old-password",
+                    "EXAMPLE")
+            };
+            var requestedQuery = new EventLogSubscriptionQuery(
+                "Application") {
+                MachineName = machineName,
+                Credential = new NetworkCredential(
+                    "watcher-user",
+                    "new-password",
+                    "EXAMPLE")
+            };
+            var existing = new WatcherInfo(
+                watcherName,
+                machineName,
+                "Application",
+                new List<int>(),
+                new List<NamedEvents>(),
+                action,
+                false,
+                false,
+                0,
+                null,
+                existingQuery) {
+                ActionIdentity = "script:stable"
+            };
+            var watchersField = typeof(WatcherManager).GetField(
+                "_watchers",
+                BindingFlags.NonPublic |
+                BindingFlags.Static);
+            var namesField = typeof(WatcherManager).GetField(
+                "_watchersByName",
+                BindingFlags.NonPublic |
+                BindingFlags.Static);
+            var watchers =
+                Assert.IsType<ConcurrentDictionary<Guid, WatcherInfo>>(
+                    watchersField!.GetValue(null));
+            var names =
+                Assert.IsType<ConcurrentDictionary<string, WatcherInfo>>(
+                    namesField!.GetValue(null));
+            watchers[existing.Id] = existing;
+            names[watcherName] = existing;
+
+            try {
+                InvalidOperationException exception =
+                    Assert.Throws<InvalidOperationException>(() =>
+                        WatcherManager.StartWatcher(
+                            watcherName,
+                            requestedQuery,
+                            action,
+                            actionIdentity: "script:stable"));
+
+                Assert.Contains(
+                    "different configuration",
+                    exception.Message,
+                    StringComparison.OrdinalIgnoreCase);
             } finally {
                 WatcherManager.StopAll();
             }

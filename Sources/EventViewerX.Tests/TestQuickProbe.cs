@@ -1,6 +1,8 @@
 using System;
 using System.Diagnostics;
 using System.Net;
+using System.Runtime.CompilerServices;
+using System.Reflection;
 using System.Threading;
 using Xunit;
 
@@ -93,6 +95,52 @@ namespace EventViewerX.Tests {
         }
 
         [Fact]
+        public void ProbeTimestampScanSkipsRecordsWithoutTimestamps() {
+            DateTime expected =
+                new DateTime(
+                    2026,
+                    7,
+                    24,
+                    20,
+                    15,
+                    0,
+                    DateTimeKind.Utc);
+            EventObject missing =
+                CreateEventWithTimestamp(
+                    DateTime.MinValue);
+            EventObject usable =
+                CreateEventWithTimestamp(
+                    expected);
+
+            DateTime? actual =
+                EventLogProbe.FindFirstUsableTimestampUtc(
+                    new[] {
+                        missing,
+                        usable
+                    },
+                    out int scanned);
+
+            Assert.Equal(2, scanned);
+            Assert.Equal(expected, actual);
+        }
+
+        [Fact]
+        public void ProbeTimestampScanReportsTheExhaustedLimit() {
+            DateTime? actual =
+                EventLogProbe.FindFirstUsableTimestampUtc(
+                    new[] {
+                        CreateEventWithTimestamp(
+                            DateTime.MinValue),
+                        CreateEventWithTimestamp(
+                            DateTime.MinValue)
+                    },
+                    out int scanned);
+
+            Assert.Equal(2, scanned);
+            Assert.Null(actual);
+        }
+
+        [Fact]
         public void ProbeLatestEvent_DoesNotWriteBoundaryDiagnostics() {
             if (!OperatingSystem.IsWindows()) return;
 
@@ -180,6 +228,24 @@ namespace EventViewerX.Tests {
                 Settings.RpcProbeTimeoutMs = originalRpcTimeout;
                 EventLogSessionManager.ClearAllHostCache();
             }
+        }
+
+        private static EventObject CreateEventWithTimestamp(
+            DateTime timestamp) {
+
+            var eventObject =
+                (EventObject)RuntimeHelpers
+                .GetUninitializedObject(
+                    typeof(EventObject));
+            typeof(EventObject)
+                .GetField(
+                    "<TimeCreated>k__BackingField",
+                    BindingFlags.Instance |
+                    BindingFlags.NonPublic)!
+                .SetValue(
+                    eventObject,
+                    timestamp);
+            return eventObject;
         }
     }
 }

@@ -92,7 +92,8 @@ public sealed partial class CmdletGetEVXEvent {
                 EventFilter sourceFilter = CopyFilterWithCheckpoint(
                     pathFilter,
                     machineName: null,
-                    path);
+                    path,
+                    sourceIsFile: true);
                 foreach (EventFilter chunk in
                          EventFilterPartitioner.Partition(
                              sourceFilter)) {
@@ -119,7 +120,8 @@ public sealed partial class CmdletGetEVXEvent {
             EventFilter sourceFilter = CopyFilterWithCheckpoint(
                 filter,
                 machineName: null,
-                path);
+                path,
+                sourceIsFile: true);
             string xpath = string.IsNullOrWhiteSpace(rawXPath)
                 ? EventFilterCompiler.BuildXPath(sourceFilter)
                 : rawXPath!;
@@ -229,7 +231,10 @@ public sealed partial class CmdletGetEVXEvent {
                 sourceKind,
                 machine));
         }
-        ValidateBookmarkFanOut(structured.Count);
+        int independentSourceCount = checked(
+            structured.Count *
+            sourceProbe.GetIndependentSourceCount());
+        ValidateBookmarkFanOut(independentSourceCount);
         EventLogBatchQuery batch =
             EventLogBatchQuery.ForStructured(structured);
         ConfigureBatch(batch);

@@ -329,7 +329,7 @@ public static class EventLogBatchConsolidator {
                     other.FallbackMessageCulture?.Name,
                     StringComparison.OrdinalIgnoreCase) ||
                 Authentication != other.Authentication ||
-                !CredentialsEqual(
+                !EventLogCredentialIdentity.AreEqual(
                     Credential,
                     other.Credential) ||
                 RemoteConnectionTimeoutMilliseconds !=
@@ -347,30 +347,6 @@ public static class EventLogBatchConsolidator {
                 throw new ArgumentException(
                     $"Batch queries targeting '{MachineName ?? Environment.MachineName}' cannot be consolidated because their read/session options differ.");
             }
-        }
-
-        private static bool CredentialsEqual(
-            NetworkCredential? left,
-            NetworkCredential? right) {
-
-            if (ReferenceEquals(left, right)) {
-                return true;
-            }
-            if (left == null || right == null) {
-                return false;
-            }
-            return string.Equals(
-                       left.Domain,
-                       right.Domain,
-                       StringComparison.OrdinalIgnoreCase) &&
-                   string.Equals(
-                       left.UserName,
-                       right.UserName,
-                       StringComparison.OrdinalIgnoreCase) &&
-                   string.Equals(
-                       left.Password,
-                       right.Password,
-                       StringComparison.Ordinal);
         }
 
         private static string? NormalizeMachine(

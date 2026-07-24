@@ -63,7 +63,6 @@ public sealed partial class CmdletGetEVXEvent : AsyncPSCmdlet {
     private readonly Dictionary<string, long> _highestRecordIds = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, EventObject> _highestCheckpointEvents = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _resetCheckpointKeys = new(StringComparer.OrdinalIgnoreCase);
-    private IReadOnlyList<string?>? _effectiveCheckpointMachines;
     private WildcardPattern[] _managedProviderPatterns =
         Array.Empty<WildcardPattern>();
     private long _eventsOutput;

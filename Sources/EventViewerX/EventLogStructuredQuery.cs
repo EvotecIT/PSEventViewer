@@ -58,6 +58,17 @@ public sealed class EventLogStructuredQuery {
             SourceKind);
     }
 
+    /// <summary>
+    /// Returns the number of independent native query handles required by the
+    /// QueryList. Channel paths share one handle, while each distinct offline
+    /// file requires its own handle.
+    /// </summary>
+    public int GetIndependentSourceCount() {
+        return EventLogStructuredQueryParser.CountIndependentSources(
+            QueryXml,
+            SourceKind);
+    }
+
     /// <summary>Remote computer name. A null or empty value targets the local computer.</summary>
     public string? MachineName { get; set; }
 

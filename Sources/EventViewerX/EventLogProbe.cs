@@ -91,32 +91,12 @@ public static class EventLogProbe {
                         Settings.RpcProbePort
                 };
 
-            foreach (EventObject eventObject in
-                     EventLogEngine.ReadChannel(
-                         query,
-                         probeCancellation.Token)) {
-                scanned++;
-                DateTime eventTimeUtc =
-                    eventObject.TimeCreated
-                        .ToUniversalTime();
-                recordCount = TryReadRecordCount(
-                    logName,
-                    machineName,
-                    credential,
-                    authentication,
-                    effectiveTimeout -
-                    stopwatch.Elapsed);
-                return new EventLogProbeResult(
-                    logName,
-                    target,
-                    eventTimeUtc,
-                    EventLogProbeStatus.Ok,
-                    null,
-                    scanned,
-                    recordCount,
-                    stopwatch.Elapsed,
-                    nativeQueryVerified: true);
-            }
+            DateTime? eventTimeUtc =
+                FindFirstUsableTimestampUtc(
+                    EventLogEngine.ReadChannel(
+                        query,
+                        probeCancellation.Token),
+                    out scanned);
 
             recordCount = TryReadRecordCount(
                 logName,
@@ -125,11 +105,27 @@ public static class EventLogProbe {
                 authentication,
                 effectiveTimeout -
                 stopwatch.Elapsed);
+            if (eventTimeUtc.HasValue) {
+                return new EventLogProbeResult(
+                    logName,
+                    target,
+                    eventTimeUtc.Value,
+                    EventLogProbeStatus.Ok,
+                    null,
+                    scanned,
+                    recordCount,
+                    stopwatch.Elapsed,
+                    nativeQueryVerified: true);
+            }
             return ProbeFailure(
                 logName,
                 target,
-                EventLogProbeStatus.NoEvent,
-                "No event matched the native query.",
+                scanned == 0
+                    ? EventLogProbeStatus.NoEvent
+                    : EventLogProbeStatus.LimitReached,
+                scanned == 0
+                    ? "No event matched the native query."
+                    : $"The first {scanned} matching events did not contain a usable timestamp.",
                 scanned,
                 recordCount,
                 stopwatch.Elapsed,
@@ -161,6 +157,23 @@ public static class EventLogProbe {
                 recordCount,
                 stopwatch.Elapsed);
         }
+    }
+
+    internal static DateTime? FindFirstUsableTimestampUtc(
+        IEnumerable<EventObject> events,
+        out int scanned) {
+
+        scanned = 0;
+        foreach (EventObject eventObject in events) {
+            scanned++;
+            if (eventObject.TimeCreated ==
+                DateTime.MinValue) {
+                continue;
+            }
+            return eventObject.TimeCreated
+                .ToUniversalTime();
+        }
+        return null;
     }
 
     private static long? TryReadRecordCount(

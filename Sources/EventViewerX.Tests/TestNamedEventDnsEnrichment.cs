@@ -1,4 +1,5 @@
 using EventViewerX.Rules.ActiveDirectory;
+using System.Net;
 using System.Runtime.CompilerServices;
 using Xunit;
 
@@ -186,6 +187,60 @@ public class TestNamedEventDnsEnrichment {
         stopwatch.Stop();
         Assert.Equal(ReverseDnsResolutionStatus.TimedOut, projected.ClientDnsResolutionStatus);
         Assert.True(stopwatch.Elapsed < TimeSpan.FromSeconds(1), $"Elapsed {stopwatch.Elapsed}.");
+    }
+
+    [Fact]
+    public async Task TimedOutSystemLookupRetainsItsConcurrencyLeaseUntilCompletion() {
+        var firstLookup =
+            new TaskCompletionSource<IPHostEntry>(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+        int calls = 0;
+        using var enricher = new NamedEventEnricher(
+            new NamedEventEnrichmentOptions {
+                ResolveDns = true,
+                DnsMaxConcurrency = 1,
+                DnsTimeoutMilliseconds = 30
+            },
+            systemDnsResolver: address => {
+                int call = Interlocked.Increment(
+                    ref calls);
+                return call == 1
+                    ? firstLookup.Task
+                    : Task.FromResult(new IPHostEntry {
+                        HostName =
+                            address +
+                            ".example.test"
+                    });
+            });
+        SMBServerAudit first =
+            CreateSmbEvent("10.0.0.31");
+        SMBServerAudit second =
+            CreateSmbEvent("10.0.0.32");
+
+        await enricher.EnrichAsync(
+            first,
+            CancellationToken.None);
+        Task secondEnrichment =
+            enricher.EnrichAsync(
+                second,
+                CancellationToken.None);
+        await Task.Delay(75);
+
+        Assert.Equal(
+            ReverseDnsResolutionStatus.TimedOut,
+            first.ClientDnsResolutionStatus);
+        Assert.Equal(1, Volatile.Read(ref calls));
+
+        firstLookup.SetResult(new IPHostEntry {
+            HostName = "first.example.test"
+        });
+        await secondEnrichment.WaitAsync(
+            TimeSpan.FromSeconds(2));
+
+        Assert.Equal(2, calls);
+        Assert.Equal(
+            ReverseDnsResolutionStatus.Resolved,
+            second.ClientDnsResolutionStatus);
     }
 
     [Fact]

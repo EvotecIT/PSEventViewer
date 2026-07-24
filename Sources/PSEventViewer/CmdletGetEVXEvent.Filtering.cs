@@ -51,13 +51,17 @@ public sealed partial class CmdletGetEVXEvent {
     private EventFilter CopyFilterWithCheckpoint(
         EventFilter source,
         string? machineName,
-        string sourceName) {
+        string sourceName,
+        bool sourceIsFile = false) {
 
         return new EventFilter {
             EventIds = source.EventIds,
             RecordIds = source.RecordIds,
             MinimumRecordIdExclusive =
-                GetCheckpointLowerBound(machineName, sourceName),
+                GetCheckpointLowerBound(
+                    machineName,
+                    sourceName,
+                    sourceIsFile),
             MaximumRecordIdExclusive = source.MaximumRecordIdExclusive,
             ProviderNames = source.ProviderNames,
             Levels = source.Levels,

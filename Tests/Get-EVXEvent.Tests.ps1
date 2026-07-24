@@ -610,6 +610,30 @@ Describe 'Get-EVXEvent - pipeline parity' {
         $events[0].ContainerLog | Should -Be 'System'
     }
 
+    It 'rejects one bookmark across multiple FilterXml file sources' {
+        $Fixture = Join-Path $PSScriptRoot 'Logs\NamedFilterExamples.evtx'
+        $FirstPath = Join-Path $TestDrive 'bookmark-first.evtx'
+        $SecondPath = Join-Path $TestDrive 'bookmark-second.evtx'
+        Copy-Item -LiteralPath $Fixture -Destination $FirstPath
+        Copy-Item -LiteralPath $Fixture -Destination $SecondPath
+        $FirstUri = ([Uri]::new([IO.Path]::GetFullPath($FirstPath))).AbsoluteUri
+        $SecondUri = ([Uri]::new([IO.Path]::GetFullPath($SecondPath))).AbsoluteUri
+        [xml] $Query = @"
+<QueryList>
+  <Query Id="0" Path="$FirstUri"><Select Path="$FirstUri">*</Select></Query>
+  <Query Id="1" Path="$SecondUri"><Select Path="$SecondUri">*</Select></Query>
+</QueryList>
+"@
+
+        {
+            Get-EVXEvent `
+                -FilterXml $Query `
+                -BookmarkXml '<BookmarkList />' `
+                -ReadMode Metadata `
+                -ErrorAction Stop
+        } | Should -Throw '*exactly one independent query source*'
+    }
+
     It 'converts a direct FilterXml string to XmlDocument' {
         $Query = @'
 <QueryList>
