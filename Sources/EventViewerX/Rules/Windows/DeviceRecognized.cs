@@ -43,20 +43,20 @@ public class DeviceRecognized : EventRuleBase {
 
     /// <summary>Initialises a device recognition wrapper from an event record.</summary>
     public DeviceRecognized(EventObject eventObject) : base(eventObject) {
-        _eventObject = eventObject;
+        Event = eventObject;
         Type = "DeviceRecognized";
-        Computer = _eventObject.ComputerName;
-        DeviceId = _eventObject.GetValueFromDataDictionary("DeviceId");
-        DeviceName = _eventObject.GetValueFromDataDictionary("DeviceDescription", "DeviceName");
-        ClassId = _eventObject.GetValueFromDataDictionary("ClassId");
-        ClassName = _eventObject.GetValueFromDataDictionary("ClassName");
-        VendorIds = _eventObject.GetValueFromDataDictionary("VendorIds");
-        CompatibleIds = _eventObject.GetValueFromDataDictionary("CompatibleIds");
-        LocationInformation = _eventObject.GetValueFromDataDictionary("LocationInformation");
+        Computer = Event.ComputerName;
+        DeviceId = Event.GetValueFromDataDictionary("DeviceId");
+        DeviceName = Event.GetValueFromDataDictionary("DeviceDescription", "DeviceName");
+        ClassId = Event.GetValueFromDataDictionary("ClassId");
+        ClassName = Event.GetValueFromDataDictionary("ClassName");
+        VendorIds = Event.GetValueFromDataDictionary("VendorIds");
+        CompatibleIds = Event.GetValueFromDataDictionary("CompatibleIds");
+        LocationInformation = Event.GetValueFromDataDictionary("LocationInformation");
         DeviceType = EventsHelper.TranslateDeviceType(ClassName);
         Vendor = EventsHelper.TranslateVendor(VendorIds);
-        Who = _eventObject.GetSubjectAccountOrEmpty();
-        When = _eventObject.TimeCreated;
+        Who = Event.GetSubjectAccountOrEmpty();
+        When = Event.TimeCreated;
     }
 }
 

@@ -39,20 +39,20 @@ public class OSCrashOnAuditFailRecovery : EventRuleBase {
     /// </summary>
     /// <param name="eventObject">Event describing the recovery.</param>
     public OSCrashOnAuditFailRecovery(EventObject eventObject) : base(eventObject) {
-        _eventObject = eventObject;
+        Event = eventObject;
         Type = "OSCrashOnAuditFailRecovery";
-        Computer = _eventObject.ComputerName;
+        Computer = Event.ComputerName;
         Action = "Administrator recovered system from CrashOnAuditFail";
-        ObjectAffected = _eventObject.MachineName;
-        ActionDetails = _eventObject.MessageSubject;
-        var rawStartText = _eventObject.GetValueFromDataDictionary("StartTime") ??
-                           _eventObject.GetValueFromDataDictionary("#text") ??
-                           _eventObject.GetValueFromDataDictionary("ActionDetailsDateTime");
+        ObjectAffected = Event.MachineName;
+        ActionDetails = Event.MessageSubject;
+        var rawStartText = Event.GetValueFromDataDictionary("StartTime") ??
+                           Event.GetValueFromDataDictionary("#text") ??
+                           Event.GetValueFromDataDictionary("ActionDetailsDateTime");
 
-        ActionTimestampUtc = RuleHelpers.ParseUnlabeledOsTimestamp(_eventObject)
+        ActionTimestampUtc = RuleHelpers.ParseUnlabeledOsTimestamp(Event)
                             ?? RuleHelpers.ParseDateTimeLoose(rawStartText)
-                            ?? _eventObject.TimeCreated.ToUniversalTime();
+                            ?? Event.TimeCreated.ToUniversalTime();
 
-        When = ActionTimestampUtc ?? _eventObject.TimeCreated;
+        When = ActionTimestampUtc ?? Event.TimeCreated;
     }
 }

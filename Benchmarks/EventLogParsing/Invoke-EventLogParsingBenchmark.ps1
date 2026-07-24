@@ -211,8 +211,8 @@ if (-not $Plan) {
         Update-BenchmarkDocument `
             -Path $readmePath `
             -BlockId 'event-log-evtx-native-benchmark' `
-            -SummaryPath $benchmarkResult.Artifacts['summary.json'] `
-            -Renderer SummaryTable `
+            -ComparisonPath $benchmarkResult.Artifacts['comparison.json'] `
+            -Renderer ComparisonTable `
             -Confirm:$false | Out-Null
     }
 }

@@ -74,19 +74,28 @@ public static class LiveEventQueryExecutor {
         try {
             var rows = new List<LiveEventRow>();
             bool truncated = false;
-            int readLimit = request.MaxEvents > 0 && request.MaxEvents < int.MaxValue
-                ? request.MaxEvents + 1
-                : request.MaxEvents;
+            long readLimit =
+                request.MaxEvents > 0 &&
+                request.MaxEvents < int.MaxValue
+                    ? request.MaxEvents + 1L
+                    : request.MaxEvents;
+            var query = new EventLogChannelQuery(
+                request.LogName) {
+                XPath = xpath,
+                MachineName = request.MachineName,
+                MaxEvents = readLimit,
+                Oldest = request.OldestFirst,
+                RemoteConnectionTimeoutMilliseconds =
+                    request.SessionTimeoutMs ?? 5000,
+                ReadMode = request.IncludeMessage
+                    ? EventReadMode.Message
+                    : EventReadMode.Metadata
+            };
 
-            foreach (var ev in SearchEvents.QueryLogXPath(
-                         logName: request.LogName,
-                         xpath: xpath,
-                         machineName: request.MachineName,
-                         maxEvents: readLimit,
-                         oldest: request.OldestFirst,
-                         cancellationToken: cancellationToken,
-                         sessionTimeoutMs: request.SessionTimeoutMs,
-                         readMode: request.IncludeMessage ? EventReadMode.Message : EventReadMode.Metadata)) {
+            foreach (EventObject ev in
+                     EventLogEngine.ReadChannel(
+                         query,
+                         cancellationToken)) {
                 cancellationToken.ThrowIfCancellationRequested();
 
                 if (request.MaxEvents > 0 && rows.Count >= request.MaxEvents) {

@@ -14,15 +14,11 @@ Describe 'Get-EVXPowerShellScript bounded query contract' {
         { Get-EVXPowerShellScript -Type WindowsPowerShell -MaxPendingScripts 0 } | Should -Throw
     }
 
-    It 'Exposes execution records through a dedicated cmdlet and compatibility alias' {
+    It 'exposes execution records through a dedicated canonical cmdlet' {
         $command = Get-Command -Name Get-EVXPowerShellScriptExecution -ErrorAction Stop
 
         $command.Parameters.ContainsKey('MaxEvents') | Should -BeTrue
         $command.Parameters.ContainsKey('MaxEventsScanned') | Should -BeTrue
         $command.Parameters.ContainsKey('IncludeQueryInfo') | Should -BeTrue
-        (Get-Alias -Name Get-PowerShellScriptExecution -ErrorAction Stop).ResolvedCommandName |
-            Should -Be 'Get-EVXPowerShellScriptExecution'
-        (Get-Alias -Name Restore-PowerShellScript -ErrorAction Stop).ResolvedCommandName |
-            Should -Be 'Get-EVXPowerShellScript'
     }
 }

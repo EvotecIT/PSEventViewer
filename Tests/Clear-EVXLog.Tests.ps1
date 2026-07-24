@@ -1,14 +1,15 @@
 Describe 'Clear-EVXLog cmdlet' {
     BeforeAll {
-        $script:log = 'EVXClearTestLog'
-        $script:provider = 'EVXClearTestSource'
+        $suffix = [Guid]::NewGuid().ToString('N')
+        $script:log = 'EVXClear' + $suffix
+        $script:provider = 'EVXClearSource' + $suffix
         $script:isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltinRole]::Administrator)
         $script:skip = -not $script:isAdmin
 
         if (-not $script:skip) {
             Remove-EVXSource -SourceName $script:provider -LogName $script:log -ErrorAction SilentlyContinue
             Remove-EVXLog -LogName $script:log -ErrorAction SilentlyContinue
-            New-EVXLog -LogName $script:log -ProviderName $script:provider -SourceLogName $script:log | Out-Null
+            New-EVXLog -LogName $script:log -ProviderName $script:provider | Out-Null
             Write-EVXEntry -LogName $script:log -ProviderName $script:provider -Message 'test' -EventId 1000
         }
     }
@@ -18,16 +19,20 @@ Describe 'Clear-EVXLog cmdlet' {
             Remove-EVXSource -SourceName $script:provider -LogName $script:log -ErrorAction SilentlyContinue
         }
     }
-    It 'clears the log and sets retention' -Skip:$script:skip {
-        $result = Clear-EVXLog -LogName $script:log -RetentionDays 2
-        if ($script:isAdmin) {
-            $result | Should -Be $true
-            $eventLog = New-Object System.Diagnostics.EventLog $script:log
-            $eventLog.Entries.Count | Should -Be 0
-            $eventLog.MinimumRetentionDays | Should -Be 2
-        }
-        else {
-            $result | Should -Be $false
-        }
+    It 'exposes bounded remote session controls' {
+        $command = Get-Command Clear-EVXLog
+        $command.Parameters.Keys | Should -Contain 'Credential'
+        $command.Parameters.Keys | Should -Contain 'Authentication'
+        $command.Parameters.Keys | Should -Contain 'TimeoutMs'
+    }
+    It 'atomically backs up and clears the log through wevtapi' -Skip:$script:skip {
+        $backup = Join-Path $TestDrive 'EVXClearTestLog.evtx'
+        $result = Clear-EVXLog -LogName $script:log -BackupPath $backup -Confirm:$false
+
+        $result.LogName | Should -Be $script:log
+        $result.BackupPath | Should -Be ([IO.Path]::GetFullPath($backup))
+        Test-Path -LiteralPath $backup | Should -BeTrue
+        (Get-EVXLog -Path $backup).RecordCount | Should -BeGreaterThan 0
+        (Get-EVXLog -LogName $script:log).RecordCount | Should -Be 0
     }
 }

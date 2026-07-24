@@ -47,16 +47,16 @@ public class ADGroupPolicyEdits : EventRuleBase {
 
     /// <summary>Initialises a GPO edit wrapper from an event record.</summary>
     public ADGroupPolicyEdits(EventObject eventObject) : base(eventObject) {
-        _eventObject = eventObject;
+        Event = eventObject;
         Type = "ADGroupPolicyEdits";
-        Computer = _eventObject.ComputerName;
-        Action = _eventObject.MessageSubject;
-        ObjectClass = _eventObject.GetValueFromDataDictionary("ObjectClass");
-        OperationType = ConvertFromOperationType(_eventObject.GetDataValueOrEmpty("OperationType"));
-        Who = _eventObject.GetSubjectAccountOrEmpty();
-        When = _eventObject.TimeCreated;
-        GroupPolicyDisplayName = _eventObject.GetValueFromDataDictionary("ObjectDN");
-        var dn = _eventObject.GetValueFromDataDictionary("ObjectDN");
+        Computer = Event.ComputerName;
+        Action = Event.MessageSubject;
+        ObjectClass = Event.GetValueFromDataDictionary("ObjectClass");
+        OperationType = ConvertFromOperationType(Event.GetDataValueOrEmpty("OperationType"));
+        Who = Event.GetSubjectAccountOrEmpty();
+        When = Event.TimeCreated;
+        GroupPolicyDisplayName = Event.GetValueFromDataDictionary("ObjectDN");
+        var dn = Event.GetValueFromDataDictionary("ObjectDN");
         var guidPattern = @"\{(?<guid>[0-9A-Fa-f-]+)\}";
         var match = System.Text.RegularExpressions.Regex.Match(dn, guidPattern);
         if (match.Success) {
@@ -71,8 +71,8 @@ public class ADGroupPolicyEdits : EventRuleBase {
                 GroupPolicyDisplayName = foundGpo.GpoName;
             }
         }
-        AttributeLDAPDisplayName = _eventObject.GetValueFromDataDictionary("AttributeLDAPDisplayName");
-        //AttributeValue = _eventObject.GetValueFromDataDictionary("AttributeValue");
+        AttributeLDAPDisplayName = Event.GetValueFromDataDictionary("AttributeLDAPDisplayName");
+        //AttributeValue = Event.GetValueFromDataDictionary("AttributeValue");
     }
 }
 

@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics.Eventing.Reader;
 using System.Linq;
 using System.Threading;
 
@@ -8,13 +7,12 @@ namespace EventViewerX {
     /// <summary>
     /// Watches an event log and invokes a callback for matching events.
     /// </summary>
-    public class WatchEvents : Settings, IDisposable {
+    public sealed class WatchEvents : IDisposable {
         private static int _numberOfEventsFound;
         private readonly object _lifecycleSync = new();
         private readonly InternalLogger _instanceLogger;
         private volatile HashSet<int> _watchEventIds = new();
-        private EventLogSession? _eventLogSession;
-        private EventLogWatcher? _eventLogWatcher;
+        private readonly List<EventLogSubscription> _subscriptions = new();
         private CancellationTokenRegistration _cancellationRegistration;
         private bool _hasCancellationRegistration;
         private Action<EventObject>? _eventAction;
@@ -33,6 +31,12 @@ namespace EventViewerX {
         /// <summary>The most recent managed event snapshot observed by this watcher.</summary>
         public EventObject? LastEvent { get; private set; }
 
+        /// <summary>The most recent asynchronous subscription failure.</summary>
+        public EventLogSubscriptionFailure? LastFailure { get; private set; }
+
+        /// <summary>Raised when the native subscription reports a recoverable or terminal failure.</summary>
+        public event EventHandler<EventLogSubscriptionFailure>? SubscriptionFailed;
+
         /// <summary>Indicates whether staging event ID 350 is included.</summary>
         public bool StagingEnabled { get; private set; }
 
@@ -45,6 +49,42 @@ namespace EventViewerX {
         /// <param name="internalLogger">Optional logger used by watcher callbacks.</param>
         public WatchEvents(InternalLogger? internalLogger = null) {
             _instanceLogger = internalLogger ?? Settings._logger;
+        }
+
+        /// <summary>Enables console error output for this watcher.</summary>
+        public bool Error {
+            get => _instanceLogger.IsError;
+            set => _instanceLogger.IsError = value;
+        }
+
+        /// <summary>Enables console warning output for this watcher.</summary>
+        public bool Warning {
+            get => _instanceLogger.IsWarning;
+            set => _instanceLogger.IsWarning = value;
+        }
+
+        /// <summary>Enables console verbose output for this watcher.</summary>
+        public bool Verbose {
+            get => _instanceLogger.IsVerbose;
+            set => _instanceLogger.IsVerbose = value;
+        }
+
+        /// <summary>Enables console debug output for this watcher.</summary>
+        public bool Debug {
+            get => _instanceLogger.IsDebug;
+            set => _instanceLogger.IsDebug = value;
+        }
+
+        /// <summary>Enables console information output for this watcher.</summary>
+        public bool Information {
+            get => _instanceLogger.IsInformation;
+            set => _instanceLogger.IsInformation = value;
+        }
+
+        /// <summary>Enables console progress output for this watcher.</summary>
+        public bool Progress {
+            get => _instanceLogger.IsProgress;
+            set => _instanceLogger.IsProgress = value;
         }
 
         /// <summary>Resets the process-wide matching event counter.</summary>
@@ -87,6 +127,99 @@ namespace EventViewerX {
                 throw new ArgumentException("At least one positive event ID is required.", nameof(eventId));
             }
 
+            string xpath = EventFilterCompiler.BuildXPath(new EventFilter {
+                EventIds = ids.OrderBy(static id => id).ToArray()
+            });
+            var query = new EventLogSubscriptionQuery(logName) {
+                MachineName = machineName,
+                XPath = xpath,
+                Start = EventLogSubscriptionStart.Future,
+                ReadMode = EventReadMode.Full,
+                RemoteConnectionTimeoutMilliseconds =
+                    Settings.SessionTimeoutMs,
+                BufferCapacity = 256
+            };
+            StartSubscription(
+                new[] { query },
+                ids,
+                eventAction,
+                cancellationToken,
+                staging,
+                enabledBy);
+        }
+
+        /// <summary>
+        /// Starts a watcher from the complete native subscription contract.
+        /// The XPath is the sole event-selection authority.
+        /// </summary>
+        public void Watch(
+            EventLogSubscriptionQuery query,
+            Action<EventObject>? eventAction = null,
+            CancellationToken cancellationToken = default) {
+
+            if (query == null) {
+                throw new ArgumentNullException(nameof(query));
+            }
+            StartSubscription(
+                new[] { query },
+                new HashSet<int>(),
+                eventAction,
+                cancellationToken,
+                staging: false,
+                enabledBy: null);
+        }
+
+        /// <summary>
+        /// Starts a logical watcher backed by several partitioned native subscriptions.
+        /// Each query must target the same machine and channel.
+        /// </summary>
+        public void Watch(
+            IEnumerable<EventLogSubscriptionQuery> queries,
+            Action<EventObject>? eventAction = null,
+            CancellationToken cancellationToken = default) {
+
+            if (queries == null) {
+                throw new ArgumentNullException(nameof(queries));
+            }
+            EventLogSubscriptionQuery[] snapshot = queries.ToArray();
+            if (snapshot.Length == 0) {
+                throw new ArgumentException(
+                    "At least one subscription query is required.",
+                    nameof(queries));
+            }
+            string machineName = snapshot[0].MachineName ?? string.Empty;
+            string logName = snapshot[0].LogName;
+            if (snapshot.Any(query =>
+                    !string.Equals(
+                        query.MachineName ?? string.Empty,
+                        machineName,
+                        StringComparison.OrdinalIgnoreCase) ||
+                    !string.Equals(
+                        query.LogName,
+                        logName,
+                        StringComparison.OrdinalIgnoreCase))) {
+                throw new ArgumentException(
+                    "Every partitioned subscription must target the same machine and channel.",
+                    nameof(queries));
+            }
+            StartSubscription(
+                snapshot,
+                new HashSet<int>(),
+                eventAction,
+                cancellationToken,
+                staging: false,
+                enabledBy: null);
+        }
+
+        private void StartSubscription(
+            IReadOnlyList<EventLogSubscriptionQuery> queries,
+            HashSet<int> ids,
+            Action<EventObject>? eventAction,
+            CancellationToken cancellationToken,
+            bool staging,
+            string? enabledBy) {
+
+            cancellationToken.ThrowIfCancellationRequested();
             CancellationTokenRegistration? previousRegistration;
             lock (_lifecycleSync) {
                 previousRegistration = DetachCancellationRegistration();
@@ -97,31 +230,24 @@ namespace EventViewerX {
             lock (_lifecycleSync) {
                 _watchEventIds = ids;
                 _eventAction = eventAction;
-                _machineName = string.IsNullOrWhiteSpace(machineName) ? Environment.MachineName : machineName;
+                _machineName = string.IsNullOrWhiteSpace(
+                    queries[0].MachineName)
+                    ? Environment.MachineName
+                    : queries[0].MachineName;
                 _eventsFound = 0;
                 LastEvent = null;
+                LastFailure = null;
                 StartTime = DateTime.UtcNow;
                 StagingEnabled = staging;
                 StagingEnabledBy = staging ? enabledBy ?? Environment.UserName : null;
 
                 try {
-                    EventLogSessionOpenResult sessionResult = SearchEvents.OpenSessionResult(machineName, Settings.SessionTimeoutMs, "WatchEvents", logName);
-                    if (!sessionResult.Success || sessionResult.Session == null) {
-                        throw new InvalidOperationException(sessionResult.ErrorMessage);
+                    foreach (EventLogSubscriptionQuery query in queries) {
+                        _subscriptions.Add(new EventLogSubscription(
+                            query,
+                            DetectEvent,
+                            DetectFailure));
                     }
-
-                    _eventLogSession = sessionResult.Session;
-                    sessionResult.Session = null;
-                    sessionResult.Dispose();
-
-                    string xpath = "*[System[" + string.Join(" or ", ids.OrderBy(static id => id).Select(static id => $"EventID={id}")) + "]]";
-                    var query = new EventLogQuery(logName, PathType.LogName, xpath) {
-                        Session = _eventLogSession,
-                        TolerateQueryErrors = false
-                    };
-                    _eventLogWatcher = new EventLogWatcher(query);
-                    _eventLogWatcher.EventRecordWritten += DetectEventsLogCallback;
-                    _eventLogWatcher.Enabled = true;
                 } catch {
                     DisposeCore();
                     throw;
@@ -134,7 +260,7 @@ namespace EventViewerX {
                     newRegistration = cancellationToken.Register(CancelWatch);
                     cancellationToken.ThrowIfCancellationRequested();
                     lock (_lifecycleSync) {
-                        if (_eventLogWatcher == null) {
+                        if (_subscriptions.Count == 0) {
                             cancellationToken.ThrowIfCancellationRequested();
                             throw new InvalidOperationException("The event-log subscription stopped before cancellation registration completed.");
                         }
@@ -143,8 +269,12 @@ namespace EventViewerX {
                         newRegistration = null;
                     }
                 }
-                string eventIds = string.Join(",", ids.OrderBy(static id => id).Select(static id => id.ToString()));
-                _instanceLogger.WriteVerbose("Created event log subscription to {0} for {1}.", _machineName ?? Environment.MachineName, eventIds);
+                foreach (EventLogSubscriptionQuery query in queries) {
+                    _instanceLogger.WriteVerbose(
+                        "Created event log subscription to {0} for XPath {1}.",
+                        _machineName ?? Environment.MachineName,
+                        query.XPath);
+                }
             } catch {
                 newRegistration?.Dispose();
                 CancellationTokenRegistration? failedRegistration;
@@ -157,23 +287,28 @@ namespace EventViewerX {
             }
         }
 
-        private void DetectEventsLogCallback(object? sender, EventRecordWrittenEventArgs args) {
-            EventRecord? record = args.EventRecord;
-            if (record == null) {
-                string error = args.EventException?.Message ?? "The event subscription callback returned no event record.";
-                _instanceLogger.WriteWarning("Event log subscription callback failed: {0}", error);
-                return;
+        private void DetectFailure(EventLogSubscriptionFailure failure) {
+            LastFailure = failure;
+            _instanceLogger.WriteWarning(
+                "Event log subscription failed: {0}",
+                failure.Exception.Message.Trim());
+            try {
+                SubscriptionFailed?.Invoke(this, failure);
+            } catch (Exception exception) {
+                _instanceLogger.WriteWarning(
+                    "Event watcher failure callback threw: {0}",
+                    exception.Message.Trim());
             }
+        }
 
+        private void DetectEvent(EventObject eventObject) {
             try {
                 HashSet<int> ids = _watchEventIds;
-                if (!ids.Contains(record.Id)) {
+                if (ids.Count > 0 &&
+                    !ids.Contains(eventObject.Id)) {
                     return;
                 }
 
-                EventRecord ownedRecord = record;
-                record = null;
-                var eventObject = new EventObject(ownedRecord, _machineName ?? Environment.MachineName, EventReadMode.Full);
                 LastEvent = eventObject;
                 Interlocked.Increment(ref _numberOfEventsFound);
                 Interlocked.Increment(ref _eventsFound);
@@ -186,8 +321,6 @@ namespace EventViewerX {
                 }
             } catch (Exception ex) {
                 _instanceLogger.WriteWarning("Event log subscription callback failed: {0}", ex.Message.Trim());
-            } finally {
-                record?.Dispose();
             }
         }
 
@@ -211,15 +344,10 @@ namespace EventViewerX {
         }
 
         private void DisposeCore() {
-            if (_eventLogWatcher != null) {
-                _eventLogWatcher.EventRecordWritten -= DetectEventsLogCallback;
-                _eventLogWatcher.Enabled = false;
-                _eventLogWatcher.Dispose();
-                _eventLogWatcher = null;
+            foreach (EventLogSubscription subscription in _subscriptions) {
+                subscription.Dispose();
             }
-
-            _eventLogSession?.Dispose();
-            _eventLogSession = null;
+            _subscriptions.Clear();
             _watchEventIds = new HashSet<int>();
             _eventAction = null;
             StagingEnabled = false;

@@ -100,4 +100,69 @@ Describe 'Export-EVXEvent direct streaming contract' {
         $Result.Sha256 | Should -BeNullOrEmpty
         [System.IO.File]::Exists($OutputPath) | Should -BeTrue
     }
+
+    It 'exports a structured QueryList through the reusable engine' {
+        $OutputPath = [System.IO.Path]::Combine(
+            $OutputDirectory,
+            'structured.jsonl')
+        $QueryXml = [EventViewerX.EventFilterCompiler]::BuildFileQueryXml(
+            [string[]] @($SourcePath),
+            $null,
+            $null)
+
+        $Result = Export-EVXEvent `
+            -FilterXml $QueryXml `
+            -OutputPath $OutputPath `
+            -Format JsonLines `
+            -ReadMode Metadata `
+            -Oldest `
+            -MaxEvents 3
+
+        $Result.EventCount | Should -Be 3
+        [System.IO.File]::ReadAllLines($OutputPath).Count |
+            Should -Be 3
+    }
+
+    It 'exports several files as one deterministic bounded stream' {
+        $OutputPath = [System.IO.Path]::Combine(
+            $OutputDirectory,
+            'batch.jsonl')
+        $SecondSource = [System.IO.Path]::Combine(
+            $PSScriptRoot,
+            'Logs',
+            'Active Directory Web Services.evtx')
+
+        $Result = Export-EVXEvent `
+            -Path $SourcePath, $SecondSource `
+            -OutputPath $OutputPath `
+            -Format JsonLines `
+            -ReadMode Metadata `
+            -Oldest `
+            -MaxEvents 8
+
+        $Rows = @(
+            [System.IO.File]::ReadLines($OutputPath) |
+                ForEach-Object { $_ | ConvertFrom-Json }
+        )
+        $Result.EventCount | Should -Be 8
+        $Rows | Should -HaveCount 8
+        for ($index = 1; $index -lt $Rows.Count; $index++) {
+            [datetime] $Rows[$index].timeCreated |
+                Should -BeGreaterOrEqual ([datetime] $Rows[$index - 1].timeCreated)
+        }
+    }
+
+    It 'rejects archive-resource options for non-EVTX output' {
+        $OutputPath = [System.IO.Path]::Combine(
+            $OutputDirectory,
+            'invalid.jsonl')
+
+        {
+            Export-EVXEvent `
+                -Path $SourcePath `
+                -OutputPath $OutputPath `
+                -Format JsonLines `
+                -ArchiveResources
+        } | Should -Throw
+    }
 }

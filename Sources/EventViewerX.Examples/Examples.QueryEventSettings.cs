@@ -3,18 +3,19 @@
 
         public static void QueryBasicEventLogList() {
 
-            SearchEvents eventLogSettings = new SearchEvents();
-            eventLogSettings.Verbose = true;
-            eventLogSettings.Warning = true;
-            eventLogSettings.Error = true;
+            Settings.Logger.IsVerbose = true;
+            Settings.Logger.IsWarning = true;
+            Settings.Logger.IsError = true;
 
-            foreach (var test in SearchEvents.DisplayEventLogs()) {
+            foreach (var test in EventLogCatalog.DisplayEventLogs()) {
                 Console.WriteLine(test);
             }
         }
 
         public static void ShowChannelPolicy(string logName = "Application", string? machineName = null) {
-            var pol = SearchEvents.GetChannelPolicy(logName, machineName);
+            var pol = EventLogChannelPolicyService.Get(
+                logName,
+                machineName);
             if (pol == null) {
                 Console.WriteLine($"No policy for '{logName}'");
                 return;
@@ -24,7 +25,7 @@
 
         public static void SetChannelPolicyExample(string logName = "Application", string? machineName = null) {
             // Example: increase size for Application log (classic) to 64 MB and set circular
-            var ok = SearchEvents.SetChannelPolicy(new ChannelPolicy {
+            var ok = EventLogChannelPolicyService.Apply(new ChannelPolicy {
                 LogName = logName,
                 MachineName = machineName,
                 MaximumSizeInBytes = 64L * 1024 * 1024,

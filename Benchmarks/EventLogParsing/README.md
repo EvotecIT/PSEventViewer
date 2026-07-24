@@ -38,12 +38,11 @@ metadata CSV with EvtxECmd's forensic CSV compares different work and different 
 `Metadata`, `Message`, `StructuredData`, and `Full` are run through the same event window and streaming accumulator:
 
 - `Metadata` touches core system fields without messages, XML, properties, attachments, or bookmarks.
-- `Message` touches core metadata, the provider-formatted message, and provider display names. PSEventViewer also
-  snapshots the event bookmark, as it does for every non-metadata mode.
-- `StructuredData` touches metadata, properties, and raw XML. PSEventViewer also parses its named `Data` dictionary,
-  and snapshots the bookmark. It does not format the message or decode binary attachments.
+- `Message` touches core metadata, the provider-formatted message, and provider display names.
+- `StructuredData` touches metadata, properties, and raw XML. PSEventViewer also parses its named `Data` dictionary.
+  It does not format the message or decode binary attachments.
 - `Full` requests message and structured data together. PSEventViewer additionally materializes its parsed
-  `MessageData` fields and decodes binary attachments; bookmark work is already present in every non-metadata mode.
+  `MessageData` fields and decodes binary attachments.
 - `MetadataCsv` writes the five fields shown in the public README. The three successful engines must produce the same
   row count, byte count, and SHA-256.
 - `ExactRawXml` writes every native event XML fragment inside the same UTF-8 `Events` document. Raw .NET,
@@ -51,8 +50,8 @@ metadata CSV with EvtxECmd's forensic CSV compares different work and different 
 
 The `Message`, `StructuredData`, and `Full` cases are therefore common-user-job comparisons rather than promises that
 every internal allocation or returned type is identical. Result artifacts expose message characters, XML characters,
-property count, structured-field count, message-field count, and attachment bytes. Bookmark materialization is
-documented but is not currently a separate counter.
+property count, structured-field count, message-field count, and attachment bytes. The benchmark does not request
+bookmarks; both public APIs keep that optional cost outside these cases.
 
 ## What “full” means in EvtxECmd
 
@@ -79,7 +78,9 @@ repository, packages, or Rust code.
 Every successful lane must process the expected event count with no parser errors. Common-work lanes also require
 non-empty event identity checks, an order-sensitive rolling signature, first and last record IDs, and mode-specific
 materialization rules. Output lanes must create a non-empty file and record its size and SHA-256 outside the timed
-operation in a retained `output-validation.json` sidecar.
+operation in a retained `output-validation.json` sidecar. After validation succeeds, the generated event payload is
+deleted so repeated large-log samples do not consume unbounded disk space. A failed lane keeps its output for
+diagnosis.
 
 PowerForge records:
 

@@ -39,16 +39,16 @@ public class KerberosTicketFailure : EventRuleBase
     /// <summary>Initialises a Kerberos ticket failure wrapper from an event record.</summary>
     public KerberosTicketFailure(EventObject eventObject) : base(eventObject)
     {
-        _eventObject = eventObject;
+        Event = eventObject;
         Type = "KerberosTicketFailure";
-        Computer = _eventObject.ComputerName;
-        Action = _eventObject.MessageSubject;
-        AccountName = _eventObject.GetTargetAccountOrEmpty();
-        FailureCode = _eventObject.GetDataValueOrEmpty(KnownEventField.Status);
-        IpAddress = _eventObject.GetDataValueOrEmpty(KnownEventField.IpAddress);
-        IpPort = _eventObject.GetDataValueOrEmpty(KnownEventField.IpPort);
-        EncryptionType = EventsHelper.GetTicketEncryptionType(_eventObject.GetDataValueOrEmpty(KnownEventField.TicketEncryptionType));
-        When = _eventObject.TimeCreated;
+        Computer = Event.ComputerName;
+        Action = Event.MessageSubject;
+        AccountName = Event.GetTargetAccountOrEmpty();
+        FailureCode = Event.GetDataValueOrEmpty(KnownEventField.Status);
+        IpAddress = Event.GetDataValueOrEmpty(KnownEventField.IpAddress);
+        IpPort = Event.GetDataValueOrEmpty(KnownEventField.IpPort);
+        EncryptionType = EventsHelper.GetTicketEncryptionType(Event.GetDataValueOrEmpty(KnownEventField.TicketEncryptionType));
+        When = Event.TimeCreated;
 
         WeakEncryptionAlgorithm = EncryptionType is TicketEncryptionType.DES_CBC_CRC
             or TicketEncryptionType.DES_CBC_MD5

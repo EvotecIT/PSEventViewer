@@ -38,17 +38,17 @@ public class ADGroupEnumeration : EventRuleBase {
 
     /// <summary>Initialises a group enumeration wrapper from an event record.</summary>
     public ADGroupEnumeration(EventObject eventObject) : base(eventObject) {
-        _eventObject = eventObject;
+        Event = eventObject;
         Type = "ADGroupEnumeration";
 
-        Computer = _eventObject.ComputerName;
-        Action = _eventObject.MessageSubject;
+        Computer = Event.ComputerName;
+        Action = Event.MessageSubject;
 
-        GroupName = _eventObject.GetTargetAccountOrEmpty();
+        GroupName = Event.GetTargetAccountOrEmpty();
 
         // common fields
-        Who = _eventObject.GetSubjectAccountOrEmpty();
-        When = _eventObject.TimeCreated;
+        Who = Event.GetSubjectAccountOrEmpty();
+        When = Event.TimeCreated;
     }
 }
 

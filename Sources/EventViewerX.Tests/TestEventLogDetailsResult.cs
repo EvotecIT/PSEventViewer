@@ -10,7 +10,7 @@ public class TestEventLogDetailsResult {
     public void GetLogDetailsResult_KnownLog_ReturnsDetails() {
         if (!OperatingSystem.IsWindows()) return;
 
-        EventLogDetailsResult result = SearchEvents.GetLogDetailsResult("Application");
+        EventLogDetailsResult result = EventLogCatalog.GetLogDetailsResult("Application");
 
         Assert.True(result.Success);
         Assert.Equal(EventLogDetailsStatus.Success, result.Status);
@@ -22,7 +22,7 @@ public class TestEventLogDetailsResult {
     public void GetLogDetailsResult_MissingLog_ReturnsDiagnosticFailure() {
         if (!OperatingSystem.IsWindows()) return;
 
-        EventLogDetailsResult result = SearchEvents.GetLogDetailsResult("Definitely-Missing-EventViewerX-UnitTest-Log");
+        EventLogDetailsResult result = EventLogCatalog.GetLogDetailsResult("Definitely-Missing-EventViewerX-UnitTest-Log");
 
         Assert.False(result.Success);
         Assert.Equal(EventLogDetailsStatus.LogConfigurationUnavailable, result.Status);
@@ -36,7 +36,7 @@ public class TestEventLogDetailsResult {
 
         using var session = new EventLogSession();
 
-        EventLogDetailsResult result = SearchEvents.GetLogDetailsResult(
+        EventLogDetailsResult result = EventLogCatalog.GetLogDetailsResult(
             "Application",
             session,
             timeoutMs: 10000,
@@ -52,7 +52,7 @@ public class TestEventLogDetailsResult {
     public void OpenSessionResult_LocalMachine_ReturnsSession() {
         if (!OperatingSystem.IsWindows()) return;
 
-        using EventLogSessionOpenResult result = SearchEvents.OpenSessionResult(null, purpose: "UnitTest", logName: "Application");
+        using EventLogSessionOpenResult result = EventLogSessionManager.OpenSessionResult(null, purpose: "UnitTest", logName: "Application");
 
         Assert.True(result.Success);
         Assert.Equal(EventLogSessionOpenStatus.Success, result.Status);
@@ -65,10 +65,10 @@ public class TestEventLogDetailsResult {
     public void MapSessionFailureStatus_SessionConstructionFailureIsHostUnavailable() {
         Assert.Equal(
             EventLogDetailsStatus.HostUnavailable,
-            SearchEvents.MapSessionFailureStatus(EventLogSessionOpenStatus.EventLogSessionUnavailable));
+            EventLogCatalog.MapSessionFailureStatus(EventLogSessionOpenStatus.EventLogSessionUnavailable));
         Assert.Equal(
             EventLogDetailsStatus.Error,
-            SearchEvents.MapSessionFailureStatus(EventLogSessionOpenStatus.Error));
+            EventLogCatalog.MapSessionFailureStatus(EventLogSessionOpenStatus.Error));
     }
 
     [Theory]
@@ -76,13 +76,13 @@ public class TestEventLogDetailsResult {
     [InlineData(-1)]
     public void GetLogDetailsResult_RejectsNonPositiveTimeoutsAcrossOverloads(int timeoutMs) {
         Assert.Throws<ArgumentOutOfRangeException>(() =>
-            SearchEvents.GetLogDetailsResult("Application", timeoutMs: timeoutMs));
+            EventLogCatalog.GetLogDetailsResult("Application", timeoutMs: timeoutMs));
 
         if (!OperatingSystem.IsWindows()) return;
 
         using var session = new EventLogSession();
         Assert.Throws<ArgumentOutOfRangeException>(() =>
-            SearchEvents.GetLogDetailsResult("Application", session, timeoutMs));
+            EventLogCatalog.GetLogDetailsResult("Application", session, timeoutMs));
     }
 
     [Fact]
@@ -97,9 +97,9 @@ public class TestEventLogDetailsResult {
         logger.OnWarningMessage += (_, args) => warnings.Add(args.FullMessage);
         logger.OnVerboseMessage += (_, args) => verboseMessages.Add(args.FullMessage);
         Settings._logger = logger;
-        SearchEvents.ClearHostCache(host);
+        EventLogSessionManager.ClearHostCache(host);
         try {
-            using EventLogSessionOpenResult result = SearchEvents.OpenSessionResult(
+            using EventLogSessionOpenResult result = EventLogSessionManager.OpenSessionResult(
                 host,
                 timeoutMs: 100,
                 purpose: "UnitTest",
@@ -110,7 +110,7 @@ public class TestEventLogDetailsResult {
             Assert.Empty(warnings);
             Assert.Empty(verboseMessages);
         } finally {
-            SearchEvents.ClearHostCache(host);
+            EventLogSessionManager.ClearHostCache(host);
             Settings._logger = previous;
         }
     }
@@ -135,7 +135,7 @@ public class TestEventLogDetailsResult {
     public void ApplyEventTimeFailure_ReportsTimeoutWithPartialDetailsStatus() {
         var result = new EventLogDetailsResult { Status = EventLogDetailsStatus.Success };
 
-        SearchEvents.ApplyEventTimeFailure(result, new TimeoutException("event-time budget expired"));
+        EventLogCatalog.ApplyEventTimeFailure(result, new TimeoutException("event-time budget expired"));
 
         Assert.Equal(EventLogDetailsStatus.Timeout, result.Status);
         Assert.Equal(nameof(TimeoutException), result.ErrorType);
@@ -146,7 +146,7 @@ public class TestEventLogDetailsResult {
     public void ApplyEventTimeFailure_ReportsNonTimeoutReadFailure() {
         var result = new EventLogDetailsResult { Status = EventLogDetailsStatus.Success };
 
-        SearchEvents.ApplyEventTimeFailure(result, new InvalidOperationException("event-time read failed"));
+        EventLogCatalog.ApplyEventTimeFailure(result, new InvalidOperationException("event-time read failed"));
 
         Assert.Equal(EventLogDetailsStatus.EventTimesUnavailable, result.Status);
         Assert.Equal(nameof(InvalidOperationException), result.ErrorType);
@@ -157,7 +157,7 @@ public class TestEventLogDetailsResult {
     public void ApplyEventTimeFailure_PreservesAccessDeniedClassification() {
         var result = new EventLogDetailsResult { Status = EventLogDetailsStatus.Success };
 
-        SearchEvents.ApplyEventTimeFailure(result, new UnauthorizedAccessException("event-time access denied"));
+        EventLogCatalog.ApplyEventTimeFailure(result, new UnauthorizedAccessException("event-time access denied"));
 
         Assert.Equal(EventLogDetailsStatus.AccessDenied, result.Status);
         Assert.Equal(nameof(UnauthorizedAccessException), result.ErrorType);
@@ -171,7 +171,7 @@ public class TestEventLogDetailsResult {
             ErrorType = nameof(TimeoutException)
         };
 
-        SearchEvents.ApplyEventTimeFailure(result, new InvalidOperationException("event-time read failed"));
+        EventLogCatalog.ApplyEventTimeFailure(result, new InvalidOperationException("event-time read failed"));
 
         Assert.Equal(EventLogDetailsStatus.Timeout, result.Status);
         Assert.Equal($"{nameof(TimeoutException)};{nameof(InvalidOperationException)}", result.ErrorType);
@@ -183,13 +183,13 @@ public class TestEventLogDetailsResult {
     public void MapLogInformationFailureStatus_PreservesActionableClassification() {
         Assert.Equal(
             EventLogDetailsStatus.Timeout,
-            SearchEvents.MapLogInformationFailureStatus(new TimeoutException()));
+            EventLogCatalog.MapLogInformationFailureStatus(new TimeoutException()));
         Assert.Equal(
             EventLogDetailsStatus.AccessDenied,
-            SearchEvents.MapLogInformationFailureStatus(new UnauthorizedAccessException()));
+            EventLogCatalog.MapLogInformationFailureStatus(new UnauthorizedAccessException()));
         Assert.Equal(
             EventLogDetailsStatus.LogInformationUnavailable,
-            SearchEvents.MapLogInformationFailureStatus(new InvalidOperationException()));
+            EventLogCatalog.MapLogInformationFailureStatus(new InvalidOperationException()));
     }
 
     [Fact]
@@ -200,12 +200,12 @@ public class TestEventLogDetailsResult {
         logger.OnWarningMessage += (_, args) => warnings.Add(args.FullMessage);
         Settings._logger = logger;
         try {
-            SearchEvents.WriteLogDetailsWarningIfNeeded(new EventLogDetailsResult {
+            EventLogCatalog.WriteLogDetailsWarningIfNeeded(new EventLogDetailsResult {
                 LogName = "System",
                 Status = EventLogDetailsStatus.EventTimesUnavailable,
                 ErrorMessage = "Timestamp read failed."
             });
-            SearchEvents.WriteLogDetailsWarningIfNeeded(new EventLogDetailsResult {
+            EventLogCatalog.WriteLogDetailsWarningIfNeeded(new EventLogDetailsResult {
                 LogName = "Application",
                 Status = EventLogDetailsStatus.Success
             });
@@ -222,32 +222,32 @@ public class TestEventLogDetailsResult {
     public void MergeDiagnosticStatus_PromotesGenericFailureButRetainsActionableFailure() {
         Assert.Equal(
             EventLogDetailsStatus.Timeout,
-            SearchEvents.MergeDiagnosticStatus(
+            EventLogCatalog.MergeDiagnosticStatus(
                 EventLogDetailsStatus.LogInformationUnavailable,
                 EventLogDetailsStatus.Timeout));
         Assert.Equal(
             EventLogDetailsStatus.AccessDenied,
-            SearchEvents.MergeDiagnosticStatus(
+            EventLogCatalog.MergeDiagnosticStatus(
                 EventLogDetailsStatus.AccessDenied,
                 EventLogDetailsStatus.Timeout));
         Assert.Equal(
             EventLogDetailsStatus.LogConfigurationUnavailable,
-            SearchEvents.MergeDiagnosticStatus(
+            EventLogCatalog.MergeDiagnosticStatus(
                 EventLogDetailsStatus.LogConfigurationUnavailable,
                 EventLogDetailsStatus.EventTimesUnavailable));
         Assert.Equal(
             EventLogDetailsStatus.AccessDenied,
-            SearchEvents.MergeDiagnosticStatus(
+            EventLogCatalog.MergeDiagnosticStatus(
                 EventLogDetailsStatus.Error,
                 EventLogDetailsStatus.AccessDenied));
         Assert.Equal(
             EventLogDetailsStatus.Timeout,
-            SearchEvents.MergeDiagnosticStatus(
+            EventLogCatalog.MergeDiagnosticStatus(
                 EventLogDetailsStatus.Error,
                 EventLogDetailsStatus.Timeout));
         Assert.Equal(
             EventLogDetailsStatus.Error,
-            SearchEvents.MergeDiagnosticStatus(
+            EventLogCatalog.MergeDiagnosticStatus(
                 EventLogDetailsStatus.LogInformationUnavailable,
                 EventLogDetailsStatus.Error));
     }
@@ -256,12 +256,12 @@ public class TestEventLogDetailsResult {
     public void AppendResultDiagnostic_PreservesAllPartialFailureEvidence() {
         var result = new EventLogDetailsResult { Status = EventLogDetailsStatus.LogInformationUnavailable };
 
-        SearchEvents.AppendResultDiagnostic(
+        EventLogCatalog.AppendResultDiagnostic(
             result,
             EventLogDetailsStatus.Timeout,
             "Runtime information timed out.",
             nameof(TimeoutException));
-        SearchEvents.AppendResultDiagnostic(
+        EventLogCatalog.AppendResultDiagnostic(
             result,
             EventLogDetailsStatus.EventTimesUnavailable,
             "Event time failed.",
@@ -283,11 +283,11 @@ public class TestEventLogDetailsResult {
         logger.OnWarningMessage += (_, args) => warnings.Add(args.FullMessage);
         Settings._logger = logger;
         try {
-            EventLogDetailsResult typed = SearchEvents.GetLogDetailsResult("Definitely-Missing-EventViewerX-Warning-Test-Log");
+            EventLogDetailsResult typed = EventLogCatalog.GetLogDetailsResult("Definitely-Missing-EventViewerX-Warning-Test-Log");
             Assert.True(typed.HasDiagnosticFailure);
             Assert.Empty(warnings);
 
-            EventLogDetails? details = SearchEvents.GetLogDetails("Definitely-Missing-EventViewerX-Warning-Test-Log");
+            EventLogDetails? details = EventLogCatalog.GetLogDetails("Definitely-Missing-EventViewerX-Warning-Test-Log");
             Assert.Null(details);
         } finally {
             Settings._logger = previous;
@@ -307,7 +307,7 @@ public class TestEventLogDetailsResult {
         logger.OnWarningMessage += (_, args) => warnings.Add(args.FullMessage);
         Settings._logger = logger;
         try {
-            using EventLogSessionOpenResult result = SearchEvents.CreateSessionResult(
+            using EventLogSessionOpenResult result = EventLogSessionManager.CreateSessionResult(
                 null,
                 "LogDetails",
                 "Application",
@@ -328,9 +328,9 @@ public class TestEventLogDetailsResult {
         if (!OperatingSystem.IsWindows()) return;
 
         const string host = "[";
-        SearchEvents.ClearHostCache(host);
+        EventLogSessionManager.ClearHostCache(host);
         try {
-            List<EventLogDetailsResult> results = SearchEvents.DisplayEventLogResults(
+            List<EventLogDetailsResult> results = EventLogCatalog.DisplayEventLogResults(
                     new[] { "Application", "System", "Application" },
                     host,
                     timeoutMs: 100)
@@ -340,7 +340,7 @@ public class TestEventLogDetailsResult {
             Assert.Equal(new[] { "Application", "System" }, results.Select(result => result.LogName));
             Assert.All(results, result => Assert.Equal(EventLogDetailsStatus.HostUnavailable, result.Status));
         } finally {
-            SearchEvents.ClearHostCache(host);
+            EventLogSessionManager.ClearHostCache(host);
         }
     }
 }

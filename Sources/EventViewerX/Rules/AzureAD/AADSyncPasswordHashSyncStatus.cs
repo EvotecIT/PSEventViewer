@@ -44,12 +44,12 @@ public class AADSyncPasswordHashSyncStatus : EventRuleBase
     /// <param name="eventObject">Event containing password hash sync status.</param>
     public AADSyncPasswordHashSyncStatus(EventObject eventObject) : base(eventObject)
     {
-        _eventObject = eventObject;
+        Event = eventObject;
         Type = "AADSyncPasswordHashSyncStatus";
-        Computer = _eventObject.ComputerName;
-        When = _eventObject.TimeCreated;
+        Computer = Event.ComputerName;
+        When = Event.TimeCreated;
 
-        var msg = Rules.RuleHelpers.GetMessage(_eventObject);
+        var msg = Rules.RuleHelpers.GetMessage(Event);
         var partitionMatch = PartitionRegex.Match(msg);
         if (partitionMatch.Success) PartitionName = partitionMatch.Groups["p"].Value;
 

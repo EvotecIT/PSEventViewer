@@ -19,7 +19,62 @@
     It 'Should return proper LogName' {
         $Events[0].LogName | Should -Be 'Active Directory Web Services'
     }
+    It 'Should default to message projection rather than eager full payload parsing' {
+        $Events[0].ReadMode | Should -Be ([EventViewerX.EventReadMode]::Message)
+    }
 }
+
+Describe 'Get-EVXEvent - RawXml bookmark projection' {
+    It 'materializes a bookmark only when explicitly requested' {
+        $FilePath = [System.IO.Path]::Combine(
+            $PSScriptRoot,
+            'Logs',
+            'Active Directory Web Services.evtx')
+
+        $WithoutBookmark = Get-EVXEvent `
+            -Path $FilePath `
+            -MaxEvents 1 `
+            -ReadMode RawXml
+        $WithBookmark = Get-EVXEvent `
+            -Path $FilePath `
+            -MaxEvents 1 `
+            -ReadMode RawXml `
+            -IncludeBookmark
+
+        $WithoutBookmark.Bookmark | Should -BeNullOrEmpty
+        $WithBookmark.Bookmark | Should -Not -BeNullOrEmpty
+        $WithBookmark.XMLData | Should -Not -BeNullOrEmpty
+        $WithBookmark.Properties | Should -BeNullOrEmpty
+    }
+}
+
+Describe 'Get-EVXEvent provider-only binding' {
+    It 'does not require LogName when ProviderName is supplied' {
+        {
+            Get-EVXEvent `
+                -ProviderName Microsoft-Windows-Kernel-General `
+                -EventId 12 `
+                -MaxEvents 1 `
+                -ReadMode Metadata
+        } | Should -Not -Throw
+    }
+
+    It 'preserves positional LogName binding' {
+        $Command = Get-Command Get-EVXEvent
+        $Generic = $Command.ParameterSets |
+            Where-Object Name -EQ 'GenericEvents'
+        $LogName = $Generic.Parameters |
+            Where-Object Name -EQ 'LogName'
+        $Provider = $Command.ParameterSets |
+            Where-Object Name -EQ 'ProviderEvents' |
+            ForEach-Object Parameters |
+            Where-Object Name -EQ 'ProviderName'
+
+        $LogName.Position | Should -Be 0
+        $Provider.Position | Should -Be ([int]::MinValue)
+    }
+}
+
 Describe 'Get-EVXEvent - MaxEvents Test (EVTX sample)' {
     $FilePath = [System.IO.Path]::Combine($PSScriptRoot, 'Logs', 'Active Directory Web Services.evtx')
 
@@ -72,7 +127,7 @@ Describe 'Get-EVXEvent - Read events from path (oldest / newest)' {
 
     It 'Should read 1 newest event' {
 
-        $EventsNewest = Get-EVXEvent -Path $FilePath -MaxEvents 1 -Expand
+        $EventsNewest = Get-EVXEvent -Path $FilePath -MaxEvents 1 -ReadMode StructuredData -Expand
         $EventsNewest.Count | Should -Be 1
         $EventsNewest[0].Id | Should -Be 1200
         $EventsNewest[0].GatheredFrom | Should -Be $FilePath
@@ -96,14 +151,14 @@ Describe 'Get-EVXEvent - Read events with NamedDataFilter' {
     }
 
     It 'named exclude filter' {
-        $ret = Get-EVXEvent -Path $FilePath -Id 7040 -NamedDataExcludeFilter @{ param4 = ('BITS', 'TrustedInstaller') } -MaxEvents 1 -AsArray -Expand
+        $ret = Get-EVXEvent -Path $FilePath -Id 7040 -NamedDataExcludeFilter @{ param4 = ('BITS', 'TrustedInstaller') } -MaxEvents 1 -ReadMode StructuredData -AsArray -Expand
         $ret | Should -HaveCount 1
         ( [datetime] $ret.TimeCreated ) | Should -Be ( [datetime] "2019-08-30T06:57:44.037957100Z" )
         $ret.param4 | Should -Be 'NgcCtnrSvc'
 
     }
     It 'named include filter' {
-        $ret = Get-EVXEvent -Path $FilePath -Id 7040 -NamedDataFilter @{ param4 = ('BITS', 'TrustedInstaller') } -oldest -MaxEvents 1 -AsArray -Expand
+        $ret = Get-EVXEvent -Path $FilePath -Id 7040 -NamedDataFilter @{ param4 = ('BITS', 'TrustedInstaller') } -oldest -MaxEvents 1 -ReadMode StructuredData -AsArray -Expand
         $ret | Should -HaveCount 1
         ( [datetime] $ret.TimeCreated ) | Should -Be ( [datetime] "2019-08-30T06:50:13.213617700Z" )
         $ret.param4 | Should -Be 'BITS'
@@ -139,12 +194,49 @@ Describe 'Get-EVXEvent - MessageRegex' {
 }
 
 Describe 'Get-EVXEvent - Parameter validation' {
+    It 'uses an Int64 MaxEvents contract like Get-WinEvent' {
+        (Get-Command Get-EVXEvent).Parameters.MaxEvents.ParameterType |
+            Should -Be ([long])
+    }
+
     It 'Fails when NumberOfThreads is less than 1' {
         { Get-EVXEvent -LogName 'Application' -NumberOfThreads 0 } | Should -Throw
     }
 
     It 'Fails when NumberOfThreads exceeds the reusable concurrency bound' {
         { Get-EVXEvent -LogName 'Application' -NumberOfThreads 65 } | Should -Throw
+    }
+
+    It 'uses one MaxConcurrency contract while preserving NumberOfThreads as an alias' {
+        $Parameter = (Get-Command Get-EVXEvent).Parameters['MaxConcurrency']
+
+        $Parameter | Should -Not -BeNullOrEmpty
+        $Parameter.Aliases | Should -Contain 'NumberOfThreads'
+        $Parameter.ParameterSets.Keys | Should -Contain 'GenericEvents'
+        $Parameter.ParameterSets.Keys | Should -Contain 'NamedEvents'
+        $Parameter.ParameterSets.Keys | Should -Contain 'PathEvents'
+        $Parameter.ParameterSets.Keys | Should -Contain 'FilterHashtableEvents'
+        $Parameter.ParameterSets.Keys | Should -Contain 'FilterXmlEvents'
+        $Parameter.ParameterSets.Keys | Should -Contain 'ProviderEvents'
+    }
+
+    It 'applies DisableParallel to offline native queries' {
+        $FilePath = [System.IO.Path]::Combine($PSScriptRoot, 'Logs', 'Active Directory Web Services.evtx')
+
+        $Event = Get-EVXEvent -Path $FilePath -MaxEvents 1 -MaxConcurrency 4 -DisableParallel
+
+        $Event | Should -HaveCount 1
+    }
+
+    It 'exposes named-event source and projection controls' {
+        $NamedSet = (Get-Command Get-EVXEvent).ParameterSets |
+            Where-Object Name -EQ 'NamedEvents'
+
+        $NamedSet.Parameters.Name | Should -Contain 'LogName'
+        $NamedSet.Parameters.Name | Should -Contain 'EventId'
+        $NamedSet.Parameters.Name | Should -Contain 'Oldest'
+        $NamedSet.Parameters.Name | Should -Contain 'ReadMode'
+        $NamedSet.Parameters.Name | Should -Contain 'MessageCulture'
     }
 }
 
@@ -168,5 +260,350 @@ Describe 'Get-EVXEvent - EVTX record filtering' {
         $Matching | Should -HaveCount 1
         $Matching[0].RecordId | Should -Be $Latest.RecordId
         $Missing | Should -HaveCount 0
+    }
+}
+
+Describe 'Get-EVXEvent - Get-WinEvent compatible native filters' {
+    It 'expands provider wildcards and chunks past the native 22-expression limit' {
+        $event = Get-EVXEvent `
+            -FilterHashtable @{
+                LogName = 'System'
+                ProviderName = 'Microsoft-Windows-Kernel-*'
+            } `
+            -MaxEvents 1 `
+            -ReadMode Metadata
+
+        $event | Should -Not -BeNullOrEmpty
+        $event.ProviderName | Should -Match '^Microsoft-Windows-Kernel-'
+    }
+
+    It 'accepts Oldest with a FilterHashtable query' {
+        $events = @(Get-EVXEvent -FilterHashtable @{ LogName = 'System' } -Oldest -MaxEvents 2 -ReadMode Metadata)
+        $events | Should -HaveCount 2
+        $events[0].RecordId | Should -BeLessThan $events[1].RecordId
+    }
+
+    It 'partitions SuppressHashFilter values beyond the native XPath limit' {
+        $events = @(
+            Get-EVXEvent `
+                -FilterHashtable @{
+                    LogName = 'System'
+                    SuppressHashFilter = @{
+                        Id = 1..60
+                    }
+                } `
+                -MaxEvents 2 `
+                -ReadMode Metadata
+        )
+
+        $events | Should -HaveCount 2
+        foreach ($event in $events) {
+            $event.Id | Should -Not -BeIn (1..60)
+        }
+    }
+
+    It 'resolves offline SuppressHashFilter provider wildcards from the file' {
+        $FilePath = [System.IO.Path]::Combine(
+            $PSScriptRoot,
+            'Logs',
+            'NamedFilterExamples.evtx')
+
+        $control = @(
+            Get-EVXEvent `
+                -FilterHashtable @{
+                    Path = $FilePath
+                    Id = 7040
+                } `
+                -ReadMode Metadata
+        )
+        $events = @(
+            Get-EVXEvent `
+                -FilterHashtable @{
+                    Path = $FilePath
+                    Id = 7040
+                    SuppressHashFilter = @{
+                        ProviderName = 'Service*'
+                    }
+                } `
+                -ReadMode Metadata
+        )
+
+        $control | Should -Not -BeNullOrEmpty
+        $events | Should -HaveCount 0
+    }
+
+    It 'accepts several FilterHashtable queries as one ordered union' {
+        $FilePath = [System.IO.Path]::Combine(
+            $PSScriptRoot,
+            'Logs',
+            'NamedFilterExamples.evtx')
+        $SystemEvent = Get-EVXEvent `
+            -LogName System `
+            -MaxEvents 1 `
+            -ReadMode Metadata
+        $events = @(
+            Get-EVXEvent `
+                -FilterHashtable @(
+                    @{
+                        Path = $FilePath
+                        Id = 7040
+                    },
+                    @{
+                        LogName = 'System'
+                        Id = $SystemEvent.Id
+                        StartTime = $SystemEvent.TimeCreated.AddSeconds(-1)
+                        EndTime = $SystemEvent.TimeCreated.AddSeconds(1)
+                    }
+                ) `
+                -ReadMode Metadata `
+                -Oldest
+        )
+
+        $events | Should -Not -BeNullOrEmpty
+        $events.GatheredFrom | Should -Contain $FilePath
+        $events.ContainerLog | Should -Contain 'System'
+        foreach ($source in $events | Group-Object GatheredFrom) {
+            $records = @($source.Group.RecordId)
+            for ($index = 1; $index -lt $records.Count; $index++) {
+                $records[$index] |
+                    Should -BeGreaterThan $records[$index - 1]
+            }
+        }
+    }
+
+    It 'accepts LogName and Path together in one FilterHashtable' {
+        $FilePath = [System.IO.Path]::Combine(
+            $PSScriptRoot,
+            'Logs',
+            'NamedFilterExamples.evtx')
+
+        $events = @(
+            Get-EVXEvent `
+                -FilterHashtable @{
+                    LogName = 'System'
+                    Path = $FilePath
+                    Id = 7040
+                } `
+                -ReadMode Metadata
+        )
+
+        $events.GatheredFrom | Should -Contain $FilePath
+        $events.ContainerLog | Should -Contain 'System'
+    }
+
+    It 'deduplicates overlapping FilterHashtable Select expressions natively' {
+        $Latest = Get-EVXEvent `
+            -LogName System `
+            -MaxEvents 1 `
+            -ReadMode Metadata
+        $Filter = @{
+            LogName = 'System'
+            Id = $Latest.Id
+        }
+
+        $events = @(
+            Get-EVXEvent `
+                -FilterHashtable @($Filter, $Filter) `
+                -MaxEvents 10 `
+                -ReadMode Metadata
+        )
+
+        $events | Should -HaveCount 10
+        @($events.RecordId | Sort-Object -Unique) |
+            Should -HaveCount 10
+    }
+}
+
+Describe 'Get-EVXEvent - wildcard source parity' {
+    It 'expands channel wildcards on the queried machine' {
+        $events = @(
+            Get-EVXEvent `
+                -LogName '*PowerShell*' `
+                -MaxEvents 3 `
+                -ReadMode Metadata `
+                -ContinueOnError `
+                -ErrorAction SilentlyContinue
+        )
+
+        $events | Should -Not -BeNullOrEmpty
+        foreach ($event in $events) {
+            $event.ContainerLog | Should -Match 'PowerShell'
+        }
+    }
+
+    It 'expands offline file path wildcards' {
+        $pattern = [System.IO.Path]::Combine(
+            $PSScriptRoot,
+            'Logs',
+            'NamedFilter*.evtx')
+
+        $events = @(
+            Get-EVXEvent `
+                -Path $pattern `
+                -Oldest `
+                -MaxEvents 2 `
+                -ReadMode Metadata
+        )
+
+        $events | Should -HaveCount 2
+    }
+
+    It 'matches offline provider wildcards from event metadata' {
+        $filePath = [System.IO.Path]::Combine(
+            $PSScriptRoot,
+            'Logs',
+            'NamedFilterExamples.evtx')
+
+        $events = @(
+            Get-EVXEvent `
+                -Path $filePath `
+                -ProviderName 'Service*' `
+                -Oldest `
+                -MaxEvents 3 `
+                -ReadMode Metadata
+        )
+
+        $events | Should -HaveCount 3
+        foreach ($event in $events) {
+            $event.ProviderName | Should -BeLike 'Service*'
+        }
+    }
+}
+
+Describe 'Get-EVXEvent - pipeline parity' {
+    It 'accepts channel names from the pipeline' {
+        $events = @(
+            'System', 'Application' |
+                Get-EVXEvent `
+                    -MaxEvents 1 `
+                    -ReadMode Metadata
+        )
+
+        $events | Should -HaveCount 2
+        $events.ContainerLog | Should -Contain 'System'
+        $events.ContainerLog | Should -Contain 'Application'
+    }
+
+    It 'accepts PSPath by property name from the pipeline' {
+        $FilePath = [System.IO.Path]::Combine(
+            $PSScriptRoot,
+            'Logs',
+            'NamedFilterExamples.evtx')
+
+        $events = @(
+            [pscustomobject] @{ PSPath = $FilePath } |
+                Get-EVXEvent `
+                    -MaxEvents 1 `
+                    -ReadMode Metadata
+        )
+
+        $events | Should -HaveCount 1
+        $events[0].GatheredFrom | Should -Be $FilePath
+    }
+
+    It 'accepts hashtable queries from the pipeline' {
+        $events = @(
+            @{ LogName = 'System'; Id = 117 } |
+                Get-EVXEvent `
+                    -MaxEvents 1 `
+                    -ReadMode Metadata
+        )
+
+        $events | Should -HaveCount 1
+        $events[0].Id | Should -Be 117
+    }
+
+    It 'accepts an XmlDocument query from the pipeline' {
+        [xml] $Query = @'
+<QueryList>
+  <Query Id="0" Path="System">
+    <Select Path="System">*[System[EventID=117]]</Select>
+  </Query>
+</QueryList>
+'@
+
+        $events = @(
+            $Query |
+                Get-EVXEvent `
+                    -MaxEvents 1 `
+                    -ReadMode Metadata
+        )
+
+        $events | Should -HaveCount 1
+        $events[0].Id | Should -Be 117
+    }
+
+    It 'converts a direct FilterXml string to XmlDocument' {
+        $Query = @'
+<QueryList>
+  <Query Id="0" Path="System">
+    <Select Path="System">*[System[EventID=117]]</Select>
+  </Query>
+</QueryList>
+'@
+
+        $events = @(
+            Get-EVXEvent `
+                -FilterXml $Query `
+                -MaxEvents 1 `
+                -ReadMode Metadata
+        )
+
+        $events | Should -HaveCount 1
+        $events[0].Id | Should -Be 117
+    }
+}
+
+Describe 'Get-EVXEvent - Force parity' {
+    It 'exposes Force on wildcard-capable parameter sets' {
+        $command = Get-Command Get-EVXEvent
+
+        foreach ($setName in @(
+            'GenericEvents',
+            'ProviderEvents',
+            'FilterHashtableEvents')) {
+            $set = $command.ParameterSets |
+                Where-Object Name -EQ $setName
+
+            $set | Should -Not -BeNullOrEmpty
+            $set.Parameters.Name | Should -Contain 'Force'
+        }
+    }
+}
+
+Describe 'Get-EVXEvent - raw XPath wildcard expansion' {
+    It 'expands wildcard channel names before applying raw XPath' {
+        $events = @(
+            Get-EVXEvent `
+                -LogName 'Sys*' `
+                -FilterXPath '*' `
+                -MaxEvents 1 `
+                -ReadMode Metadata
+        )
+
+        $events | Should -HaveCount 1
+        $events[0].ContainerLog | Should -Be 'System'
+    }
+}
+
+Describe 'Get-EVXEvent - bookmark projection' {
+    It 'materializes bookmarks only when requested' {
+        $FilePath = [System.IO.Path]::Combine(
+            $PSScriptRoot,
+            'Logs',
+            'NamedFilterExamples.evtx')
+
+        $without = Get-EVXEvent `
+            -Path $FilePath `
+            -MaxEvents 1 `
+            -ReadMode Message
+        $with = Get-EVXEvent `
+            -Path $FilePath `
+            -MaxEvents 1 `
+            -ReadMode Message `
+            -IncludeBookmark
+
+        $without.Bookmark | Should -BeNullOrEmpty
+        $with.Bookmark | Should -Not -BeNullOrEmpty
     }
 }

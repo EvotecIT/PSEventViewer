@@ -61,17 +61,17 @@ namespace EventViewerX.Tests {
             var olderCompletion = new RestoredPowerShellScript { ScriptBlockId = "older" };
             var newerCompletion = new RestoredPowerShellScript { ScriptBlockId = "newer" };
 
-            SearchEvents.AddBoundedRestoredPowerShellScript(selected, encounterOrder: 1, olderCompletion, maxScripts: 1);
-            SearchEvents.AddBoundedRestoredPowerShellScript(selected, encounterOrder: 0, newerCompletion, maxScripts: 1);
+            PowerShellEventEngine.AddBoundedRestoredPowerShellScript(selected, encounterOrder: 1, olderCompletion, maxScripts: 1);
+            PowerShellEventEngine.AddBoundedRestoredPowerShellScript(selected, encounterOrder: 0, newerCompletion, maxScripts: 1);
 
             KeyValuePair<long, RestoredPowerShellScript> retained = Assert.Single(selected);
             Assert.Equal(0, retained.Key);
             Assert.Same(newerCompletion, retained.Value);
-            Assert.False(SearchEvents.CanFinalizeBoundedPowerShellScriptSelection(
+            Assert.False(PowerShellEventEngine.CanFinalizeBoundedPowerShellScriptSelection(
                 selected,
                 maxScripts: 1,
                 newestPendingEncounterOrder: 0));
-            Assert.True(SearchEvents.CanFinalizeBoundedPowerShellScriptSelection(
+            Assert.True(PowerShellEventEngine.CanFinalizeBoundedPowerShellScriptSelection(
                 selected,
                 maxScripts: 1,
                 newestPendingEncounterOrder: 2));
@@ -98,11 +98,11 @@ namespace EventViewerX.Tests {
                 events: new[] { CreateEventObject() },
                 parts: new Dictionary<int, string> {
                     [1] = "first",
-                    [SearchEvents.MaximumPowerShellScriptPartCount] = "last"
+                    [PowerShellEventEngine.MaximumPowerShellScriptPartCount] = "last"
                 },
                 expectedParts: int.MaxValue,
                 isComplete: false);
-            MethodInfo method = typeof(SearchEvents).GetMethod(
+            MethodInfo method = typeof(PowerShellEventEngine).GetMethod(
                 "TryBuildRestoredPowerShellScript",
                 BindingFlags.NonPublic | BindingFlags.Static)!;
             object?[] arguments = { assembly, false, new[] { "not-present" }, null };
@@ -138,10 +138,10 @@ namespace EventViewerX.Tests {
 
         [Fact]
         public void GetPowerShellScriptsRejectsInvalidBoundsBeforeOpeningTheLog() {
-            Assert.Throws<ArgumentOutOfRangeException>(() => SearchEvents.GetPowerShellScripts(
+            Assert.Throws<ArgumentOutOfRangeException>(() => PowerShellEventEngine.GetPowerShellScripts(
                 PowerShellEdition.WindowsPowerShell,
                 maxScripts: -1).ToList());
-            Assert.Throws<ArgumentOutOfRangeException>(() => SearchEvents.GetPowerShellScripts(
+            Assert.Throws<ArgumentOutOfRangeException>(() => PowerShellEventEngine.GetPowerShellScripts(
                 PowerShellEdition.WindowsPowerShell,
                 maxPendingScripts: 0).ToList());
         }
@@ -151,7 +151,7 @@ namespace EventViewerX.Tests {
             using var cancellation = new CancellationTokenSource();
             cancellation.Cancel();
 
-            Assert.Throws<OperationCanceledException>(() => SearchEvents.GetPowerShellScripts(
+            Assert.Throws<OperationCanceledException>(() => PowerShellEventEngine.GetPowerShellScripts(
                 PowerShellEdition.WindowsPowerShell,
                 null,
                 null,
@@ -161,10 +161,10 @@ namespace EventViewerX.Tests {
                 null,
                 0,
                 0,
-                SearchEvents.DefaultPowerShellScriptPendingLimit,
-                SearchEvents.DefaultPowerShellScriptEventCacheLimit,
+                PowerShellEventEngine.DefaultPowerShellScriptPendingLimit,
+                PowerShellEventEngine.DefaultPowerShellScriptEventCacheLimit,
                 cancellation.Token).ToList());
-            Assert.Throws<OperationCanceledException>(() => SearchEvents.GetPowerShellScriptExecution(
+            Assert.Throws<OperationCanceledException>(() => PowerShellEventEngine.GetPowerShellScriptExecution(
                 PowerShellEdition.WindowsPowerShell,
                 null,
                 null,

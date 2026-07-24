@@ -29,13 +29,13 @@ public class FirewallRuleChange : EventRuleBase {
 
     /// <summary>Initialises a firewall rule change wrapper from an event record.</summary>
     public FirewallRuleChange(EventObject eventObject) : base(eventObject) {
-        _eventObject = eventObject;
+        Event = eventObject;
         Type = "FirewallRuleChange";
-        Computer = _eventObject.ComputerName;
-        Action = _eventObject.MessageSubject;
-        RuleName = _eventObject.GetValueFromDataDictionary("RuleName");
-        ProfileChanged = _eventObject.GetValueFromDataDictionary("ProfileChanged");
-        When = _eventObject.TimeCreated;
+        Computer = Event.ComputerName;
+        Action = Event.MessageSubject;
+        RuleName = Event.GetValueFromDataDictionary("RuleName");
+        ProfileChanged = Event.GetValueFromDataDictionary("ProfileChanged");
+        When = Event.TimeCreated;
     }
 }
 

@@ -128,20 +128,36 @@ public static partial class NamedEventsTimelineQueryExecutor {
         }
 
         try {
-            await foreach (var item in SearchEvents.FindEventsByNamedEvents(
-                               typeEventsList: effectiveNamedEvents,
-                               machineNames: normalizedMachines.Count > 0 ? normalizedMachines.Cast<string?>().ToList() : null,
-                               startTime: request.StartTimeUtc,
-                               endTime: request.EndTimeUtc,
-                               timePeriod: request.TimePeriod,
-                               maxThreads: maxThreads,
-                               maxEvents: selectionLimit,
-                               maxEventsScanned: request.MaxEventsScanned,
-                               executionInfo: queryInfo,
-                               cancellationToken: cancellationToken,
-                               resultPredicate: TrySelectTimelineEvent,
-                               sourceLogName: logName,
-                               sourceEventIds: normalizedEventIds)) {
+            var namedQuery =
+                new NamedEventQuery(
+                    effectiveNamedEvents) {
+                    MachineNames =
+                        normalizedMachines.Count > 0
+                            ? normalizedMachines
+                                .Cast<string?>()
+                                .ToArray()
+                            : null,
+                    StartTime =
+                        request.StartTimeUtc,
+                    EndTime =
+                        request.EndTimeUtc,
+                    TimePeriod =
+                        request.TimePeriod,
+                    MaxConcurrency = maxThreads,
+                    MaxEvents = selectionLimit,
+                    MaxCandidates =
+                        request.MaxEventsScanned,
+                    ResultPredicate =
+                        TrySelectTimelineEvent,
+                    SourceLogName = logName,
+                    SourceEventIds =
+                        normalizedEventIds
+                };
+            await foreach (var item in
+                           NamedEventEngine.ReadAsync(
+                               namedQuery,
+                               queryInfo,
+                               cancellationToken)) {
                 cancellationToken.ThrowIfCancellationRequested();
                 if (rows.Count >= maxEvents) {
                     outputTruncated = true;

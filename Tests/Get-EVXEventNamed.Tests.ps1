@@ -17,6 +17,22 @@ Describe 'Get-EVXEvent - Named Event' {
         $DnsConcurrencySets | Should -Be @('NamedEvents')
     }
 
+    It 'exposes native remote, failure, bookmark, and Int64 scan controls without no-op filters' {
+        $Command = Get-Command Get-EVXEvent
+        $NamedSet = $Command.ParameterSets |
+            Where-Object Name -EQ 'NamedEvents'
+
+        $NamedSet.Parameters.Name | Should -Contain 'Credential'
+        $NamedSet.Parameters.Name | Should -Contain 'Authentication'
+        $NamedSet.Parameters.Name | Should -Contain 'ContinueOnError'
+        $NamedSet.Parameters.Name | Should -Contain 'SessionTimeoutMs'
+        $NamedSet.Parameters.Name | Should -Contain 'BufferCapacity'
+        $NamedSet.Parameters.Name | Should -Contain 'IncludeBookmark'
+        $NamedSet.Parameters.Name | Should -Not -Contain 'NamedDataFilter'
+        $Command.Parameters.MaxEventsScanned.ParameterType |
+            Should -Be ([long])
+    }
+
     It 'Returns ADUserLogon events when available' -Tag 'RequiresEvents' {
         $events = Get-EVXEvent -Type ADUserLogon -MaxEvents 1 -ErrorAction SilentlyContinue
         if ($events) {
@@ -40,7 +56,7 @@ Describe 'Get-EVXEvent - Named Event' {
             return
         }
 
-        $Expanded = Get-EVXEvent -Type OSStartup -MaxEvents 1 -Expand -ErrorAction Stop | Select-Object -First 1
+        $Expanded = Get-EVXEvent -Type OSStartup -MaxEvents 1 -ReadMode Full -Expand -ErrorAction Stop | Select-Object -First 1
 
         $Expanded.PSObject.Properties.Name | Should -Contain $PayloadKey[0]
         $Expanded.PSObject.BaseObject | Should -BeOfType $Plain.GetType()

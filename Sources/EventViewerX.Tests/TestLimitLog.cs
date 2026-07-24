@@ -9,21 +9,35 @@ public class TestLimitLog {
         if (!OperatingSystem.IsWindows()) return;
         if (!TestEnv.IsAdmin()) return;
         string logName = "EVXLimitTestLog" + Guid.NewGuid().ToString("N");
-        if (SearchEvents.LogExists(logName)) {
-            SearchEvents.RemoveLog(logName);
+        if (ClassicEventLogManager.LogExists(logName)) {
+            ClassicEventLogManager.RemoveLog(logName);
         }
         try {
-            if (!SearchEvents.CreateLog(logName, logName, null, 1024, OverflowAction.OverwriteAsNeeded, 1)) return;
-            bool limited = SearchEvents.LimitLog(logName, null, 2048, OverflowAction.OverwriteOlder, 2);
-            if (!limited) return;
+            ClassicEventLogManager.EnsureLog(
+                new ClassicEventLogConfiguration {
+                    LogName = logName,
+                    SourceName = logName,
+                    MaximumKilobytes = 1024
+                });
+            ClassicEventLogEnsureResult limited =
+                ClassicEventLogManager.EnsureLog(
+                    new ClassicEventLogConfiguration {
+                        LogName = logName,
+                        SourceName = logName,
+                        MaximumKilobytes = 2048,
+                        OverflowAction =
+                            OverflowAction.OverwriteOlder,
+                        RetentionDays = 2
+                    });
+            Assert.True(limited.UpdatedConfiguration);
             using EventLog log = new(logName);
             Assert.Equal(2048, log.MaximumKilobytes);
             Assert.Equal(OverflowAction.OverwriteOlder, log.OverflowAction);
             Assert.Equal(2, log.MinimumRetentionDays);
         }
         finally {
-            if (SearchEvents.LogExists(logName)) {
-                SearchEvents.RemoveLog(logName);
+            if (ClassicEventLogManager.LogExists(logName)) {
+                ClassicEventLogManager.RemoveLog(logName);
             }
         }
     }
@@ -33,20 +47,44 @@ public class TestLimitLog {
         if (!OperatingSystem.IsWindows()) return;
         if (!TestEnv.IsAdmin()) return;
         string logName = "EVXLimitTestLog" + Guid.NewGuid().ToString("N");
-        if (SearchEvents.LogExists(logName)) {
-            SearchEvents.RemoveLog(logName);
+        if (ClassicEventLogManager.LogExists(logName)) {
+            ClassicEventLogManager.RemoveLog(logName);
         }
         try {
-            if (!SearchEvents.CreateLog(logName, logName, null, 1024, OverflowAction.OverwriteAsNeeded, 1)) return;
-            bool limited = SearchEvents.LimitLog(logName, null, 4096, OverflowAction.OverwriteAsNeeded);
-            if (!limited) return;
+            ClassicEventLogManager.EnsureLog(
+                new ClassicEventLogConfiguration {
+                    LogName = logName,
+                    SourceName = logName,
+                    MaximumKilobytes = 1024
+                });
+            OverflowAction originalOverflowAction;
+            int originalRetentionDays;
+            using (EventLog initial = new(logName)) {
+                originalOverflowAction =
+                    initial.OverflowAction;
+                originalRetentionDays =
+                    initial.MinimumRetentionDays;
+            }
+            ClassicEventLogEnsureResult limited =
+                ClassicEventLogManager.EnsureLog(
+                    new ClassicEventLogConfiguration {
+                        LogName = logName,
+                        SourceName = logName,
+                        MaximumKilobytes = 4096
+                    });
+            Assert.True(limited.UpdatedConfiguration);
             using EventLog log = new(logName);
             Assert.Equal(4096, log.MaximumKilobytes);
-            Assert.Equal(OverflowAction.OverwriteAsNeeded, log.OverflowAction);
+            Assert.Equal(
+                originalOverflowAction,
+                log.OverflowAction);
+            Assert.Equal(
+                originalRetentionDays,
+                log.MinimumRetentionDays);
         }
         finally {
-            if (SearchEvents.LogExists(logName)) {
-                SearchEvents.RemoveLog(logName);
+            if (ClassicEventLogManager.LogExists(logName)) {
+                ClassicEventLogManager.RemoveLog(logName);
             }
         }
     }

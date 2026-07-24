@@ -79,25 +79,70 @@ public class TestEventObjectReadMode {
 
         Assert.Equal("Subject", snapshot.MessageSubject);
         Assert.Null(typeof(EventObject).GetField("_messageData", Flags)!.GetValue(snapshot));
+        Assert.Null(typeof(EventObject).GetField("_messageLines", Flags)!.GetValue(snapshot));
 
         snapshot.MessageSubject = "Override";
         Assert.Equal("Value", snapshot.MessageData["Key"]);
         Assert.Equal("Override", snapshot.MessageSubject);
         Assert.NotNull(typeof(EventObject).GetField("_messageData", Flags)!.GetValue(snapshot));
+        Assert.Null(typeof(EventObject).GetField("_messageLines", Flags)!.GetValue(snapshot));
     }
 
     [Fact]
-    public void StructuredDataModeDoesNotFormatProviderMessage() {
+    public void StructuredDataModeDefersPayloadParsingAndDoesNotFormatMessage() {
         var record = new TrackingEventRecord();
 
         var snapshot = new EventObject(record, "testhost", EventReadMode.StructuredData);
+        const BindingFlags Flags = BindingFlags.Instance | BindingFlags.NonPublic;
 
         Assert.True(record.Disposed);
         Assert.Equal(0, record.FormatDescriptionCalls);
         Assert.Equal(1, record.ToXmlCalls);
+        Assert.Null(typeof(EventObject).GetField("_data", Flags)!.GetValue(snapshot));
+        Assert.Null(typeof(EventObject).GetField("_attachments", Flags)!.GetValue(snapshot));
+        Assert.False((bool)typeof(EventObject).GetField("_payloadParsed", Flags)!.GetValue(snapshot)!);
+
         Assert.Equal("StructuredValue", snapshot.Data["Field"]);
+        Assert.True((bool)typeof(EventObject).GetField("_payloadParsed", Flags)!.GetValue(snapshot)!);
         Assert.Empty(snapshot.Message);
         Assert.Empty(snapshot.Attachments);
+    }
+
+    [Fact]
+    public void RawXmlModeSkipsMessageAndTypedPropertyProjection() {
+        var record = new TrackingEventRecord();
+
+        var snapshot =
+            new EventObject(
+                record,
+                "testhost",
+                EventReadMode.RawXml);
+
+        Assert.True(record.Disposed);
+        Assert.Equal(0, record.FormatDescriptionCalls);
+        Assert.Equal(1, record.ToXmlCalls);
+        Assert.Equal(0, record.BookmarkCalls);
+        Assert.Empty(snapshot.Properties);
+        Assert.Contains("StructuredValue", snapshot.XMLData);
+        Assert.Equal(
+            "StructuredValue",
+            snapshot.Data["Field"]);
+    }
+
+    [Fact]
+    public void RawXmlModeMaterializesBookmarkOnlyWhenRequested() {
+        var record = new TrackingEventRecord();
+
+        var snapshot =
+            new EventObject(
+                record,
+                "testhost",
+                EventReadMode.RawXml,
+                includeBookmark: true);
+
+        Assert.True(record.Disposed);
+        Assert.Equal(1, record.BookmarkCalls);
+        Assert.Null(snapshot.Bookmark);
     }
 
     [Fact]

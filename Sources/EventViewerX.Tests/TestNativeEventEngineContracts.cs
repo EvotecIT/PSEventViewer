@@ -8,11 +8,147 @@ namespace EventViewerX.Tests;
 
 public sealed class TestNativeEventEngineContracts {
     [Fact]
+    public void RemoteSessionUsesTheRequiredReservedNativeTimeout() {
+        Assert.Equal(
+            0,
+            Native.WindowsEventRemoteSession
+                .EvtOpenSessionReservedTimeout);
+    }
+
+    [Fact]
+    public void BoundedNativeOperationHonorsCancellationAndCleansLateResult() {
+        using var release = new ManualResetEventSlim();
+        using var cleaned = new ManualResetEventSlim();
+        using var cancellation =
+            new CancellationTokenSource(50);
+
+        Assert.Throws<OperationCanceledException>(() =>
+            Native.BoundedNativeOperation.Execute(
+                () => {
+                    release.Wait();
+                    return new object();
+                },
+                5000,
+                "operation timed out",
+                cancellation.Token,
+                _ => cleaned.Set()));
+
+        release.Set();
+        Assert.True(
+            cleaned.Wait(5000),
+            "The late native result was not cleaned after cancellation.");
+    }
+
+    [Fact]
+    public void BookmarkMaterializationIsExplicitForQueryProjections() {
+        if (!OperatingSystem.IsWindows()) return;
+        string path = GetFixturePath();
+
+        EventObject withoutBookmark =
+            EventLogEngine.ReadFile(
+                    new EventLogFileQuery(path) {
+                        MaxEvents = 1,
+                        ReadMode = EventReadMode.Message
+                    })
+                .Single();
+        EventObject withBookmark =
+            EventLogEngine.ReadFile(
+                    new EventLogFileQuery(path) {
+                        MaxEvents = 1,
+                        ReadMode = EventReadMode.Message,
+                        IncludeBookmark = true
+                    })
+                .Single();
+        EventObject rawXmlWithoutBookmark =
+            EventLogEngine.ReadFile(
+                    new EventLogFileQuery(path) {
+                        MaxEvents = 1,
+                        ReadMode = EventReadMode.RawXml
+                    })
+                .Single();
+        EventObject rawXmlWithBookmark =
+            EventLogEngine.ReadFile(
+                    new EventLogFileQuery(path) {
+                        MaxEvents = 1,
+                        ReadMode = EventReadMode.RawXml,
+                        IncludeBookmark = true
+                    })
+                .Single();
+
+        Assert.Null(withoutBookmark.Bookmark);
+        Assert.NotNull(withBookmark.Bookmark);
+        Assert.Null(rawXmlWithoutBookmark.Bookmark);
+        Assert.NotNull(rawXmlWithBookmark.Bookmark);
+        Assert.False(string.IsNullOrWhiteSpace(
+            rawXmlWithBookmark.XMLData));
+    }
+
+    [Fact]
+    public void ChannelCatalogCanExcludeAnalyticAndDebugChannels() {
+        if (!OperatingSystem.IsWindows()) return;
+
+        IReadOnlyList<string> regular =
+            EventLogCatalog.GetChannelNames(
+                channelPatterns: new[] { "*" },
+                includeAnalyticDebug: false);
+
+        foreach (string channel in regular) {
+            using var configuration =
+                new System.Diagnostics.Eventing.Reader.EventLogConfiguration(
+                    channel);
+            Assert.NotEqual(
+                System.Diagnostics.Eventing.Reader.EventLogType.Analytical,
+                configuration.LogType);
+            Assert.NotEqual(
+                System.Diagnostics.Eventing.Reader.EventLogType.Debug,
+                configuration.LogType);
+        }
+    }
+
+    [Fact]
     public void RemoteChannelDefaultsToBoundedConnectionAndUnboundedRead() {
         var query = new EventLogChannelQuery("System");
 
+        Assert.Equal(EventReadMode.Message, query.ReadMode);
         Assert.Equal(5000, query.RemoteConnectionTimeoutMilliseconds);
         Assert.Equal(0, query.RemoteReadTimeoutMilliseconds);
+        Assert.Equal(EventLogAuthentication.Default, query.Authentication);
+        Assert.Null(query.Credential);
+        Assert.Equal(1, query.BookmarkOffset);
+        Assert.True(query.StrictBookmark);
+    }
+
+    [Fact]
+    public void GeneralQueriesDefaultToMessageInsteadOfEagerFullProjection() {
+        Assert.Equal(
+            EventReadMode.Message,
+            new EventLogFileQuery(GetFixturePath()).ReadMode);
+        Assert.Equal(
+            EventReadMode.Message,
+            new EventLogStructuredQuery(
+                "<QueryList><Query Id='0'><Select Path='System'>*</Select></Query></QueryList>")
+                .ReadMode);
+        Assert.Equal(
+            EventReadMode.Message,
+            new EventLogSubscriptionQuery("System").ReadMode);
+        Assert.Equal(
+            EventReadMode.Message,
+            new EventLogQueryOptions().ReadMode);
+    }
+
+    [Fact]
+    public void LocalChannelRejectsCredentialsInsteadOfSilentlyIgnoringThem() {
+        if (!OperatingSystem.IsWindows()) return;
+        var query = new EventLogChannelQuery("System") {
+            Credential = new NetworkCredential("event-reader", "secret"),
+            MaxEvents = 1,
+            ReadMode = EventReadMode.Metadata
+        };
+
+        ArgumentException exception = Assert.Throws<ArgumentException>(() =>
+            EventLogEngine.ReadChannel(query).ToArray());
+
+        Assert.Contains("remote", exception.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -53,6 +189,86 @@ public sealed class TestNativeEventEngineContracts {
         EventObject[] actual = events.ToArray();
         Assert.Equal(2, actual.Length);
         Assert.All(actual, static item => Assert.Equal(EventReadMode.Metadata, item.ReadMode));
+    }
+
+    [Fact]
+    public void StructuredQueryStreamsSeveralChannelsThroughOneNativeResultSet() {
+        if (!OperatingSystem.IsWindows()) return;
+        string queryXml = EventFilterCompiler.BuildChannelQueryXml(
+            new[] { "System", "Application" });
+        var query = new EventLogStructuredQuery(queryXml) {
+            MaxEvents = 10,
+            ReadMode = EventReadMode.Metadata
+        };
+
+        EventObject[] actual = EventLogEngine.ReadStructured(query).ToArray();
+
+        Assert.Equal(10, actual.Length);
+        Assert.All(actual, static item => {
+            Assert.Contains(
+                item.LogName,
+                new[] { "System", "Application" },
+                StringComparer.OrdinalIgnoreCase);
+            Assert.Equal(item.LogName, item.ContainerLog, ignoreCase: true);
+        });
+    }
+
+    [Fact]
+    public void TolerantStructuredQueryReportsEveryFailedPathAndStreamsValidPaths() {
+        if (!OperatingSystem.IsWindows()) return;
+        const string missingLog =
+            "EventViewerX-Missing-Structured-Query-Channel";
+        string queryXml =
+            "<QueryList>" +
+            "<Query Id=\"0\" Path=\"System\">" +
+            "<Select Path=\"System\">*</Select>" +
+            "</Query>" +
+            $"<Query Id=\"1\" Path=\"{missingLog}\">" +
+            $"<Select Path=\"{missingLog}\">*</Select>" +
+            "</Query>" +
+            "</QueryList>";
+        var failures = new List<EventLogQueryFailure>();
+        var query = new EventLogStructuredQuery(queryXml) {
+            TolerateQueryErrors = true,
+            FailureHandler = failures.Add,
+            MaxEvents = 3,
+            ReadMode = EventReadMode.Metadata
+        };
+
+        EventObject[] actual = EventLogEngine.ReadStructured(query).ToArray();
+
+        Assert.Equal(3, actual.Length);
+        EventLogQueryFailure failure = Assert.Single(failures);
+        Assert.Equal(missingLog, failure.Source);
+        Assert.IsType<Win32Exception>(failure.Exception);
+    }
+
+    [Fact]
+    public void TolerantStructuredQueryCannotSilentlyReturnPartialResults() {
+        if (!OperatingSystem.IsWindows()) return;
+        const string missingLog =
+            "EventViewerX-Missing-Structured-Query-Channel";
+        string queryXml =
+            "<QueryList>" +
+            "<Query Id=\"0\" Path=\"System\">" +
+            "<Select Path=\"System\">*</Select>" +
+            "</Query>" +
+            $"<Query Id=\"1\" Path=\"{missingLog}\">" +
+            $"<Select Path=\"{missingLog}\">*</Select>" +
+            "</Query>" +
+            "</QueryList>";
+        var query = new EventLogStructuredQuery(queryXml) {
+            TolerateQueryErrors = true,
+            MaxEvents = 3,
+            ReadMode = EventReadMode.Metadata
+        };
+
+        EventLogStructuredQueryException exception =
+            Assert.Throws<EventLogStructuredQueryException>(() =>
+                EventLogEngine.ReadStructured(query).ToArray());
+
+        EventLogQueryFailure failure = Assert.Single(exception.Failures);
+        Assert.Equal(missingLog, failure.Source);
     }
 
     [Fact]
@@ -98,6 +314,118 @@ public sealed class TestNativeEventEngineContracts {
             }
         });
         Assert.Equal(3, count);
+    }
+
+    [Fact]
+    public void FileQueryCanResumeAfterANativeBookmark() {
+        if (!OperatingSystem.IsWindows()) return;
+        string path = GetFixturePath();
+        EventObject first = Assert.Single(EventLogEngine.ReadFile(
+            new EventLogFileQuery(path) {
+                Oldest = true,
+                MaxEvents = 1,
+                ReadMode = EventReadMode.StructuredData,
+                IncludeBookmark = true
+            }));
+        Assert.NotNull(first.Bookmark);
+
+        EventObject resumed = Assert.Single(EventLogEngine.ReadFile(
+            new EventLogFileQuery(path) {
+                Oldest = true,
+                MaxEvents = 1,
+                ReadMode = EventReadMode.Metadata,
+                BookmarkXml = first.Bookmark!.BookmarkXml
+            }));
+
+        Assert.True(resumed.RecordId > first.RecordId);
+    }
+
+    [Fact]
+    public void OfflineArchiveMetadataMatchesTheNativeRecordStream() {
+        if (!OperatingSystem.IsWindows()) return;
+        string path = GetFixturePath();
+
+        EventLogFileInformation information =
+            EventLogArchive.GetInformation(path);
+        long streamed = EventLogEngine.ReadFile(
+            new EventLogFileQuery(path) {
+                Oldest = true,
+                ReadMode = EventReadMode.Metadata
+            }).LongCount();
+
+        Assert.Equal(Path.GetFullPath(path), information.Path);
+        Assert.Equal(streamed, information.RecordCount);
+        Assert.True(information.FileSize > 0);
+        Assert.True(information.OldestRecordNumber > 0);
+    }
+
+    [Fact]
+    public void ExportedArchiveCanReceiveProviderResourcesSeparately() {
+        if (!OperatingSystem.IsWindows()) return;
+        string directory = CreateTemporaryDirectory();
+        try {
+            string outputPath = Path.Combine(
+                directory,
+                "archived.evtx");
+            EventLogExporter.ExportFile(
+                new EventLogFileQuery(
+                    GetFixturePath()),
+                outputPath,
+                EventExportFormat.Evtx,
+                archiveResources: false);
+
+            EventLogArchive.ArchiveResources(
+                outputPath,
+                System.Globalization.CultureInfo
+                    .GetCultureInfo("en-US"));
+
+            EventLogFileInformation information =
+                EventLogArchive.GetInformation(
+                    outputPath);
+            Assert.True(information.RecordCount > 0);
+        } finally {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task AsyncFileStreamIsBoundedLazyAndOrdered() {
+        if (!OperatingSystem.IsWindows()) return;
+        var query = new EventLogFileQuery(GetFixturePath()) {
+            Oldest = true,
+            MaxEvents = 5,
+            ReadMode = EventReadMode.Metadata
+        };
+        var records = new List<long>();
+
+        await foreach (EventObject eventObject in
+                       EventLogEngine.ReadFileAsync(
+                           query,
+                           bufferCapacity: 2)) {
+            records.Add(eventObject.RecordId!.Value);
+        }
+
+        Assert.Equal(5, records.Count);
+        Assert.Equal(
+            records.OrderBy(static value => value),
+            records);
+    }
+
+    [Fact]
+    public void ProviderNameCatalogDoesNotRequireMetadataProjection() {
+        if (!OperatingSystem.IsWindows()) return;
+
+        IReadOnlyList<string> providers =
+            EventLogCatalog.GetProviderNames(
+                providerPatterns:
+                    new[] { "Microsoft-Windows-Kernel-*" });
+
+        Assert.NotEmpty(providers);
+        Assert.All(providers, static provider =>
+            Assert.StartsWith(
+                "Microsoft-Windows-Kernel-",
+                provider,
+                StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]

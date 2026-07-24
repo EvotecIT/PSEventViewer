@@ -26,7 +26,7 @@ public sealed class LiveStatsQueryRequest {
     /// <summary>
     /// Maximum events scanned from the live channel.
     /// </summary>
-    public int MaxEventsScanned { get; set; }
+    public long MaxEventsScanned { get; set; }
 
     /// <summary>
     /// Read direction. When true, reads oldest to newest.
@@ -190,17 +190,17 @@ public sealed class LiveStatsQueryResult {
     /// <summary>
     /// Maximum scanned events cap used by query.
     /// </summary>
-    public int MaxEventsScanned { get; set; }
+    public long MaxEventsScanned { get; set; }
 
     /// <summary>
     /// Number of scanned events.
     /// </summary>
-    public int ScannedEvents { get; set; }
+    public long ScannedEvents { get; set; }
 
     /// <summary>
     /// Number of matched events (after time filters).
     /// </summary>
-    public int MatchedEvents { get; set; }
+    public long MatchedEvents { get; set; }
 
     /// <summary>
     /// Indicates whether scanning stopped at cap.

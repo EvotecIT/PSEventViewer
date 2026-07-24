@@ -26,15 +26,15 @@ public class ExchangeDatabaseMounted : EventRuleBase {
 
     /// <summary>Initialises an Exchange DB mounted wrapper from an event record.</summary>
     public ExchangeDatabaseMounted(EventObject eventObject) : base(eventObject) {
-        _eventObject = eventObject;
+        Event = eventObject;
         Type = "ExchangeDatabaseMounted";
-        Computer = _eventObject.ComputerName;
-        MailboxDatabase = _eventObject.GetValueFromDataDictionary("Database", "Mailbox Database");
+        Computer = Event.ComputerName;
+        MailboxDatabase = Event.GetValueFromDataDictionary("Database", "Mailbox Database");
         if (string.IsNullOrEmpty(MailboxDatabase)) {
-            var match = System.Text.RegularExpressions.Regex.Match(_eventObject.Message ?? string.Empty,
+            var match = System.Text.RegularExpressions.Regex.Match(Event.Message ?? string.Empty,
                 "database '(?<db>[^']+)'", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
             MailboxDatabase = match.Success ? match.Groups["db"].Value : string.Empty;
         }
-        When = _eventObject.TimeCreated;
+        When = Event.TimeCreated;
     }
 }

@@ -27,20 +27,20 @@ public class WindowsUpdateFailure : EventRuleBase {
 
     /// <summary>Initialises a Windows Update failure wrapper from an event record.</summary>
     public WindowsUpdateFailure(EventObject eventObject) : base(eventObject) {
-        _eventObject = eventObject;
+        Event = eventObject;
         Type = "WindowsUpdateFailure";
-        Computer = _eventObject.ComputerName;
-        var title = _eventObject.GetValueFromDataDictionary("UpdateTitle", "Title");
+        Computer = Event.ComputerName;
+        var title = Event.GetValueFromDataDictionary("UpdateTitle", "Title");
         if (string.IsNullOrEmpty(title)) {
-            title = _eventObject.Message;
+            title = Event.Message;
         }
         var kbMatch = System.Text.RegularExpressions.Regex.Match(title ?? string.Empty, @"KB\d{6,7}", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
         KB = kbMatch.Success ? kbMatch.Value : string.Empty;
-        Reason = _eventObject.GetValueFromDataDictionary("ErrorDescription", "Message");
+        Reason = Event.GetValueFromDataDictionary("ErrorDescription", "Message");
         if (string.IsNullOrEmpty(Reason)) {
-            Reason = _eventObject.GetValueFromDataDictionary("ErrorCode", "ResultCode");
+            Reason = Event.GetValueFromDataDictionary("ErrorCode", "ResultCode");
         }
-        When = _eventObject.TimeCreated;
+        When = Event.TimeCreated;
     }
 }
 

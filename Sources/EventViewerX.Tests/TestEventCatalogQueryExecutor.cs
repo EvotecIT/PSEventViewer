@@ -45,9 +45,9 @@ public class TestEventCatalogQueryExecutor {
         if (!OperatingSystem.IsWindows()) return;
 
         const string host = "eventviewerx-catalog-unavailable.invalid";
-        SearchEvents.ClearHostCache(host);
+        EventLogSessionManager.ClearHostCache(host);
         try {
-            using EventLogSessionOpenResult seed = SearchEvents.CreateSessionResult(
+            using EventLogSessionOpenResult seed = EventLogSessionManager.CreateSessionResult(
                 host,
                 "CatalogTest",
                 "*",
@@ -64,7 +64,7 @@ public class TestEventCatalogQueryExecutor {
             Assert.NotNull(failure);
             Assert.Equal(EventCatalogFailureKind.HostUnavailable, failure!.Kind);
         } finally {
-            SearchEvents.ClearHostCache(host);
+            EventLogSessionManager.ClearHostCache(host);
         }
     }
 

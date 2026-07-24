@@ -33,7 +33,7 @@ public static class EventLogRemoteQueryFailureClassifier {
         Exception exception,
         out EventLogRemoteQueryFailureKind failureKind) {
 
-        if (SearchEvents.IsLocalMachine(machineName) || exception is OperationCanceledException) {
+        if (EventLogTarget.IsLocalMachine(machineName) || exception is OperationCanceledException) {
             failureKind = EventLogRemoteQueryFailureKind.None;
             return false;
         }

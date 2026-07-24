@@ -43,12 +43,12 @@ public class TestRuleSourceGuards
     [Fact]
     public void RuleSources_DoNotUseDirectEventObjectDataIndexer()
     {
-        Regex directIndexerPattern = new(@"_eventObject\s*\.\s*Data\s*\[", RegexOptions.Compiled);
+        Regex directIndexerPattern = new(@"Event\s*\.\s*Data\s*\[", RegexOptions.Compiled);
         IReadOnlyList<string> offenders = FindRuleSourceOffenders(directIndexerPattern);
 
         Assert.True(
             offenders.Count == 0,
-            "Direct _eventObject.Data[...] usage is forbidden in rules. Use TryGetDataValue/GetDataValueOrEmpty. Offenders:" +
+            "Direct Event.Data[...] usage is forbidden in rules. Use TryGetDataValue/GetDataValueOrEmpty. Offenders:" +
             Environment.NewLine +
             string.Join(Environment.NewLine, offenders));
     }
@@ -56,7 +56,7 @@ public class TestRuleSourceGuards
     [Fact]
     public void RuleSources_DoNotUseDirectDataTryGetValueCalls()
     {
-        Regex directTryGetValuePattern = new(@"\b(?:_eventObject|eventObject)\s*\.\s*Data\s*\.\s*TryGetValue\s*\(", RegexOptions.Compiled);
+        Regex directTryGetValuePattern = new(@"\b(?:Event|eventObject)\s*\.\s*Data\s*\.\s*TryGetValue\s*\(", RegexOptions.Compiled);
         IReadOnlyList<string> offenders = FindRuleSourceOffenders(directTryGetValuePattern);
 
         Assert.True(

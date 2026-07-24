@@ -1,0 +1,145 @@
+using System.Diagnostics.Eventing.Reader;
+
+namespace EventViewerX;
+
+/// <summary>
+/// Channel policy getters over the supported Windows Event Log channel API.
+/// </summary>
+public static partial class EventLogChannelPolicyService {
+    /// <summary>
+    /// Returns a channel policy for a single log.
+    /// </summary>
+    public static ChannelPolicy? Get(string logName, string? machineName = null) {
+        return Get(
+            logName,
+            new EventLogCatalogQuery {
+                MachineName = machineName
+            });
+    }
+
+    /// <summary>
+    /// Returns a channel policy using bounded local or remote catalog options.
+    /// </summary>
+    public static ChannelPolicy? Get(
+        string logName,
+        EventLogCatalogQuery query) {
+
+        if (string.IsNullOrWhiteSpace(logName)) {
+            throw new ArgumentException("logName cannot be null or empty", nameof(logName));
+        }
+        if (query == null) {
+            throw new ArgumentNullException(nameof(query));
+        }
+
+        EventLogSession? session = null;
+        try {
+            session = EventLogSessionManager.OpenRequiredSession(
+                query.MachineName,
+                "ChannelPolicy.Get",
+                logName,
+                query.ConnectionTimeoutMilliseconds,
+                query.Credential,
+                query.Authentication);
+
+            using var cfg = new EventLogConfiguration(
+                logName,
+                session);
+            return CreateSnapshot(
+                cfg,
+                query.MachineName,
+                query.Credential,
+                query.Authentication,
+                query.ConnectionTimeoutMilliseconds);
+        } finally {
+            session?.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// Enumerates policies for all logs on a machine.
+    /// </summary>
+    /// <param name="machineName">Machine name or null for local.</param>
+    /// <param name="includePatterns">Optional wildcard filters.</param>
+    /// <param name="parallel">If true, enumerate policies in parallel. Defaults to false.</param>
+    /// <param name="degreeOfParallelism">When parallel, max concurrency. Defaults to Environment.ProcessorCount.</param>
+    public static IEnumerable<ChannelPolicy> GetMany(string? machineName = null, string[]? includePatterns = null, bool parallel = false, int? degreeOfParallelism = null) {
+        return GetMany(
+            new EventLogCatalogQuery {
+                MachineName = machineName
+            },
+            includePatterns,
+            parallel,
+            degreeOfParallelism);
+    }
+
+    /// <summary>
+    /// Enumerates policies using bounded remote authentication and catalog
+    /// options.
+    /// </summary>
+    public static IEnumerable<ChannelPolicy> GetMany(
+        EventLogCatalogQuery query,
+        string[]? includePatterns = null,
+        bool parallel = false,
+        int? degreeOfParallelism = null) {
+
+        if (query == null) {
+            throw new ArgumentNullException(nameof(query));
+        }
+        string[] names = EventLogCatalog.GetChannelNames(
+                query,
+                includePatterns)
+            .ToArray();
+        IEnumerable<string> filtered = names;
+
+        if (parallel) {
+            int dop = Math.Max(1, degreeOfParallelism ?? Environment.ProcessorCount);
+            if (dop > EventLogLimits.MaximumConcurrency) {
+                throw new ArgumentOutOfRangeException(
+                    nameof(degreeOfParallelism),
+                    $"Maximum degree of parallelism cannot exceed {EventLogLimits.MaximumConcurrency}.");
+            }
+            var policies = filtered
+                .AsParallel()
+                .WithDegreeOfParallelism(dop)
+                .Select(name => Get(name, query))
+                .Where(static policy => policy != null)
+                .Cast<ChannelPolicy>();
+            foreach (ChannelPolicy policy in policies) {
+                yield return policy;
+            }
+        } else {
+            foreach (string name in filtered) {
+                ChannelPolicy? policy =
+                    Get(name, query);
+                if (policy != null) {
+                    yield return policy;
+                }
+            }
+        }
+    }
+
+    private static ChannelPolicy CreateSnapshot(
+        EventLogConfiguration configuration,
+        string? machineName,
+        System.Net.NetworkCredential? credential,
+        EventLogAuthentication authentication,
+        int connectionTimeoutMilliseconds) {
+
+        return new ChannelPolicy {
+            LogName = configuration.LogName,
+            MachineName = machineName,
+            Credential = credential,
+            Authentication = authentication,
+            ConnectionTimeoutMilliseconds =
+                connectionTimeoutMilliseconds,
+            IsEnabled = configuration.IsEnabled,
+            MaximumSizeInBytes =
+                configuration.MaximumSizeInBytes,
+            LogFilePath = configuration.LogFilePath,
+            Isolation = configuration.LogIsolation,
+            Mode = configuration.LogMode,
+            SecurityDescriptor =
+                configuration.SecurityDescriptor
+        };
+    }
+}

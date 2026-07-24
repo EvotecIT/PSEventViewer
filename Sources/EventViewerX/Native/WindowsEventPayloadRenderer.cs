@@ -24,15 +24,22 @@ internal sealed class WindowsEventPayloadRenderer : IDisposable {
         }
     }
 
-    internal NativeEventStructured Render(IntPtr eventHandle, NativeEventMetadata metadata) {
+    internal NativeEventStructured Render(
+        IntPtr eventHandle,
+        NativeEventMetadata metadata,
+        bool includeBookmark = false) {
+
         return new NativeEventStructured(
             metadata,
             _xmlRenderer.Render(eventHandle),
             RenderValues(eventHandle),
-            _bookmarkRenderer.Render(eventHandle));
+            includeBookmark
+                ? _bookmarkRenderer.Render(eventHandle)
+                : null);
     }
 
-    private IReadOnlyList<EventPropertyValue> RenderValues(IntPtr eventHandle) {
+    private unsafe IReadOnlyList<EventPropertyValue> RenderValues(
+        IntPtr eventHandle) {
         if (!WindowsEventNativeMethods.EvtRender(
                 _userContext,
                 eventHandle,
@@ -68,13 +75,12 @@ internal sealed class WindowsEventPayloadRenderer : IDisposable {
             return Array.Empty<EventPropertyValue>();
         }
 
-        int variantSize = Marshal.SizeOf<WindowsEventNativeMethods.EventVariant>();
         var values = new EventPropertyValue[propertyCount];
+        var variants =
+            (WindowsEventNativeMethods.EventVariant*)_valueBuffer.Pointer;
         for (int index = 0; index < propertyCount; index++) {
-            WindowsEventNativeMethods.EventVariant variant =
-                Marshal.PtrToStructure<WindowsEventNativeMethods.EventVariant>(
-                    IntPtr.Add(_valueBuffer.Pointer, index * variantSize));
-            values[index] = new EventPropertyValue(ReadValue(variant));
+            values[index] =
+                new EventPropertyValue(ReadValue(variants[index]));
         }
         return values;
     }

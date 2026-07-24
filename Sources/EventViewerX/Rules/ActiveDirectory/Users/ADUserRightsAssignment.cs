@@ -33,15 +33,15 @@ public class ADUserRightsAssignment : EventRuleBase {
 
     /// <summary>Initialises a user rights assignment wrapper from an event record.</summary>
     public ADUserRightsAssignment(EventObject eventObject) : base(eventObject) {
-        _eventObject = eventObject;
+        Event = eventObject;
         Type = "ADUserRightsAssignment";
 
-        Computer = _eventObject.ComputerName;
-        Action = _eventObject.MessageSubject;
+        Computer = Event.ComputerName;
+        Action = Event.MessageSubject;
 
-        UserAffected = _eventObject.GetTargetAccountOrEmpty();
+        UserAffected = Event.GetTargetAccountOrEmpty();
         if (string.IsNullOrEmpty(UserAffected)) {
-            var sid = _eventObject.GetDataValueOrEmpty(KnownEventField.TargetSid);
+            var sid = Event.GetDataValueOrEmpty(KnownEventField.TargetSid);
             if (!string.IsNullOrEmpty(sid)) {
                 try {
                     var identifier = new System.Security.Principal.SecurityIdentifier(sid);
@@ -52,7 +52,7 @@ public class ADUserRightsAssignment : EventRuleBase {
             }
         }
 
-        var privileges = _eventObject.GetDataValueOrEmpty(KnownEventField.PrivilegeList);
+        var privileges = Event.GetDataValueOrEmpty(KnownEventField.PrivilegeList);
         if (!string.IsNullOrEmpty(privileges)) {
             Rights = privileges.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries).ToList();
             RightsTranslated = Rights.Select(EventsHelper.TranslatePrivilege).ToList();
@@ -61,8 +61,8 @@ public class ADUserRightsAssignment : EventRuleBase {
             RightsTranslated = new List<string>();
         }
 
-        Who = _eventObject.GetSubjectAccountOrEmpty();
-        When = _eventObject.TimeCreated;
+        Who = Event.GetSubjectAccountOrEmpty();
+        When = Event.TimeCreated;
     }
 }
 

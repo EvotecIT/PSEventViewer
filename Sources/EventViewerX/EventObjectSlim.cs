@@ -13,15 +13,7 @@ public class EventObjectSlim {
     /// <summary>
     /// Gets the detailed event snapshot used to build this rule result.
     /// </summary>
-    public EventObject Event { get; private set; } = null!;
-
-    /// <summary>
-    /// Compatibility alias for <see cref="Event"/>.
-    /// </summary>
-    public EventObject _eventObject {
-        get => Event;
-        protected set => Event = value;
-    }
+    public EventObject Event { get; protected set; } = null!;
 
     /// <summary>
     /// Identifier of the event.

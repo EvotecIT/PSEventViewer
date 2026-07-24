@@ -58,23 +58,23 @@ namespace EventViewerX.Rules.ActiveDirectory {
 
         /// <summary>Initialises a detailed wrapper for non-standard directory object changes.</summary>
         public ADOtherChangeDetailed(EventObject eventObject) : base(eventObject) {
-            _eventObject = eventObject;
+            Event = eventObject;
 
             Type = "ADOtherChangeDetailed";
-            Computer = _eventObject.ComputerName;
-            Action = _eventObject.MessageSubject;
-            ObjectClass = _eventObject.GetValueFromDataDictionary("ObjectClass");
-            OperationType = ConvertFromOperationType(_eventObject.GetDataValueOrEmpty("OperationType"));
-            User = _eventObject.GetValueFromDataDictionary("ObjectDN");
-            FieldChanged = _eventObject.GetValueFromDataDictionary("AttributeLDAPDisplayName");
-            FieldValue = _eventObject.GetValueFromDataDictionary("AttributeValue");
+            Computer = Event.ComputerName;
+            Action = Event.MessageSubject;
+            ObjectClass = Event.GetValueFromDataDictionary("ObjectClass");
+            OperationType = ConvertFromOperationType(Event.GetDataValueOrEmpty("OperationType"));
+            User = Event.GetValueFromDataDictionary("ObjectDN");
+            FieldChanged = Event.GetValueFromDataDictionary("AttributeLDAPDisplayName");
+            FieldValue = Event.GetValueFromDataDictionary("AttributeValue");
             // common fields
-            Who = _eventObject.GetSubjectAccountOrEmpty();
-            When = _eventObject.TimeCreated;
+            Who = Event.GetSubjectAccountOrEmpty();
+            When = Event.TimeCreated;
 
             // OverwriteByField logic
-            User = OverwriteByField(Action, "A directory service object was moved.", User, _eventObject.GetValueFromDataDictionary("OldObjectDN"));
-            FieldValue = OverwriteByField(Action, "A directory service object was moved.", FieldValue, _eventObject.GetValueFromDataDictionary("NewObjectDN"));
+            User = OverwriteByField(Action, "A directory service object was moved.", User, Event.GetValueFromDataDictionary("OldObjectDN"));
+            FieldValue = OverwriteByField(Action, "A directory service object was moved.", FieldValue, Event.GetValueFromDataDictionary("NewObjectDN"));
         }
     }
 }

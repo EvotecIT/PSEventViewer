@@ -21,6 +21,13 @@ public enum EventReadMode {
     StructuredData,
 
     /// <summary>
+    /// Captures core metadata and raw event XML without formatting the provider
+    /// message or projecting typed payload values. This is the lowest-cost
+    /// mode for XML streaming and export.
+    /// </summary>
+    RawXml,
+
+    /// <summary>
     /// Captures metadata, the formatted message, structured XML data, and attachments.
     /// </summary>
     Full

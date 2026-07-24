@@ -3,6 +3,7 @@ namespace EventViewerX;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.Eventing.Reader;
+using System.Net;
 
 /// <summary>
 /// Strongly typed policy for a Windows Event Log channel (modern wevt or classic).
@@ -12,14 +13,20 @@ public sealed class ChannelPolicy {
     public string LogName { get; set; } = string.Empty;
     /// <summary>Optional remote computer name; <c>null</c> targets the local host.</summary>
     public string? MachineName { get; set; }
+    /// <summary>Optional credentials for a remote channel-policy session.</summary>
+    public NetworkCredential? Credential { get; set; }
+    /// <summary>Authentication package for a remote channel-policy session.</summary>
+    public EventLogAuthentication Authentication { get; set; }
+    /// <summary>Maximum time for RPC preflight and session establishment.</summary>
+    public int ConnectionTimeoutMilliseconds { get; set; } = 5000;
     /// <summary>Enables or disables the channel when set.</summary>
     public bool? IsEnabled { get; set; }
     /// <summary>Maximum log size in bytes.</summary>
     public long? MaximumSizeInBytes { get; set; }
     /// <summary>Full file path for the log.</summary>
     public string? LogFilePath { get; set; }
-    /// <summary>Isolation level (application/system/custom) for the log.</summary>
-    public EventLogIsolation? Isolation { get; set; }
+    /// <summary>Isolation level (application/system/custom) reported by Windows. This property is read-only because Windows does not expose a supported channel-policy setter for it.</summary>
+    public EventLogIsolation? Isolation { get; internal set; }
     /// <summary>Retention mode for the channel.</summary>
     public EventLogMode? Mode { get; set; }
     /// <summary>Canonical retention mode name for callers that should not bind directly to <see cref="EventLogMode"/>.</summary>
@@ -43,6 +50,14 @@ public sealed class ChannelPolicy {
     public IReadOnlyDictionary<string, object?> ToDictionary() => new Dictionary<string, object?> {
         [nameof(LogName)] = LogName,
         [nameof(MachineName)] = MachineName,
+        ["CredentialUserName"] = Credential == null
+            ? null
+            : string.IsNullOrWhiteSpace(Credential.Domain)
+                ? Credential.UserName
+                : $"{Credential.Domain}\\{Credential.UserName}",
+        [nameof(Authentication)] = Authentication.ToString(),
+        [nameof(ConnectionTimeoutMilliseconds)] =
+            ConnectionTimeoutMilliseconds,
         [nameof(IsEnabled)] = IsEnabled,
         [nameof(MaximumSizeInBytes)] = MaximumSizeInBytes,
         [nameof(LogFilePath)] = LogFilePath,

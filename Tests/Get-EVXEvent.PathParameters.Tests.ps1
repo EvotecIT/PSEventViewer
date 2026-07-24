@@ -12,9 +12,27 @@ Describe 'Get-EVXEvent -Path parameter contract' {
         }
     }
 
-    It 'does not advertise live-query parallel switches that EVTX reads do not use' {
+    It 'uses the canonical native concurrency controls for EVTX reads' {
         $PathParameters | Should -Not -Contain 'ParallelOption'
-        $PathParameters | Should -Not -Contain 'DisableParallel'
+        $PathParameters | Should -Contain 'DisableParallel'
+        $PathParameters | Should -Contain 'MaxConcurrency'
+    }
+
+    It 'keeps offline files local instead of accepting an ignored remote target' {
+        $PathParameters | Should -Not -Contain 'MachineName'
+        $PathParameters | Should -Not -Contain 'Credential'
+        $PathParameters | Should -Not -Contain 'Authentication'
+    }
+
+    It 'rejects remote options for file-only FilterHashtable queries' {
+        {
+            Get-EVXEvent `
+                -FilterHashtable @{
+                    Path = 'C:\missing.evtx'
+                } `
+                -MachineName 'server.example.test' `
+                -ErrorAction Stop
+        } | Should -Throw '*always read locally*'
     }
 
     It 'supports explicit provider-message culture for offline, live, and named queries' {

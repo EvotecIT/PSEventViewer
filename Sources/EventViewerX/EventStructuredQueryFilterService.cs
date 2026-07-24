@@ -164,24 +164,57 @@ public static class EventStructuredQueryFilterService {
             return "*";
         }
 
-        var normalizedFilter = filter!;
-        var providerName = CreateSingleValueArray(normalizedFilter.ProviderName);
-        var userId = CreateSingleValueArray(normalizedFilter.UserId);
+        EventStructuredQueryFilter normalizedFilter = filter!;
+        return EventFilterCompiler.BuildXPath(new EventFilter {
+            EventIds = normalizedFilter.EventIds,
+            RecordIds = normalizedFilter.RecordIds,
+            ProviderNames = CreateSingleValueArray(
+                normalizedFilter.ProviderName),
+            StartTime = normalizedFilter.StartTimeUtc,
+            EndTime = normalizedFilter.EndTimeUtc,
+            Levels = normalizedFilter.Level.HasValue
+                ? new[] { (byte)normalizedFilter.Level.Value }
+                : null,
+            Keywords = normalizedFilter.Keywords.HasValue
+                ? new[] { (long)normalizedFilter.Keywords.Value }
+                : null,
+            UserIds = CreateSingleValueArray(normalizedFilter.UserId),
+            NamedData = ConvertNamedData(
+                normalizedFilter.NamedDataFilter),
+            ExcludedNamedData = ConvertNamedData(
+                normalizedFilter.NamedDataExcludeFilter)
+        });
+    }
 
-        var xpath = SearchEvents.BuildWinEventFilter(
-            id: normalizedFilter.EventIds?.Select(static value => value.ToString(CultureInfo.InvariantCulture)).ToArray(),
-            eventRecordId: normalizedFilter.RecordIds?.Select(static value => value.ToString(CultureInfo.InvariantCulture)).ToArray(),
-            startTime: normalizedFilter.StartTimeUtc,
-            endTime: normalizedFilter.EndTimeUtc,
-            providerName: providerName,
-            keywords: normalizedFilter.Keywords.HasValue ? new[] { (long)normalizedFilter.Keywords.Value } : null,
-            level: normalizedFilter.Level.HasValue ? new[] { normalizedFilter.Level.Value.ToString() } : null,
-            userId: userId,
-            namedDataFilter: normalizedFilter.NamedDataFilter is null ? null : new[] { normalizedFilter.NamedDataFilter },
-            namedDataExcludeFilter: normalizedFilter.NamedDataExcludeFilter is null ? null : new[] { normalizedFilter.NamedDataExcludeFilter },
-            xpathOnly: true);
+    private static IReadOnlyDictionary<string, IReadOnlyList<string>>?
+        ConvertNamedData(Hashtable? values) {
 
-        return string.IsNullOrWhiteSpace(xpath) ? "*" : xpath;
+        if (values == null || values.Count == 0) {
+            return null;
+        }
+        var normalized =
+            new Dictionary<string, IReadOnlyList<string>>(
+                StringComparer.OrdinalIgnoreCase);
+        foreach (DictionaryEntry entry in values) {
+            string key = Convert.ToString(
+                entry.Key,
+                CultureInfo.InvariantCulture) ?? string.Empty;
+            if (key.Length == 0) {
+                continue;
+            }
+            IEnumerable<object?> rawValues =
+                entry.Value is IEnumerable enumerable &&
+                entry.Value is not string
+                    ? enumerable.Cast<object?>()
+                    : new[] { entry.Value };
+            string[] items = rawValues
+                .Select(value => Convert.ToString(
+                    value,
+                    CultureInfo.InvariantCulture) ?? string.Empty)
+                .ToArray();
+            normalized[key] = items;
+        }
+        return normalized.Count == 0 ? null : normalized;
     }
 
     private static bool TryNormalizeBoundedText(

@@ -24,12 +24,12 @@ public class SyncCompleted : EventRuleBase {
 
     /// <summary>Initialises a sync completion wrapper from an event record.</summary>
     public SyncCompleted(EventObject eventObject) : base(eventObject) {
-        _eventObject = eventObject;
+        Event = eventObject;
         Type = "SyncCompleted";
-        Computer = _eventObject.ComputerName;
-        When = _eventObject.TimeCreated;
+        Computer = Event.ComputerName;
+        When = Event.TimeCreated;
 
-        var matches = System.Text.RegularExpressions.Regex.Matches(_eventObject.Message ?? string.Empty, @"(\w+):\s*(\d+)");
+        var matches = System.Text.RegularExpressions.Regex.Matches(Event.Message ?? string.Empty, @"(\w+):\s*(\d+)");
         foreach (System.Text.RegularExpressions.Match match in matches) {
             var key = match.Groups[1].Value;
             if (int.TryParse(match.Groups[2].Value, out var val)) {

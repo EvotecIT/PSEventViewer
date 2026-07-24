@@ -116,7 +116,7 @@ public abstract class AsyncPSCmdlet : PSCmdlet, IDisposable {
                 _currentOutPipe = outPipe;
                 _currentReplyPipe = replyPipe;
                 if (_eventViewerLogger != null) {
-                    Settings._logger = _eventViewerLogger;
+                    Settings.Logger = _eventViewerLogger;
                 }
                 await task();
             } finally {
@@ -181,7 +181,7 @@ public abstract class AsyncPSCmdlet : PSCmdlet, IDisposable {
     /// <param name="logger">Logger connected to this cmdlet's PowerShell streams.</param>
     protected void SetEventViewerLogger(InternalLogger logger) {
         _eventViewerLogger = logger ?? throw new ArgumentNullException(nameof(logger));
-        Settings._logger = logger;
+        Settings.Logger = logger;
     }
 
     /// <summary>

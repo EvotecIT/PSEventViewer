@@ -149,7 +149,7 @@ public class EventLogDetails {
 
     private static EventLogDetailsStatus ClassifyProjectionFailure(Exception exception, EventLogDetailsStatus fallbackStatus) {
         if (exception is EventLogSessionException sessionException) {
-            return SearchEvents.MapSessionFailureStatus(sessionException.Status);
+            return EventLogCatalog.MapSessionFailureStatus(sessionException.Status);
         }
 
         return exception switch {

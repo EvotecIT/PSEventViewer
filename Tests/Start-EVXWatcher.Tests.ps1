@@ -1,9 +1,87 @@
 Describe 'Start-EVXWatcher - Parameter validation' {
+    It 'requires exactly one stop selector and supports ShouldProcess' {
+        $command = Get-Command Stop-EVXWatcher
+        $command.ParameterSets.Name | Should -Contain 'ById'
+        $command.ParameterSets.Name | Should -Contain 'ByName'
+        $command.ParameterSets.Name | Should -Contain 'All'
+        $command.Parameters.Keys | Should -Contain 'WhatIf'
+        $command.Parameters.Keys | Should -Contain 'PassThru'
+        { Stop-EVXWatcher -ErrorAction Stop } | Should -Throw
+        {
+            Stop-EVXWatcher -Id ([Guid]::NewGuid()) -All -ErrorAction Stop
+        } | Should -Throw
+    }
+
     It 'Fails when NumberOfThreads is less than 1' {
         { Start-EVXWatcher -MachineName $env:COMPUTERNAME -LogName 'Application' -EventId 1 -Action {} -NumberOfThreads 0 } | Should -Throw
     }
     It 'Fails when NumberOfThreads is greater than 1024' {
         { Start-EVXWatcher -MachineName $env:COMPUTERNAME -LogName 'Application' -EventId 1 -Action {} -NumberOfThreads 2000 } | Should -Throw
+    }
+
+    It 'exposes native XPath and hashtable subscription sets' {
+        $sets = (Get-Command Start-EVXWatcher).ParameterSets.Name
+        $sets | Should -Contain 'FilterXPath'
+        $sets | Should -Contain 'FilterHashtable'
+    }
+
+    It 'requires bookmark start semantics' {
+        {
+            Start-EVXWatcher -LogName System -FilterXPath '*' -BookmarkXml '<BookmarkList />' -Action {}
+        } | Should -Throw
+    }
+
+    It 'creates a bounded English-first native subscription from a hashtable' {
+        $watcher = Start-EVXWatcher `
+            -LogName System `
+            -FilterHashtable @{ Id = 41; ProviderName = 'Microsoft-Windows-Kernel-Power' } `
+            -Start Future `
+            -ReadMode Metadata `
+            -MessageCulture en-US `
+            -BufferCapacity 8 `
+            -Action {}
+        try {
+            $watcher.SubscriptionQuery.XPath | Should -Match 'EventID=41'
+            $watcher.SubscriptionQuery.XPath | Should -Match 'Microsoft-Windows-Kernel-Power'
+            $watcher.SubscriptionQuery.ReadMode.ToString() | Should -Be 'Metadata'
+            $watcher.SubscriptionQuery.MessageCulture.Name | Should -Be 'en-US'
+            $watcher.SubscriptionQuery.BufferCapacity | Should -Be 8
+        } finally {
+            Stop-EVXWatcher -Id $watcher.Id -ErrorAction SilentlyContinue
+        }
+    }
+
+    It 'partitions filters that exceed the native XPath expression limit' {
+        $watcher = Start-EVXWatcher `
+            -LogName System `
+            -EventId (1..40) `
+            -ReadMode Metadata `
+            -Action {}
+        try {
+            $watcher.SubscriptionQueries.Count | Should -BeGreaterThan 1
+            foreach ($query in $watcher.SubscriptionQueries) {
+                $query.XPath | Should -Not -BeNullOrEmpty
+            }
+        } finally {
+            Stop-EVXWatcher -Id $watcher.Id -ErrorAction SilentlyContinue
+        }
+    }
+
+    It 'expands provider wildcards before creating native subscriptions' {
+        $watcher = Start-EVXWatcher `
+            -LogName System `
+            -FilterHashtable @{ ProviderName = 'Microsoft-Windows-Kernel-*' } `
+            -ReadMode Metadata `
+            -Action {}
+        try {
+            $watcher.SubscriptionQueries.Count | Should -BeGreaterThan 0
+            ($watcher.SubscriptionQueries.XPath -join "`n") |
+                Should -Match 'Microsoft-Windows-Kernel-'
+            ($watcher.SubscriptionQueries.XPath -join "`n") |
+                Should -Not -Match 'Microsoft-Windows-Kernel-\*'
+        } finally {
+            Stop-EVXWatcher -Id $watcher.Id -ErrorAction SilentlyContinue
+        }
     }
 }
 
@@ -73,6 +151,44 @@ Describe 'Start-EVXWatcher - PowerShell event dispatch' {
             if ($First) {
                 Stop-EVXWatcher -Id $First.Id -ErrorAction SilentlyContinue
             }
+        }
+    }
+
+    It 'removes the PowerShell bridge when an oldest-first watcher stops before registration settles' {
+        $Name = 'PSEventViewer.AutoStop.' + [Guid]::NewGuid().ToString('N')
+        $BeforeCount = @(Get-EventSubscriber -Force |
+                Where-Object SourceIdentifier -Like 'PSEventViewer.Watcher.*').Count
+        $Watcher = Start-EVXWatcher `
+            -Name $Name `
+            -MachineName $env:COMPUTERNAME `
+            -LogName System `
+            -FilterXPath '*' `
+            -Start Oldest `
+            -ReadMode Metadata `
+            -StopAfter 1 `
+            -Action {}
+        try {
+            $Deadline = [DateTime]::UtcNow.AddSeconds(10)
+            while (-not $Watcher.IsStopped -and
+                   [DateTime]::UtcNow -lt $Deadline) {
+                Start-Sleep -Milliseconds 25
+            }
+
+            $Watcher.IsStopped | Should -BeTrue
+            $Watcher.EventsFound | Should -Be 1
+            @(Get-EVXWatcher -Name $Name) | Should -BeNullOrEmpty
+            while (@(Get-EventSubscriber -Force |
+                        Where-Object SourceIdentifier -Like 'PSEventViewer.Watcher.*').Count -ne
+                   $BeforeCount -and
+                   [DateTime]::UtcNow -lt $Deadline) {
+                Start-Sleep -Milliseconds 25
+            }
+            @(Get-EventSubscriber -Force |
+                    Where-Object SourceIdentifier -Like 'PSEventViewer.Watcher.*').Count |
+                Should -Be $BeforeCount
+        } finally {
+            [EventViewerX.WatcherManager]::StopWatcher($Watcher.Id) |
+                Out-Null
         }
     }
 

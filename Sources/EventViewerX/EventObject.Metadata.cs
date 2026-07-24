@@ -102,11 +102,14 @@ public partial class EventObject {
         Version = ToByte(values[17]);
         Bookmark = bookmark;
         Properties = Array.Empty<EventPropertyValue>();
+        MatchedQueryIds = Array.Empty<int>();
         TaskDisplayName = string.Empty;
         OpcodeDisplayName = string.Empty;
         KeywordsDisplayNames = Array.Empty<string>();
         LevelDisplayName = LevelToDisplayName(Level);
-        ContainerLog = containerLog ?? string.Empty;
+        ContainerLog = string.IsNullOrEmpty(containerLog)
+            ? LogName
+            : containerLog;
         GatheredFrom = string.IsNullOrEmpty(QueriedMachine) ? Environment.MachineName : QueriedMachine;
         GatheredLogName = LogName;
     }
@@ -184,6 +187,32 @@ public partial class EventObject {
     }
 
     internal EventObject(
+        NativeEventMetadata metadata,
+        string xml,
+        EventBookmark? bookmark,
+        string queriedMachine,
+        string containerLog)
+        : this(
+            metadata,
+            EventReadMode.RawXml,
+            queriedMachine,
+            containerLog,
+            string.Empty,
+            string.Empty,
+            EventMessageRenderStatus.NotRequested,
+            0,
+            bookmark,
+            Array.Empty<EventPropertyValue>(),
+            LevelToDisplayName(metadata.Level),
+            string.Empty,
+            string.Empty,
+            Array.Empty<string>(),
+            xml,
+            parsePayload: true,
+            includeAttachments: false) {
+    }
+
+    internal EventObject(
         NativeEventFull full,
         string queriedMachine,
         string containerLog)
@@ -228,6 +257,8 @@ public partial class EventObject {
 
         ReadMode = readMode;
         QueriedMachine = queriedMachine ?? string.Empty;
+        _payloadParsingEnabled = parsePayload;
+        _includeAttachments = includeAttachments;
         _message = message;
         MessageCulture = messageCulture;
         MessageRenderStatus = messageRenderStatus;
@@ -252,25 +283,18 @@ public partial class EventObject {
         Version = metadata.Version;
         Bookmark = bookmark;
         Properties = properties;
+        MatchedQueryIds = Array.Empty<int>();
         TaskDisplayName = taskDisplayName;
         OpcodeDisplayName = opcodeDisplayName;
         KeywordsDisplayNames = keywordDisplayNames;
         LevelDisplayName = levelDisplayName;
-        ContainerLog = containerLog ?? string.Empty;
+        ContainerLog = string.IsNullOrEmpty(containerLog)
+            ? LogName
+            : containerLog;
         GatheredFrom = string.IsNullOrEmpty(QueriedMachine) ? Environment.MachineName : QueriedMachine;
         GatheredLogName = LogName;
         XMLData = xml;
 
-        if (parsePayload) {
-            ParseXmlPayload(
-                XMLData,
-                out Dictionary<string, string> data,
-                out IReadOnlyList<byte[]> attachments,
-                includeAttachments);
-            Data = data;
-            _nicIdentifiers = ExtractNicIdentifiers(data);
-            Attachments = attachments;
-        }
     }
 
     private static byte? ToByte(object? value) {

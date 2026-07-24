@@ -46,13 +46,13 @@ public class AADSyncProvisionCredentialsPing : EventRuleBase
     /// <param name="eventObject">Event describing the ping state.</param>
     public AADSyncProvisionCredentialsPing(EventObject eventObject) : base(eventObject)
     {
-        _eventObject = eventObject;
+        Event = eventObject;
         Type = "AADSyncProvisionCredentialsPing";
-        Computer = _eventObject.ComputerName;
-        When = _eventObject.TimeCreated;
+        Computer = Event.ComputerName;
+        When = Event.TimeCreated;
 
         State = eventObject.Id == 653 ? "Start" : "End";
-        var msg = Rules.RuleHelpers.GetMessage(_eventObject);
+        var msg = Rules.RuleHelpers.GetMessage(Event);
         TrackingId = ExtractAfter(msg, "TrackingID :") ?? ExtractAfter(msg, "TrackingId:");
 
         var partitionMatch = PartitionRegex.Match(msg);

@@ -27,12 +27,12 @@ public class ObjectDeletion : EventRuleBase {
 
     /// <summary>Initialises an object deletion wrapper from an event record.</summary>
     public ObjectDeletion(EventObject eventObject) : base(eventObject) {
-        _eventObject = eventObject;
+        Event = eventObject;
         Type = "ObjectDeletion";
-        Computer = _eventObject.ComputerName;
-        Path = _eventObject.GetValueFromDataDictionary("ObjectName");
-        Who = _eventObject.GetSubjectAccountOrEmpty();
-        When = _eventObject.TimeCreated;
+        Computer = Event.ComputerName;
+        Path = Event.GetValueFromDataDictionary("ObjectName");
+        Who = Event.GetSubjectAccountOrEmpty();
+        When = Event.TimeCreated;
     }
 }
 

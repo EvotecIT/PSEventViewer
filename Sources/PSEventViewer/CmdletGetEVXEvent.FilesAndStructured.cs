@@ -1,0 +1,270 @@
+using System.Collections;
+using System.Net;
+
+namespace PSEventViewer;
+
+public sealed partial class CmdletGetEVXEvent {
+    private EventLogBatchQuery CreateFileBatch(
+        IReadOnlyList<string> paths,
+        EventFilter filter,
+        EventFilter? suppress,
+        string? rawXPath) {
+
+        if (Credential != null ||
+            (MachineName != null && MachineName.Any(
+                static machine => !string.IsNullOrWhiteSpace(machine)))) {
+            throw new PSArgumentException(
+                "Offline event log files are read locally and cannot be combined with MachineName or Credential.");
+        }
+        if (ContainsWildcard(filter.ProviderNames)) {
+            string[] patterns = NormalizeRequiredValues(
+                filter.ProviderNames!,
+                nameof(ProviderName));
+            _managedProviderPatterns = patterns
+                .Select(pattern => new WildcardPattern(
+                    pattern,
+                    WildcardOptions.IgnoreCase |
+                    WildcardOptions.CultureInvariant))
+                .ToArray();
+            filter = WithProviders(
+                filter,
+                Array.Empty<string>());
+        }
+        bool expandSuppressProviders =
+            suppress != null &&
+            ContainsWildcard(suppress.ProviderNames);
+        IReadOnlyList<EventFilter> suppressions =
+            expandSuppressProviders
+                ? Array.Empty<EventFilter>()
+                : PartitionSuppressions(suppress);
+        IReadOnlyList<EventFilter> filterChunks =
+            EventFilterPartitioner.Partition(filter);
+        if (expandSuppressProviders ||
+            suppressions.Count > 0 ||
+            filterChunks.Count > 1) {
+            var structured = new List<EventLogStructuredQuery>(
+                checked(paths.Count * filterChunks.Count));
+            foreach (string path in paths) {
+                IReadOnlyList<EventFilter> pathSuppressions =
+                    expandSuppressProviders
+                        ? PartitionSuppressions(
+                            ExpandOfflineSuppressProviderPatterns(
+                                suppress!,
+                                path))
+                        : suppressions;
+                EventFilter sourceFilter = CopyFilterWithCheckpoint(
+                    filter,
+                    machineName: null,
+                    path);
+                foreach (EventFilter chunk in
+                         EventFilterPartitioner.Partition(
+                             sourceFilter)) {
+                    string queryXml =
+                        EventFilterCompiler.BuildFileQueryXmlWithSuppressions(
+                        new[] { path },
+                        chunk,
+                        pathSuppressions);
+                    structured.Add(CreateStructuredQuery(
+                        queryXml,
+                        EventLogQuerySourceKind.File,
+                        machineName: null));
+                }
+            }
+            ValidateBookmarkFanOut(structured.Count);
+            EventLogBatchQuery structuredBatch =
+                EventLogBatchQuery.ForStructured(structured);
+            ConfigureBatch(structuredBatch);
+            return structuredBatch;
+        }
+
+        ValidateRawXPathCombination(rawXPath, filter);
+        var files = new List<EventLogFileQuery>(paths.Count);
+        foreach (string path in paths) {
+            EventFilter sourceFilter = CopyFilterWithCheckpoint(
+                filter,
+                machineName: null,
+                path);
+            string xpath = string.IsNullOrWhiteSpace(rawXPath)
+                ? EventFilterCompiler.BuildXPath(sourceFilter)
+                : rawXPath!;
+            files.Add(CreateFileQuery(path, xpath));
+        }
+        ValidateBookmarkFanOut(files.Count);
+        EventLogBatchQuery batch = EventLogBatchQuery.ForFiles(files);
+        ConfigureBatch(batch);
+        return batch;
+    }
+
+    private static EventFilter
+        ExpandOfflineSuppressProviderPatterns(
+            EventFilter suppress,
+            string path) {
+
+        string[] patterns = NormalizeRequiredValues(
+            suppress.ProviderNames ??
+            Array.Empty<string>(),
+            nameof(FilterHashtable));
+        WildcardPattern[] wildcards = patterns
+            .Select(pattern => new WildcardPattern(
+                pattern,
+                WildcardOptions.IgnoreCase |
+                WildcardOptions.CultureInvariant))
+            .ToArray();
+        var providers = new HashSet<string>(
+            StringComparer.OrdinalIgnoreCase);
+        foreach (EventObject eventObject in
+                 EventLogEngine.ReadFile(
+                     new EventLogFileQuery(path) {
+                         Oldest = true,
+                         ReadMode =
+                             EventReadMode.Metadata
+                     })) {
+            if (wildcards.Any(pattern =>
+                    pattern.IsMatch(
+                        eventObject.ProviderName))) {
+                providers.Add(
+                    eventObject.ProviderName);
+            }
+        }
+        return WithProviders(
+            suppress,
+            providers.Count > 0
+                ? providers
+                    .OrderBy(
+                        static provider => provider,
+                        StringComparer.OrdinalIgnoreCase)
+                    .ToArray()
+                : new[] {
+                    "__EventViewerX_No_Matching_Provider__"
+                });
+    }
+
+    private static IReadOnlyList<EventFilter> PartitionSuppressions(
+        EventFilter? filter) {
+
+        return filter?.HasAny == true
+            ? EventFilterPartitioner.Partition(filter)
+            : Array.Empty<EventFilter>();
+    }
+
+    private EventLogBatchQuery CreateStructuredBatch(
+        string queryXml,
+        EventLogQuerySourceKind sourceKind) {
+
+        if (string.IsNullOrWhiteSpace(queryXml)) {
+            throw new PSArgumentException(
+                "FilterXml cannot be null, empty, or whitespace.");
+        }
+        bool usesFiles = queryXml.IndexOf(
+            "file://",
+            StringComparison.OrdinalIgnoreCase) >= 0;
+        if (usesFiles &&
+            (Credential != null ||
+             (MachineName != null &&
+              MachineName.Any(static machine =>
+                  !string.IsNullOrWhiteSpace(machine))))) {
+            throw new PSArgumentException(
+                "A file-based FilterXml is evaluated locally and cannot be combined with MachineName or Credential.");
+        }
+        IReadOnlyList<string?> machines =
+            usesFiles
+                ? new string?[] { null }
+                : EventLogTarget.NormalizeMachineNames(MachineName);
+        ValidateRemoteCredentialTargets(machines);
+        var structured = new List<EventLogStructuredQuery>(machines.Count);
+        foreach (string? machine in machines) {
+            structured.Add(CreateStructuredQuery(
+                queryXml,
+                sourceKind,
+                machine));
+        }
+        ValidateBookmarkFanOut(structured.Count);
+        EventLogBatchQuery batch =
+            EventLogBatchQuery.ForStructured(structured);
+        ConfigureBatch(batch);
+        return batch;
+    }
+
+    private EventLogChannelQuery CreateChannelQuery(
+        string logName,
+        string? machineName,
+        string xpath) {
+
+        var query = new EventLogChannelQuery(logName) {
+            MachineName = machineName,
+            Credential = Credential?.GetNetworkCredential(),
+            Authentication = Authentication,
+            XPath = xpath,
+            Oldest = EffectiveOldest,
+            ReadMode = ReadMode,
+            MessageCulture = MessageCulture,
+            FallbackMessageCulture = FallbackMessageCulture,
+            MaxEvents = GetNativeCandidateLimit(),
+            IncludeBookmark = IncludeBookmark,
+            RemoteReadTimeoutMilliseconds =
+                EffectiveRemoteReadTimeoutMilliseconds,
+            BufferCapacity = BufferCapacity > 0 ? BufferCapacity : 64,
+            BookmarkXml = BookmarkXml,
+            BookmarkOffset = BookmarkOffset,
+            StrictBookmark = !IgnoreStaleBookmark
+        };
+        query.RemoteConnectionTimeoutMilliseconds =
+            EffectiveRemoteConnectionTimeoutMilliseconds;
+        return query;
+    }
+
+    private EventLogFileQuery CreateFileQuery(
+        string path,
+        string xpath) {
+
+        return new EventLogFileQuery(path) {
+            XPath = xpath,
+            Oldest = EffectiveOldest,
+            ReadMode = ReadMode,
+            MessageCulture = MessageCulture,
+            FallbackMessageCulture = FallbackMessageCulture,
+            MaxEvents = GetNativeCandidateLimit(),
+            IncludeBookmark = IncludeBookmark,
+            BookmarkXml = BookmarkXml,
+            BookmarkOffset = BookmarkOffset,
+            StrictBookmark = !IgnoreStaleBookmark
+        };
+    }
+
+    private EventLogStructuredQuery CreateStructuredQuery(
+        string queryXml,
+        EventLogQuerySourceKind sourceKind,
+        string? machineName) {
+
+        var query = new EventLogStructuredQuery(queryXml) {
+            SourceKind = sourceKind,
+            MachineName = machineName,
+            Credential = Credential?.GetNetworkCredential(),
+            Authentication = Authentication,
+            Oldest = EffectiveOldest,
+            ReadMode = ReadMode,
+            MessageCulture = MessageCulture,
+            FallbackMessageCulture = FallbackMessageCulture,
+            MaxEvents = GetNativeCandidateLimit(),
+            IncludeBookmark = IncludeBookmark,
+            RemoteReadTimeoutMilliseconds =
+                EffectiveRemoteReadTimeoutMilliseconds,
+            BufferCapacity = BufferCapacity > 0 ? BufferCapacity : 64,
+            BookmarkXml = BookmarkXml,
+            BookmarkOffset = BookmarkOffset,
+            StrictBookmark = !IgnoreStaleBookmark,
+            TolerateQueryErrors = TolerateQueryErrors,
+            FailureHandler = failure => WriteError(new ErrorRecord(
+                failure.Exception,
+                "EVXStructuredQueryPathFailed",
+                ErrorCategory.ReadError,
+                string.IsNullOrWhiteSpace(failure.MachineName)
+                    ? failure.Source
+                    : $"{failure.Source} on {failure.MachineName}"))
+        };
+        query.RemoteConnectionTimeoutMilliseconds =
+            EffectiveRemoteConnectionTimeoutMilliseconds;
+        return query;
+    }
+
+}

@@ -22,7 +22,7 @@ public class TestLoggerIsolation {
     }
 
     private static void WriteInContext(InternalLogger logger, string message, Barrier barrier) {
-        _ = new SearchEvents(logger);
+        Settings._logger = logger;
         barrier.SignalAndWait();
         Settings._logger.WriteWarning(message);
     }

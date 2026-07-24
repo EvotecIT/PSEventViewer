@@ -30,18 +30,18 @@ public class ADUserUnlocked : EventRuleBase {
 
     /// <summary>Initialises an account unlock wrapper from an event record.</summary>
     public ADUserUnlocked(EventObject eventObject) : base(eventObject) {
-        _eventObject = eventObject;
+        Event = eventObject;
         Type = "ADUserUnlocked";
 
-        Computer = _eventObject.ComputerName;
-        Action = _eventObject.MessageSubject;
+        Computer = Event.ComputerName;
+        Action = Event.MessageSubject;
 
-        ComputerLockoutOn = _eventObject.GetDataValueOrEmpty(KnownEventField.TargetDomainName);
+        ComputerLockoutOn = Event.GetDataValueOrEmpty(KnownEventField.TargetDomainName);
 
-        UserAffected = _eventObject.GetTargetAccountOrEmpty();
+        UserAffected = Event.GetTargetAccountOrEmpty();
 
-        Who = _eventObject.GetSubjectAccountOrEmpty();
-        When = _eventObject.TimeCreated;
+        Who = Event.GetSubjectAccountOrEmpty();
+        When = Event.TimeCreated;
     }
 }
 

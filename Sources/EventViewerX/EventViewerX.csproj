@@ -2,7 +2,7 @@
 
     <PropertyGroup>
         <TargetFrameworks>net472;net8.0-windows;net10.0-windows</TargetFrameworks>
-        <Description>Library to work with Event Logs</Description>
+        <Description>Dependency-free, high-performance Windows Event Log query, projection, subscription, export, diagnostics, and administration engine.</Description>
         <AssemblyName>EventViewerX</AssemblyName>
         <AssemblyTitle>EventViewerX</AssemblyTitle>
         <VersionPrefix>4.0.0</VersionPrefix>
@@ -22,10 +22,6 @@
             Files (x86)\Microsoft Visual Studio\Shared\NuGetPackages</RestoreAdditionalProjectFallbackFoldersExcludes>
         <RestoreFallbackFolders />
     </PropertyGroup>
-
-    <ItemGroup>
-        <PackageReference Include="DnsClientX" Version="1.0.4" />
-    </ItemGroup>
 
     <ItemGroup>
         <None Include="..\..\README.md" Pack="true" PackagePath="\" />

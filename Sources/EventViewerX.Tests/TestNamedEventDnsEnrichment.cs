@@ -1,4 +1,3 @@
-using DnsClientX;
 using EventViewerX.Rules.ActiveDirectory;
 using System.Runtime.CompilerServices;
 using Xunit;
@@ -210,7 +209,7 @@ public class TestNamedEventDnsEnrichment {
                 return new DnsResponse { Status = DnsResponseCode.NoError };
             });
 
-        await foreach (SearchEvents.NamedEventProjection projection in SearchEvents.ProjectNamedCandidatesInOrderAsync(
+        await foreach (NamedEventEngine.NamedEventProjection projection in NamedEventEngine.ProjectCandidatesInOrderAsync(
                            YieldEventsAsync(sourceEvents),
                            new List<NamedEvents> { NamedEvents.ADSMBServerAuditV1 },
                            enricher,
@@ -239,7 +238,7 @@ public class TestNamedEventDnsEnrichment {
             });
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(async () => {
-            await foreach (SearchEvents.NamedEventProjection _ in SearchEvents.ProjectNamedCandidatesInOrderAsync(
+            await foreach (NamedEventEngine.NamedEventProjection _ in NamedEventEngine.ProjectCandidatesInOrderAsync(
                                YieldEventsAsync(new[] { CreateSmbEventObject("10.0.0.24", 24) }),
                                new List<NamedEvents> { NamedEvents.ADSMBServerAuditV1 },
                                enricher,

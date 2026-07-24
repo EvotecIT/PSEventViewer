@@ -30,7 +30,7 @@ public static class EventCatalogQueryExecutor {
         cancellationToken.ThrowIfCancellationRequested();
 
         try {
-            using EventLogSessionOpenResult sessionResult = SearchEvents.OpenSessionResult(
+            using EventLogSessionOpenResult sessionResult = EventLogSessionManager.OpenSessionResult(
                 machineName: request.MachineName,
                 timeoutMs: request.SessionTimeoutMs,
                 purpose: "EventCatalogChannels",
@@ -102,7 +102,7 @@ public static class EventCatalogQueryExecutor {
         cancellationToken.ThrowIfCancellationRequested();
 
         try {
-            using EventLogSessionOpenResult sessionResult = SearchEvents.OpenSessionResult(
+            using EventLogSessionOpenResult sessionResult = EventLogSessionManager.OpenSessionResult(
                 machineName: request.MachineName,
                 timeoutMs: request.SessionTimeoutMs,
                 purpose: "EventCatalogProviders",

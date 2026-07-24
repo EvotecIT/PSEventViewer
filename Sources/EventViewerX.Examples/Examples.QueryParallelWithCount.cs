@@ -8,7 +8,11 @@
             // Initialize a dictionary to keep track of the number of events per server
             var eventCounts = new Dictionary<string, int>();
 
-            await foreach (var eventObject in SearchEvents.QueryLogsParallel("Security", eventIds, machineNames, maxThreads: 1)) {
+            await foreach (var eventObject in EventLogEngine.ReadChannelsAsync(
+                               ["Security"],
+                               machineNames,
+                               new EventFilter { EventIds = eventIds },
+                               new EventLogQueryOptions { MaxConcurrency = 1 })) {
                 // If the server is not yet in the dictionary, add it with a count of 1
                 if (!eventCounts.ContainsKey(eventObject.ComputerName)) {
                     eventCounts[eventObject.ComputerName] = 1;

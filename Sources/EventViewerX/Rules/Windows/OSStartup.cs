@@ -34,18 +34,18 @@ public class OSStartup : EventRuleBase {
 
     /// <summary>Initialises an OS startup wrapper from an event record.</summary>
     public OSStartup(EventObject eventObject) : base(eventObject) {
-        _eventObject = eventObject;
+        Event = eventObject;
         Type = "OSStartup";
-        Computer = _eventObject.ComputerName;
+        Computer = Event.ComputerName;
         Action = "System Start";
-        ObjectAffected = _eventObject.MachineName;
-        ActionDetails = _eventObject.MessageSubject;
-        var rawStartText = _eventObject.GetValueFromDataDictionary("StartTime") ??
-                           _eventObject.GetValueFromDataDictionary("#text") ??
-                           _eventObject.GetValueFromDataDictionary("ActionDetailsDateTime");
-        ActionTimestampUtc = RuleHelpers.ParseUnlabeledOsTimestamp(_eventObject)
+        ObjectAffected = Event.MachineName;
+        ActionDetails = Event.MessageSubject;
+        var rawStartText = Event.GetValueFromDataDictionary("StartTime") ??
+                           Event.GetValueFromDataDictionary("#text") ??
+                           Event.GetValueFromDataDictionary("ActionDetailsDateTime");
+        ActionTimestampUtc = RuleHelpers.ParseUnlabeledOsTimestamp(Event)
                             ?? RuleHelpers.ParseDateTimeLoose(rawStartText)
-                            ?? _eventObject.TimeCreated.ToUniversalTime();
-        When = ActionTimestampUtc ?? _eventObject.TimeCreated;
+                            ?? Event.TimeCreated.ToUniversalTime();
+        When = ActionTimestampUtc ?? Event.TimeCreated;
     }
 }

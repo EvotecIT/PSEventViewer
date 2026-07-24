@@ -19,7 +19,6 @@ namespace PSEventViewer;
 ///   <para>Returns a typed statistics result or a PowerShell error with the underlying failure category.</para>
 /// </example>
 [Cmdlet(VerbsCommon.Get, "EVXEventStatistics")]
-[Alias("Get-EVXStats")]
 [OutputType(typeof(LiveStatsQueryResult))]
 public sealed class CmdletGetEVXEventStatistics : AsyncPSCmdlet {
     /// <summary>Event log channel to scan.</summary>
@@ -37,8 +36,8 @@ public sealed class CmdletGetEVXEventStatistics : AsyncPSCmdlet {
 
     /// <summary>Maximum number of events to scan. Zero removes the limit.</summary>
     [Parameter]
-    [ValidateRange(0, int.MaxValue)]
-    public int MaxEvents { get; set; } = 10000;
+    [ValidateRange(0, long.MaxValue)]
+    public long MaxEvents { get; set; } = 10000;
 
     /// <summary>Reads from oldest to newest.</summary>
     [Parameter]

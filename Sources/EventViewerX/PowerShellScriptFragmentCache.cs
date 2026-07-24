@@ -50,10 +50,10 @@ internal sealed class PowerShellScriptFragmentCache {
         EventObject eventObject,
         out PowerShellScriptAssembly? completed) {
 
-        if (messageNumber < 0 || messageNumber > SearchEvents.MaximumPowerShellScriptPartCount) {
+        if (messageNumber < 0 || messageNumber > PowerShellEventEngine.MaximumPowerShellScriptPartCount) {
             throw new ArgumentOutOfRangeException(nameof(messageNumber));
         }
-        if (messageTotal < 0 || messageTotal > SearchEvents.MaximumPowerShellScriptPartCount) {
+        if (messageTotal < 0 || messageTotal > PowerShellEventEngine.MaximumPowerShellScriptPartCount) {
             throw new ArgumentOutOfRangeException(nameof(messageTotal));
         }
 

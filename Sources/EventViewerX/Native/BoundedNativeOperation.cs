@@ -27,12 +27,30 @@ internal static class BoundedNativeOperation {
         string timeoutMessage,
         Action<T>? lateResultCleanup = null) {
 
+        return Execute(
+            operation,
+            timeoutMilliseconds,
+            timeoutMessage,
+            CancellationToken.None,
+            lateResultCleanup);
+    }
+
+    internal static T Execute<T>(
+        Func<T> operation,
+        int timeoutMilliseconds,
+        string timeoutMessage,
+        CancellationToken cancellationToken,
+        Action<T>? lateResultCleanup = null) {
+
+        cancellationToken.ThrowIfCancellationRequested();
         if (timeoutMilliseconds <= 0) {
             return operation();
         }
 
         var timeoutBudget = Stopwatch.StartNew();
-        if (!Slots.Wait(timeoutMilliseconds)) {
+        if (!Slots.Wait(
+                timeoutMilliseconds,
+                cancellationToken)) {
             throw new TimeoutException(timeoutMessage);
         }
 
@@ -68,14 +86,31 @@ internal static class BoundedNativeOperation {
 
         bool completed;
         try {
-            completed = task.Wait(remainingTimeout);
+            completed = task.Wait(
+                remainingTimeout,
+                cancellationToken);
         } catch (AggregateException) {
             return task.GetAwaiter().GetResult();
+        } catch (OperationCanceledException) {
+            ObserveLateResult(
+                task,
+                lateResultCleanup);
+            throw;
         }
 
         if (completed) {
             return task.GetAwaiter().GetResult();
         }
+
+        ObserveLateResult(
+            task,
+            lateResultCleanup);
+        throw new TimeoutException(timeoutMessage);
+    }
+
+    private static void ObserveLateResult<T>(
+        Task<T> task,
+        Action<T>? lateResultCleanup) {
 
         _ = task.ContinueWith(
             completedTask => {
@@ -91,7 +126,6 @@ internal static class BoundedNativeOperation {
             CancellationToken.None,
             TaskContinuationOptions.ExecuteSynchronously,
             TaskScheduler.Default);
-        throw new TimeoutException(timeoutMessage);
     }
 
     private sealed class SlotLease : IDisposable {

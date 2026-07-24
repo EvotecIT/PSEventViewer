@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -10,64 +11,105 @@ namespace EventViewerX.Native;
 internal static class WindowsEventRemoteReader {
     internal static IEnumerable<EventObject> Read(
         string machineName,
-        string logName,
-        string xpath,
+        string? path,
+        string query,
+        string displayName,
+        string containerLog,
         WindowsEventNativeMethods.QueryFlags flags,
         EventReadMode readMode,
         int messageLocale,
-        int maxEvents,
+        int fallbackMessageLocale,
+        bool includeBookmark,
+        long maxEvents,
         int connectionTimeoutMilliseconds,
         int readTimeoutMilliseconds,
         int bufferCapacity,
         int rpcEndpointPort,
+        NetworkCredential? credential,
+        EventLogAuthentication authentication,
+        string? bookmarkXml,
+        long bookmarkOffset,
+        bool strictBookmark,
+        Action<EventLogQueryFailure>? failureHandler,
         CancellationToken cancellationToken) {
 
         return ReadIterator(
             machineName,
-            logName,
-            xpath,
+            path,
+            query,
+            displayName,
+            containerLog,
             flags,
             readMode,
             messageLocale,
+            fallbackMessageLocale,
+            includeBookmark,
             maxEvents,
             connectionTimeoutMilliseconds,
             readTimeoutMilliseconds,
             bufferCapacity,
             rpcEndpointPort,
+            credential,
+            authentication,
+            bookmarkXml,
+            bookmarkOffset,
+            strictBookmark,
+            failureHandler,
             cancellationToken);
     }
 
     private static IEnumerable<EventObject> ReadIterator(
         string machineName,
-        string logName,
-        string xpath,
+        string? path,
+        string query,
+        string displayName,
+        string containerLog,
         WindowsEventNativeMethods.QueryFlags flags,
         EventReadMode readMode,
         int messageLocale,
-        int maxEvents,
+        int fallbackMessageLocale,
+        bool includeBookmark,
+        long maxEvents,
         int connectionTimeoutMilliseconds,
         int readTimeoutMilliseconds,
         int bufferCapacity,
         int rpcEndpointPort,
+        NetworkCredential? credential,
+        EventLogAuthentication authentication,
+        string? bookmarkXml,
+        long bookmarkOffset,
+        bool strictBookmark,
+        Action<EventLogQueryFailure>? failureHandler,
         CancellationToken cancellationToken) {
 
         string connectionTimeoutMessage =
-            $"Timed out connecting to '{logName}' on '{machineName}' after {connectionTimeoutMilliseconds} ms.";
+            $"Timed out connecting to '{displayName}' on '{machineName}' after {connectionTimeoutMilliseconds} ms.";
         string readTimeoutMessage =
-            $"Timed out reading '{logName}' on '{machineName}' after {readTimeoutMilliseconds} ms without progress.";
+            $"Timed out reading '{displayName}' on '{machineName}' after {readTimeoutMilliseconds} ms without progress.";
+        if (EventLogSessionManager
+            .TryGetHostNegativeCacheExpiry(
+                machineName,
+                out DateTime cachedUntilUtc)) {
+            throw new System.ComponentModel.Win32Exception(
+                1722,
+                $"Host '{machineName}' is temporarily cached as unreachable until {cachedUntilUtc:u}.");
+        }
         if (!RpcEndpointProbe.TryConnect(
                 machineName,
                 rpcEndpointPort,
                 connectionTimeoutMilliseconds)) {
+            EventLogSessionManager.MarkHostUnreachable(
+                machineName);
             throw new System.ComponentModel.Win32Exception(
                 1722,
-                $"The RPC endpoint for '{machineName}' is unavailable.");
+                $"RPC preflight to '{machineName}' on port {rpcEndpointPort} failed within {connectionTimeoutMilliseconds} ms.");
         }
         IDisposable operationSlot = BoundedNativeOperation.Acquire(
             connectionTimeoutMilliseconds,
             connectionTimeoutMessage);
         var results = new BlockingCollection<EventObject>(bufferCapacity);
         var failures = new ConcurrentQueue<Exception>();
+        var queryFailures = new ConcurrentQueue<EventLogQueryFailure>();
         var sessionOpened = new TaskCompletionSource<object?>(
             TaskCreationOptions.RunContinuationsAsynchronously);
         using var workerCancellation =
@@ -80,17 +122,30 @@ internal static class WindowsEventRemoteReader {
                 try {
                     Produce(
                         machineName,
-                        logName,
-                        xpath,
+                        path,
+                        query,
+                        displayName,
+                        containerLog,
                         flags,
                         readMode,
                         messageLocale,
+                        fallbackMessageLocale,
+                        includeBookmark,
                         maxEvents,
                         readTimeoutMilliseconds,
                         results,
                         failures,
                         sessionOpened,
                         operationSlot,
+                        credential,
+                        authentication,
+                        connectionTimeoutMilliseconds,
+                        bookmarkXml,
+                        bookmarkOffset,
+                        strictBookmark,
+                        failureHandler == null
+                            ? null
+                            : queryFailures.Enqueue,
                         workerCancellation.Token);
                     completion.TrySetResult(null);
                 } catch (Exception ex) {
@@ -113,6 +168,7 @@ internal static class WindowsEventRemoteReader {
         try {
             while (true) {
                 cancellationToken.ThrowIfCancellationRequested();
+                DrainQueryFailures(queryFailures, failureHandler);
                 if (results.TryTake(
                         out EventObject? eventObject,
                         100,
@@ -143,6 +199,7 @@ internal static class WindowsEventRemoteReader {
             }
 
             producer.GetAwaiter().GetResult();
+            DrainQueryFailures(queryFailures, failureHandler);
             if (failures.TryDequeue(out Exception? failure)) {
                 throw failure;
             }
@@ -165,44 +222,62 @@ internal static class WindowsEventRemoteReader {
 
     private static void Produce(
         string machineName,
-        string logName,
-        string xpath,
+        string? path,
+        string query,
+        string displayName,
+        string containerLog,
         WindowsEventNativeMethods.QueryFlags flags,
         EventReadMode readMode,
         int messageLocale,
-        int maxEvents,
+        int fallbackMessageLocale,
+        bool includeBookmark,
+        long maxEvents,
         int readTimeoutMilliseconds,
         BlockingCollection<EventObject> results,
         ConcurrentQueue<Exception> failures,
         TaskCompletionSource<object?> sessionOpened,
         IDisposable operationSlot,
+        NetworkCredential? credential,
+        EventLogAuthentication authentication,
+        int connectionTimeoutMilliseconds,
+        string? bookmarkXml,
+        long bookmarkOffset,
+        bool strictBookmark,
+        Action<EventLogQueryFailure>? failureHandler,
         CancellationToken cancellationToken) {
 
         using (operationSlot) {
             try {
                 using WindowsEventNativeMethods.EventHandle session =
-                    WindowsEventRemoteSession.OpenCore(machineName, new WindowsEventNativeMethods.RpcLogin {
-                        Server = machineName,
-                        User = null,
-                        Domain = null,
-                        Password = IntPtr.Zero,
-                        Flags = 0
-                    });
+                    WindowsEventRemoteSession.Open(
+                        machineName,
+                        credential,
+                        authentication,
+                        connectionTimeoutMilliseconds);
+                EventLogSessionManager.ClearNegativeCache(
+                    machineName);
                 sessionOpened.TrySetResult(null);
                 var nativeQuery = new NativeEventQuery(
                     session.DangerousGetHandle(),
-                    logName,
-                    xpath,
+                    path,
+                    query,
                     flags,
-                    $"{logName} on {machineName}",
+                    $"{displayName} on {machineName}",
                     messageLocale: messageLocale,
-                    nextTimeoutMilliseconds: readTimeoutMilliseconds);
-                int returned = 0;
+                    fallbackMessageLocale: fallbackMessageLocale,
+                    nextTimeoutMilliseconds: readTimeoutMilliseconds,
+                    includeBookmark: includeBookmark,
+                    bookmarkXml: bookmarkXml,
+                    bookmarkOffset: bookmarkOffset,
+                    strictBookmark: strictBookmark,
+                    machineName: machineName,
+                    failureHandler: failureHandler);
+                long returned = 0;
                 foreach (EventObject eventObject in WindowsEventReader.Read(
                              nativeQuery,
                              readMode,
                              machineName,
-                             logName,
+                             containerLog,
                              cancellationToken)) {
                     results.Add(eventObject, cancellationToken);
                     returned++;
@@ -216,6 +291,19 @@ internal static class WindowsEventRemoteReader {
             } finally {
                 results.CompleteAdding();
             }
+        }
+    }
+
+    private static void DrainQueryFailures(
+        ConcurrentQueue<EventLogQueryFailure> failures,
+        Action<EventLogQueryFailure>? failureHandler) {
+
+        if (failureHandler == null) {
+            return;
+        }
+        while (failures.TryDequeue(
+                   out EventLogQueryFailure? failure)) {
+            failureHandler(failure);
         }
     }
 }

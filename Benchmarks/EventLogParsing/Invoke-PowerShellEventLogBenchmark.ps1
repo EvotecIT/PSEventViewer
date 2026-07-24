@@ -278,6 +278,7 @@ if ($Engine -eq 'PSEventViewer') {
         $settings.Encoding = [Text.UTF8Encoding]::new($false)
         $settings.Indent = $false
         $settings.CloseOutput = $false
+        $settings.NewLineHandling = [Xml.NewLineHandling]::None
         $stream = [IO.FileStream]::new(
             $xmlFullPath,
             [IO.FileMode]::Create,

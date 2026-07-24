@@ -29,6 +29,15 @@ internal static class WindowsEventReader {
                     yield return new EventObject(structured, queriedMachine, containerLog);
                 }
                 break;
+            case EventReadMode.RawXml:
+                foreach (EventObject eventObject in ReadRawXml(
+                             query,
+                             queriedMachine,
+                             containerLog,
+                             cancellationToken)) {
+                    yield return eventObject;
+                }
+                break;
             case EventReadMode.Full:
                 foreach (NativeEventFull full in ReadFull(query, cancellationToken)) {
                     yield return new EventObject(full, queriedMachine, containerLog);
@@ -87,10 +96,34 @@ internal static class WindowsEventReader {
         return ReadXmlIterator(query, cancellationToken);
     }
 
+    private static IEnumerable<EventObject> ReadRawXml(
+        NativeEventQuery query,
+        string queriedMachine,
+        string containerLog,
+        CancellationToken cancellationToken) {
+
+        using var systemRenderer = new WindowsEventSystemRenderer();
+        using var xmlRenderer = new WindowsEventXmlRenderer();
+        using var bookmarkRenderer = query.IncludeBookmark
+            ? new WindowsEventBookmarkRenderer()
+            : null;
+        foreach (EventObject eventObject in ReadEvents(
+                     query,
+                     cancellationToken,
+                     eventHandle => new EventObject(
+                         systemRenderer.Render(eventHandle),
+                         xmlRenderer.Render(eventHandle),
+                         bookmarkRenderer?.Render(eventHandle),
+                         queriedMachine,
+                         containerLog))) {
+            yield return eventObject;
+        }
+    }
+
     internal static long CopyXml(
         NativeEventQuery query,
         Stream destination,
-        int maxEvents,
+        long maxEvents,
         CancellationToken cancellationToken) {
 
         if (destination == null) {
@@ -128,13 +161,18 @@ internal static class WindowsEventReader {
         using var messageRenderer = new WindowsEventMessageRenderer(
             query.Session,
             query.PublisherMetadataPath,
-            query.MessageLocale);
+            query.MessageLocale,
+            query.FallbackMessageLocale);
         foreach (NativeEventMessage message in ReadEvents(
                      query,
                      cancellationToken,
                      eventHandle => {
-                         NativeEventMetadata metadata = systemRenderer.Render(eventHandle);
-                         return messageRenderer.Render(eventHandle, metadata);
+                         NativeEventMetadata metadata =
+                             systemRenderer.Render(eventHandle);
+                         return messageRenderer.Render(
+                             eventHandle,
+                             metadata,
+                             query.IncludeBookmark);
                      })) {
             yield return message;
         }
@@ -150,8 +188,12 @@ internal static class WindowsEventReader {
                      query,
                      cancellationToken,
                      eventHandle => {
-                         NativeEventMetadata metadata = systemRenderer.Render(eventHandle);
-                         return payloadRenderer.Render(eventHandle, metadata);
+                         NativeEventMetadata metadata =
+                             systemRenderer.Render(eventHandle);
+                         return payloadRenderer.Render(
+                             eventHandle,
+                             metadata,
+                             query.IncludeBookmark);
                      })) {
             yield return structured;
         }
@@ -165,15 +207,21 @@ internal static class WindowsEventReader {
         using var messageRenderer = new WindowsEventMessageRenderer(
             query.Session,
             query.PublisherMetadataPath,
-            query.MessageLocale);
+            query.MessageLocale,
+            query.FallbackMessageLocale);
         using var payloadRenderer = new WindowsEventPayloadRenderer();
         foreach (NativeEventFull full in ReadEvents(
                      query,
                      cancellationToken,
                      eventHandle => {
-                         NativeEventMetadata metadata = systemRenderer.Render(eventHandle);
+                         NativeEventMetadata metadata =
+                             systemRenderer.Render(eventHandle);
                          NativeEventMessage message = messageRenderer.Render(eventHandle, metadata, includeBookmark: false);
-                         NativeEventStructured structured = payloadRenderer.Render(eventHandle, metadata);
+                         NativeEventStructured structured =
+                             payloadRenderer.Render(
+                                 eventHandle,
+                                 metadata,
+                                 query.IncludeBookmark);
                          return new NativeEventFull(message, structured);
                      })) {
             yield return full;

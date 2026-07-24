@@ -5,14 +5,15 @@ namespace EventViewerX.Examples {
     internal partial class Examples {
         public static async Task FindEventsTargetedBasic() {
 
-            await foreach (var foundObject in SearchEvents.FindEventsByNamedEvents([
+            var query = new NamedEventQuery([
                 NamedEvents.OSCrash,
                 NamedEvents.OSStartup,
                 NamedEvents.OSShutdown,
                 NamedEvents.OSUncleanShutdown,
                 NamedEvents.OSStartupSecurity,
                 NamedEvents.OSCrashOnAuditFailRecovery,
-                NamedEvents.OSBugCheck])) {
+                NamedEvents.OSBugCheck]);
+            await foreach (var foundObject in NamedEventEngine.ReadAsync(query)) {
 
                 Console.WriteLine("Event ID: {0}", foundObject.EventID + ", " + foundObject.Type + " " + foundObject.GatheredFrom);
                 Console.WriteLine("Type: " + foundObject.Type + ", " + foundObject.EventID + " " + foundObject.EventID + " " + foundObject.GatheredFrom);
@@ -56,11 +57,14 @@ namespace EventViewerX.Examples {
             // Initialize the logger
             var internalLogger = new InternalLogger(true);
 
-            SearchEvents eventSearching = new SearchEvents(internalLogger);
-            eventSearching.Verbose = true;
+            internalLogger.IsVerbose = true;
+            Settings.Logger = internalLogger;
 
             List<NamedEvents> Type = new List<NamedEvents> { NamedEvents.ADLdapBindingDetails, NamedEvents.ADLdapBindingSummary };
-            await foreach (var foundObject in SearchEvents.FindEventsByNamedEvents(Type, MachineName)) {
+            var query = new NamedEventQuery(Type) {
+                MachineNames = MachineName
+            };
+            await foreach (var foundObject in NamedEventEngine.ReadAsync(query)) {
                 // Check if the foundObject is of type ADComputerChangeDetailed
 
                 // Console.WriteLine("Event ID: {0}", foundObject.EventID + ", " + foundObject.Type + " " + foundObject.GatheredFrom);

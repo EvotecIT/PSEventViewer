@@ -6,6 +6,44 @@ namespace EventViewerX {
     public partial class EventObject {
         private static readonly string[] NewLineSeparators = { "\r\n", "\n" };
 
+        private void EnsurePayloadParsed() {
+            if (_payloadParsed) {
+                return;
+            }
+
+            object sync = _payloadSync ??=
+                new object();
+            lock (sync) {
+                if (_payloadParsed) {
+                    return;
+                }
+
+                if (_data != null) {
+                    _nicIdentifiers ??=
+                        ExtractNicIdentifiers(_data) ??
+                        new List<string>();
+                    _attachments ??= Array.Empty<byte[]>();
+                } else if (_payloadParsingEnabled) {
+                    ParseXmlPayload(
+                        XMLData,
+                        out Dictionary<string, string> data,
+                        out IReadOnlyList<byte[]> attachments,
+                        _includeAttachments);
+                    _data = data;
+                    _nicIdentifiers =
+                        ExtractNicIdentifiers(data) ??
+                        new List<string>();
+                    _attachments = attachments;
+                } else {
+                    _data = new Dictionary<string, string>(
+                        StringComparer.OrdinalIgnoreCase);
+                    _nicIdentifiers = new List<string>();
+                    _attachments = Array.Empty<byte[]>();
+                }
+                _payloadParsed = true;
+            }
+        }
+
         private static string[] SplitMessageLines(string message) {
             if (string.IsNullOrEmpty(message)) {
                 return Array.Empty<string>();
@@ -17,50 +55,122 @@ namespace EventViewerX {
         /// <summary>
         /// Parses the message of the event record into a dictionary converting it into a key value pair
         /// </summary>
-        /// <param name="lines">Provider-formatted message lines.</param>
+        /// <param name="message">Provider-formatted message.</param>
         /// <returns></returns>
-        private Dictionary<string, string> ParseMessage(IReadOnlyList<string> lines) {
+        private static Dictionary<string, string> ParseMessage(
+            string message) {
+
             var data = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            int firstNonEmptyLineIndex = FindFirstMessageLine(lines);
-            if (firstNonEmptyLineIndex >= 0) {
-                string firstLine = lines[firstNonEmptyLineIndex].Trim();
-                data["Message"] = firstLine;
+            if (string.IsNullOrEmpty(message)) {
+                return data;
             }
 
-            // Process remaining lines (after the subject) into key:value pairs.
-            for (int i = firstNonEmptyLineIndex + 1; i < lines.Count; i++) {
-                string line = lines[i].Trim();
-
-                // Skip empty lines
-                if (string.IsNullOrEmpty(line)) {
-                    continue;
+            bool subjectFound = false;
+            int lineStart = 0;
+            while (lineStart < message.Length) {
+                int newLineIndex = message.IndexOf('\n', lineStart);
+                int lineEnd = newLineIndex >= 0
+                    ? newLineIndex
+                    : message.Length;
+                if (lineEnd > lineStart &&
+                    message[lineEnd - 1] == '\r') {
+                    lineEnd--;
                 }
 
-                int colonIndex = line.IndexOf(':');
-                if (colonIndex > 0) {
-                    string key = line.Substring(0, colonIndex).Trim();
-                    string value = line.Substring(colonIndex + 1).Trim();
-                    if (!string.IsNullOrEmpty(key)) {
-                        data[key] = value;
+                TrimRange(
+                    message,
+                    ref lineStart,
+                    ref lineEnd);
+                if (lineEnd > lineStart) {
+                    if (!subjectFound) {
+                        data["Message"] = message.Substring(
+                            lineStart,
+                            lineEnd - lineStart);
+                        subjectFound = true;
+                    } else {
+                        int colonIndex = message.IndexOf(
+                            ':',
+                            lineStart,
+                            lineEnd - lineStart);
+                        if (colonIndex > lineStart) {
+                            int keyStart = lineStart;
+                            int keyEnd = colonIndex;
+                            TrimRange(
+                                message,
+                                ref keyStart,
+                                ref keyEnd);
+                            int valueStart = colonIndex + 1;
+                            int valueEnd = lineEnd;
+                            TrimRange(
+                                message,
+                                ref valueStart,
+                                ref valueEnd);
+                            if (keyEnd > keyStart) {
+                                string key = message.Substring(
+                                    keyStart,
+                                    keyEnd - keyStart);
+                                data[key] = message.Substring(
+                                    valueStart,
+                                    valueEnd - valueStart);
+                            }
+                        }
                     }
                 }
+
+                if (newLineIndex < 0) {
+                    break;
+                }
+                lineStart = newLineIndex + 1;
             }
 
             return data;
         }
 
-        private static string GetMessageSubject(IReadOnlyList<string> lines) {
-            int index = FindFirstMessageLine(lines);
-            return index >= 0 ? lines[index].Trim() : string.Empty;
+        private static string GetMessageSubject(string message) {
+            if (string.IsNullOrEmpty(message)) {
+                return string.Empty;
+            }
+
+            int lineStart = 0;
+            while (lineStart < message.Length) {
+                int newLineIndex = message.IndexOf('\n', lineStart);
+                int lineEnd = newLineIndex >= 0
+                    ? newLineIndex
+                    : message.Length;
+                if (lineEnd > lineStart &&
+                    message[lineEnd - 1] == '\r') {
+                    lineEnd--;
+                }
+                TrimRange(
+                    message,
+                    ref lineStart,
+                    ref lineEnd);
+                if (lineEnd > lineStart) {
+                    return message.Substring(
+                        lineStart,
+                        lineEnd - lineStart);
+                }
+                if (newLineIndex < 0) {
+                    break;
+                }
+                lineStart = newLineIndex + 1;
+            }
+            return string.Empty;
         }
 
-        private static int FindFirstMessageLine(IReadOnlyList<string> lines) {
-            for (int i = 0; i < lines.Count; i++) {
-                if (!string.IsNullOrWhiteSpace(lines[i])) {
-                    return i;
-                }
+        private static void TrimRange(
+            string text,
+            ref int start,
+            ref int end) {
+
+            while (start < end &&
+                   char.IsWhiteSpace(text[start])) {
+                start++;
             }
-            return -1;
+            while (end > start &&
+                   char.IsWhiteSpace(text[end - 1])) {
+                end--;
+            }
         }
 
         /// <summary>
@@ -109,8 +219,11 @@ namespace EventViewerX {
 
                     if (keyEnd > contentStart) {
                         string key = text.Substring(contentStart, keyEnd - contentStart);
-                        parsed ??= new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-                        parsed[key] = text.Substring(valueStart, lineEnd - valueStart);
+                        parsed ??= new Dictionary<string, string>(
+                            StringComparer.OrdinalIgnoreCase);
+                        parsed[key] = text.Substring(
+                            valueStart,
+                            lineEnd - valueStart);
                     }
                 }
 

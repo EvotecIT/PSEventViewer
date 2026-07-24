@@ -96,7 +96,7 @@ public sealed class EvtxStatsReportBuilder {
     }
 
     /// <summary>
-    /// Convenience API: reads an EVTX file using <see cref="SearchEvents.QueryLogFile"/> and returns a stats report.
+    /// Convenience API: reads an EVTX file using <see cref="EventLogEngine"/> and returns a stats report.
     /// </summary>
     public static EvtxStatsReport BuildFromFile(
         string filePath,

@@ -5,7 +5,7 @@ namespace EventViewerX;
 /// <summary>
 /// Provides logging verbosity switches and default timeouts used throughout EventViewerX.
 /// </summary>
-public class Settings {
+public static class Settings {
     private static readonly AsyncLocal<InternalLogger?> ContextLogger = new();
     private static readonly InternalLogger DefaultLogger = new();
 
@@ -16,9 +16,18 @@ public class Settings {
     /// The value flows to child tasks without allowing concurrent PowerShell runspaces or callers to overwrite
     /// one another's logging callbacks.
     /// </remarks>
-    public static InternalLogger _logger {
+    internal static InternalLogger _logger {
         get => ContextLogger.Value ?? DefaultLogger;
         set => ContextLogger.Value = value ?? throw new ArgumentNullException(nameof(value));
+    }
+
+    /// <summary>
+    /// Logger for the current asynchronous execution context. Setting it affects
+    /// the caller's context and flows to child tasks without changing unrelated callers.
+    /// </summary>
+    public static InternalLogger Logger {
+        get => _logger;
+        set => _logger = value;
     }
 
     /// <summary>TTL (seconds) for negative host reachability cache; adjust for slower/faster networks.</summary>
@@ -38,35 +47,5 @@ public class Settings {
     /// Session establishment still respects <see cref="SessionTimeoutMs"/>.
     /// </summary>
     public static int QuerySessionTimeoutMs { get; set; } = 0;
-
-    /// <summary>When set, error messages are written to the console.</summary>
-    public bool Error {
-        get => _logger.IsError;
-        set => _logger.IsError = value;
-    }
-
-    /// <summary>Enables verbose output.</summary>
-    public bool Verbose {
-        get => _logger.IsVerbose;
-        set => _logger.IsVerbose = value;
-    }
-
-    /// <summary>Enables warning output.</summary>
-    public bool Warning {
-        get => _logger.IsWarning;
-        set => _logger.IsWarning = value;
-    }
-
-    /// <summary>Enables progress reporting.</summary>
-    public bool Progress {
-        get => _logger.IsProgress;
-        set => _logger.IsProgress = value;
-    }
-
-    /// <summary>Enables debug output.</summary>
-    public bool Debug {
-        get => _logger.IsDebug;
-        set => _logger.IsDebug = value;
-    }
 
 }

@@ -55,18 +55,18 @@ public class ADGroupMembershipChange : EventRuleBase {
 
     /// <summary>Initialises a group membership change wrapper from an event record.</summary>
     public ADGroupMembershipChange(EventObject eventObject) : base(eventObject) {
-        _eventObject = eventObject;
+        Event = eventObject;
         Type = "ADGroupMembershipChange";
 
-        Computer = _eventObject.ComputerName;
-        Action = _eventObject.MessageSubject;
+        Computer = Event.ComputerName;
+        Action = Event.MessageSubject;
 
-        GroupName = _eventObject.GetTargetAccountOrEmpty();
-        MemberName = _eventObject.GetValueFromDataDictionary("MemberNameWithoutCN");
+        GroupName = Event.GetTargetAccountOrEmpty();
+        MemberName = Event.GetValueFromDataDictionary("MemberNameWithoutCN");
 
         // common fields
-        Who = _eventObject.GetSubjectAccountOrEmpty();
-        When = _eventObject.TimeCreated;
+        Who = Event.GetSubjectAccountOrEmpty();
+        When = Event.TimeCreated;
     }
 }
 

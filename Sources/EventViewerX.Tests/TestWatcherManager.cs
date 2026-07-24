@@ -186,6 +186,43 @@ namespace EventViewerX.Tests {
         }
 
         [Fact]
+        public void OnEventHonorsStopAfterExactly() {
+            int delivered = 0;
+            var info = (WatcherInfo)Activator.CreateInstance(
+                typeof(WatcherInfo),
+                BindingFlags.Instance | BindingFlags.NonPublic,
+                null,
+                new object[] {
+                    "limited",
+                    Environment.MachineName,
+                    "Application",
+                    new List<int> { 1 },
+                    new List<NamedEvents>(),
+                    new Action<EventObject>(_ =>
+                        Interlocked.Increment(ref delivered)),
+                    false,
+                    false,
+                    1,
+                    null
+                },
+                null)!;
+            var dummy = (EventObject)FormatterServices
+                .GetUninitializedObject(typeof(EventObject));
+            var method = typeof(WatcherInfo).GetMethod(
+                "OnEvent",
+                BindingFlags.Instance |
+                BindingFlags.NonPublic)!;
+
+            for (int i = 0; i < 128; i++) {
+                method.Invoke(info, new object[] { dummy });
+            }
+
+            Assert.Equal(1, delivered);
+            Assert.Equal(1, info.EventsFound);
+            info.Dispose();
+        }
+
+        [Fact]
         public void StartWatcherIsThreadSafe() {
             WatcherManager.StopAll();
             var tasks = new List<Task<WatcherInfo>>();

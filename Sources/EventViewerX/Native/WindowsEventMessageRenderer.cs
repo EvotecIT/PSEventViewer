@@ -10,7 +10,7 @@ internal sealed class WindowsEventMessageRenderer : IDisposable {
     private readonly string? _filePath;
     private readonly IntPtr _session;
     private readonly int _locale;
-    private readonly string _cultureName;
+    private readonly int _fallbackLocale;
     private readonly NativeEventBuffer _messageBuffer = new();
     private readonly WindowsEventBookmarkRenderer _bookmarkRenderer = new();
     private readonly Dictionary<string, ProviderContext> _providers =
@@ -19,7 +19,8 @@ internal sealed class WindowsEventMessageRenderer : IDisposable {
     internal WindowsEventMessageRenderer(
         IntPtr session,
         string? filePath,
-        int locale = 0) {
+        int locale = 0,
+        int fallbackLocale = 0) {
 
         _session = session;
         _filePath = filePath;
@@ -27,13 +28,15 @@ internal sealed class WindowsEventMessageRenderer : IDisposable {
             ? CultureInfo.CurrentUICulture
             : CultureInfo.GetCultureInfo(locale);
         _locale = culture.LCID;
-        _cultureName = culture.Name;
+        _fallbackLocale = fallbackLocale == 0
+            ? 0
+            : CultureInfo.GetCultureInfo(fallbackLocale).LCID;
     }
 
     internal NativeEventMessage Render(
         IntPtr eventHandle,
         NativeEventMetadata metadata,
-        bool includeBookmark = true) {
+        bool includeBookmark = false) {
         ProviderContext provider = GetProvider(metadata.ProviderName);
         FormatResult message = Format(
             provider,
@@ -75,7 +78,7 @@ internal sealed class WindowsEventMessageRenderer : IDisposable {
             opcode,
             keywords,
             includeBookmark ? _bookmarkRenderer.Render(eventHandle) : null,
-            _cultureName,
+            message.CultureName,
             GetRenderStatus(provider, message.ErrorCode),
             message.ErrorCode);
     }
@@ -85,39 +88,101 @@ internal sealed class WindowsEventMessageRenderer : IDisposable {
             return provider;
         }
 
-        WindowsEventNativeMethods.EventHandle handle = WindowsEventNativeMethods.EvtOpenPublisherMetadata(
-            _session,
-            providerName,
-            _filePath,
-            _locale,
-            0);
-        int openError = handle.IsInvalid ? Marshal.GetLastWin32Error() : 0;
-        if (handle.IsInvalid) {
-            handle.Dispose();
-            handle = WindowsEventNativeMethods.EvtOpenPublisherMetadata(
-                _session,
+        WindowsEventNativeMethods.EventHandle primary =
+            OpenProvider(providerName, _locale);
+        int primaryError =
+            primary.IsInvalid
+                ? Marshal.GetLastWin32Error()
+                : 0;
+        WindowsEventNativeMethods.EventHandle? fallback = null;
+        int fallbackError = 0;
+        string fallbackCultureName = string.Empty;
+        if (_fallbackLocale != 0 &&
+            _fallbackLocale != _locale) {
+            fallback = OpenProvider(
                 providerName,
-                null,
-                _locale,
-                0);
-            openError = handle.IsInvalid ? Marshal.GetLastWin32Error() : 0;
+                _fallbackLocale);
+            fallbackError = fallback.IsInvalid
+                ? Marshal.GetLastWin32Error()
+                : 0;
+            fallbackCultureName =
+                CultureInfo.GetCultureInfo(
+                    _fallbackLocale).Name;
         }
 
-        provider = new ProviderContext(handle, openError);
+        provider = new ProviderContext(
+            primary,
+            primaryError,
+            CultureInfo.GetCultureInfo(_locale).Name,
+            fallback,
+            fallbackError,
+            fallbackCultureName);
         _providers.Add(providerName, provider);
         return provider;
     }
 
-    private FormatResult Format(
+    private WindowsEventNativeMethods.EventHandle OpenProvider(
+        string providerName,
+        int locale) {
+
+        WindowsEventNativeMethods.EventHandle handle =
+            WindowsEventNativeMethods.EvtOpenPublisherMetadata(
+                _session,
+                providerName,
+                _filePath,
+                locale,
+                0);
+        if (!handle.IsInvalid || _filePath == null) {
+            return handle;
+        }
+        handle.Dispose();
+        return WindowsEventNativeMethods.EvtOpenPublisherMetadata(
+            _session,
+            providerName,
+            null,
+            locale,
+            0);
+    }
+
+    private unsafe FormatResult Format(
         ProviderContext provider,
         IntPtr eventHandle,
         WindowsEventNativeMethods.FormatMessageFlags flags) {
 
-        if (provider.Handle.IsInvalid) {
-            return new FormatResult(string.Empty, provider.OpenErrorCode);
+        FormatResult result = FormatHandle(
+            provider.Handle,
+            provider.OpenErrorCode,
+            provider.CultureName,
+            eventHandle,
+            flags);
+        if (!ShouldTryFallback(result.ErrorCode) ||
+            provider.FallbackHandle == null) {
+            return result;
         }
 
-        IntPtr publisherHandle = provider.Handle.DangerousGetHandle();
+        return FormatHandle(
+            provider.FallbackHandle,
+            provider.FallbackOpenErrorCode,
+            provider.FallbackCultureName,
+            eventHandle,
+            flags);
+    }
+
+    private unsafe FormatResult FormatHandle(
+        WindowsEventNativeMethods.EventHandle handle,
+        int openErrorCode,
+        string cultureName,
+        IntPtr eventHandle,
+        WindowsEventNativeMethods.FormatMessageFlags flags) {
+
+        if (handle.IsInvalid) {
+            return new FormatResult(
+                string.Empty,
+                openErrorCode,
+                cultureName);
+        }
+
+        IntPtr publisherHandle = handle.DangerousGetHandle();
         if (!WindowsEventNativeMethods.EvtFormatMessage(
                 publisherHandle,
                 eventHandle,
@@ -131,7 +196,10 @@ internal sealed class WindowsEventMessageRenderer : IDisposable {
 
             int error = Marshal.GetLastWin32Error();
             if (error != WindowsEventNativeMethods.ErrorInsufficientBuffer) {
-                return new FormatResult(string.Empty, error);
+                return new FormatResult(
+                    string.Empty,
+                    error,
+                    cultureName);
             }
 
             _messageBuffer.EnsureCapacity(checked(bufferUsed * sizeof(char)));
@@ -145,18 +213,46 @@ internal sealed class WindowsEventMessageRenderer : IDisposable {
                     _messageBuffer.Capacity / sizeof(char),
                     _messageBuffer.Pointer,
                     out bufferUsed)) {
-                return new FormatResult(string.Empty, Marshal.GetLastWin32Error());
+                return new FormatResult(
+                    string.Empty,
+                    Marshal.GetLastWin32Error(),
+                    cultureName);
             }
         }
 
         if (bufferUsed <= 0) {
-            return new FormatResult(string.Empty, 0);
+            return new FormatResult(
+                string.Empty,
+                0,
+                cultureName);
         }
 
+        var characters = (char*)_messageBuffer.Pointer;
+        while (bufferUsed > 0 &&
+               characters[bufferUsed - 1] == '\0') {
+            bufferUsed--;
+        }
         return new FormatResult(
-            (Marshal.PtrToStringUni(_messageBuffer.Pointer, bufferUsed) ?? string.Empty)
-                .TrimEnd('\0'),
-            0);
+            bufferUsed == 0
+                ? string.Empty
+                : new string(characters, 0, bufferUsed),
+            0,
+            cultureName);
+    }
+
+    private static bool ShouldTryFallback(int errorCode) {
+        return errorCode ==
+                   WindowsEventNativeMethods
+                       .ErrorEvtPublisherMetadataNotFound ||
+               errorCode ==
+                   WindowsEventNativeMethods
+                       .ErrorEvtMessageNotFound ||
+               errorCode ==
+                   WindowsEventNativeMethods
+                       .ErrorEvtMessageIdNotFound ||
+               errorCode ==
+                   WindowsEventNativeMethods
+                       .ErrorEvtMessageLocaleNotFound;
     }
 
     private static EventMessageRenderStatus GetRenderStatus(
@@ -166,7 +262,9 @@ internal sealed class WindowsEventMessageRenderer : IDisposable {
         if (errorCode == 0) {
             return EventMessageRenderStatus.Rendered;
         }
-        if (provider.Handle.IsInvalid ||
+        if ((provider.Handle.IsInvalid &&
+             (provider.FallbackHandle == null ||
+              provider.FallbackHandle.IsInvalid)) ||
             errorCode == WindowsEventNativeMethods.ErrorEvtPublisherMetadataNotFound) {
             return EventMessageRenderStatus.ProviderMetadataUnavailable;
         }
@@ -196,13 +294,19 @@ internal sealed class WindowsEventMessageRenderer : IDisposable {
     }
 
     private readonly struct FormatResult {
-        internal FormatResult(string text, int errorCode) {
+        internal FormatResult(
+            string text,
+            int errorCode,
+            string cultureName) {
+
             Text = text;
             ErrorCode = errorCode;
+            CultureName = cultureName;
         }
 
         internal string Text { get; }
         internal int ErrorCode { get; }
+        internal string CultureName { get; }
     }
 
     private sealed class ProviderContext : IDisposable {
@@ -213,14 +317,28 @@ internal sealed class WindowsEventMessageRenderer : IDisposable {
 
         internal ProviderContext(
             WindowsEventNativeMethods.EventHandle handle,
-            int openErrorCode) {
+            int openErrorCode,
+            string cultureName,
+            WindowsEventNativeMethods.EventHandle? fallbackHandle,
+            int fallbackOpenErrorCode,
+            string fallbackCultureName) {
 
             Handle = handle;
             OpenErrorCode = openErrorCode;
+            CultureName = cultureName;
+            FallbackHandle = fallbackHandle;
+            FallbackOpenErrorCode = fallbackOpenErrorCode;
+            FallbackCultureName = fallbackCultureName;
         }
 
         internal WindowsEventNativeMethods.EventHandle Handle { get; }
         internal int OpenErrorCode { get; }
+        internal string CultureName { get; }
+        internal WindowsEventNativeMethods.EventHandle? FallbackHandle {
+            get;
+        }
+        internal int FallbackOpenErrorCode { get; }
+        internal string FallbackCultureName { get; }
 
         internal string GetLevel(byte? value, Func<string> factory) {
             return value.HasValue ? GetOrAdd(_levels, value.Value, factory) : string.Empty;
@@ -257,6 +375,7 @@ internal sealed class WindowsEventMessageRenderer : IDisposable {
         }
 
         public void Dispose() {
+            FallbackHandle?.Dispose();
             Handle.Dispose();
         }
     }

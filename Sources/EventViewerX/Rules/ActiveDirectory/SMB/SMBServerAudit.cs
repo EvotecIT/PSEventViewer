@@ -1,5 +1,3 @@
-﻿using DnsClientX;
-
 using EventViewerX;
 using System.Net;
 
@@ -51,12 +49,12 @@ public class SMBServerAudit : EventRuleBase {
     public SMBServerAudit(EventObject eventObject) : base(eventObject) {
         //EventObject = eventObject;
 
-        _eventObject = eventObject;
+        Event = eventObject;
         Type = "ADSMBServerAuditV1";
-        Computer = _eventObject.ComputerName;
-        Action = _eventObject.MessageSubject;
-        ClientAddress = _eventObject.GetValueFromDataDictionary("ClientName");
-        When = _eventObject.TimeCreated;
+        Computer = Event.ComputerName;
+        Action = Event.MessageSubject;
+        ClientAddress = Event.GetValueFromDataDictionary("ClientName");
+        When = Event.TimeCreated;
     }
 
     /// <summary>

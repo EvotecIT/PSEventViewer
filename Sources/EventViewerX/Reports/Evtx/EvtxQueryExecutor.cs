@@ -54,20 +54,38 @@ public static class EvtxQueryExecutor {
         EvtxQueryRequest validatedRequest = request!;
 
         try {
-            var eventIds = validatedRequest.EventIds is null ? null : new List<int>(validatedRequest.EventIds);
-            int readLimit = validatedRequest.MaxEvents > 0 && validatedRequest.MaxEvents < int.MaxValue
-                ? validatedRequest.MaxEvents + 1
-                : validatedRequest.MaxEvents;
-            foreach (var ev in SearchEvents.QueryLogFile(
-                         filePath: validatedRequest.FilePath,
-                         eventIds: eventIds,
-                         providerName: validatedRequest.ProviderName,
-                         startTime: validatedRequest.StartTimeUtc,
-                         endTime: validatedRequest.EndTimeUtc,
-                         maxEvents: readLimit,
-                         oldest: validatedRequest.OldestFirst,
-                         cancellationToken: cancellationToken,
-                         readMode: readModeOverride ?? validatedRequest.ReadMode)) {
+            long readLimit =
+                validatedRequest.MaxEvents > 0 &&
+                validatedRequest.MaxEvents < int.MaxValue
+                    ? validatedRequest.MaxEvents + 1L
+                    : validatedRequest.MaxEvents;
+            var query = new EventLogFileQuery(
+                validatedRequest.FilePath) {
+                XPath = EventFilterCompiler.BuildXPath(
+                    new EventFilter {
+                        EventIds = validatedRequest.EventIds,
+                        ProviderNames =
+                            string.IsNullOrWhiteSpace(
+                                validatedRequest.ProviderName)
+                                ? null
+                                : new[] {
+                                    validatedRequest.ProviderName!
+                                },
+                        StartTime =
+                            validatedRequest.StartTimeUtc,
+                        EndTime =
+                            validatedRequest.EndTimeUtc
+                    }),
+                MaxEvents = readLimit,
+                Oldest = validatedRequest.OldestFirst,
+                ReadMode =
+                    readModeOverride ??
+                    validatedRequest.ReadMode
+            };
+            foreach (EventObject ev in
+                     EventLogEngine.ReadFile(
+                         query,
+                         cancellationToken)) {
                 cancellationToken.ThrowIfCancellationRequested();
 
                 if (validatedRequest.MaxEvents > 0 && executionInfo.EventsDelivered >= validatedRequest.MaxEvents) {

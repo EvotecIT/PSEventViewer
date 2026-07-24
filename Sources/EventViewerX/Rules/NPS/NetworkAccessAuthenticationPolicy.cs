@@ -144,45 +144,45 @@ public class NetworkAccessAuthenticationPolicy : EventRuleBase {
 
     /// <summary>Initialises an NPS authentication policy wrapper from an event record.</summary>
     public NetworkAccessAuthenticationPolicy(EventObject eventObject) : base(eventObject) {
-        _eventObject = eventObject;
+        Event = eventObject;
 
         Type = "NetworkAccessAuthenticationPolicy";
-        Computer = _eventObject.ComputerName;
-        Action = _eventObject.MessageSubject;
-        SecurityID = _eventObject.GetDataValueOrEmpty("SubjectUserSid");
-        AccountName = _eventObject.GetDataValueOrEmpty(KnownEventField.SubjectUserName);
-        AccountDomain = _eventObject.GetDataValueOrEmpty(KnownEventField.SubjectDomainName);
+        Computer = Event.ComputerName;
+        Action = Event.MessageSubject;
+        SecurityID = Event.GetDataValueOrEmpty("SubjectUserSid");
+        AccountName = Event.GetDataValueOrEmpty(KnownEventField.SubjectUserName);
+        AccountDomain = Event.GetDataValueOrEmpty(KnownEventField.SubjectDomainName);
 
-        CalledStationID = _eventObject.GetDataValueOrEmpty("CalledStationID");
-        CallingStationID = _eventObject.GetDataValueOrEmpty("CallingStationID");
+        CalledStationID = Event.GetDataValueOrEmpty("CalledStationID");
+        CallingStationID = Event.GetDataValueOrEmpty("CallingStationID");
 
-        NASIPv4Address = _eventObject.GetDataValueOrEmpty("NASIPv4Address");
-        NASIPv6Address = _eventObject.GetDataValueOrEmpty("NASIPv6Address");
+        NASIPv4Address = Event.GetDataValueOrEmpty("NASIPv4Address");
+        NASIPv6Address = Event.GetDataValueOrEmpty("NASIPv6Address");
 
-        NASIdentifier = _eventObject.GetDataValueOrEmpty("NASIdentifier");
-        NASPort = _eventObject.GetDataValueOrEmpty("NASPort");
+        NASIdentifier = Event.GetDataValueOrEmpty("NASIdentifier");
+        NASPort = Event.GetDataValueOrEmpty("NASPort");
         NASPortType = EventsHelper.GetNasPortType(
-            _eventObject.GetDataValueOrEmpty("NASPortType"));
+            Event.GetDataValueOrEmpty("NASPortType"));
 
 
-        AuthenticationProvider = _eventObject.GetDataValueOrEmpty("AuthenticationProvider");
-        AuthenticationServer = _eventObject.GetDataValueOrEmpty("AuthenticationServer");
-        var authType = _eventObject.GetDataValueOrEmpty("AuthenticationType");
+        AuthenticationProvider = Event.GetDataValueOrEmpty("AuthenticationProvider");
+        AuthenticationServer = Event.GetDataValueOrEmpty("AuthenticationServer");
+        var authType = Event.GetDataValueOrEmpty("AuthenticationType");
         AuthenticationType = ParseAuthenticationType(authType);
 
-        EAPType = _eventObject.GetDataValueOrEmpty("EAPType");
+        EAPType = Event.GetDataValueOrEmpty("EAPType");
 
-        ClientFriendlyIPAddress = _eventObject.GetDataValueOrEmpty("ClientIPAddress");
-        ClientFriendlyName = _eventObject.GetDataValueOrEmpty("ClientName");
+        ClientFriendlyIPAddress = Event.GetDataValueOrEmpty("ClientIPAddress");
+        ClientFriendlyName = Event.GetDataValueOrEmpty("ClientName");
 
-        ConnectionRequestPolicyName = _eventObject.GetDataValueOrEmpty("ProxyPolicyName");
+        ConnectionRequestPolicyName = Event.GetDataValueOrEmpty("ProxyPolicyName");
 
-        NetworkPolicyName = _eventObject.GetDataValueOrEmpty("NetworkPolicyName");
+        NetworkPolicyName = Event.GetDataValueOrEmpty("NetworkPolicyName");
 
-        Reason = _eventObject.GetDataValueOrEmpty("Reason");
-        ReasonCode = _eventObject.GetDataValueOrEmpty("ReasonCode");
+        Reason = Event.GetDataValueOrEmpty("Reason");
+        ReasonCode = Event.GetDataValueOrEmpty("ReasonCode");
         // common fields
-        Who = _eventObject.GetDataValueOrEmpty("FullyQualifiedSubjectUserName");
-        When = _eventObject.TimeCreated;
+        Who = Event.GetDataValueOrEmpty("FullyQualifiedSubjectUserName");
+        When = Event.TimeCreated;
     }
 }

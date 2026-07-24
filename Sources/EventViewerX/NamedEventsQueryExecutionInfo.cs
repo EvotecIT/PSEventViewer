@@ -22,7 +22,7 @@ public sealed class NamedEventsQueryExecutionInfo {
     /// <summary>
     /// Effective candidate scan cap. Zero means unlimited.
     /// </summary>
-    public int MaxEventsScanned { get; internal set; }
+    public long MaxEventsScanned { get; internal set; }
 
     /// <summary>
     /// Indicates that another candidate existed beyond <see cref="MaxEventsScanned"/>.
@@ -37,7 +37,7 @@ public sealed class NamedEventsQueryExecutionInfo {
         .ThenBy(static failure => failure.LogName, StringComparer.OrdinalIgnoreCase)
         .ToArray();
 
-    internal void Reset(int maxEventsScanned) {
+    internal void Reset(long maxEventsScanned) {
         EventsScanned = 0;
         EventsEmitted = 0;
         MaxEventsScanned = maxEventsScanned;

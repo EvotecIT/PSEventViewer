@@ -1,5 +1,36 @@
 ﻿### Changelog
 
+#### 4.0.0 - Unreleased
+
+- Replaced the monolithic `SearchEvents` implementation with reusable query,
+  batch, named-event, subscription, catalog, administration, export, and
+  event-writing engines.
+- Added a dependency-free native Windows Event Log reader for local channels,
+  remote channels, structured QueryList XML, and offline EVTX files.
+- Added explicit `Metadata`, `Message`, `StructuredData`, `RawXml`, and `Full`
+  read modes, deterministic provider-message cultures with event-specific
+  fallback, render status, lazy payload work, 64-bit limits, native bookmarks,
+  and durable per-source checkpoints.
+- Added Get-WinEvent-compatible hashtable/XML/XPath filtering, provider-only
+  queries, wildcard and multi-source expansion, QueryList diagnostics, bounded
+  concurrency, cancellation, and per-source failure continuation.
+- Added bounded direct CSV, JSON Lines, XML, and native EVTX exports with
+  temporary-file promotion, optional SHA-256, and archive-resource support.
+- Added native subscriptions, hardened watchers, provider and channel catalogs,
+  health probes, channel policy, archive maintenance, classic log/source
+  management, and Windows Event Collector subscription management.
+- Added `Write-EVXEvent` for registered manifest/ETW providers and retained
+  `Write-EVXEntry` as the explicit classic Event Log write contract.
+- Rebuilt named-event querying on the shared engine and added bounded optional
+  enrichment with ordered checkpoint semantics.
+- Added reproducible PowerForge benchmark contracts for common public work,
+  byte-identical output, and intentionally different native schemas.
+- Removed stale examples, placeholder rules, duplicate implementations, and
+  historical command aliases. `Find-WinEvent` is the only retained alias.
+- **Breaking:** C# consumers must use the focused engine APIs instead of
+  `SearchEvents`. General queries now default to `ReadMode Message`, bookmarks
+  are opt-in, and the PowerShell surface exposes only canonical EVX commands.
+
 #### 2.3.0 - 2024.11.25 *EXPERIMENTAL*
 - Fix for SMBv1
 - `BuildWinEventFilter` adds newlines between clauses for easier debugging when `xpathOnly` is `$false`

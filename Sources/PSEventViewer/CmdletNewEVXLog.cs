@@ -7,7 +7,7 @@ namespace PSEventViewer;
 
 /// <summary>
 /// <para type="synopsis">Creates a new Windows event log with optional size and retention settings.</para>
-/// <para type="description">Wraps SearchEvents.CreateLog to add a log/provider pair locally or remotely, with overflow behavior and retention tuning.</para>
+/// <para type="description">Applies explicit desired state through ClassicEventLogManager and reports exactly what changed.</para>
 /// </summary>
 /// <example>
 ///   <summary>Create custom log</summary>
@@ -25,8 +25,7 @@ namespace PSEventViewer;
 ///   <para>Creates the log on SRV01.</para>
 /// </example>
 [Cmdlet(VerbsCommon.New, "EVXLog", SupportsShouldProcess = true)]
-[Alias("New-EventViewerXLog", "New-WinEventLog")]
-[OutputType(typeof(bool))]
+[OutputType(typeof(ClassicEventLogEnsureResult))]
 public sealed class CmdletNewEVXLog : AsyncPSCmdlet {
     /// <summary>
     /// Name of the log to create.
@@ -42,12 +41,6 @@ public sealed class CmdletNewEVXLog : AsyncPSCmdlet {
     public string ProviderName { get; set; } = string.Empty;
 
     /// <summary>
-    /// Optional log name to scope source creation checks (defaults to the log being created when provided).
-    /// </summary>
-    [Parameter]
-    public string? SourceLogName { get; set; }
-
-    /// <summary>
     /// Target machine on which to create the log.
     /// </summary>
     [Alias("ComputerName", "ServerName")]
@@ -58,19 +51,19 @@ public sealed class CmdletNewEVXLog : AsyncPSCmdlet {
     /// Maximum log size in kilobytes.
     /// </summary>
     [Parameter]
-    public int MaximumKilobytes { get; set; }
+    public long? MaximumKilobytes { get; set; }
 
     /// <summary>
     /// Overflow behavior when the log is full.
     /// </summary>
     [Parameter]
-    public OverflowAction OverflowAction { get; set; } = OverflowAction.OverwriteAsNeeded;
+    public OverflowAction? OverflowAction { get; set; }
 
     /// <summary>
     /// Minimum days to retain events when using OverwriteOlder policy.
     /// </summary>
     [Parameter]
-    public int RetentionDays { get; set; } = 7;
+    public int? RetentionDays { get; set; }
 
     /// <summary>
     /// Creates the event log with the specified options.
@@ -82,15 +75,20 @@ public sealed class CmdletNewEVXLog : AsyncPSCmdlet {
 
         try {
             if (ShouldProcess($"{LogName} on {MachineName ?? "localhost"}", "Create event log")) {
-                var sourceLog = string.IsNullOrEmpty(SourceLogName) ? LogName : SourceLogName;
-                bool result = SearchEvents.CreateLog(LogName, ProviderName, MachineName, MaximumKilobytes, OverflowAction, RetentionDays, sourceLog);
+                ClassicEventLogEnsureResult result =
+                    ClassicEventLogManager.EnsureLog(
+                        new ClassicEventLogConfiguration {
+                            LogName = LogName,
+                            SourceName = ProviderName,
+                            MachineName = MachineName,
+                            MaximumKilobytes = MaximumKilobytes,
+                            OverflowAction = OverflowAction,
+                            RetentionDays = RetentionDays
+                        });
                 WriteObject(result);
-            } else {
-                WriteObject(false);
             }
         } catch (Exception ex) {
             WriteError(new ErrorRecord(ex, "NewEVXLogFailed", ErrorCategory.InvalidOperation, LogName));
-            WriteObject(false);
         }
 
         return Task.CompletedTask;

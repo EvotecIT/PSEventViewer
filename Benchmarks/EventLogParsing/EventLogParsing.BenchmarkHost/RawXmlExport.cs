@@ -28,7 +28,8 @@ internal static class RawXmlExport {
             using XmlWriter writer = XmlWriter.Create(stream, new XmlWriterSettings {
                 Encoding = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false),
                 Indent = false,
-                CloseOutput = false
+                CloseOutput = false,
+                NewLineHandling = NewLineHandling.None
             });
             writer.WriteStartDocument();
             writer.WriteStartElement("Events");

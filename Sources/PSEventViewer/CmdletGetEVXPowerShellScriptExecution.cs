@@ -7,7 +7,6 @@ namespace PSEventViewer;
 
 /// <summary>Retrieves PowerShell execution-context events from live operational logs or exported EVTX files.</summary>
 [Cmdlet(VerbsCommon.Get, "EVXPowerShellScriptExecution")]
-[Alias("Get-PowerShellScriptExecution")]
 [OutputType(typeof(PowerShellScriptExecutionInfo), typeof(PowerShellScriptQueryExecutionInfo))]
 public sealed class CmdletGetEVXPowerShellScriptExecution : PowerShellScriptQueryCmdletBase {
     /// <summary>Maximum execution records to return per computer. Zero returns every matching record.</summary>
@@ -21,7 +20,7 @@ public sealed class CmdletGetEVXPowerShellScriptExecution : PowerShellScriptQuer
         foreach (string? machine in machines) {
             CancelToken.ThrowIfCancellationRequested();
             var queryInfo = new PowerShellScriptQueryExecutionInfo();
-            using IEnumerator<PowerShellScriptExecutionInfo> executions = SearchEvents.GetPowerShellScriptExecution(
+            using IEnumerator<PowerShellScriptExecutionInfo> executions = PowerShellEventEngine.GetPowerShellScriptExecution(
                 type: Type,
                 machineName: machine,
                 eventLogPath: EventLogPath,

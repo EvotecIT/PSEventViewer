@@ -158,6 +158,174 @@ public sealed class TestEventLogExporter {
         Assert.True(File.Exists(outputPath));
     }
 
+    [Fact]
+    public void NativeEvtxExportCanBeReopenedWithExactFilteredCount() {
+        if (!OperatingSystem.IsWindows()) return;
+        using var fixture = new ExportFixture();
+        int eventId = EventLogEngine.ReadFile(
+                fixture.CreateQuery(
+                    EventReadMode.Metadata,
+                    maxEvents: 1))
+            .Single()
+            .Id;
+        var query = fixture.CreateQuery(EventReadMode.Metadata);
+        query.XPath = $"*[System[EventID={eventId}]]";
+        string outputPath = fixture.GetPath("events.evtx");
+
+        EventExportResult result = EventLogExporter.ExportFile(
+            query,
+            outputPath,
+            EventExportFormat.Evtx);
+        EventObject[] reopened = EventLogEngine.ReadFile(
+                new EventLogFileQuery(outputPath) {
+                    ReadMode = EventReadMode.Metadata
+                })
+            .ToArray();
+
+        Assert.Equal(EventExportFormat.Evtx, result.Format);
+        Assert.Equal(result.EventCount, reopened.Length);
+        Assert.NotEmpty(reopened);
+        Assert.All(reopened, item => Assert.Equal(eventId, item.Id));
+    }
+
+    [Fact]
+    public void StructuredQueryExportsProjectedAndNativeFormats() {
+        if (!OperatingSystem.IsWindows()) return;
+        using var fixture = new ExportFixture();
+        int eventId = EventLogEngine.ReadFile(
+                fixture.CreateQuery(
+                    EventReadMode.Metadata,
+                    maxEvents: 1))
+            .Single()
+            .Id;
+        string queryXml = EventFilterCompiler.BuildFileQueryXml(
+            new[] { fixture.SourcePath },
+            new EventFilter {
+                EventIds = new[] { eventId }
+            });
+        var projectedQuery =
+            new EventLogStructuredQuery(queryXml) {
+                SourceKind = EventLogQuerySourceKind.File,
+                Oldest = true,
+                ReadMode = EventReadMode.Metadata,
+                MaxEvents = 3
+            };
+
+        EventExportResult json = EventLogExporter.ExportStructured(
+            projectedQuery,
+            fixture.GetPath("structured.jsonl"),
+            EventExportFormat.JsonLines);
+        var nativeQuery =
+            new EventLogStructuredQuery(queryXml) {
+                SourceKind = EventLogQuerySourceKind.File,
+                Oldest = true
+            };
+        string evtxPath = fixture.GetPath("structured.evtx");
+        EventExportResult evtx = EventLogExporter.ExportStructured(
+            nativeQuery,
+            evtxPath,
+            EventExportFormat.Evtx);
+        EventObject[] reopened = EventLogEngine.ReadFile(
+            new EventLogFileQuery(evtxPath) {
+                ReadMode = EventReadMode.Metadata
+            }).ToArray();
+
+        Assert.Equal(3, json.EventCount);
+        Assert.Equal(evtx.EventCount, reopened.LongLength);
+        Assert.NotEmpty(reopened);
+        Assert.All(
+            reopened,
+            item => Assert.Equal(eventId, item.Id));
+    }
+
+    [Fact]
+    public void BatchExportStreamsOneGloballyOrderedOutput() {
+        if (!OperatingSystem.IsWindows()) return;
+        using var fixture = new ExportFixture();
+        long[] recordIds = EventLogEngine.ReadFile(
+                fixture.CreateQuery(
+                    EventReadMode.Metadata,
+                    maxEvents: 100))
+            .Select(static item => item.RecordId)
+            .Where(static value => value.HasValue)
+            .Select(static value => value!.Value)
+            .Distinct()
+            .Take(2)
+            .ToArray();
+        Assert.Equal(2, recordIds.Length);
+        EventLogFileQuery[] sources = recordIds
+            .Select(recordId => new EventLogFileQuery(
+                fixture.SourcePath) {
+                XPath = $"*[System[EventRecordID={recordId}]]",
+                Oldest = true,
+                ReadMode = EventReadMode.Metadata
+            })
+            .ToArray();
+        EventLogBatchQuery batch =
+            EventLogBatchQuery.ForFiles(sources);
+        batch.MaxEvents = 10;
+        string outputPath = fixture.GetPath("batch.jsonl");
+
+        EventExportResult result = EventLogExporter.ExportBatch(
+            batch,
+            outputPath,
+            EventExportFormat.JsonLines);
+
+        JsonElement[] records = File.ReadLines(outputPath)
+            .Select(line => JsonDocument.Parse(line).RootElement.Clone())
+            .ToArray();
+        Assert.Equal(result.EventCount, records.LongLength);
+        Assert.NotEmpty(records);
+        Assert.True(records
+            .Select(static record =>
+                record.GetProperty("timeCreated").GetDateTime())
+            .SequenceEqual(records
+                .Select(static record =>
+                    record.GetProperty("timeCreated").GetDateTime())
+                .OrderBy(static time => time)));
+        Assert.All(records, record =>
+            Assert.Contains(
+                record.GetProperty("recordId").GetInt64(),
+                recordIds));
+    }
+
+    [Fact]
+    public void BatchExportRejectsAFalseNativeEvtxMerge() {
+        using var fixture = new ExportFixture();
+        EventLogBatchQuery batch =
+            EventLogBatchQuery.ForFiles(new[] {
+                fixture.CreateQuery(EventReadMode.Metadata)
+            });
+
+        Assert.Throws<NotSupportedException>(() =>
+            EventLogExporter.ExportBatch(
+                batch,
+                fixture.GetPath("batch.evtx"),
+                EventExportFormat.Evtx));
+    }
+
+    [Fact]
+    public void NativeEvtxExportRejectsRemoteDestinationSemanticsUpFront() {
+        var channel = new EventLogChannelQuery("System") {
+            MachineName = "remote.example.test"
+        };
+        string output = Path.Combine(
+            Path.GetTempPath(),
+            $"remote-{Guid.NewGuid():N}.evtx");
+
+        NotSupportedException exception = Assert.Throws<NotSupportedException>(
+            () => EventLogExporter.ExportChannel(
+                channel,
+                output,
+                EventExportFormat.Evtx));
+
+        Assert.Contains(
+            "Run the EVTX export on the source computer",
+            exception.Message,
+            StringComparison.Ordinal);
+        Assert.False(File.Exists(output));
+    }
+
     private sealed class ExportFixture : IDisposable {
         internal ExportFixture() {
             DirectoryPath = Path.Combine(

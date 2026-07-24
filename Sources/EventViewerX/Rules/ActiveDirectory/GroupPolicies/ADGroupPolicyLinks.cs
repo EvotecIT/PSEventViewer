@@ -99,18 +99,18 @@ public class ADGroupPolicyLinks : EventRuleBase {
     }
     /// <summary>Initialises a GPO link/unlink wrapper from an event record.</summary>
     public ADGroupPolicyLinks(EventObject eventObject) : base(eventObject) {
-        _eventObject = eventObject;
+        Event = eventObject;
         Type = "ADGroupPolicyLinks";
-        Computer = _eventObject.ComputerName;
-        //Action = _eventObject.MessageSubject;
-        LinkedToType = _eventObject.GetValueFromDataDictionary("ObjectClass");
-        OperationType = ConvertFromOperationType(_eventObject.GetDataValueOrEmpty("OperationType"));
-        Who = _eventObject.GetSubjectAccountOrEmpty();
-        When = _eventObject.TimeCreated;
-        DomainName = _eventObject.GetValueFromDataDictionary("DSName");
-        LinkedTo = _eventObject.GetValueFromDataDictionary("ObjectDN");
-        // AttributeLDAPDisplayName = _eventObject.GetValueFromDataDictionary("AttributeLDAPDisplayName");
-        var attributeValue = _eventObject.GetValueFromDataDictionary("AttributeValue");
+        Computer = Event.ComputerName;
+        //Action = Event.MessageSubject;
+        LinkedToType = Event.GetValueFromDataDictionary("ObjectClass");
+        OperationType = ConvertFromOperationType(Event.GetDataValueOrEmpty("OperationType"));
+        Who = Event.GetSubjectAccountOrEmpty();
+        When = Event.TimeCreated;
+        DomainName = Event.GetValueFromDataDictionary("DSName");
+        LinkedTo = Event.GetValueFromDataDictionary("ObjectDN");
+        // AttributeLDAPDisplayName = Event.GetValueFromDataDictionary("AttributeLDAPDisplayName");
+        var attributeValue = Event.GetValueFromDataDictionary("AttributeValue");
         var gpoLinks = ExtractGpoLinks(attributeValue);
         if (OperationType.IndexOf("Value Added", StringComparison.Ordinal) >= 0) {
             Action = "Group Policies were linked";

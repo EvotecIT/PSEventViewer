@@ -48,17 +48,17 @@ public class ADGroupPolicyChangesDetailed : EventRuleBase {
 
     /// <summary>Initialises a detailed GPO change wrapper from an event record.</summary>
     public ADGroupPolicyChangesDetailed(EventObject eventObject) : base(eventObject) {
-        _eventObject = eventObject;
+        Event = eventObject;
         Type = "ADGroupPolicyChangesDetailed";
-        Computer = _eventObject.ComputerName;
-        Action = _eventObject.MessageSubject;
-        ObjectClass = _eventObject.GetValueFromDataDictionary("ObjectClass");
-        OperationType = ConvertFromOperationType(_eventObject.GetDataValueOrEmpty("OperationType"));
-        Who = _eventObject.GetSubjectAccountOrEmpty();
-        When = _eventObject.TimeCreated;
-        GpoName = _eventObject.GetValueFromDataDictionary("ObjectDN");
-        AttributeLDAPDisplayName = _eventObject.GetValueFromDataDictionary("AttributeLDAPDisplayName");
-        AttributeValue = _eventObject.GetValueFromDataDictionary("AttributeValue");
+        Computer = Event.ComputerName;
+        Action = Event.MessageSubject;
+        ObjectClass = Event.GetValueFromDataDictionary("ObjectClass");
+        OperationType = ConvertFromOperationType(Event.GetDataValueOrEmpty("OperationType"));
+        Who = Event.GetSubjectAccountOrEmpty();
+        When = Event.TimeCreated;
+        GpoName = Event.GetValueFromDataDictionary("ObjectDN");
+        AttributeLDAPDisplayName = Event.GetValueFromDataDictionary("AttributeLDAPDisplayName");
+        AttributeValue = Event.GetValueFromDataDictionary("AttributeValue");
     }
 }
 

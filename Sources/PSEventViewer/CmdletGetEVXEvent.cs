@@ -38,8 +38,8 @@ namespace PSEventViewer;
 /// </example>
 /// <example>
 ///   <summary>Parallel query across servers</summary>
-///   <code>Get-EVXEvent -LogName Security -MachineName DC1,DC2 -EventId 4740 -Parallel</code>
-///   <para>Retrieves account lockouts from multiple domain controllers concurrently.</para>
+///   <code>Get-EVXEvent -LogName Security -MachineName DC1,DC2 -EventId 4740 -MaxConcurrency 8</code>
+///   <para>Retrieves account lockouts from multiple domain controllers with bounded concurrent source setup.</para>
 /// </example>
 /// <example>
 ///   <summary>Stream core metadata from a large EVTX file</summary>
@@ -48,11 +48,13 @@ namespace PSEventViewer;
 /// </example>
 [OutputType(typeof(EventObject), ParameterSetName = new string[] { "GenericEvents" })]
 [OutputType(typeof(EventObject), ParameterSetName = new string[] { "PathEvents" })]
+[OutputType(typeof(EventObject), ParameterSetName = new string[] { "FilterHashtableEvents" })]
+[OutputType(typeof(EventObject), ParameterSetName = new string[] { "FilterXmlEvents" })]
+[OutputType(typeof(EventObject), ParameterSetName = new string[] { "ProviderEvents" })]
 [OutputType(typeof(EventObjectSlim), ParameterSetName = new string[] { "NamedEvents" })]
-[OutputType(typeof(EventLogDetails), ParameterSetName = new string[] { "ListLog" })]
-[Cmdlet(VerbsCommon.Get, "EVXEvent", DefaultParameterSetName = "GenericEvents")]
-[Alias("Get-EventViewerXEvent", "Find-WinEvent", "Get-Events")]
-public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
+[Cmdlet(VerbsCommon.Get, "EVXEvent", DefaultParameterSetName = "ProviderEvents")]
+[Alias("Find-WinEvent")]
+public sealed partial class CmdletGetEVXEvent : AsyncPSCmdlet {
     private string _recordIdKey = string.Empty;
     private Dictionary<string, long> _recordMap = new();
     private readonly Dictionary<string, Guid> _checkpointGenerations = new(StringComparer.OrdinalIgnoreCase);
@@ -62,26 +64,40 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
     private readonly Dictionary<string, EventObject> _highestCheckpointEvents = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _resetCheckpointKeys = new(StringComparer.OrdinalIgnoreCase);
     private IReadOnlyList<string?>? _effectiveCheckpointMachines;
-    private int _eventsOutput;
+    private WildcardPattern[] _managedProviderPatterns =
+        Array.Empty<WildcardPattern>();
+    private long _eventsOutput;
     /// <summary>
     /// Name of the log to query.
     /// </summary>
-    [Parameter(Mandatory = true, Position = 0, ParameterSetName = "GenericEvents")]
-    public string LogName { get; set; } = null!;
+    [Parameter(
+        Mandatory = true,
+        Position = 0,
+        ValueFromPipeline = true,
+        ValueFromPipelineByPropertyName = true,
+        ParameterSetName = "GenericEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
+    public string[] LogName { get; set; } = Array.Empty<string>();
 
     /// <summary>
     /// Path to an event log file for offline analysis.
     /// </summary>
-    [Parameter(Mandatory = true, ParameterSetName = "PathEvents")]
-    public string Path { get; set; } = null!;
+    [Alias("PSPath")]
+    [Parameter(
+        Mandatory = true,
+        ValueFromPipelineByPropertyName = true,
+        ParameterSetName = "PathEvents")]
+    public string[] Path { get; set; } = Array.Empty<string>();
 
     /// <summary>
     /// Event identifiers used to filter results.
     /// </summary>
     [Alias("Id")]
     [Parameter(Mandatory = false, Position = 1, ParameterSetName = "GenericEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
-    public List<int>? EventId { get; set; }
+    [Parameter(Mandatory = false, Position = 1, ParameterSetName = "ProviderEvents")]
+    public int[]? EventId { get; set; }
 
     /// <summary>
     /// Specific event record identifiers to retrieve.
@@ -89,7 +105,8 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
     [Alias("RecordId")]
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
-    public List<long>? EventRecordId { get; set; }
+    [Parameter(Mandatory = false, ParameterSetName = "ProviderEvents")]
+    public long[]? EventRecordId { get; set; }
 
     /// <summary>
     /// Path to a file storing last processed record ID.
@@ -97,6 +114,8 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "FilterHashtableEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "ProviderEvents")]
     public string? RecordIdFile { get; set; }
 
     /// <summary>
@@ -105,6 +124,8 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "FilterHashtableEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "ProviderEvents")]
     public string? RecordIdKey { get; set; }
 
     /// <summary>
@@ -113,7 +134,9 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
     [Alias("ComputerName", "ServerName")]
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "ListLog")]
+    [Parameter(Mandatory = false, ParameterSetName = "FilterHashtableEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "FilterXmlEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "ProviderEvents")]
     public List<string?>? MachineName { get; set; }
 
     /// <summary>
@@ -122,21 +145,24 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
     [Alias("Source", "Provider")]
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
-    public string? ProviderName { get; set; }
+    [Parameter(Mandatory = true, ParameterSetName = "ProviderEvents")]
+    public string[]? ProviderName { get; set; }
 
     /// <summary>
     /// Keywords used to filter events.
     /// </summary>
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
-    public Keywords? Keywords { get; set; }
+    [Parameter(Mandatory = false, ParameterSetName = "ProviderEvents")]
+    public long[]? Keywords { get; set; }
 
     /// <summary>
     /// Event level (e.g. Error, Warning) used for filtering.
     /// </summary>
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
-    public Level? Level { get; set; }
+    [Parameter(Mandatory = false, ParameterSetName = "ProviderEvents")]
+    public int[]? Level { get; set; }
 
     /// <summary>
     /// Start time for the event query.
@@ -145,6 +171,7 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
     [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "ProviderEvents")]
     public DateTime? StartTime { get; set; }
 
     /// <summary>
@@ -154,6 +181,7 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
     [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "ProviderEvents")]
     public DateTime? EndTime { get; set; }
 
     /// <summary>
@@ -162,6 +190,7 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "ProviderEvents")]
     public TimePeriod? TimePeriod { get; set; }
 
     /// <summary>
@@ -169,7 +198,8 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
     /// </summary>
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
-    public string? UserId { get; set; }
+    [Parameter(Mandatory = false, ParameterSetName = "ProviderEvents")]
+    public string[]? UserId { get; set; }
 
     /// <summary>
     /// Filters events by matching their formatted message against the provided regular expression.
@@ -177,16 +207,23 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "FilterHashtableEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "FilterXmlEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "ProviderEvents")]
     public Regex? MessageRegex { get; set; }
 
     /// <summary>
-    /// Number of parallel threads used for queries.
+    /// Maximum number of independent event sources opened concurrently.
     /// </summary>
+    [Alias("NumberOfThreads")]
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "ListLog")]
-    [ValidateRange(1, SearchEvents.MaximumParallelism)]
-    public int NumberOfThreads { get; set; } = 8;
+    [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "FilterHashtableEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "FilterXmlEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "ProviderEvents")]
+    [ValidateRange(1, EventLogLimits.MaximumConcurrency)]
+    public int MaxConcurrency { get; set; } = 8;
 
     /// <summary>
     /// Maximum number of events to return.
@@ -194,19 +231,25 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
-    [ValidateRange(0, int.MaxValue)]
-    public int MaxEvents { get; set; }
+    [Parameter(Mandatory = false, ParameterSetName = "FilterHashtableEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "FilterXmlEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "ProviderEvents")]
+    [ValidateRange(0, long.MaxValue)]
+    public long MaxEvents { get; set; }
 
     /// <summary>
-    /// Maximum number of globally merged candidate events delivered for message and checkpoint filtering.
+    /// Maximum number of merged candidate events delivered for message and checkpoint filtering.
     /// Zero continues until the output limit is satisfied or the query is exhausted. Native selection may perform
     /// one initial lookahead per machine/XPath chunk plus bounded page prefetch; those rows are not evaluated by the cmdlet.
     /// </summary>
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
-    [ValidateRange(0, int.MaxValue)]
-    public int MaxEventsScanned { get; set; }
+    [Parameter(Mandatory = false, ParameterSetName = "FilterHashtableEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "FilterXmlEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "ProviderEvents")]
+    [ValidateRange(0, long.MaxValue)]
+    public long MaxEventsScanned { get; set; }
 
     /// <summary>
     /// Resolves reverse-DNS names for supported named events after projection. DNS failures remain visible on the
@@ -234,8 +277,13 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
     /// Message formats the provider message; StructuredData parses XML without formatting the message; Full includes all data.
     /// </summary>
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
-    public EventReadMode ReadMode { get; set; } = EventReadMode.Full;
+    [Parameter(Mandatory = false, ParameterSetName = "FilterHashtableEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "FilterXmlEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "ProviderEvents")]
+    public EventReadMode ReadMode { get; set; } =
+        EventReadMode.Message;
 
     /// <summary>
     /// Culture used to format provider messages and display names for offline EVTX queries.
@@ -244,28 +292,46 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
     [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
-    public CultureInfo? MessageCulture { get; set; }
+    [Parameter(Mandatory = false, ParameterSetName = "FilterHashtableEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "FilterXmlEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "ProviderEvents")]
+    public CultureInfo? MessageCulture { get; set; } =
+        CultureInfo.GetCultureInfo("en-US");
 
     /// <summary>
-    /// Session and per-read timeout in milliseconds. Zero keeps the legacy unbounded read behavior.
+    /// Overrides both remote connection and no-progress read timeouts in milliseconds.
+    /// Zero uses Settings.SessionTimeoutMs for connection establishment and
+    /// Settings.QuerySessionTimeoutMs for reading.
     /// </summary>
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "FilterHashtableEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "FilterXmlEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "ProviderEvents")]
     [ValidateRange(0, int.MaxValue)]
     public int SessionTimeoutMs { get; set; }
+
+    private int EffectiveRemoteConnectionTimeoutMilliseconds =>
+        SessionTimeoutMs > 0
+            ? SessionTimeoutMs
+            : Settings.SessionTimeoutMs;
+
+    private int EffectiveRemoteReadTimeoutMilliseconds =>
+        SessionTimeoutMs > 0
+            ? SessionTimeoutMs
+            : Settings.QuerySessionTimeoutMs;
 
     /// <summary>
     /// Maximum number of projected events buffered between parallel readers and the PowerShell pipeline. Zero selects a bounded default.
     /// </summary>
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "FilterHashtableEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "FilterXmlEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "ProviderEvents")]
     [ValidateRange(0, int.MaxValue)]
     public int BufferCapacity { get; set; }
-
-    /// <summary>
-    /// Controls whether queries run in parallel or sequentially.
-    /// </summary>
-    [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
-    public ParallelOption ParallelOption { get; set; } = ParallelOption.Parallel;
 
     /// <summary>
     /// Expands event data into individual properties.
@@ -273,24 +339,38 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "FilterHashtableEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "FilterXmlEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "ProviderEvents")]
     public SwitchParameter Expand { get; set; }
 
     /// <summary>
     /// Reads events from oldest to newest when querying files.
     /// </summary>
     [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "FilterHashtableEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "FilterXmlEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "ProviderEvents")]
     public SwitchParameter Oldest { get; set; }
 
     /// <summary>
     /// Hashtable filter for named event data when querying files.
     /// </summary>
     [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "FilterHashtableEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "ProviderEvents")]
     public Hashtable? NamedDataFilter { get; set; }
 
     /// <summary>
     /// Hashtable filter to exclude named event data when querying files.
     /// </summary>
     [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "FilterHashtableEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "ProviderEvents")]
     public Hashtable? NamedDataExcludeFilter { get; set; }
 
     /// <summary>
@@ -298,6 +378,10 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
     /// </summary>
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "FilterHashtableEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "FilterXmlEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "ProviderEvents")]
     public SwitchParameter DisableParallel { get; set; }
 
     /// <summary>
@@ -306,7 +390,9 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "ListLog")]
+    [Parameter(Mandatory = false, ParameterSetName = "FilterHashtableEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "FilterXmlEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "ProviderEvents")]
     public SwitchParameter AsArray { get; set; }
 
     /// <summary>
@@ -317,138 +403,14 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
     public NamedEvents[] Type { get; set; } = Array.Empty<NamedEvents>();
 
     /// <summary>
-    /// The list log parameter is used to list the logs on the machine.
-    /// You can use wildcards to search for logs.
-    /// When using wildcards, you can use the * character to match zero or more characters, and the ? character to match a single character.
-    /// </summary>
-    [Parameter(Mandatory = true, ParameterSetName = "ListLog")]
-    public string[] ListLog { get; set; } = new[] { "*" };
-
-
-    /// <summary>
     /// Initializes logging and helper classes before processing.
     /// </summary>
-    protected override Task BeginProcessingAsync() {
-        // Initialize the logger to be able to see verbose, warning, debug, error, progress, and information messages.
-        var internalLogger = new InternalLogger(false);
-        var internalLoggerPowerShell = new InternalLoggerPowerShell(internalLogger, this.WriteVerbose, this.WriteWarning, this.WriteDebug, this.WriteError, this.WriteProgress, this.WriteInformation);
-        SetEventViewerLogger(internalLogger);
-        var searchEvents = new SearchEvents(internalLogger);
-        if (!string.IsNullOrWhiteSpace(RecordIdFile)) {
-            EventCheckpointSnapshot checkpointSnapshot = EventCheckpointStore.Load(RecordIdFile!);
-            _recordMap = checkpointSnapshot.Records.ToDictionary(
-                static entry => entry.Key,
-                static entry => entry.Value,
-                StringComparer.OrdinalIgnoreCase);
-            foreach (KeyValuePair<string, EventCheckpointValue> checkpoint in checkpointSnapshot.Checkpoints) {
-                _checkpointGenerations[checkpoint.Key] = checkpoint.Value.GenerationId;
-                if (!string.IsNullOrWhiteSpace(checkpoint.Value.BoundaryIdentity)) {
-                    _checkpointBoundaries[checkpoint.Key] = checkpoint.Value.BoundaryIdentity!;
-                }
-            }
-        }
-        _recordIdKey = !string.IsNullOrEmpty(RecordIdKey)
-            ? RecordIdKey!
-            : BuildDefaultCheckpointKey();
-        if (string.IsNullOrEmpty(RecordIdKey)) {
-            string legacyKey = BuildLegacyCheckpointKey();
-            if (!_recordMap.ContainsKey(_recordIdKey) && _recordMap.TryGetValue(legacyKey, out long legacyRecordId)) {
-                _recordMap[_recordIdKey] = legacyRecordId;
-                if (_checkpointBoundaries.TryGetValue(legacyKey, out string? legacyBoundary)) {
-                    _checkpointBoundaries[_recordIdKey] = legacyBoundary;
-                }
-            }
-        }
-        return Task.CompletedTask;
-    }
-
-    private string BuildDefaultCheckpointKey() {
-        IReadOnlyList<string?> checkpointMachines = GetEffectiveCheckpointMachines();
-        string sourceIdentity = ParameterSetName switch {
-            "NamedEvents" => "Named:" + string.Join(",", Type.OrderBy(static value => value)),
-            "PathEvents" => "Path:" + System.IO.Path.GetFullPath(Path).TrimEnd(System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar).ToUpperInvariant(),
-            _ => "Log:" + (LogName ?? string.Empty).Trim().ToUpperInvariant()
-        };
-
-        var identity = new List<string> {
-            ParameterSetName,
-            sourceIdentity,
-            "Machines",
-            string.Join(",", checkpointMachines
-                .Select(static machine => string.IsNullOrWhiteSpace(machine) ? "<LOCAL>" : machine!.Trim().ToUpperInvariant())
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .OrderBy(static machine => machine, StringComparer.OrdinalIgnoreCase)),
-            "EventIds",
-            string.Join(",", (EventId ?? new List<int>()).Distinct().OrderBy(static value => value)),
-            "RecordIds",
-            string.Join(",", (EventRecordId ?? new List<long>()).Distinct().OrderBy(static value => value)),
-            "Provider",
-            ProviderName?.Trim().ToUpperInvariant() ?? string.Empty,
-            "Keywords",
-            Keywords.HasValue ? Convert.ToInt64(Keywords.Value, CultureInfo.InvariantCulture).ToString(CultureInfo.InvariantCulture) : string.Empty,
-            "Level",
-            Level.HasValue ? Convert.ToInt32(Level.Value, CultureInfo.InvariantCulture).ToString(CultureInfo.InvariantCulture) : string.Empty,
-            "StartTimeUtc",
-            StartTime?.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture) ?? string.Empty,
-            "EndTimeUtc",
-            EndTime?.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture) ?? string.Empty,
-            "TimePeriod",
-            TimePeriod?.ToString() ?? string.Empty,
-            "UserId",
-            UserId?.Trim().ToUpperInvariant() ?? string.Empty,
-            "MessageRegex",
-            MessageRegex?.ToString() ?? string.Empty,
-            "MessageRegexOptions",
-            MessageRegex == null ? string.Empty : ((int)MessageRegex.Options).ToString(CultureInfo.InvariantCulture),
-            "MessageRegexCulture",
-            MessageRegex == null ? string.Empty : CultureInfo.CurrentCulture.Name,
-            "MessageCulture",
-            MessageCulture?.Name ?? string.Empty,
-            "Oldest",
-            EffectiveOldest.ToString(CultureInfo.InvariantCulture)
-        };
-        AddHashtableIdentity(identity, "NamedDataFilter", NamedDataFilter);
-        AddHashtableIdentity(identity, "NamedDataExcludeFilter", NamedDataExcludeFilter);
-
-        using SHA256 sha256 = SHA256.Create();
-        byte[] hash = sha256.ComputeHash(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(identity)));
-        string fingerprint = BitConverter.ToString(hash).Replace("-", string.Empty);
-        return $"{sourceIdentity}|q:{fingerprint}";
-    }
-
-    private static void AddHashtableIdentity(List<string> identity, string name, Hashtable? table) {
-        identity.Add(name);
-        if (table == null) {
-            identity.Add(string.Empty);
-            return;
-        }
-
-        foreach (DictionaryEntry entry in table.Cast<DictionaryEntry>()
-                     .OrderBy(static item => item.Key?.ToString(), StringComparer.OrdinalIgnoreCase)) {
-            identity.Add(entry.Key?.ToString() ?? string.Empty);
-            IEnumerable values = entry.Value is string || entry.Value is not IEnumerable enumerable
-                ? new[] { entry.Value }
-                : enumerable;
-            List<string> normalizedValues = values.Cast<object?>()
-                .Select(static value => Convert.ToString(value, CultureInfo.InvariantCulture) ?? string.Empty)
-                .OrderBy(static value => value, StringComparer.OrdinalIgnoreCase)
-                .ToList();
-            identity.Add(normalizedValues.Count.ToString(CultureInfo.InvariantCulture));
-            identity.AddRange(normalizedValues);
-        }
-    }
-
-    private string BuildLegacyCheckpointKey() {
-        string queryIdentity = LogName ?? Path ?? "unknown";
-        string machines = string.Join(",", MachineName ?? new List<string?>());
-        return $"{queryIdentity}|{machines}";
-    }
-
-    /// <summary>
-    /// Executes the event query based on provided parameters.
-    /// </summary>
     protected override async Task ProcessRecordAsync() {
+        _eventsOutput = 0;
+        _managedProviderPatterns =
+            Array.Empty<WildcardPattern>();
         ValidateRecordOptions();
+        InitializeCheckpointKey();
 
         CancellationToken token;
 #if NET8_0_OR_GREATER
@@ -460,26 +422,12 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
         List<object>? results = AsArray ? new List<object>() : null;
 
         PrepareRecordProcessing(token);
-        Func<EventObject, bool>? queryResultPredicate = UsesManagedOutputSelection
-            ? MessageMatches
-            : null;
-
-        if (ParameterSetName == "ListLog") {
-            foreach (EventLogDetails log in SearchEvents.DisplayEventLogsParallel(ListLog, MachineName, NumberOfThreads, token)) {
-                token.ThrowIfCancellationRequested();
-                if (AsArray) {
-                    results!.Add(log);
-                } else {
-                    WriteObject(log);
-                }
-            }
-        } else if (ParameterSetName == "PathEvents") {
-            ProcessPathEvents(token, results);
-        } else {
-            if (ParameterSetName == "NamedEvents") {
+        if (ParameterSetName == "NamedEvents") {
                 // let's find the events prepared for search
                 List<NamedEvents> typeList = Type.ToList();
-                int namedEventThreads = ParallelOption == ParallelOption.Disabled ? 1 : NumberOfThreads;
+                int namedEventThreads = DisableParallel.IsPresent
+                    ? 1
+                    : MaxConcurrency;
                 var namedQueryInfo = new NamedEventsQueryExecutionInfo();
                 Func<EventObjectSlim, bool>? namedResultPredicate = MessageRegex == null
                     ? null
@@ -492,23 +440,61 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
                         RetryDnsOnTransient = false
                     }
                     : null;
-                await foreach (EventObjectSlim eventObject in SearchEvents.FindEventsByNamedEvents(
-                                   typeList,
-                                   MachineName,
-                                   StartTime,
-                                   EndTime,
-                                   TimePeriod,
-                                   maxThreads: namedEventThreads,
-                                   maxEvents: MaxEvents,
-                                   maxEventsScanned: MaxEventsScanned,
-                                   executionInfo: namedQueryInfo,
-                                   cancellationToken: token,
-                                   minimumEventRecordIdExclusiveResolver: GetCheckpointLowerBound,
-                                   candidateObserver: candidate => TrackCheckpointProgress(candidate),
-                                   oldest: EffectiveOldest,
-                                   resultPredicate: namedResultPredicate,
-                                   enrichmentOptions: enrichmentOptions,
-                                   messageCulture: MessageCulture)) {
+                var namedQuery =
+                    new NamedEventQuery(typeList) {
+                        MachineNames = MachineName,
+                        StartTime = StartTime,
+                        EndTime = EndTime,
+                        TimePeriod = TimePeriod,
+                        SourceLogName =
+                            LogName.SingleOrDefault(),
+                        SourceEventIds =
+                            EventId,
+                        MaxConcurrency =
+                            namedEventThreads,
+                        MaxEvents = MaxEvents,
+                        MaxCandidates =
+                            MaxEventsScanned,
+                        MinimumRecordIdExclusiveResolver =
+                            GetCheckpointLowerBound,
+                        CandidateObserver =
+                            candidate =>
+                                TrackCheckpointProgress(
+                                    candidate),
+                        Oldest = EffectiveOldest,
+                        ReadMode =
+                            ReadMode,
+                        ResultPredicate =
+                            namedResultPredicate,
+                        Enrichment =
+                            enrichmentOptions,
+                        MessageCulture =
+                            MessageCulture,
+                        FallbackMessageCulture =
+                            FallbackMessageCulture,
+                        Credential =
+                            Credential?.GetNetworkCredential(),
+                        Authentication =
+                            Authentication,
+                        RemoteConnectionTimeoutMilliseconds =
+                            EffectiveRemoteConnectionTimeoutMilliseconds,
+                        RemoteReadTimeoutMilliseconds =
+                            EffectiveRemoteReadTimeoutMilliseconds,
+                        BufferCapacity =
+                            BufferCapacity > 0
+                                ? BufferCapacity
+                                : 64,
+                        ContinueOnRemoteFailure =
+                            ContinueOnError.IsPresent ||
+                            (MachineName?.Count ?? 0) > 1,
+                        IncludeBookmark =
+                            IncludeBookmark.IsPresent
+                    };
+                await foreach (EventObjectSlim eventObject in
+                               NamedEventEngine.ReadAsync(
+                                   namedQuery,
+                                   namedQueryInfo,
+                                   token)) {
                     token.ThrowIfCancellationRequested();
                     if (!TrackCheckpointProgress(eventObject.Event)) {
                         continue;
@@ -526,272 +512,29 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
                         break;
                     }
                 }
-            } else if (ParallelOption == ParallelOption.Disabled || MaxEventsScanned > 0 || UsesCheckpoint) {
-                foreach (EventObject eventObject in SearchEvents.QueryLogsSequential(LogName, EventId, MachineName, ProviderName, Keywords, Level, StartTime, EndTime, UserId, GetQueryReadLimit(), EventRecordId, TimePeriod, token, SessionTimeoutMs, ReadMode, GetCheckpointResolver(LogName), oldest: EffectiveOldest, resultPredicate: queryResultPredicate, messageCulture: MessageCulture)) {
-                    token.ThrowIfCancellationRequested();
-                    ProcessEventResult(eventObject, results);
-                    if (OutputLimitReached) {
-                        break;
-                    }
-                }
-            } else {
-                await foreach (EventObject eventObject in SearchEvents.QueryLogsParallel(LogName, EventId, MachineName, ProviderName, Keywords, Level, StartTime, EndTime, UserId, GetQueryReadLimit(), NumberOfThreads, EventRecordId, TimePeriod, token, SessionTimeoutMs, ReadMode, BufferCapacity, GetCheckpointResolver(LogName), oldest: EffectiveOldest, resultPredicate: queryResultPredicate, messageCulture: MessageCulture)) {
-                    token.ThrowIfCancellationRequested();
-                    ProcessEventResult(eventObject, results);
-                    if (OutputLimitReached) {
-                        break;
-                    }
-                }
-            }
+        } else {
+            ProcessNativeEvents(token, results);
         }
 
         WriteArrayResult(results);
     }
 
-    private void ValidateRecordOptions() {
-        if (Expand && ReadMode != EventReadMode.StructuredData && ReadMode != EventReadMode.Full) {
-            throw new PSArgumentException("-Expand requires -ReadMode StructuredData or Full.");
-        }
-        if (MessageRegex != null && ReadMode != EventReadMode.Message && ReadMode != EventReadMode.Full) {
-            throw new PSArgumentException("-MessageRegex requires -ReadMode Message or Full.");
-        }
-    }
-
-    private void PrepareRecordProcessing(CancellationToken token) {
-        if (DisableParallel.IsPresent) {
-            ParallelOption = ParallelOption.Disabled;
-        }
-
-        PrepareCheckpointBounds(token);
-    }
-
-    private void ProcessPathEvents(CancellationToken token, List<object>? results) {
-        Func<EventObject, bool>? queryResultPredicate = UsesManagedOutputSelection
-            ? MessageMatches
-            : null;
-        foreach (EventObject eventObject in SearchEvents.QueryLogFile(Path, EventId, ProviderName, Keywords, Level, StartTime, EndTime, UserId, GetQueryReadLimit(), EventRecordId, TimePeriod, EffectiveOldest, NamedDataFilter, NamedDataExcludeFilter, token, ReadMode, GetCheckpointLowerBound(null, Path), queryResultPredicate, messageCulture: MessageCulture)) {
-            token.ThrowIfCancellationRequested();
-            ProcessEventResult(eventObject, results);
-            if (OutputLimitReached) {
-                break;
-            }
-        }
-    }
-
-    private void WriteArrayResult(List<object>? results) {
-        if (AsArray && results != null) {
-            WriteObject(results.ToArray(), false);
-        }
-    }
-
-    private bool TrackCheckpointProgress(EventObject eventObject) {
-        if (!eventObject.RecordId.HasValue) {
-            return true;
-        }
-
-        string checkpointKey = GetCheckpointKey(eventObject);
-        long recordId = eventObject.RecordId.Value;
-        bool hasCheckpoint = _recordMap.TryGetValue(checkpointKey, out long previousRecordId);
-        if (hasCheckpoint && recordId <= previousRecordId) {
-            return false;
-        }
-        if (!_highestRecordIds.TryGetValue(checkpointKey, out long highestRecordId) || recordId > highestRecordId) {
-            _highestRecordIds[checkpointKey] = recordId;
-            _highestCheckpointEvents[checkpointKey] = eventObject;
-        }
-        return true;
-    }
-
-    private string GetCheckpointKey(EventObject eventObject) {
-        bool hasMultipleSources = ParameterSetName == "NamedEvents" || GetEffectiveCheckpointMachines().Count > 1;
-        if (!hasMultipleSources) {
-            return _recordIdKey;
-        }
-
-        string source = string.IsNullOrWhiteSpace(eventObject.QueriedMachine)
-            ? eventObject.MachineName
-            : eventObject.QueriedMachine;
-        return $"{_recordIdKey}|{source}|{eventObject.ContainerLog}";
-    }
-
-    private Func<string?, long?>? GetCheckpointResolver(string logName) {
-        if (string.IsNullOrWhiteSpace(RecordIdFile)) {
-            return null;
-        }
-        return machineName => GetCheckpointLowerBound(machineName, logName);
-    }
-
-    private long? GetCheckpointLowerBound(string? machineName, string logName) {
-        if (string.IsNullOrWhiteSpace(RecordIdFile)) {
-            return null;
-        }
-
-        return TryGetCheckpoint(machineName, logName, out _, out long checkpoint)
-            ? checkpoint
-            : null;
-    }
-
-    private bool TryGetCheckpoint(string? machineName, string logName, out string checkpointKey, out long checkpoint) {
-        checkpointKey = _recordIdKey;
-        checkpoint = 0;
-
-        bool hasMultipleSources = ParameterSetName == "NamedEvents" || GetEffectiveCheckpointMachines().Count > 1;
-        if (!hasMultipleSources) {
-            return _recordMap.TryGetValue(_recordIdKey, out checkpoint);
-        }
-
-        HashSet<string> sourceNames = GetCheckpointSourceNames(machineName);
-        foreach (string sourceName in sourceNames) {
-            string sourceKey = $"{_recordIdKey}|{sourceName}|{logName}";
-            if (_recordMap.TryGetValue(sourceKey, out checkpoint)) {
-                checkpointKey = sourceKey;
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private static HashSet<string> GetCheckpointSourceNames(string? machineName) {
-        var sourceNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        if (!string.IsNullOrWhiteSpace(machineName)) {
-            sourceNames.Add(machineName!.Trim());
-        } else {
-            sourceNames.Add(Environment.MachineName);
-            try {
-                sourceNames.Add(Dns.GetHostEntry(Environment.MachineName).HostName);
-            } catch (System.Net.Sockets.SocketException) {
-                // The short local name remains a valid fallback when DNS is unavailable.
-            }
-        }
-        return sourceNames;
-    }
-
-    private IReadOnlyList<string?> GetEffectiveCheckpointMachines()
-        => _effectiveCheckpointMachines ??= SearchEvents.NormalizeMachineTargets(MachineName);
-
-    private void PrepareCheckpointBounds(CancellationToken cancellationToken) {
-        if (string.IsNullOrWhiteSpace(RecordIdFile) || _recordMap.Count == 0 || ParameterSetName == "ListLog") {
-            return;
-        }
-
-        if (ParameterSetName == "PathEvents") {
-            if (TryGetCheckpoint(null, Path, out string checkpointKey, out long checkpoint)) {
-                EventObject? boundaryEvent = checkpoint > 0
-                    ? SearchEvents.QueryLogFile(
-                        Path,
-                        maxEvents: 1,
-                        eventRecordId: new List<long> { checkpoint },
-                        cancellationToken: cancellationToken,
-                        readMode: EventReadMode.Metadata).FirstOrDefault()
-                    : null;
-                EvaluateCheckpointBoundary(checkpointKey, checkpoint, boundaryEvent, Path);
-            }
-            return;
-        }
-
-        IEnumerable<string> logs = ParameterSetName == "NamedEvents"
-            ? EventObjectSlim.GetEventInfoForNamedEvents(Type.ToList()).Keys
-            : new[] { LogName };
-        IReadOnlyList<string?> machines = GetEffectiveCheckpointMachines();
-
-        foreach (string log in logs) {
-            foreach (string? machine in machines) {
-                cancellationToken.ThrowIfCancellationRequested();
-                if (!TryGetCheckpoint(machine, log, out string checkpointKey, out long checkpoint)) {
-                    continue;
-                }
-
-                try {
-                    EventObject? boundaryEvent = checkpoint > 0
-                        ? SearchEvents.QueryLog(
-                            log,
-                            eventRecordId: new List<long> { checkpoint },
-                            machineName: machine,
-                            maxEvents: 1,
-                            cancellationToken: cancellationToken,
-                            sessionTimeoutMs: ParameterSetName == "GenericEvents" ? SessionTimeoutMs : null,
-                            readMode: EventReadMode.Metadata).FirstOrDefault()
-                        : null;
-                    EvaluateCheckpointBoundary(
-                        checkpointKey,
-                        checkpoint,
-                        boundaryEvent,
-                        string.IsNullOrWhiteSpace(machine) ? log : $"{log} on {machine}");
-                } catch (Exception ex) when (EventLogRemoteQueryFailureClassifier.TryClassify(machine, ex, out _)) {
-                    ResetCheckpointForSafeReplay(
-                        checkpointKey,
-                        $"Checkpoint boundary {checkpoint} for '{checkpointKey}' could not be validated on " +
-                        $"'{(string.IsNullOrWhiteSpace(machine) ? log : $"{log} on {machine}")}'. " +
-                        $"Replaying this source without the saved lower bound to avoid event loss. {ex.GetType().Name}: {ex.Message}");
-                }
-            }
-        }
-    }
-
-    private void EvaluateCheckpointBoundary(
-        string checkpointKey,
-        long checkpoint,
-        EventObject? boundaryEvent,
-        string target) {
-
-        if (checkpoint <= 0) {
-            return;
-        }
-
-        string? actualBoundary = boundaryEvent == null
-            ? null
-            : EventCheckpointBoundaryIdentity.Create(boundaryEvent);
-        if (!_checkpointBoundaries.TryGetValue(checkpointKey, out string? expectedBoundary)) {
-            if (actualBoundary != null) {
-                _checkpointBoundaryMigrations[checkpointKey] = actualBoundary;
-                return;
-            }
-        } else if (string.Equals(expectedBoundary, actualBoundary, StringComparison.Ordinal)) {
-            return;
-        }
-
-        ResetCheckpointForSafeReplay(
-            checkpointKey,
-            $"Checkpoint boundary {checkpoint} for '{checkpointKey}' no longer identifies the same record in '{target}'. " +
-            "The source was cleared, replaced, or aged past that boundary; restarting from its oldest available matching record.");
-    }
-
-    private void ResetCheckpointForSafeReplay(string checkpointKey, string warning) {
-        _recordMap.Remove(checkpointKey);
-        _highestRecordIds.Remove(checkpointKey);
-        _highestCheckpointEvents.Remove(checkpointKey);
-        _checkpointBoundaryMigrations.Remove(checkpointKey);
-        _resetCheckpointKeys.Add(checkpointKey);
-        WriteWarning(warning);
-    }
-
-    private bool OutputLimitReached => MaxEvents > 0 && _eventsOutput >= MaxEvents;
-
-    private bool UsesCheckpoint => !string.IsNullOrWhiteSpace(RecordIdFile);
-
-    private bool EffectiveOldest => Oldest.IsPresent || UsesCheckpoint;
-
-    private int GetQueryReadLimit() {
-        if (UsesManagedOutputSelection) {
-            return MaxEvents;
-        }
-        if (HasManagedPostReadFilter || MaxEvents <= 0) {
-            return MaxEventsScanned;
-        }
-        if (MaxEventsScanned <= 0) {
-            return MaxEvents;
-        }
-        return Math.Min(MaxEvents, MaxEventsScanned);
-    }
-
-    private bool HasManagedPostReadFilter => MessageRegex != null || UsesCheckpoint;
+    private bool HasManagedPostReadFilter =>
+        MessageRegex != null ||
+        _managedProviderPatterns.Length > 0 ||
+        UsesCheckpoint;
 
     private bool UsesManagedOutputSelection =>
-        MessageRegex != null && !UsesCheckpoint && MaxEvents > 0 && MaxEventsScanned <= 0;
+        (MessageRegex != null ||
+         _managedProviderPatterns.Length > 0) &&
+        !UsesCheckpoint &&
+        MaxEvents > 0 &&
+        MaxEventsScanned <= 0;
 
     private void ProcessEventResult(EventObject eventObject, List<object>? results) {
-        if (!TrackCheckpointProgress(eventObject) || !MessageMatches(eventObject)) {
+        if (!TrackCheckpointProgress(eventObject) ||
+            !ProviderMatches(eventObject) ||
+            !MessageMatches(eventObject)) {
             return;
         }
 
@@ -843,59 +586,12 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
         return MessageRegex.IsMatch(message);
     }
 
-    /// <summary>
-    /// Saves the highest contiguously processed record ID to <see cref="RecordIdFile"/> when processing completes.
-    /// </summary>
-    protected override Task EndProcessingAsync() {
-        if (!string.IsNullOrEmpty(RecordIdFile) &&
-            (_highestRecordIds.Count > 0 || _resetCheckpointKeys.Count > 0 || _checkpointBoundaryMigrations.Count > 0)) {
-            var updates = new List<EventCheckpointUpdate>(
-                _highestRecordIds.Count + _resetCheckpointKeys.Count + _checkpointBoundaryMigrations.Count);
-            foreach (string resetKey in _resetCheckpointKeys) {
-                updates.Add(new EventCheckpointUpdate(
-                    resetKey,
-                    _highestRecordIds.TryGetValue(resetKey, out long resetValue) ? resetValue : null,
-                    GetInitialCheckpointGeneration(resetKey),
-                    startsNewGeneration: true,
-                    boundaryIdentity: _highestCheckpointEvents.TryGetValue(resetKey, out EventObject? resetBoundaryEvent)
-                        ? EventCheckpointBoundaryIdentity.Create(resetBoundaryEvent)
-                        : null));
-            }
-            foreach (KeyValuePair<string, long> checkpoint in _highestRecordIds) {
-                if (_resetCheckpointKeys.Contains(checkpoint.Key)) {
-                    continue;
-                }
-                updates.Add(new EventCheckpointUpdate(
-                    checkpoint.Key,
-                    checkpoint.Value,
-                    GetInitialCheckpointGeneration(checkpoint.Key),
-                    boundaryIdentity: _highestCheckpointEvents.TryGetValue(checkpoint.Key, out EventObject? boundaryEvent)
-                        ? EventCheckpointBoundaryIdentity.Create(boundaryEvent)
-                        : null));
-            }
-            foreach (KeyValuePair<string, string> migration in _checkpointBoundaryMigrations) {
-                if (_resetCheckpointKeys.Contains(migration.Key) || _highestRecordIds.ContainsKey(migration.Key) ||
-                    !_recordMap.TryGetValue(migration.Key, out long recordId)) {
-                    continue;
-                }
-                updates.Add(new EventCheckpointUpdate(
-                    migration.Key,
-                    recordId,
-                    GetInitialCheckpointGeneration(migration.Key),
-                    boundaryIdentity: migration.Value));
-            }
-
-            EventCheckpointSnapshot persisted = EventCheckpointStore.Update(RecordIdFile!, updates);
-            _recordMap = persisted.Records.ToDictionary(
-                static entry => entry.Key,
-                static entry => entry.Value,
-                StringComparer.OrdinalIgnoreCase);
-        }
-        return Task.CompletedTask;
+    private bool ProviderMatches(EventObject eventObject) {
+        return _managedProviderPatterns.Length == 0 ||
+               _managedProviderPatterns.Any(pattern =>
+                   pattern.IsMatch(
+                       eventObject.ProviderName ??
+                       string.Empty));
     }
 
-    private Guid GetInitialCheckpointGeneration(string checkpointKey)
-        => _checkpointGenerations.TryGetValue(checkpointKey, out Guid generationId)
-            ? generationId
-            : Guid.Empty;
 }

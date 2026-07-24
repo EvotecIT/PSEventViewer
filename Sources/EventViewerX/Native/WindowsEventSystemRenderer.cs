@@ -19,7 +19,7 @@ internal sealed class WindowsEventSystemRenderer : IDisposable {
         }
     }
 
-    internal NativeEventMetadata Render(IntPtr eventHandle) {
+    internal unsafe NativeEventMetadata Render(IntPtr eventHandle) {
         if (!WindowsEventNativeMethods.EvtRender(
                 _renderContext,
                 eventHandle,
@@ -51,28 +51,27 @@ internal sealed class WindowsEventSystemRenderer : IDisposable {
             throw new InvalidOperationException($"Windows returned {propertyCount} event system properties; expected {WindowsEventNativeMethods.SystemPropertyCount}.");
         }
 
-        int variantSize = Marshal.SizeOf<WindowsEventNativeMethods.EventVariant>();
-        WindowsEventNativeMethods.EventVariant GetVariant(int index) =>
-            Marshal.PtrToStructure<WindowsEventNativeMethods.EventVariant>(IntPtr.Add(_buffer.Pointer, index * variantSize));
-
-        WindowsEventNativeMethods.EventVariant providerName = GetVariant(0);
-        WindowsEventNativeMethods.EventVariant providerId = GetVariant(1);
-        WindowsEventNativeMethods.EventVariant eventId = GetVariant(2);
-        WindowsEventNativeMethods.EventVariant qualifiers = GetVariant(3);
-        WindowsEventNativeMethods.EventVariant level = GetVariant(4);
-        WindowsEventNativeMethods.EventVariant task = GetVariant(5);
-        WindowsEventNativeMethods.EventVariant opcode = GetVariant(6);
-        WindowsEventNativeMethods.EventVariant keywords = GetVariant(7);
-        WindowsEventNativeMethods.EventVariant timeCreated = GetVariant(8);
-        WindowsEventNativeMethods.EventVariant recordId = GetVariant(9);
-        WindowsEventNativeMethods.EventVariant activityId = GetVariant(10);
-        WindowsEventNativeMethods.EventVariant relatedActivityId = GetVariant(11);
-        WindowsEventNativeMethods.EventVariant processId = GetVariant(12);
-        WindowsEventNativeMethods.EventVariant threadId = GetVariant(13);
-        WindowsEventNativeMethods.EventVariant channel = GetVariant(14);
-        WindowsEventNativeMethods.EventVariant computer = GetVariant(15);
-        WindowsEventNativeMethods.EventVariant userId = GetVariant(16);
-        WindowsEventNativeMethods.EventVariant version = GetVariant(17);
+        var variants =
+            (WindowsEventNativeMethods.EventVariant*)_buffer.Pointer;
+        WindowsEventNativeMethods.EventVariant providerName = variants[0];
+        WindowsEventNativeMethods.EventVariant providerId = variants[1];
+        WindowsEventNativeMethods.EventVariant eventId = variants[2];
+        WindowsEventNativeMethods.EventVariant qualifiers = variants[3];
+        WindowsEventNativeMethods.EventVariant level = variants[4];
+        WindowsEventNativeMethods.EventVariant task = variants[5];
+        WindowsEventNativeMethods.EventVariant opcode = variants[6];
+        WindowsEventNativeMethods.EventVariant keywords = variants[7];
+        WindowsEventNativeMethods.EventVariant timeCreated = variants[8];
+        WindowsEventNativeMethods.EventVariant recordId = variants[9];
+        WindowsEventNativeMethods.EventVariant activityId = variants[10];
+        WindowsEventNativeMethods.EventVariant relatedActivityId =
+            variants[11];
+        WindowsEventNativeMethods.EventVariant processId = variants[12];
+        WindowsEventNativeMethods.EventVariant threadId = variants[13];
+        WindowsEventNativeMethods.EventVariant channel = variants[14];
+        WindowsEventNativeMethods.EventVariant computer = variants[15];
+        WindowsEventNativeMethods.EventVariant userId = variants[16];
+        WindowsEventNativeMethods.EventVariant version = variants[17];
 
         return new NativeEventMetadata(
             ReadString(providerName),
@@ -133,10 +132,12 @@ internal sealed class WindowsEventSystemRenderer : IDisposable {
         return DateTime.FromFileTimeUtc(unchecked((long)value.UInt64Value)).ToLocalTime();
     }
 
-    private static Guid? ReadGuid(WindowsEventNativeMethods.EventVariant value) {
+    private static unsafe Guid? ReadGuid(
+        WindowsEventNativeMethods.EventVariant value) {
+
         return value.ScalarType == WindowsEventNativeMethods.VariantType.Null || value.PointerValue == IntPtr.Zero
             ? null
-            : Marshal.PtrToStructure<Guid>(value.PointerValue);
+            : *(Guid*)value.PointerValue;
     }
 
     private static SecurityIdentifier? ReadSid(WindowsEventNativeMethods.EventVariant value) {

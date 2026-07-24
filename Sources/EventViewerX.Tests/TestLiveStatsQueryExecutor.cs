@@ -62,10 +62,12 @@ public class TestLiveStatsQueryExecutor {
     public void TryBuild_ExecutesCustomSelectorWithManagedTimeRange() {
         if (!OperatingSystem.IsWindows()) return;
         if (!TestEnv.CanReadLog("System")) return;
-        EventObject? latest = SearchEvents.QueryLog(
+        EventObject? latest = EventLogEngine.ReadChannel(
             "System",
-            maxEvents: 1,
-            readMode: EventReadMode.Metadata).SingleOrDefault();
+            options: new EventLogQueryOptions {
+                MaxEvents = 1,
+                ReadMode = EventReadMode.Metadata
+            }).SingleOrDefault();
         if (latest == null) return;
 
         DateTime createdUtc = latest.TimeCreated.ToUniversalTime();

@@ -7,7 +7,6 @@ namespace PSEventViewer;
 
 /// <summary>Retrieves PowerShell scripts from event logs and optionally saves them.</summary>
 [Cmdlet(VerbsCommon.Get, "EVXPowerShellScript")]
-[Alias("Restore-EVXPowerShellScript", "Restore-PowerShellScript")]
 [OutputType(typeof(RestoredPowerShellScript), typeof(PowerShellScriptQueryExecutionInfo), typeof(string))]
 public sealed class CmdletGetEVXPowerShellScript : PowerShellScriptQueryCmdletBase {
     /// <summary>Destination directory where retrieved scripts should be saved.</summary>
@@ -31,12 +30,12 @@ public sealed class CmdletGetEVXPowerShellScript : PowerShellScriptQueryCmdletBa
     /// <summary>Maximum incomplete script groups retained while scanning.</summary>
     [Parameter]
     [ValidateRange(1, int.MaxValue)]
-    public int MaxPendingScripts { get; set; } = SearchEvents.DefaultPowerShellScriptPendingLimit;
+    public int MaxPendingScripts { get; set; } = PowerShellEventEngine.DefaultPowerShellScriptPendingLimit;
 
     /// <summary>Maximum event snapshots retained across incomplete script groups.</summary>
     [Parameter]
     [ValidateRange(1, int.MaxValue)]
-    public int MaxCachedEvents { get; set; } = SearchEvents.DefaultPowerShellScriptEventCacheLimit;
+    public int MaxCachedEvents { get; set; } = PowerShellEventEngine.DefaultPowerShellScriptEventCacheLimit;
 
     /// <summary>Retrieves matching scripts and writes each result or saved path to the pipeline.</summary>
     protected override Task ProcessRecordAsync() {
@@ -44,7 +43,7 @@ public sealed class CmdletGetEVXPowerShellScript : PowerShellScriptQueryCmdletBa
         foreach (string? machine in machines) {
             CancelToken.ThrowIfCancellationRequested();
             var queryInfo = new PowerShellScriptQueryExecutionInfo();
-            using IEnumerator<RestoredPowerShellScript> scripts = SearchEvents.GetPowerShellScripts(
+            using IEnumerator<RestoredPowerShellScript> scripts = PowerShellEventEngine.GetPowerShellScripts(
                 type: Type,
                 machineName: machine,
                 eventLogPath: EventLogPath,

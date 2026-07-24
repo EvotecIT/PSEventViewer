@@ -20,6 +20,11 @@ public partial class EventObject {
     private string[]? _messageLines;
     private string? _messageSubject;
     private List<string>? _nicIdentifiers;
+    private IReadOnlyList<byte[]>? _attachments;
+    private object? _payloadSync = new();
+    private bool _payloadParsingEnabled;
+    private bool _includeAttachments;
+    private volatile bool _payloadParsed;
 
     /// <summary>Time and date when the event was created.</summary>
     public DateTime TimeCreated { get; }
@@ -65,7 +70,7 @@ public partial class EventObject {
 
     /// <summary>
     /// Bookmark that can be used to resume a query. Metadata-only snapshots omit bookmarks to preserve
-    /// the low-allocation path; use another <see cref="EventReadMode"/> when the native bookmark is required.
+    /// the low-allocation path; set IncludeBookmark on the query when a native bookmark is required.
     /// </summary>
     public EventBookmark? Bookmark { get; }
 
@@ -121,35 +126,62 @@ public partial class EventObject {
     /// <summary>Event property values copied from the native record.</summary>
     public IReadOnlyList<EventPropertyValue> Properties { get; }
 
+    /// <summary>
+    /// Query identifiers whose Select expressions matched this event in a
+    /// structured QueryList.
+    /// </summary>
+    /// <remarks>
+    /// Windows documents <c>EvtEventQueryIDs</c> as unsupported. Owned native
+    /// projections therefore return an empty collection instead of inventing
+    /// matches; snapshots created from a managed <see cref="EventLogRecord"/>
+    /// preserve whatever identifiers that API supplies.
+    /// </remarks>
+    public IReadOnlyList<int> MatchedQueryIds { get; }
+
     /// <summary>Structured event data parsed from XML.</summary>
     public Dictionary<string, string> Data {
-        get => _data ??= new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        get {
+            EnsurePayloadParsed();
+            return _data!;
+        }
         private set => _data = value;
     }
 
     /// <summary>NIC-related identifiers extracted from structured event data.</summary>
     public List<string> NicIdentifiers {
-        get => _nicIdentifiers ??= new List<string>();
+        get {
+            EnsurePayloadParsed();
+            return _nicIdentifiers!;
+        }
         private set => _nicIdentifiers = value;
     }
 
     /// <summary>Key/value pairs parsed from the formatted message.</summary>
     public Dictionary<string, string> MessageData {
-        get => _messageData ??= MessageLines.Count > 0
-            ? ParseMessage(MessageLines)
-            : new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        get => _messageData ??= ParseMessage(_message);
         private set => _messageData = value;
     }
 
     /// <summary>First non-empty line of the formatted message.</summary>
     /// <remarks>The subject is derived lazily so message-only scans do not split every formatted message.</remarks>
     public string MessageSubject {
-        get => _messageSubject ??= GetMessageSubject(MessageLines);
+        get => _messageSubject ??= GetMessageSubject(_message);
         set => _messageSubject = value ?? string.Empty;
     }
 
     /// <summary>Binary attachments extracted from structured event data.</summary>
-    public IReadOnlyList<byte[]> Attachments { get; private set; } = Array.Empty<byte[]>();
+    /// <remarks>
+    /// XML parsing and binary decoding occur only when structured properties are
+    /// first requested. Enumerating rich snapshots without touching payload
+    /// helpers therefore remains bounded and avoids unnecessary parsing work.
+    /// </remarks>
+    public IReadOnlyList<byte[]> Attachments {
+        get {
+            EnsurePayloadParsed();
+            return _attachments!;
+        }
+        private set => _attachments = value;
+    }
 
     /// <summary>Raw event XML, when requested by <see cref="ReadMode"/>.</summary>
     public string XMLData { get; set; } = string.Empty;
@@ -172,7 +204,13 @@ public partial class EventObject {
     /// <param name="eventRecord">Event record whose ownership is transferred to this constructor.</param>
     /// <param name="queriedMachine">Computer name or file path from which the event was read.</param>
     /// <param name="readMode">Amount of provider data to materialize.</param>
-    public EventObject(EventRecord eventRecord, string queriedMachine, EventReadMode readMode = EventReadMode.Full) {
+    /// <param name="includeBookmark">Whether to materialize a resumable bookmark.</param>
+    public EventObject(
+        EventRecord eventRecord,
+        string queriedMachine,
+        EventReadMode readMode = EventReadMode.Full,
+        bool includeBookmark = false) {
+
         if (eventRecord == null) {
             throw new ArgumentNullException(nameof(eventRecord));
         }
@@ -180,6 +218,11 @@ public partial class EventObject {
         ReadMode = readMode;
         QueriedMachine = queriedMachine ?? string.Empty;
         _message = string.Empty;
+        _payloadParsingEnabled =
+            readMode == EventReadMode.StructuredData ||
+            readMode == EventReadMode.RawXml ||
+            readMode == EventReadMode.Full;
+        _includeAttachments = readMode == EventReadMode.Full;
 
         try {
             TimeCreated = eventRecord.TimeCreated ?? DateTime.MinValue;
@@ -194,7 +237,9 @@ public partial class EventObject {
             RelatedActivityId = eventRecord.RelatedActivityId;
             ActivityId = eventRecord.ActivityId;
             UserId = eventRecord.UserId;
-            Bookmark = readMode == EventReadMode.Metadata ? null : eventRecord.Bookmark;
+            Bookmark = includeBookmark
+                ? eventRecord.Bookmark
+                : null;
             Keywords = eventRecord.Keywords;
             Level = eventRecord.Level;
             Version = eventRecord.Version;
@@ -204,6 +249,10 @@ public partial class EventObject {
             Properties = readMode == EventReadMode.StructuredData || readMode == EventReadMode.Full
                 ? SnapshotProperties(eventRecord)
                 : Array.Empty<EventPropertyValue>();
+            MatchedQueryIds = eventRecord is EventLogRecord matchedRecord
+                ? matchedRecord.MatchedQueryIds?.ToArray() ??
+                  Array.Empty<int>()
+                : Array.Empty<int>();
             bool includeProviderDisplayNames = readMode == EventReadMode.Message || readMode == EventReadMode.Full;
             TaskDisplayName = includeProviderDisplayNames
                 ? SafeReadDisplayName(() => eventRecord.TaskDisplayName)
@@ -238,16 +287,10 @@ public partial class EventObject {
                 MessageRenderErrorCode = renderErrorCode;
             }
 
-            if (readMode == EventReadMode.StructuredData || readMode == EventReadMode.Full) {
+            if (readMode == EventReadMode.StructuredData ||
+                readMode == EventReadMode.RawXml ||
+                readMode == EventReadMode.Full) {
                 XMLData = SafeToXml(eventRecord);
-                ParseXmlPayload(
-                    XMLData,
-                    out Dictionary<string, string> data,
-                    out IReadOnlyList<byte[]> attachments,
-                    includeAttachments: readMode == EventReadMode.Full);
-                Data = data;
-                _nicIdentifiers = ExtractNicIdentifiers(data);
-                Attachments = attachments;
             }
         } finally {
             eventRecord.Dispose();

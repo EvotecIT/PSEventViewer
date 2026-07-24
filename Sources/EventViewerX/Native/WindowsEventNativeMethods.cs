@@ -7,6 +7,7 @@ namespace EventViewerX.Native;
 internal static class WindowsEventNativeMethods {
     internal const int ErrorInsufficientBuffer = 122;
     internal const int ErrorNoMoreItems = 259;
+    internal const int ErrorCancelled = 1223;
     internal const int ErrorTimeout = 1460;
     internal const int ErrorEvtPublisherMetadataNotFound = 15002;
     internal const int ErrorEvtMessageNotFound = 15027;
@@ -19,7 +20,37 @@ internal static class WindowsEventNativeMethods {
         ChannelPath = 0x1,
         FilePath = 0x2,
         ForwardDirection = 0x100,
-        ReverseDirection = 0x200
+        ReverseDirection = 0x200,
+        TolerateQueryErrors = 0x1000
+    }
+
+    [Flags]
+    internal enum ExportLogFlags : uint {
+        ChannelPath = 0x1,
+        FilePath = 0x2,
+        TolerateQueryErrors = 0x1000,
+        Overwrite = 0x2000
+    }
+
+    internal enum OpenLogFlags : uint {
+        ChannelPath = 1,
+        FilePath = 2
+    }
+
+    internal enum QueryPropertyId {
+        Names = 0,
+        Statuses = 1
+    }
+
+    internal enum LogPropertyId {
+        CreationTime = 0,
+        LastAccessTime = 1,
+        LastWriteTime = 2,
+        FileSize = 3,
+        Attributes = 4,
+        NumberOfLogRecords = 5,
+        OldestRecordNumber = 6,
+        Full = 7
     }
 
     internal enum RenderContextFlags : uint {
@@ -41,9 +72,52 @@ internal static class WindowsEventNativeMethods {
         Keyword = 5
     }
 
+    internal enum EventMetadataPropertyId {
+        EventId = 0,
+        Version = 1,
+        Channel = 2,
+        Level = 3,
+        Opcode = 4,
+        Task = 5,
+        Keyword = 6,
+        MessageId = 7,
+        Template = 8
+    }
+
     internal enum LoginClass {
         RpcLogin = 1
     }
+
+    [Flags]
+    internal enum SeekFlags : uint {
+        RelativeToFirst = 1,
+        RelativeToLast = 2,
+        RelativeToCurrent = 3,
+        RelativeToBookmark = 4,
+        OriginMask = 7,
+        Strict = 0x10000
+    }
+
+    [Flags]
+    internal enum SubscribeFlags : uint {
+        ToFutureEvents = 1,
+        StartAtOldestRecord = 2,
+        StartAfterBookmark = 3,
+        OriginMask = 3,
+        TolerateQueryErrors = 0x1000,
+        Strict = 0x10000
+    }
+
+    internal enum SubscribeAction : uint {
+        Error = 0,
+        Deliver = 1
+    }
+
+    [UnmanagedFunctionPointer(CallingConvention.Winapi)]
+    internal delegate int SubscribeCallback(
+        SubscribeAction action,
+        IntPtr userContext,
+        IntPtr eventHandle);
 
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
     internal struct RpcLogin {
@@ -129,6 +203,7 @@ internal static class WindowsEventNativeMethods {
         internal uint Type;
 
         internal VariantType ScalarType => (VariantType)(Type & 0x7f);
+        internal bool IsArray => (Type & 0x80) != 0;
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -156,9 +231,18 @@ internal static class WindowsEventNativeMethods {
     [DllImport("wevtapi.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     internal static extern EventHandle EvtQuery(
         IntPtr session,
-        string path,
-        string query,
+        string? path,
+        string? query,
         QueryFlags flags);
+
+    [DllImport("wevtapi.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool EvtGetQueryInfo(
+        EventHandle queryOrSubscription,
+        QueryPropertyId propertyId,
+        int propertyValueBufferSize,
+        IntPtr propertyValueBuffer,
+        out int propertyValueBufferUsed);
 
     [DllImport("wevtapi.dll", SetLastError = true)]
     internal static extern EventHandle EvtOpenSession(
@@ -166,6 +250,46 @@ internal static class WindowsEventNativeMethods {
         ref RpcLogin login,
         int timeout,
         int flags);
+
+    [DllImport("wevtapi.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool EvtExportLog(
+        IntPtr session,
+        string? path,
+        string? query,
+        string targetFilePath,
+        ExportLogFlags flags);
+
+    [DllImport("wevtapi.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool EvtArchiveExportedLog(
+        IntPtr session,
+        string logFilePath,
+        int locale,
+        int flags);
+
+    [DllImport("wevtapi.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool EvtClearLog(
+        IntPtr session,
+        string channelPath,
+        string? targetFilePath,
+        int flags);
+
+    [DllImport("wevtapi.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    internal static extern EventHandle EvtOpenLog(
+        IntPtr session,
+        string path,
+        OpenLogFlags flags);
+
+    [DllImport("wevtapi.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool EvtGetLogInfo(
+        EventHandle log,
+        LogPropertyId propertyId,
+        int propertyValueBufferSize,
+        IntPtr propertyValueBuffer,
+        out int propertyValueBufferUsed);
 
     [DllImport("wevtapi.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
@@ -176,6 +300,30 @@ internal static class WindowsEventNativeMethods {
         int timeout,
         int flags,
         out int returned);
+
+    [DllImport("wevtapi.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool EvtSeek(
+        EventHandle resultSet,
+        long position,
+        EventHandle? bookmark,
+        int timeout,
+        SeekFlags flags);
+
+    [DllImport("wevtapi.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool EvtCancel(EventHandle? objectHandle);
+
+    [DllImport("wevtapi.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    internal static extern EventHandle EvtSubscribe(
+        IntPtr session,
+        IntPtr signalEvent,
+        string channelPath,
+        string? query,
+        IntPtr bookmark,
+        IntPtr context,
+        SubscribeCallback? callback,
+        SubscribeFlags flags);
 
     [DllImport("wevtapi.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     internal static extern EventHandle EvtCreateRenderContext(
@@ -212,6 +360,26 @@ internal static class WindowsEventNativeMethods {
         string? logFilePath,
         int locale,
         int flags);
+
+    [DllImport("wevtapi.dll", SetLastError = true)]
+    internal static extern EventHandle EvtOpenEventMetadataEnum(
+        EventHandle publisherMetadata,
+        int flags);
+
+    [DllImport("wevtapi.dll", SetLastError = true)]
+    internal static extern EventHandle EvtNextEventMetadata(
+        EventHandle eventMetadataEnum,
+        int flags);
+
+    [DllImport("wevtapi.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool EvtGetEventMetadataProperty(
+        EventHandle eventMetadata,
+        EventMetadataPropertyId propertyId,
+        int flags,
+        int propertyValueBufferSize,
+        IntPtr propertyValueBuffer,
+        out int propertyValueBufferUsed);
 
     [DllImport("wevtapi.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]

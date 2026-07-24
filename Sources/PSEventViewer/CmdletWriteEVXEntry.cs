@@ -2,7 +2,7 @@
 
 /// <summary>
 /// <para type="synopsis">Writes custom events to Windows Event Logs for testing, debugging, or application logging.</para>
-/// <para type="description">Wraps SearchEvents.WriteEvent so you can specify provider, log, event ID, type, category, message, and additional fields locally or remotely.</para>
+/// <para type="description">Writes through ClassicEventLogManager. A normal write never performs an implicit administrative source registration; use CreateSource explicitly when that behavior is intended.</para>
 /// </summary>
 /// <example>
 ///   <summary>Write informational message</summary>
@@ -24,9 +24,10 @@
 ///   <code>Write-EVXEntry -LogName Application -ProviderName MyApp -EventId 4001 -Category 42 -EventLogEntryType Error -Message "Unhandled exception"</code>
 ///   <para>Records an error and sets a custom category value.</para>
 /// </example>
-[Cmdlet(VerbsCommunications.Write, "EVXEntry")]
-[Alias("Write-EventViewerXEntry", "Write-WinEvent", "Write-Event")]
-[OutputType(typeof(bool))]
+[Cmdlet(
+    VerbsCommunications.Write,
+    "EVXEntry",
+    SupportsShouldProcess = true)]
 public sealed class CmdletWriteEVXEntry : AsyncPSCmdlet {
     /// <summary>
     /// Target computer to write the event to.
@@ -82,22 +83,46 @@ public sealed class CmdletWriteEVXEntry : AsyncPSCmdlet {
     public string[]? AdditionalFields { get; set; }
 
     /// <summary>
+    /// Explicitly registers a missing source before writing. Source registration normally requires administrative rights.
+    /// </summary>
+    [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
+    public SwitchParameter CreateSource { get; set; }
+
+    /// <summary>
     /// Initializes processing and reads error preferences.
     /// </summary>
     protected override Task BeginProcessingAsync() {
         // Initialize the logger to be able to see verbose, warning, debug, error, progress, and information messages.
         var internalLogger = new InternalLogger();
         var internalLoggerPowerShell = new InternalLoggerPowerShell(internalLogger, this.WriteVerbose, this.WriteWarning, this.WriteDebug, this.WriteError, this.WriteProgress, this.WriteInformation);
-        LoggingMessages.Logger = internalLogger;
+        Settings.Logger = internalLogger;
         return Task.CompletedTask;
     }
 
     /// <summary>
-    /// Writes the event using <see cref="SearchEvents"/>.
+    /// Writes the event using <see cref="ClassicEventLogManager"/>.
     /// </summary>
     protected override Task ProcessRecordAsync() {
         try {
-            SearchEvents.WriteEvent(ProviderName, LogName, Message, EventLogEntryType, Category, EventId, MachineName, AdditionalFields);
+            string target = string.IsNullOrWhiteSpace(MachineName)
+                ? $"{LogName}/{ProviderName}"
+                : $"{MachineName}/{LogName}/{ProviderName}";
+            if (!ShouldProcess(target, $"Write event {EventId}")) {
+                return Task.CompletedTask;
+            }
+            ClassicEventLogManager.Write(
+                new ClassicEventWriteRequest {
+                    SourceName = ProviderName,
+                    LogName = LogName,
+                    Message = Message,
+                    EntryType = EventLogEntryType,
+                    Category = Category,
+                    EventId = EventId,
+                    MachineName = MachineName,
+                    ReplacementStrings = AdditionalFields,
+                    CreateSourceIfMissing =
+                        CreateSource.IsPresent
+                });
         } catch (Exception ex) {
             WriteError(new ErrorRecord(ex, "WriteEventFailed", ErrorCategory.WriteError, this));
         }

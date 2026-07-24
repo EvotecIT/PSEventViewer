@@ -53,27 +53,27 @@ public class ADGroupChangeDetailed : EventRuleBase {
 
     /// <summary>Initialises a detailed group change wrapper from an event record.</summary>
     public ADGroupChangeDetailed(EventObject eventObject) : base(eventObject) {
-        _eventObject = eventObject;
+        Event = eventObject;
         Type = "ADGroupChangeDetailed";
 
-        Computer = _eventObject.ComputerName;
-        Action = _eventObject.MessageSubject;
+        Computer = Event.ComputerName;
+        Action = Event.MessageSubject;
 
-        Computer = _eventObject.ComputerName;
-        Action = _eventObject.MessageSubject;
-        ObjectClass = _eventObject.GetValueFromDataDictionary("ObjectClass");
-        OperationType = ConvertFromOperationType(_eventObject.GetDataValueOrEmpty("OperationType"));
-        Group = _eventObject.GetValueFromDataDictionary("ObjectDN");
-        FieldChanged = _eventObject.GetValueFromDataDictionary("AttributeLDAPDisplayName");
-        FieldValue = _eventObject.GetValueFromDataDictionary("AttributeValue");
+        Computer = Event.ComputerName;
+        Action = Event.MessageSubject;
+        ObjectClass = Event.GetValueFromDataDictionary("ObjectClass");
+        OperationType = ConvertFromOperationType(Event.GetDataValueOrEmpty("OperationType"));
+        Group = Event.GetValueFromDataDictionary("ObjectDN");
+        FieldChanged = Event.GetValueFromDataDictionary("AttributeLDAPDisplayName");
+        FieldValue = Event.GetValueFromDataDictionary("AttributeValue");
 
         // OverwriteByField logic
-        Group = OverwriteByField(Action, "A directory service object was moved.", Group, _eventObject.GetValueFromDataDictionary("OldObjectDN"));
-        FieldValue = OverwriteByField(Action, "A directory service object was moved.", FieldValue, _eventObject.GetValueFromDataDictionary("NewObjectDN"));
+        Group = OverwriteByField(Action, "A directory service object was moved.", Group, Event.GetValueFromDataDictionary("OldObjectDN"));
+        FieldValue = OverwriteByField(Action, "A directory service object was moved.", FieldValue, Event.GetValueFromDataDictionary("NewObjectDN"));
 
         // common fields
-        Who = _eventObject.GetSubjectAccountOrEmpty();
-        When = _eventObject.TimeCreated;
+        Who = Event.GetSubjectAccountOrEmpty();
+        When = Event.TimeCreated;
     }
 }
 

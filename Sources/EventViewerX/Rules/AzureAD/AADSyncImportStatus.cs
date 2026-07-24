@@ -50,12 +50,12 @@ public class AADSyncImportStatus : EventRuleBase
     /// <param name="eventObject">Event containing import status details.</param>
     public AADSyncImportStatus(EventObject eventObject) : base(eventObject)
     {
-        _eventObject = eventObject;
+        Event = eventObject;
         Type = "AADSyncImportStatus";
-        Computer = _eventObject.ComputerName;
-        When = _eventObject.TimeCreated;
+        Computer = Event.ComputerName;
+        When = Event.TimeCreated;
 
-        var msg = Rules.RuleHelpers.GetMessage(_eventObject);
+        var msg = Rules.RuleHelpers.GetMessage(Event);
 
         Phase = eventObject.Id switch
         {

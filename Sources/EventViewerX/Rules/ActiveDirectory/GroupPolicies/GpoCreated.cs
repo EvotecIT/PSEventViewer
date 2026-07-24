@@ -30,13 +30,13 @@ public class GpoCreated : EventRuleBase {
 
     /// <summary>Initialises a GPO creation wrapper from an event record.</summary>
     public GpoCreated(EventObject eventObject) : base(eventObject) {
-        _eventObject = eventObject;
+        Event = eventObject;
         Type = "GpoCreated";
-        Computer = _eventObject.ComputerName;
-        Action = _eventObject.MessageSubject;
-        GpoName = _eventObject.GetValueFromDataDictionary("ObjectDN");
-        Who = _eventObject.GetSubjectAccountOrEmpty();
-        When = _eventObject.TimeCreated;
+        Computer = Event.ComputerName;
+        Action = Event.MessageSubject;
+        GpoName = Event.GetValueFromDataDictionary("ObjectDN");
+        Who = Event.GetSubjectAccountOrEmpty();
+        When = Event.TimeCreated;
     }
 }
 

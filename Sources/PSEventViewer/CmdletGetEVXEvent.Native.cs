@@ -1,0 +1,418 @@
+using System.Collections;
+using System.Net;
+
+namespace PSEventViewer;
+
+public sealed partial class CmdletGetEVXEvent {
+    private void ProcessNativeEvents(
+        CancellationToken cancellationToken,
+        List<object>? results) {
+
+        EventLogBatchQuery batch = CreateNativeBatch();
+        foreach (EventObject eventObject in EventLogBatchEngine.Read(
+                     batch,
+                     cancellationToken)) {
+            cancellationToken.ThrowIfCancellationRequested();
+            ProcessEventResult(eventObject, results);
+            if (OutputLimitReached) {
+                break;
+            }
+        }
+    }
+
+    private EventLogBatchQuery CreateNativeBatch() {
+        switch (ParameterSetName) {
+            case "GenericEvents":
+                return CreateChannelBatch(
+                    NormalizeRequiredValues(LogName, nameof(LogName)),
+                    CreateCommandFilter(),
+                    suppress: null,
+                    FilterXPath);
+            case "PathEvents":
+                return CreateFileBatch(
+                    ExpandFilePaths(Path, nameof(Path)),
+                    CreateCommandFilter(),
+                    suppress: null,
+                    FilterXPath);
+            case "ProviderEvents":
+                return CreateProviderBatch(
+                    CreateCommandFilter(),
+                    suppress: null);
+            case "FilterHashtableEvents":
+                return CreateFilterHashtableBatch();
+            case "FilterXmlEvents":
+                return CreateStructuredBatch(
+                    FilterXml!.OuterXml,
+                    EventLogQuerySourceKind.Auto);
+            default:
+                throw new InvalidOperationException(
+                    $"Parameter set '{ParameterSetName}' is not a native query parameter set.");
+        }
+    }
+
+    private EventLogBatchQuery CreateFilterHashtableBatch() {
+        Hashtable[] hashtables = GetFilterHashtables();
+        PowerShellEventFilterBinding[] bindings =
+            hashtables
+                .Select(PowerShellEventFilterAdapter.Bind)
+                .ToArray();
+        bool usesFiles =
+            bindings.Any(static binding =>
+                binding.UsesFiles);
+        bool usesRemoteCapableSource =
+            bindings.Any(static binding =>
+                binding.UsesChannels ||
+                binding.ProviderOnly);
+        if (usesFiles &&
+            !usesRemoteCapableSource &&
+            (MyInvocation.BoundParameters.ContainsKey(
+                 nameof(MachineName)) ||
+             Credential != null)) {
+            throw new PSArgumentException(
+                "MachineName and Credential cannot be used with a file-only FilterHashtable query. Offline event-log files are always read locally.");
+        }
+
+        var batches = new List<EventLogBatchQuery>();
+        foreach (PowerShellEventFilterBinding binding in
+                 bindings) {
+            if (binding.ProviderOnly) {
+                batches.Add(CreateProviderBatch(
+                    binding.Select,
+                    binding.Suppress));
+                continue;
+            }
+            if (binding.UsesChannels) {
+                batches.Add(CreateChannelBatch(
+                    binding.LogNames,
+                    binding.Select,
+                    binding.Suppress,
+                    rawXPath: null));
+            }
+            if (binding.UsesFiles) {
+                batches.Add(CreateFileBatch(
+                    ExpandFilePaths(
+                        binding.Paths,
+                        nameof(FilterHashtable)),
+                    binding.Select,
+                    binding.Suppress,
+                    rawXPath: null));
+            }
+        }
+        EventLogBatchQuery batch = batches.Count == 1
+            ? batches[0]
+            : EventLogBatchQuery.Combine(batches);
+        int sourceCount =
+            batch.ChannelQueries.Count +
+            batch.FileQueries.Count +
+            batch.StructuredQueries.Count;
+        ValidateBookmarkFanOut(sourceCount);
+        batch = EventLogBatchConsolidator.Consolidate(batch);
+        ConfigureBatch(batch);
+        return batch;
+    }
+
+    private Hashtable[] GetFilterHashtables() {
+        Hashtable[] hashtables = FilterHashtable?
+            .Where(static table => table != null)
+            .ToArray() ?? Array.Empty<Hashtable>();
+        if (hashtables.Length == 0) {
+            throw new PSArgumentException(
+                "FilterHashtable requires at least one hashtable.");
+        }
+        return hashtables;
+    }
+
+    private EventLogBatchQuery CreateProviderBatch(
+        EventFilter filter,
+        EventFilter? suppress) {
+
+        string[] providerPatterns = NormalizeRequiredValues(
+            filter.ProviderNames ?? Array.Empty<string>(),
+            nameof(ProviderName));
+        IReadOnlyList<string?> machines =
+            EventLogTarget.NormalizeMachineNames(MachineName);
+        ValidateRemoteCredentialTargets(machines);
+        var channels = new List<EventLogChannelQuery>();
+        var structured = new List<EventLogStructuredQuery>();
+        foreach (string? machine in machines) {
+            var catalogQuery = new EventLogCatalogQuery {
+                MachineName = machine,
+                Credential = Credential?.GetNetworkCredential(),
+                Authentication = Authentication,
+                ConnectionTimeoutMilliseconds =
+                    EffectiveRemoteConnectionTimeoutMilliseconds,
+                Culture = MessageCulture
+            };
+            EventProviderCatalogResult[] providers;
+            try {
+                providers = EventLogCatalog
+                    .GetProviders(
+                        catalogQuery,
+                        providerPatterns,
+                        CancelToken)
+                    .ToArray();
+            } catch (Exception exception) {
+                if (!ContinueOnError) {
+                    throw;
+                }
+                WriteError(new ErrorRecord(
+                    exception,
+                    "EVXProviderDiscoveryFailed",
+                    ErrorCategory.ResourceUnavailable,
+                    machine));
+                continue;
+            }
+            foreach (EventProviderCatalogResult failure in providers
+                         .Where(static result => !result.Success)) {
+                if (!ContinueOnError) {
+                    throw failure.Exception!;
+                }
+                WriteError(new ErrorRecord(
+                    failure.Exception!,
+                    "EVXProviderMetadataFailed",
+                    ErrorCategory.ReadError,
+                    failure.ProviderName));
+            }
+
+            EventProviderMetadataSnapshot[] successful = providers
+                .Where(static result => result.Success)
+                .Select(static result => result.Provider!)
+                .ToArray();
+            EventFilter? machineSuppress = suppress;
+            if (suppress != null &&
+                ContainsWildcard(suppress.ProviderNames)) {
+                machineSuppress = ExpandProviderPatterns(
+                    suppress,
+                    machine,
+                    suppressFilter: true);
+            }
+            IReadOnlyList<EventFilter> suppressions =
+                PartitionSuppressions(machineSuppress);
+            foreach (IGrouping<string, EventProviderMetadataSnapshot> group in
+                     successful
+                         .SelectMany(
+                             provider => provider.LogLinks,
+                             static (provider, link) => new {
+                                 Provider = provider,
+                                 Link = link
+                             })
+                         .Where(static item =>
+                             !string.IsNullOrWhiteSpace(item.Link.LogName))
+                         .GroupBy(
+                             static item => item.Link.LogName,
+                             static item => item.Provider,
+                             StringComparer.OrdinalIgnoreCase)) {
+                if (!Force.IsPresent &&
+                    providerPatterns.Any(
+                        WildcardPattern
+                            .ContainsWildcardCharacters) &&
+                    EventLogCatalog.GetChannelNames(
+                        catalogQuery,
+                        new[] { group.Key },
+                        includeAnalyticDebug: false,
+                        cancellationToken: CancelToken)
+                    .Count == 0) {
+                    continue;
+                }
+                EventFilter sourceFilter = WithProviders(
+                    CopyFilterWithCheckpoint(
+                        filter,
+                        machine,
+                        group.Key),
+                    group
+                        .Select(static provider => provider.Name)
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .ToArray());
+                foreach (EventFilter partition in
+                         EventFilterPartitioner.Partition(
+                             sourceFilter)) {
+                    if (suppressions.Count == 0) {
+                        channels.Add(CreateChannelQuery(
+                            group.Key,
+                            machine,
+                            EventFilterCompiler.BuildXPath(
+                                partition)));
+                    } else {
+                        structured.Add(CreateStructuredQuery(
+                            EventFilterCompiler.BuildChannelQueryXmlWithSuppressions(
+                                new[] { group.Key },
+                                partition,
+                                suppressions),
+                            EventLogQuerySourceKind.Channel,
+                            machine));
+                    }
+                }
+            }
+        }
+
+        int sourceCount = suppress == null
+            ? channels.Count
+            : structured.Count;
+        if (sourceCount == 0) {
+            throw new ItemNotFoundException(
+                $"No event channels are linked to provider pattern(s): {string.Join(", ", providerPatterns)}.");
+        }
+        ValidateBookmarkFanOut(sourceCount);
+        EventLogBatchQuery batch = suppress == null
+            ? EventLogBatchQuery.ForChannels(channels)
+            : EventLogBatchQuery.ForStructured(structured);
+        ConfigureBatch(batch);
+        return batch;
+    }
+
+    private EventLogBatchQuery CreateChannelBatch(
+        IReadOnlyList<string> logNames,
+        EventFilter filter,
+        EventFilter? suppress,
+        string? rawXPath) {
+
+        IReadOnlyList<string?> machines =
+            EventLogTarget.NormalizeMachineNames(MachineName);
+        ValidateRemoteCredentialTargets(machines);
+        ValidateRawXPathCombination(rawXPath, filter);
+        bool useStructured =
+            !UsesCheckpoint &&
+            string.IsNullOrWhiteSpace(rawXPath) &&
+            (suppress != null ||
+             logNames.Count > 1 ||
+             (filter.ProviderNames?.Count ?? 0) > 0);
+        var channels = new List<EventLogChannelQuery>();
+        var structured = new List<EventLogStructuredQuery>();
+        foreach (string? machine in machines) {
+            IReadOnlyList<string> machineLogNames =
+                ExpandChannelPatterns(logNames, machine);
+            if (!Force.IsPresent &&
+                ContainsWildcard(filter.ProviderNames)) {
+                var catalogQuery =
+                    new EventLogCatalogQuery {
+                        MachineName = machine,
+                        Credential =
+                            Credential?
+                                .GetNetworkCredential(),
+                        Authentication =
+                            Authentication,
+                        ConnectionTimeoutMilliseconds =
+                            EffectiveRemoteConnectionTimeoutMilliseconds,
+                        Culture = MessageCulture
+                    };
+                machineLogNames =
+                    EventLogCatalog.GetChannelNames(
+                        catalogQuery,
+                        machineLogNames,
+                        includeAnalyticDebug: false,
+                        cancellationToken: CancelToken);
+            }
+            EventFilter machineFilter = ContainsWildcard(
+                    filter.ProviderNames)
+                ? ExpandProviderPatterns(
+                    filter,
+                    machine,
+                    suppressFilter: false)
+                : filter;
+            EventFilter? machineSuppress = suppress;
+            if (suppress != null &&
+                ContainsWildcard(suppress.ProviderNames)) {
+                machineSuppress = ExpandProviderPatterns(
+                    suppress,
+                    machine,
+                    suppressFilter: true);
+            }
+            IReadOnlyList<EventFilter> suppressions =
+                PartitionSuppressions(machineSuppress);
+
+            if (!string.IsNullOrWhiteSpace(rawXPath)) {
+                foreach (string logName in machineLogNames) {
+                    channels.Add(CreateChannelQuery(
+                        logName,
+                        machine,
+                        rawXPath!));
+                }
+                continue;
+            }
+
+            if (!UsesCheckpoint) {
+                IReadOnlyList<EventFilter> chunks =
+                    EventFilterPartitioner.Partition(
+                        machineFilter);
+                if (useStructured) {
+                    foreach (EventFilter chunk in chunks) {
+                        structured.Add(CreateStructuredQuery(
+                            EventFilterCompiler.BuildChannelQueryXmlWithSuppressions(
+                                machineLogNames,
+                                chunk,
+                                suppressions),
+                            EventLogQuerySourceKind.Channel,
+                            machine));
+                    }
+                    continue;
+                }
+            }
+
+            foreach (string logName in machineLogNames) {
+                EventFilter sourceFilter = CopyFilterWithCheckpoint(
+                    machineFilter,
+                    machine,
+                    logName);
+                foreach (EventFilter chunk in
+                         EventFilterPartitioner.Partition(
+                             sourceFilter)) {
+                    channels.Add(CreateChannelQuery(
+                        logName,
+                        machine,
+                        EventFilterCompiler.BuildXPath(chunk)));
+                }
+            }
+        }
+        int sourceCount = channels.Count + structured.Count;
+        ValidateBookmarkFanOut(sourceCount);
+        EventLogBatchQuery batch = structured.Count > 0
+            ? EventLogBatchQuery.ForStructured(structured)
+            : EventLogBatchQuery.ForChannels(channels);
+        ConfigureBatch(batch);
+        return batch;
+    }
+
+    private EventFilter ExpandProviderPatterns(
+        EventFilter filter,
+        string? machineName,
+        bool suppressFilter) {
+
+        string[] patterns = NormalizeRequiredValues(
+            filter.ProviderNames ?? Array.Empty<string>(),
+            nameof(ProviderName));
+        var catalogQuery = new EventLogCatalogQuery {
+            MachineName = machineName,
+            Credential = Credential?.GetNetworkCredential(),
+            Authentication = Authentication,
+            ConnectionTimeoutMilliseconds =
+                EffectiveRemoteConnectionTimeoutMilliseconds,
+            Culture = MessageCulture
+        };
+        string[] providers = EventLogCatalog
+            .GetProviderNames(
+                catalogQuery,
+                patterns,
+                CancelToken)
+            .ToArray();
+        if (providers.Length == 0) {
+            if (!suppressFilter) {
+                throw new ItemNotFoundException(
+                    $"No event providers match pattern(s) '{string.Join(", ", patterns)}' on '{machineName ?? Environment.MachineName}'.");
+            }
+            providers = new[] {
+                "__EventViewerX_No_Matching_Provider__"
+            };
+        }
+        return WithProviders(filter, providers);
+    }
+
+    private static bool ContainsWildcard(
+        IReadOnlyList<string>? values) {
+
+        return values?.Any(static value =>
+            value.IndexOf('*') >= 0 ||
+            value.IndexOf('?') >= 0) == true;
+    }
+
+
+}

@@ -33,25 +33,32 @@ public static class LiveStatsQueryExecutor {
 
         string xpath = BuildEffectiveXPath(request.XPath, request.StartTimeUtc, request.EndTimeUtc);
         var builder = new EvtxStatsReportBuilder();
-        var scanned = 0;
-        var matched = 0;
+        long scanned = 0;
+        long matched = 0;
         bool truncated = false;
         DateTime? minUtc = null;
         DateTime? maxUtc = null;
-        int readLimit = request.MaxEventsScanned > 0 && request.MaxEventsScanned < int.MaxValue
-            ? request.MaxEventsScanned + 1
-            : request.MaxEventsScanned;
+        long readLimit =
+            request.MaxEventsScanned > 0 &&
+            request.MaxEventsScanned < long.MaxValue
+                ? request.MaxEventsScanned + 1L
+                : request.MaxEventsScanned;
 
         try {
-            foreach (var ev in SearchEvents.QueryLogXPath(
-                         logName: request.LogName,
-                         xpath: xpath,
-                         machineName: request.MachineName,
-                         maxEvents: readLimit,
-                         oldest: request.OldestFirst,
-                         cancellationToken: cancellationToken,
-                         sessionTimeoutMs: request.SessionTimeoutMs,
-                         readMode: EventReadMode.Metadata)) {
+            var query = new EventLogChannelQuery(
+                request.LogName) {
+                XPath = xpath,
+                MachineName = request.MachineName,
+                MaxEvents = readLimit,
+                Oldest = request.OldestFirst,
+                RemoteConnectionTimeoutMilliseconds =
+                    request.SessionTimeoutMs ?? 5000,
+                ReadMode = EventReadMode.Metadata
+            };
+            foreach (EventObject ev in
+                     EventLogEngine.ReadChannel(
+                         query,
+                         cancellationToken)) {
                 cancellationToken.ThrowIfCancellationRequested();
 
                 if (request.MaxEventsScanned > 0 && scanned >= request.MaxEventsScanned) {

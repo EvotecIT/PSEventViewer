@@ -11,6 +11,7 @@ internal sealed class WindowsEventHandleEnumerator : IDisposable {
     private readonly NativeEventQuery _eventQuery;
     private readonly IntPtr[] _handles = new IntPtr[BatchSize];
     private readonly WindowsEventNativeMethods.EventHandle _query;
+    private readonly CancellationTokenRegistration _cancellationRegistration;
     private int _index;
     private int _returned;
     private bool _disposed;
@@ -33,6 +34,11 @@ internal sealed class WindowsEventHandleEnumerator : IDisposable {
                 error,
                 $"Failed to query Windows event source '{eventQuery.DisplayName}'.");
         }
+        WindowsEventQueryDiagnostics.ReportFailures(_query, eventQuery);
+        SeekToBookmark();
+        _cancellationRegistration = cancellationToken.Register(
+            static state => ((WindowsEventHandleEnumerator)state!).CancelPendingRead(),
+            this);
     }
 
     internal IntPtr Current { get; private set; }
@@ -75,6 +81,10 @@ internal sealed class WindowsEventHandleEnumerator : IDisposable {
         }
 
         int error = Marshal.GetLastWin32Error();
+        if (error == WindowsEventNativeMethods.ErrorCancelled &&
+            _cancellationToken.IsCancellationRequested) {
+            throw new OperationCanceledException(_cancellationToken);
+        }
         if (error == WindowsEventNativeMethods.ErrorNoMoreItems) {
             return false;
         }
@@ -85,6 +95,44 @@ internal sealed class WindowsEventHandleEnumerator : IDisposable {
         throw new Win32Exception(
             error,
             $"Failed while reading Windows event source '{_eventQuery.DisplayName}'.");
+    }
+
+    private void SeekToBookmark() {
+        if (string.IsNullOrWhiteSpace(_eventQuery.BookmarkXml)) {
+            return;
+        }
+
+        using WindowsEventNativeMethods.EventHandle bookmark =
+            WindowsEventNativeMethods.EvtCreateBookmark(_eventQuery.BookmarkXml);
+        if (bookmark.IsInvalid) {
+            int error = Marshal.GetLastWin32Error();
+            throw new Win32Exception(
+                error,
+                $"Failed to open the bookmark for Windows event source '{_eventQuery.DisplayName}'.");
+        }
+
+        WindowsEventNativeMethods.SeekFlags flags =
+            WindowsEventNativeMethods.SeekFlags.RelativeToBookmark;
+        if (_eventQuery.StrictBookmark) {
+            flags |= WindowsEventNativeMethods.SeekFlags.Strict;
+        }
+        if (!WindowsEventNativeMethods.EvtSeek(
+                _query,
+                _eventQuery.BookmarkOffset,
+                bookmark,
+                0,
+                flags)) {
+            int error = Marshal.GetLastWin32Error();
+            throw new Win32Exception(
+                error,
+                $"Failed to seek from the bookmark for Windows event source '{_eventQuery.DisplayName}'.");
+        }
+    }
+
+    private void CancelPendingRead() {
+        if (!_query.IsClosed && !_query.IsInvalid) {
+            WindowsEventNativeMethods.EvtCancel(_query);
+        }
     }
 
     private void CloseCurrent() {
@@ -100,6 +148,7 @@ internal sealed class WindowsEventHandleEnumerator : IDisposable {
         }
 
         _disposed = true;
+        _cancellationRegistration.Dispose();
         CloseCurrent();
         for (int index = _index; index < _returned; index++) {
             if (_handles[index] != IntPtr.Zero) {

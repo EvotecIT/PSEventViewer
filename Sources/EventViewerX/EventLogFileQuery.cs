@@ -28,7 +28,7 @@ public sealed class EventLogFileQuery {
     public bool Oldest { get; set; }
 
     /// <summary>Amount of event data materialized for each record.</summary>
-    public EventReadMode ReadMode { get; set; } = EventReadMode.Full;
+    public EventReadMode ReadMode { get; set; } = EventReadMode.Message;
 
     /// <summary>
     /// Culture used for provider messages and display names. A null value uses
@@ -36,6 +36,27 @@ public sealed class EventLogFileQuery {
     /// </summary>
     public CultureInfo? MessageCulture { get; set; }
 
+    /// <summary>Fallback culture used when provider resources do not contain MessageCulture.</summary>
+    public CultureInfo? FallbackMessageCulture { get; set; }
+
     /// <summary>Maximum number of records returned. Zero streams every match.</summary>
-    public int MaxEvents { get; set; }
+    public long MaxEvents { get; set; }
+
+    /// <summary>Materializes a native bookmark for every returned event.</summary>
+    public bool IncludeBookmark { get; set; }
+
+    /// <summary>
+    /// Optional native bookmark XML used as the seek origin before enumeration starts.
+    /// </summary>
+    public string? BookmarkXml { get; set; }
+
+    /// <summary>
+    /// Record offset relative to <see cref="BookmarkXml"/>. The default of one resumes after the bookmarked event.
+    /// </summary>
+    public long BookmarkOffset { get; set; } = 1;
+
+    /// <summary>
+    /// Requires the bookmark to identify an event present in the result set.
+    /// </summary>
+    public bool StrictBookmark { get; set; } = true;
 }

@@ -1,6 +1,7 @@
-using DnsClientX;
 using EventViewerX.Rules.ActiveDirectory;
 using System.Collections.Concurrent;
+using System.Net;
+using System.Net.Sockets;
 
 namespace EventViewerX;
 
@@ -9,7 +10,6 @@ namespace EventViewerX;
 /// </summary>
 internal sealed class NamedEventEnricher : IDisposable {
     private readonly NamedEventEnrichmentOptions _options;
-    private readonly Lazy<ClientX>? _dnsClient;
     private readonly Func<string, CancellationToken, Task<DnsResponse>>? _rawDnsResolver;
     private readonly ConcurrentDictionary<string, Lazy<Task<DnsResponse>>> _pendingDnsRequests =
         new(StringComparer.OrdinalIgnoreCase);
@@ -27,9 +27,6 @@ internal sealed class NamedEventEnricher : IDisposable {
 
         _dnsConcurrency = new SemaphoreSlim(_options.DnsMaxConcurrency, _options.DnsMaxConcurrency);
         _rawDnsResolver = dnsResolver;
-        if (dnsResolver == null) {
-            _dnsClient = new Lazy<ClientX>(CreateDnsClient, LazyThreadSafetyMode.ExecutionAndPublication);
-        }
     }
 
     /// <summary>
@@ -75,11 +72,9 @@ internal sealed class NamedEventEnricher : IDisposable {
             lookupCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             lookupCancellation.CancelAfter(_options.DnsTimeoutMilliseconds);
             DnsResponse response = _rawDnsResolver == null
-                ? await _dnsClient!.Value.Resolve(
+                ? await ResolveSystemDnsAsync(
                     address,
-                    DnsRecordType.PTR,
-                    retryOnTransient: _options.RetryDnsOnTransient,
-                    cancellationToken: lookupCancellation.Token).ConfigureAwait(false)
+                    lookupCancellation.Token).ConfigureAwait(false)
                 : await _rawDnsResolver(address, lookupCancellation.Token).ConfigureAwait(false);
 
             cancellationToken.ThrowIfCancellationRequested();
@@ -99,19 +94,55 @@ internal sealed class NamedEventEnricher : IDisposable {
         }
     }
 
-    private ClientX CreateDnsClient() {
-        return new ClientXBuilder()
-            .WithEndpoint(DnsEndpoint.System)
-            .WithTimeout(_options.DnsTimeoutMilliseconds)
-            .WithEnableCache()
-            .Build();
+    private async Task<DnsResponse> ResolveSystemDnsAsync(
+        string address,
+        CancellationToken cancellationToken) {
+
+        int attempts = _options.RetryDnsOnTransient ? 2 : 1;
+        for (int attempt = 1; attempt <= attempts; attempt++) {
+            try {
+                Task<IPHostEntry> lookup = Dns.GetHostEntryAsync(address);
+                Task cancelled = Task.Delay(
+                    Timeout.Infinite,
+                    cancellationToken);
+                Task completed = await Task.WhenAny(
+                    lookup,
+                    cancelled).ConfigureAwait(false);
+                if (!ReferenceEquals(completed, lookup)) {
+                    throw new OperationCanceledException(cancellationToken);
+                }
+                IPHostEntry entry = await lookup.ConfigureAwait(false);
+                string hostName = entry.HostName?.Trim().TrimEnd('.') ??
+                                  string.Empty;
+                return new DnsResponse {
+                    Status = DnsResponseCode.NoError,
+                    Answers = hostName.Length == 0
+                        ? Array.Empty<DnsAnswer>()
+                        : new[] {
+                            new DnsAnswer {
+                                Type = DnsRecordType.PTR,
+                                DataRaw = hostName
+                            }
+                        }
+                };
+            } catch (SocketException exception) when (
+                exception.SocketErrorCode == SocketError.HostNotFound ||
+                exception.SocketErrorCode == SocketError.NoData) {
+                return new DnsResponse {
+                    Status = DnsResponseCode.NXDomain,
+                    Error = exception.Message
+                };
+            } catch (SocketException) when (attempt < attempts) {
+            }
+        }
+        return new DnsResponse {
+            Status = DnsResponseCode.ServerFailure,
+            Error = "The system DNS resolver did not return a result."
+        };
     }
 
     /// <inheritdoc />
     public void Dispose() {
-        if (_dnsClient?.IsValueCreated == true) {
-            _dnsClient.Value.Dispose();
-        }
         _dnsConcurrency?.Dispose();
     }
 }

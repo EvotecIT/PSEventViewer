@@ -48,17 +48,17 @@ public class ADGroupCreateDelete : EventRuleBase {
 
     /// <summary>Initialises a group creation/deletion wrapper from an event record.</summary>
     public ADGroupCreateDelete(EventObject eventObject) : base(eventObject) {
-        _eventObject = eventObject;
+        Event = eventObject;
         Type = "ADGroupCreateDelete";
 
-        Computer = _eventObject.ComputerName;
-        Action = _eventObject.MessageSubject;
+        Computer = Event.ComputerName;
+        Action = Event.MessageSubject;
 
-        GroupName = _eventObject.GetTargetAccountOrEmpty();
+        GroupName = Event.GetTargetAccountOrEmpty();
 
         // common fields
-        Who = _eventObject.GetSubjectAccountOrEmpty();
-        When = _eventObject.TimeCreated;
+        Who = Event.GetSubjectAccountOrEmpty();
+        When = Event.TimeCreated;
     }
 }
 

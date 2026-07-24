@@ -6,164 +6,92 @@ using System.Threading;
 using System.Threading.Tasks;
 
 namespace EventViewerX {
-    /// <summary>
-    /// Represents information about a running watcher instance.
-    /// </summary>
-    public class WatcherInfo : IDisposable {
-        internal WatcherInfo(string name, string machineName, string logName, List<int> eventIds, List<NamedEvents> namedEvents, Action<EventObject> action, bool staging, bool stopOnMatch, int stopAfter, TimeSpan? timeout) {
-            Name = name;
-            MachineName = machineName;
-            LogName = logName;
-            EventIds = eventIds.ToArray();
-            NamedEvents = namedEvents.ToArray();
-            Action = action;
-            Staging = staging;
-            StopOnMatch = stopOnMatch;
-            StopAfter = stopAfter;
-            Timeout = timeout;
-            _staging = staging;
-            Watcher = new WatchEvents(new InternalLogger(false));
-        }
-
-        private readonly bool _staging;
-        private readonly object _stopSync = new();
-        private bool _started;
-        private bool _stopped;
-        private bool _cancellationDisposed;
-        private int _stopScheduled;
-        /// <summary>Unique identifier assigned to the watcher instance.</summary>
-        public Guid Id { get; } = Guid.NewGuid();
-        /// <summary>User-friendly name used to find and deduplicate watchers.</summary>
-        public string Name { get; }
-        /// <summary>Target computer name for the watcher.</summary>
-        public string MachineName { get; }
-        /// <summary>Event log name being monitored.</summary>
-        public string LogName { get; }
-        /// <summary>Event IDs the watcher listens for.</summary>
-        public IReadOnlyList<int> EventIds { get; }
-        /// <summary>NamedEvents packs that were expanded into <see cref="EventIds"/>.</summary>
-        public IReadOnlyList<NamedEvents> NamedEvents { get; }
-        /// <summary>Callback invoked when a matching event arrives.</summary>
-        public Action<EventObject> Action { get; }
-        internal string? ActionIdentity { get; set; }
-        internal string? ReuseScopeIdentity { get; set; }
-        /// <summary>Whether staging event ID 350 is included in the subscription.</summary>
-        public bool Staging { get; }
-        /// <summary>Stops the watcher after the first match when <c>true</c>.</summary>
-        public bool StopOnMatch { get; }
-        /// <summary>Optional cap on number of matching events before stopping.</summary>
-        public int StopAfter { get; }
-        /// <summary>Optional timeout after which the watcher is stopped automatically.</summary>
-        public TimeSpan? Timeout { get; }
-        internal CancellationTokenSource Cancellation { get; } = new();
-        internal Task? TimeoutTask { get; private set; }
-        /// <summary>Underlying watcher engine instance.</summary>
-        public WatchEvents Watcher { get; }
-
-        /// <summary>Total number of matched events observed by this watcher.</summary>
-        public int EventsFound => Watcher.EventsFound;
-        /// <summary>UTC start time of the watcher.</summary>
-        public DateTime StartTime => Watcher.StartTime;
-        /// <summary>UTC stop time of the watcher if it has ended; otherwise <c>null</c>.</summary>
-        public DateTime? EndTime { get; private set; }
-
-        /// <summary>Begins monitoring and starts the optional timeout timer.</summary>
-        public void Start() {
-            lock (_stopSync) {
-                if (_stopped) {
-                    throw new ObjectDisposedException(nameof(WatcherInfo));
-                }
-                if (_started) {
-                    return;
-                }
-
-                Watcher.Watch(MachineName, LogName, new List<int>(EventIds), OnEvent, Cancellation.Token, _staging, Environment.UserName);
-                _started = true;
-                if (Timeout.HasValue) {
-                    TimeoutTask = StopAfterTimeoutAsync(Timeout.Value, Cancellation.Token);
-                }
-            }
-        }
-
-        private async Task StopAfterTimeoutAsync(TimeSpan timeout, CancellationToken cancellationToken) {
-            try {
-                await Task.Delay(timeout, cancellationToken).ConfigureAwait(false);
-                Stop();
-            } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
-            }
-        }
-
-        /// <summary>Invokes the user callback for each matching event and applies stop conditions.</summary>
-        /// <param name="obj">Event object passed to the callback.</param>
-        private void OnEvent(EventObject obj) {
-            Exception? exCaught = null;
-            try {
-                Action?.Invoke(obj);
-            } catch (Exception ex) {
-                exCaught = ex;
-                Settings._logger.WriteWarning("OnEvent callback threw: {0}", ex.Message.Trim());
-            }
-
-            if (StopOnMatch) {
-                ScheduleStop();
-            } else if (StopAfter > 0 && Watcher.EventsFound >= StopAfter) {
-                ScheduleStop();
-            }
-
-            if (exCaught != null) {
-                ActionException?.Invoke(this, exCaught);
-            }
-        }
-
-        /// <summary>Raised when the user-supplied <see cref="Action"/> throws.</summary>
-        public event EventHandler<Exception>? ActionException;
-
-        /// <summary>Raised after the watcher has released its native resources.</summary>
-        public event EventHandler? Stopped;
-
-        private void ScheduleStop() {
-            if (Interlocked.Exchange(ref _stopScheduled, 1) == 0) {
-                _ = Task.Run(Stop);
-            }
-        }
-
-        /// <summary>Stops the watcher, disposes resources, and records end time.</summary>
-        public void Stop() {
-            bool stoppedNow = false;
-            lock (_stopSync) {
-                if (_stopped) {
-                    return;
-                }
-                _stopped = true;
-                Cancellation.Cancel();
-                Watcher.Dispose();
-                Cancellation.Dispose();
-                _cancellationDisposed = true;
-                EndTime = DateTime.UtcNow;
-                stoppedNow = true;
-            }
-            if (stoppedNow) {
-                Stopped?.Invoke(this, EventArgs.Empty);
-            }
-        }
-
-        /// <summary>Stops the watcher and disposes internal cancellation token.</summary>
-        public void Dispose() {
-            Stop();
-            lock (_stopSync) {
-                if (!_cancellationDisposed) {
-                    Cancellation.Dispose();
-                    _cancellationDisposed = true;
-                }
-            }
-        }
-    }
-
     /// <summary>Manages active watcher instances.</summary>
     public static class WatcherManager {
         private static readonly ConcurrentDictionary<Guid, WatcherInfo> _watchers = new();
         private static readonly ConcurrentDictionary<string, WatcherInfo> _watchersByName = new(StringComparer.OrdinalIgnoreCase);
         private static readonly object _syncRoot = new();
+
+        /// <summary>
+        /// Starts a watcher from the complete native subscription contract.
+        /// </summary>
+        public static WatcherInfo StartWatcher(
+            string? name,
+            EventLogSubscriptionQuery query,
+            Action<EventObject> action,
+            bool stopOnMatch = false,
+            int stopAfter = 0,
+            TimeSpan? timeout = null,
+            string? actionIdentity = null,
+            string? reuseScopeIdentity = null,
+            IReadOnlyList<NamedEvents>? namedEvents = null) {
+
+            if (query == null) {
+                throw new ArgumentNullException(nameof(query));
+            }
+            return StartWatcher(
+                name,
+                new[] { query },
+                action,
+                stopOnMatch,
+                stopAfter,
+                timeout,
+                actionIdentity,
+                reuseScopeIdentity,
+                namedEvents);
+        }
+
+        /// <summary>
+        /// Starts one logical watcher from partitioned native subscription contracts.
+        /// </summary>
+        public static WatcherInfo StartWatcher(
+            string? name,
+            IReadOnlyList<EventLogSubscriptionQuery> queries,
+            Action<EventObject> action,
+            bool stopOnMatch = false,
+            int stopAfter = 0,
+            TimeSpan? timeout = null,
+            string? actionIdentity = null,
+            string? reuseScopeIdentity = null,
+            IReadOnlyList<NamedEvents>? namedEvents = null) {
+
+            if (queries == null || queries.Count == 0) {
+                throw new ArgumentException(
+                    "At least one subscription query is required.",
+                    nameof(queries));
+            }
+            EventLogSubscriptionQuery first = queries[0];
+            if (queries.Any(query =>
+                    !string.Equals(
+                        query.MachineName ?? string.Empty,
+                        first.MachineName ?? string.Empty,
+                        StringComparison.OrdinalIgnoreCase) ||
+                    !string.Equals(
+                        query.LogName,
+                        first.LogName,
+                        StringComparison.OrdinalIgnoreCase))) {
+                throw new ArgumentException(
+                    "Every partitioned subscription must target the same machine and channel.",
+                    nameof(queries));
+            }
+            return StartWatcher(
+                name,
+                string.IsNullOrWhiteSpace(first.MachineName)
+                    ? Environment.MachineName
+                    : first.MachineName!,
+                first.LogName,
+                new List<int>(),
+                namedEvents?.ToList() ?? new List<NamedEvents>(),
+                action,
+                staging: false,
+                stopOnMatch,
+                stopAfter,
+                timeout,
+                actionIdentity,
+                reuseScopeIdentity,
+                subscriptionQuery: first,
+                subscriptionQueries: queries);
+        }
 
         /// <summary>
         /// Starts a watcher for the given machine/log and returns the tracking object.
@@ -182,8 +110,25 @@ namespace EventViewerX {
         /// <param name="timeout">Optional timeout after which the watcher stops.</param>
         /// <param name="actionIdentity">Optional stable callback identity used by hosts that recreate equivalent delegate instances.</param>
         /// <param name="reuseScopeIdentity">Optional host scope that isolates friendly-name and action reuse from other host instances.</param>
+        /// <param name="subscriptionQuery">Optional complete native subscription contract. New integrations should use the dedicated overload.</param>
+        /// <param name="subscriptionQueries">Optional partitioned native subscription contracts for one logical watcher.</param>
         /// <returns>A <see cref="WatcherInfo"/> describing the running watcher.</returns>
-        public static WatcherInfo StartWatcher(string? name, string machineName, string logName, List<int> eventIds, List<NamedEvents> namedEvents, Action<EventObject> action, bool staging, bool stopOnMatch, int stopAfter, TimeSpan? timeout, string? actionIdentity = null, string? reuseScopeIdentity = null) {
+        public static WatcherInfo StartWatcher(
+            string? name,
+            string machineName,
+            string logName,
+            List<int> eventIds,
+            List<NamedEvents> namedEvents,
+            Action<EventObject> action,
+            bool staging,
+            bool stopOnMatch,
+            int stopAfter,
+            TimeSpan? timeout,
+            string? actionIdentity = null,
+            string? reuseScopeIdentity = null,
+            EventLogSubscriptionQuery? subscriptionQuery = null,
+            IReadOnlyList<EventLogSubscriptionQuery>?
+                subscriptionQueries = null) {
             if (string.IsNullOrWhiteSpace(machineName)) {
                 machineName = Environment.MachineName;
             } else {
@@ -213,7 +158,8 @@ namespace EventViewerX {
             actionIdentity = string.IsNullOrWhiteSpace(actionIdentity) ? null : actionIdentity!.Trim();
             reuseScopeIdentity = string.IsNullOrWhiteSpace(reuseScopeIdentity) ? null : reuseScopeIdentity!.Trim();
             eventIds = eventIds.Where(static id => id > 0).Distinct().OrderBy(static id => id).ToList();
-            if (eventIds.Count == 0) {
+            if (eventIds.Count == 0 &&
+                subscriptionQuery == null) {
                 throw new ArgumentException("At least one positive event ID is required.", nameof(eventIds));
             }
             namedEvents = namedEvents.Distinct().OrderBy(static value => value).ToList();
@@ -222,8 +168,8 @@ namespace EventViewerX {
             lock (_syncRoot) {
                 if (!string.IsNullOrEmpty(name)) {
                     string watcherKey = GetWatcherKey(name!, reuseScopeIdentity);
-                    if (_watchersByName.TryGetValue(watcherKey, out var existingByName) && existingByName.EndTime == null) {
-                        if (HasEquivalentConfiguration(existingByName, machineName, logName, eventIds, namedEvents, action, staging, stopOnMatch, stopAfter, timeout, actionIdentity)) {
+                    if (_watchersByName.TryGetValue(watcherKey, out var existingByName) && !existingByName.IsStopped) {
+                        if (HasEquivalentConfiguration(existingByName, machineName, logName, eventIds, namedEvents, action, staging, stopOnMatch, stopAfter, timeout, actionIdentity, subscriptionQuery, subscriptionQueries)) {
                             return existingByName;
                         }
 
@@ -238,10 +184,10 @@ namespace EventViewerX {
                         throw new InvalidOperationException($"Multiple watchers with name '{name}' already exist.");
                     }
                     if (sameName.Count >= 1) {
-                        var active = sameName.FirstOrDefault(w => w.EndTime == null) ?? sameName[0];
+                        var active = sameName.FirstOrDefault(w => !w.IsStopped) ?? sameName[0];
                         _watchersByName[watcherKey] = active;
-                        if (active.EndTime == null) {
-                            if (HasEquivalentConfiguration(active, machineName, logName, eventIds, namedEvents, action, staging, stopOnMatch, stopAfter, timeout, actionIdentity)) {
+                        if (!active.IsStopped) {
+                            if (HasEquivalentConfiguration(active, machineName, logName, eventIds, namedEvents, action, staging, stopOnMatch, stopAfter, timeout, actionIdentity, subscriptionQuery, subscriptionQueries)) {
                                 return active;
                             }
                             throw new InvalidOperationException($"A running watcher named '{name}' already exists with different configuration.");
@@ -249,10 +195,11 @@ namespace EventViewerX {
                     }
                 }
 
-                info = new WatcherInfo(name ?? string.Empty, machineName, logName, eventIds, namedEvents, action, staging, stopOnMatch, stopAfter, timeout) {
-                    ActionIdentity = actionIdentity,
-                    ReuseScopeIdentity = reuseScopeIdentity
-                };
+                info = subscriptionQueries == null
+                    ? new WatcherInfo(name ?? string.Empty, machineName, logName, eventIds, namedEvents, action, staging, stopOnMatch, stopAfter, timeout, subscriptionQuery)
+                    : new WatcherInfo(name ?? string.Empty, machineName, logName, eventIds, namedEvents, action, staging, stopOnMatch, stopAfter, timeout, subscriptionQueries);
+                info.ActionIdentity = actionIdentity;
+                info.ReuseScopeIdentity = reuseScopeIdentity;
                 info.Stopped += RemoveStoppedWatcher;
                 _watchers.TryAdd(info.Id, info);
                 if (!string.IsNullOrEmpty(name)) {
@@ -283,7 +230,10 @@ namespace EventViewerX {
             bool stopOnMatch,
             int stopAfter,
             TimeSpan? timeout,
-            string? actionIdentity) {
+            string? actionIdentity,
+            EventLogSubscriptionQuery? subscriptionQuery,
+            IReadOnlyList<EventLogSubscriptionQuery>?
+                subscriptionQueries) {
 
             bool actionMatches = existing.ActionIdentity != null || actionIdentity != null
                 ? string.Equals(existing.ActionIdentity, actionIdentity, StringComparison.Ordinal)
@@ -296,7 +246,94 @@ namespace EventViewerX {
                    existing.Staging == staging &&
                    existing.StopOnMatch == stopOnMatch &&
                    existing.StopAfter == stopAfter &&
-                   existing.Timeout == timeout;
+                   existing.Timeout == timeout &&
+                   SubscriptionQuerySetsEqual(
+                       existing.SubscriptionQueries,
+                       subscriptionQueries ??
+                           (subscriptionQuery == null
+                               ? null
+                               : new[] { subscriptionQuery }));
+        }
+
+        private static bool SubscriptionQuerySetsEqual(
+            IReadOnlyList<EventLogSubscriptionQuery> existing,
+            IReadOnlyList<EventLogSubscriptionQuery>? requested) {
+
+            if (requested == null) {
+                return true;
+            }
+            return existing.Count == requested.Count &&
+                   existing
+                       .Zip(
+                           requested,
+                           static (current, candidate) =>
+                               SubscriptionQueriesEqual(
+                                   current,
+                                   candidate))
+                       .All(static equal => equal);
+        }
+
+        private static bool SubscriptionQueriesEqual(
+            EventLogSubscriptionQuery existing,
+            EventLogSubscriptionQuery? requested) {
+
+            if (requested == null) {
+                return true;
+            }
+            return string.Equals(
+                       existing.LogName,
+                       requested.LogName,
+                       StringComparison.OrdinalIgnoreCase) &&
+                   string.Equals(
+                       existing.MachineName,
+                       requested.MachineName,
+                       StringComparison.OrdinalIgnoreCase) &&
+                   string.Equals(
+                       existing.XPath,
+                       requested.XPath,
+                       StringComparison.Ordinal) &&
+                   existing.Authentication == requested.Authentication &&
+                   existing.Start == requested.Start &&
+                   string.Equals(
+                       existing.BookmarkXml,
+                       requested.BookmarkXml,
+                       StringComparison.Ordinal) &&
+                   existing.StrictBookmark == requested.StrictBookmark &&
+                   existing.TolerateQueryErrors ==
+                       requested.TolerateQueryErrors &&
+                   existing.ReadMode == requested.ReadMode &&
+                   Equals(
+                       existing.MessageCulture,
+                       requested.MessageCulture) &&
+                   Equals(
+                       existing.FallbackMessageCulture,
+                       requested.FallbackMessageCulture) &&
+                   existing.BufferCapacity == requested.BufferCapacity &&
+                   existing.RemoteConnectionTimeoutMilliseconds ==
+                       requested.RemoteConnectionTimeoutMilliseconds &&
+                   CredentialIdentityEquals(
+                       existing.Credential,
+                       requested.Credential);
+        }
+
+        private static bool CredentialIdentityEquals(
+            System.Net.NetworkCredential? left,
+            System.Net.NetworkCredential? right) {
+
+            if (ReferenceEquals(left, right)) {
+                return true;
+            }
+            if (left == null || right == null) {
+                return false;
+            }
+            return string.Equals(
+                       left.Domain,
+                       right.Domain,
+                       StringComparison.OrdinalIgnoreCase) &&
+                   string.Equals(
+                       left.UserName,
+                       right.UserName,
+                       StringComparison.OrdinalIgnoreCase);
         }
 
         private static void RemoveStoppedWatcher(object? sender, EventArgs args) {
@@ -344,18 +381,34 @@ namespace EventViewerX {
         }
 
         /// <summary>Stops all watchers that share the given name.</summary>
-        public static void StopWatchersByName(string name) {
-            foreach (var w in GetWatchers(name)) {
-                StopWatcher(w.Id);
+        /// <returns>The number of watchers that were stopped.</returns>
+        public static int StopWatchersByName(string name) {
+            if (string.IsNullOrWhiteSpace(name)) {
+                throw new ArgumentException(
+                    "Watcher name cannot be null or whitespace.",
+                    nameof(name));
             }
+
+            int stopped = 0;
+            foreach (var w in GetWatchers(name)) {
+                if (StopWatcher(w.Id)) {
+                    stopped++;
+                }
+            }
+            return stopped;
         }
 
         /// <summary>Stops every active watcher and clears internal tracking.</summary>
-        public static void StopAll() {
+        /// <returns>The number of watchers that were stopped.</returns>
+        public static int StopAll() {
+            int stopped = 0;
             foreach (var id in _watchers.Keys.ToList()) {
-                StopWatcher(id);
+                if (StopWatcher(id)) {
+                    stopped++;
+                }
             }
             _watchersByName.Clear();
+            return stopped;
         }
     }
 }

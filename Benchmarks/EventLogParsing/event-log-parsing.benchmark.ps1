@@ -711,6 +711,12 @@ benchmark 'event-log-parsing' -out (Join-Path $repositoryRoot 'Ignore\Benchmarks
                 $exactOutputHashes[$outputKey] = $outputHash
             }
         }
+
+        # Keep the validated size/hash sidecar and metrics, not repeated multi-gigabyte
+        # payloads. KeepOnFailure still preserves the output when an assertion above fails.
+        if ($requiresOutput -and (Test-Path -LiteralPath $run.EventOutputPath -PathType Leaf)) {
+            Remove-Item -LiteralPath $run.EventOutputPath -Force
+        }
     }
 
     metric Events {
@@ -852,10 +858,15 @@ benchmark 'event-log-parsing' -out (Join-Path $repositoryRoot 'Ignore\Benchmarks
 
     if ($readmeTable -eq 'Common' -or $readmeTable -eq 'ExactOutput') {
         comparison Engine -Baseline PSEventViewer -Metric MedianMs -TieTolerance 0.03
+        if ($readmeTable -eq 'ExactOutput') {
+            comparison Engine -Baseline PSEventViewer -Metric OutputBytes
+        }
     } elseif ($readmeTable -eq 'NativeOutput') {
         comparison Engine -Baseline EventViewerXExport -Metric MedianMs -TieTolerance 0.03
+        comparison Engine -Baseline EventViewerXExport -Metric OutputBytes
     } elseif ($readmeTable -eq 'EvtxNative') {
         comparison Engine -Baseline EvtxECmd -Metric MedianMs -TieTolerance 0.03
+        comparison Engine -Baseline EvtxECmd -Metric OutputBytes
     }
     artifacts Json, Csv, Markdown
 }

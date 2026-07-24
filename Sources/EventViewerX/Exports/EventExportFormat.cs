@@ -9,5 +9,8 @@ public enum EventExportFormat {
     JsonLines,
 
     /// <summary>Raw event XML fragments wrapped in a single <c>Events</c> document.</summary>
-    Xml
+    Xml,
+
+    /// <summary>Native Windows EVTX archive suitable for Event Viewer and indexed re-query.</summary>
+    Evtx
 }

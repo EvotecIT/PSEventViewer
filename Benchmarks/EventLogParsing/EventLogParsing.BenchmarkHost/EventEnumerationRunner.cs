@@ -58,7 +58,7 @@ internal static class EventEnumerationRunner {
         stopwatch.Stop();
         using Process process = Process.GetCurrentProcess();
         string productVersion = options.Engine.StartsWith("eventviewerx", StringComparison.OrdinalIgnoreCase)
-            ? typeof(SearchEvents).Assembly.GetName().Version?.ToString() ?? string.Empty
+            ? typeof(EventLogEngine).Assembly.GetName().Version?.ToString() ?? string.Empty
             : typeof(EventLogReader).Assembly.GetName().Version?.ToString() ?? string.Empty;
 
         return new BenchmarkResult {
