@@ -19,7 +19,7 @@ Test-EVXLog -LogName $LogName -MaxEventsToScan 10
 
 Clear-EVXLog `
     -LogName $LogName `
-    -BackupPath 'C:\EventBackups' `
+    -BackupPath 'C:\EventBackups\Contoso-App.evtx' `
     -Confirm:$false
 
 Remove-EVXLog -LogName $LogName -Confirm:$false
