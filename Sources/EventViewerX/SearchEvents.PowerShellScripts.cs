@@ -1,10 +1,7 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics.Eventing.Reader;
-using System.Linq;
 using System.Text;
 using System.Threading;
-using System.Xml.Linq;
 
 namespace EventViewerX {
     /// <summary>
@@ -35,50 +32,10 @@ namespace EventViewerX {
             return result;
         }
 
-        private static string? ExtractData(EventRecord record, string name) {
-            try {
-                if (record == null) {
-                    throw new ArgumentNullException(nameof(record));
-                }
-                var element = XElement.Parse(record.ToXml());
-                return ExtractData(element, name);
-            } catch (Exception ex) {
-                Settings._logger.WriteWarning($"Failed extracting '{name}' data. Exception: {ex}");
-                return null;
-            }
-        }
-
-        private static string? ExtractData(XElement element, string name) {
-            XNamespace ns = element.GetDefaultNamespace();
-            return element.Descendants(ns + "Data")
-                .FirstOrDefault(e => (string?)e.Attribute("Name") == name)?.Value;
-        }
-
-        private static Dictionary<string, string?> GetAllData(EventRecord record) {
+        private static Dictionary<string, string?> GetAllData(EventObject eventObject) {
             var result = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
-
-            if (record == null) {
-                Settings._logger.WriteWarning("Failed parsing event data. EventRecord is null.");
-                return result;
-            }
-
-            try {
-                var element = XElement.Parse(record.ToXml());
-                return GetAllData(element);
-            } catch (Exception ex) {
-                Settings._logger.WriteWarning($"Failed parsing event data. Error: {ex.Message}");
-                return result;
-            }
-        }
-
-        private static Dictionary<string, string?> GetAllData(XElement element) {
-            var result = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
-            XNamespace ns = element.GetDefaultNamespace();
-            foreach (var data in element.Descendants(ns + "Data")) {
-                string? key = (string?)data.Attribute("Name");
-                if (key != null) {
-                    result[key] = data.Value;
-                }
+            foreach (KeyValuePair<string, string> data in eventObject.Data) {
+                result[data.Key] = data.Value;
             }
             return result;
         }
