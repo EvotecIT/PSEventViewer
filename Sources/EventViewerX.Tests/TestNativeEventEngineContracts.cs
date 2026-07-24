@@ -244,6 +244,51 @@ public sealed class TestNativeEventEngineContracts {
     }
 
     [Fact]
+    public void TolerantStructuredQueryDecodesEveryFailedPathBeforeReleasingNativeQueryInfo() {
+        if (!OperatingSystem.IsWindows()) return;
+        string[] missingLogs = {
+            "EventViewerX-Missing-Structured-Query-Channel-1",
+            "EventViewerX-Missing-Structured-Query-Channel-2",
+            "EventViewerX-Missing-Structured-Query-Channel-3"
+        };
+        string queries = string.Join(
+            string.Empty,
+            missingLogs.Select((log, index) =>
+                $"<Query Id=\"{index + 1}\" Path=\"{log}\">" +
+                $"<Select Path=\"{log}\">*</Select>" +
+                "</Query>"));
+        string queryXml =
+            "<QueryList>" +
+            "<Query Id=\"0\" Path=\"System\">" +
+            "<Select Path=\"System\">*</Select>" +
+            "</Query>" +
+            queries +
+            "</QueryList>";
+        var failures = new List<EventLogQueryFailure>();
+        var query = new EventLogStructuredQuery(queryXml) {
+            TolerateQueryErrors = true,
+            FailureHandler = failures.Add,
+            MaxEvents = 1,
+            ReadMode = EventReadMode.Metadata
+        };
+
+        EventObject[] actual =
+            EventLogEngine.ReadStructured(query).ToArray();
+
+        Assert.Single(actual);
+        Assert.Equal(
+            missingLogs,
+            failures
+                .Select(static failure => failure.Source)
+                .ToArray());
+        Assert.All(
+            failures,
+            static failure =>
+                Assert.IsType<Win32Exception>(
+                    failure.Exception));
+    }
+
+    [Fact]
     public void TolerantStructuredQueryCannotSilentlyReturnPartialResults() {
         if (!OperatingSystem.IsWindows()) return;
         const string missingLog =

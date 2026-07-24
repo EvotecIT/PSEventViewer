@@ -55,8 +55,12 @@ public static partial class EventLogBatchEngine {
                     channel.LogName,
                     channel.MachineName,
                     channel.Oldest,
-                    () => EventLogEngine.ReadChannel(
-                        CopyChannelQuery(channel, sourceLimit))))
+                    cancellationToken =>
+                        EventLogEngine.ReadChannel(
+                            CopyChannelQuery(
+                                channel,
+                                sourceLimit),
+                            cancellationToken)))
                 .ToArray();
         EventSourceSnapshot[] files =
             query.FileQueries
@@ -64,8 +68,12 @@ public static partial class EventLogBatchEngine {
                     file.Path,
                     null,
                     file.Oldest,
-                    () => EventLogEngine.ReadFile(
-                        CopyFileQuery(file, sourceLimit))))
+                    cancellationToken =>
+                        EventLogEngine.ReadFile(
+                            CopyFileQuery(
+                                file,
+                                sourceLimit),
+                            cancellationToken)))
                 .ToArray();
         EventSourceSnapshot[] structured =
             query.StructuredQueries
@@ -73,8 +81,12 @@ public static partial class EventLogBatchEngine {
                     $"StructuredQuery[{index}]",
                     structured.MachineName,
                     structured.Oldest,
-                    () => EventLogEngine.ReadStructured(
-                        CopyStructuredQuery(structured, sourceLimit))))
+                    cancellationToken =>
+                        EventLogEngine.ReadStructured(
+                            CopyStructuredQuery(
+                                structured,
+                                sourceLimit),
+                            cancellationToken)))
                 .ToArray();
         EventSourceSnapshot[] all = channels
             .Concat(files)
@@ -253,7 +265,8 @@ public static partial class EventLogBatchEngine {
                             index,
                             sources[index],
                             continueOnError,
-                            failureHandler);
+                            failureHandler,
+                            cancellationToken);
                         if (cursor == null) {
                             continue;
                         }
@@ -290,13 +303,15 @@ public static partial class EventLogBatchEngine {
         int index,
         EventSourceSnapshot source,
         bool continueOnError,
-        Action<EventLogQueryFailure>? failureHandler) {
+        Action<EventLogQueryFailure>? failureHandler,
+        CancellationToken cancellationToken) {
 
         try {
             return new EventSourceCursor(
                 index,
                 source,
-                source.Open().GetEnumerator());
+                source.Open(cancellationToken)
+                    .GetEnumerator());
         } catch (Exception exception) {
             if (!continueOnError) {
                 throw;
@@ -377,7 +392,7 @@ public static partial class EventLogBatchEngine {
             string source,
             string? machineName,
             bool oldest,
-            Func<IEnumerable<EventObject>> open) {
+            Func<CancellationToken, IEnumerable<EventObject>> open) {
 
             Source = source;
             MachineName = machineName;
@@ -388,7 +403,9 @@ public static partial class EventLogBatchEngine {
         internal string Source { get; }
         internal string? MachineName { get; }
         internal bool Oldest { get; }
-        internal Func<IEnumerable<EventObject>> Open { get; }
+        internal Func<CancellationToken, IEnumerable<EventObject>> Open {
+            get;
+        }
     }
 
     private sealed class EventSourceCursor : IDisposable {

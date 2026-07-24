@@ -106,7 +106,8 @@ public static partial class EventLogBatchEngine {
                     index,
                     source,
                     continueOnError,
-                    failureHandler);
+                    failureHandler,
+                    cancellationToken);
                 if (cursor == null) {
                     return null;
                 }

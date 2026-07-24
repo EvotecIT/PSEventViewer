@@ -53,8 +53,15 @@ internal static class WindowsEventQueryDiagnostics {
         WindowsEventNativeMethods.EventHandle query,
         WindowsEventNativeMethods.QueryPropertyId propertyId) {
 
-        WindowsEventNativeMethods.EventVariant value =
-            ReadProperty(query, propertyId);
+        return ReadProperty(
+            query,
+            propertyId,
+            static value => DecodeStringArray(value));
+    }
+
+    private static string[] DecodeStringArray(
+        WindowsEventNativeMethods.EventVariant value) {
+
         if (value.ScalarType !=
                 WindowsEventNativeMethods.VariantType.String ||
             !value.IsArray ||
@@ -79,8 +86,15 @@ internal static class WindowsEventQueryDiagnostics {
         WindowsEventNativeMethods.EventHandle query,
         WindowsEventNativeMethods.QueryPropertyId propertyId) {
 
-        WindowsEventNativeMethods.EventVariant value =
-            ReadProperty(query, propertyId);
+        return ReadProperty(
+            query,
+            propertyId,
+            static value => DecodeUInt32Array(value));
+    }
+
+    private static uint[] DecodeUInt32Array(
+        WindowsEventNativeMethods.EventVariant value) {
+
         if (value.ScalarType !=
                 WindowsEventNativeMethods.VariantType.UInt32 ||
             !value.IsArray ||
@@ -98,9 +112,10 @@ internal static class WindowsEventQueryDiagnostics {
         return values;
     }
 
-    private static WindowsEventNativeMethods.EventVariant ReadProperty(
+    private static TResult ReadProperty<TResult>(
         WindowsEventNativeMethods.EventHandle query,
-        WindowsEventNativeMethods.QueryPropertyId propertyId) {
+        WindowsEventNativeMethods.QueryPropertyId propertyId,
+        Func<WindowsEventNativeMethods.EventVariant, TResult> decode) {
 
         _ = WindowsEventNativeMethods.EvtGetQueryInfo(
             query,
@@ -128,8 +143,10 @@ internal static class WindowsEventQueryDiagnostics {
                     Marshal.GetLastWin32Error(),
                     $"Failed to read Windows event query property '{propertyId}'.");
             }
-            return Marshal.PtrToStructure<
-                WindowsEventNativeMethods.EventVariant>(buffer);
+            WindowsEventNativeMethods.EventVariant value =
+                Marshal.PtrToStructure<
+                    WindowsEventNativeMethods.EventVariant>(buffer);
+            return decode(value);
         } finally {
             Marshal.FreeHGlobal(buffer);
         }

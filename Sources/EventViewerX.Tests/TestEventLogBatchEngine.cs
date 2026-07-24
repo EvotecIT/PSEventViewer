@@ -212,6 +212,32 @@ public sealed class TestEventLogBatchEngine {
         Assert.IsType<FileNotFoundException>(failure.Exception);
     }
 
+    [Fact]
+    public void CancellationStopsTheMergedBatchEnumeration() {
+        if (!OperatingSystem.IsWindows()) return;
+        var query = EventLogBatchQuery.ForFiles(new[] {
+            new EventLogFileQuery(GetFixturePath()) {
+                Oldest = true,
+                ReadMode = EventReadMode.Metadata
+            }
+        });
+        using var cancellation = new CancellationTokenSource();
+        int count = 0;
+
+        Assert.Throws<OperationCanceledException>(() => {
+            foreach (EventObject _ in EventLogBatchEngine.Read(
+                         query,
+                         cancellation.Token)) {
+                count++;
+                if (count == 3) {
+                    cancellation.Cancel();
+                }
+            }
+        });
+
+        Assert.Equal(3, count);
+    }
+
     private static string GetFixturePath() {
         return Path.GetFullPath(Path.Combine(
             "..",

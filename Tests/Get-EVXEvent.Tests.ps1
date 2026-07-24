@@ -592,6 +592,36 @@ Describe 'Get-EVXEvent - raw XPath wildcard expansion' {
         $events | Should -HaveCount 1
         $events[0].ContainerLog | Should -Be 'System'
     }
+
+    It 'rejects raw XPath before partitioning a large offline typed filter' {
+        $FilePath = [System.IO.Path]::Combine(
+            $PSScriptRoot,
+            'Logs',
+            'NamedFilterExamples.evtx')
+
+        {
+            Get-EVXEvent `
+                -Path $FilePath `
+                -FilterXPath '*' `
+                -EventId (1..23) `
+                -ReadMode Metadata
+        } | Should -Throw '*FilterXPath cannot be combined*'
+    }
+
+    It 'rejects raw XPath before expanding an offline provider wildcard' {
+        $FilePath = [System.IO.Path]::Combine(
+            $PSScriptRoot,
+            'Logs',
+            'NamedFilterExamples.evtx')
+
+        {
+            Get-EVXEvent `
+                -Path $FilePath `
+                -FilterXPath '*' `
+                -ProviderName 'Microsoft-*' `
+                -ReadMode Metadata
+        } | Should -Throw '*FilterXPath cannot be combined*'
+    }
 }
 
 Describe 'Get-EVXEvent - bookmark projection' {
