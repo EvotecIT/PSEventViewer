@@ -319,8 +319,20 @@ The exact-output validator rejects a run before comparison if any event count, r
 SHA-256 differs. This is the strongest apples-to-apples export comparison.
 
 <!-- event-log-native-output-benchmark:start -->
-_Generated native-schema export benchmark pending final candidate validation._
+| Scenario | Host | Operation | EventViewerXExport | EvtxECmd | Result |
+| --- | --- | --- | ---: | ---: | --- |
+| Large-Native-Output-Csv | Core-7.6.4 | Scan | 1.00x (11.00s) | 0.81x (8.90s) | EventViewerXExport slower than EvtxECmd |
+| Large-Native-Output-FullJson | Core-7.6.4 | Scan | 1.00x (12.92s) | 1.05x (13.57s) | EventViewerXExport fastest |
+| Large-Native-Output-Xml | Core-7.6.4 | Scan | 1.00x (1.07s) | 10.97x (11.69s) | EventViewerXExport fastest |
 <!-- event-log-native-output-benchmark:end -->
+
+The retained outputs make the unequal schemas concrete:
+
+| Format | EventViewerX bytes | EvtxECmd bytes | Interpretation |
+| --- | ---: | ---: | --- |
+| CSV | 172,626,650 | 56,908,614 | EventViewerX was about 24% slower while writing 3.03 times as many bytes and including its full projection. |
+| Full JSON | 257,844,950 | 71,626,402 | EventViewerX was 5% faster while writing 3.60 times as many bytes, including provider-formatted messages. |
+| XML | 92,377,794 | 94,483,679 | Similar output volume; EventViewerX was 10.97 times faster. XML layouts differ, so byte identity is proved separately against the Windows APIs above. |
 
 EvtxECmd CSV is a map-enriched forensic schema and its `--fj true` output is raw-event JSON derived from XML.
 EventViewerX `Full` JSON also includes provider-formatted messages, typed properties, named payload fields, render
