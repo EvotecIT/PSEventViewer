@@ -39,7 +39,8 @@ namespace EventViewerX {
                 ? "Microsoft-Windows-PowerShell/Operational"
                 : "PowerShellCore/Operational";
 
-            int scanned = 0;
+            var scanLimit = new PowerShellScriptScanLimit(
+                maxEventsScanned);
             int returned = 0;
             foreach (EventObject eventObject in QueryPowerShellScriptEvents(
                          logName,
@@ -48,11 +49,14 @@ namespace EventViewerX {
                          eventLogPath,
                          dateFrom,
                          dateTo,
-                         maxEventsScanned,
+                         scanLimit.NativeReadLimit,
                          cancellationToken)) {
                     cancellationToken.ThrowIfCancellationRequested();
-                    scanned++;
-                    queryInfo.EventsScanned = scanned;
+                    if (!scanLimit.TryAcceptCandidate()) {
+                        break;
+                    }
+                    queryInfo.EventsScanned =
+                        scanLimit.EventsScanned;
 
                     string? contextInfo = eventObject.GetDataValueOrEmpty("ContextInfo");
                     var data = ParseContextInfo(contextInfo);
@@ -67,7 +71,8 @@ namespace EventViewerX {
                         yield break;
                     }
             }
-            queryInfo.ScanLimitReached = maxEventsScanned > 0 && scanned >= maxEventsScanned;
+            queryInfo.ScanLimitReached =
+                scanLimit.LimitReached;
         }
 
         /// <summary>
@@ -129,7 +134,9 @@ namespace EventViewerX {
                 ? new List<KeyValuePair<long, RestoredPowerShellScript>>(Math.Min(maxScripts, 256))
                 : null;
             try {
-                int scanned = 0;
+                var scanLimit =
+                    new PowerShellScriptScanLimit(
+                        maxEventsScanned);
                 int returned = 0;
                 foreach (EventObject eventObject in QueryPowerShellScriptEvents(
                              logName,
@@ -138,11 +145,14 @@ namespace EventViewerX {
                              eventLogPath,
                              dateFrom,
                              dateTo,
-                             maxEventsScanned,
+                             scanLimit.NativeReadLimit,
                              cancellationToken)) {
                     cancellationToken.ThrowIfCancellationRequested();
-                    scanned++;
-                    queryInfo.EventsScanned = scanned;
+                    if (!scanLimit.TryAcceptCandidate()) {
+                        break;
+                    }
+                    queryInfo.EventsScanned =
+                        scanLimit.EventsScanned;
 
                     string? scriptText = eventObject.GetDataValueOrEmpty("ScriptBlockText");
                     if (string.IsNullOrEmpty(scriptText) || scriptText == "0") {
@@ -188,7 +198,8 @@ namespace EventViewerX {
                         break;
                     }
                 }
-                queryInfo.ScanLimitReached = maxEventsScanned > 0 && scanned >= maxEventsScanned;
+                queryInfo.ScanLimitReached =
+                    scanLimit.LimitReached;
                 if (queryInfo.ScanLimitReached) {
                     Settings._logger.WriteVerbose($"PowerShellScripts: stopped after reaching the {maxEventsScanned} event scan limit.");
                 }

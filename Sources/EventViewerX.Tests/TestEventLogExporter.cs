@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Xml.Linq;
+using EventViewerX.Native;
 using Xunit;
 
 namespace EventViewerX.Tests;
@@ -239,6 +240,28 @@ public sealed class TestEventLogExporter {
     }
 
     [Fact]
+    public void StructuredNativeExportResolvesFileUriToLocalPath() {
+        using var fixture = new ExportFixture();
+        string queryXml = EventFilterCompiler.BuildFileQueryXml(
+            new[] { fixture.SourcePath },
+            new EventFilter());
+
+        string source =
+            WindowsEventArchive
+                .ResolveSingleStructuredFileSource(
+                    queryXml);
+
+        Assert.Equal(
+            Path.GetFullPath(fixture.SourcePath),
+            source,
+            ignoreCase: true);
+        Assert.DoesNotContain(
+            "file://",
+            source,
+            StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void BatchExportStreamsOneGloballyOrderedOutput() {
         if (!OperatingSystem.IsWindows()) return;
         using var fixture = new ExportFixture();
@@ -287,6 +310,27 @@ public sealed class TestEventLogExporter {
             Assert.Contains(
                 record.GetProperty("recordId").GetInt64(),
                 recordIds));
+    }
+
+    [Fact]
+    public void XmlBatchCopyPreservesTheCallerConcurrencyLimit() {
+        using var fixture = new ExportFixture();
+        EventLogBatchQuery batch =
+            EventLogBatchQuery.ForFiles(new[] {
+                fixture.CreateQuery(
+                    EventReadMode.Metadata)
+            });
+        batch.MaxConcurrency = 1;
+
+        EventLogBatchQuery copy =
+            EventLogExporter.CopyBatchQuery(
+                batch,
+                EventReadMode.RawXml);
+
+        Assert.Equal(1, copy.MaxConcurrency);
+        Assert.Equal(
+            EventReadMode.RawXml,
+            Assert.Single(copy.FileQueries).ReadMode);
     }
 
     [Fact]

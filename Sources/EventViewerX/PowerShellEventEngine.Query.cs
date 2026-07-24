@@ -16,7 +16,7 @@ public static partial class PowerShellEventEngine {
         string? eventLogPath,
         DateTime? dateFrom,
         DateTime? dateTo,
-        int maxEventsScanned,
+        long nativeReadLimit,
         CancellationToken cancellationToken) {
 
         string xpath = EventFilterCompiler.BuildXPath(
@@ -36,7 +36,7 @@ public static partial class PowerShellEventEngine {
                 XPath = xpath,
                 Oldest = false,
                 ReadMode = EventReadMode.StructuredData,
-                MaxEvents = maxEventsScanned
+                MaxEvents = nativeReadLimit
             };
             foreach (EventObject eventObject in EventLogEngine.ReadFile(fileQuery, cancellationToken)) {
                 yield return eventObject;
@@ -49,7 +49,7 @@ public static partial class PowerShellEventEngine {
             MachineName = machineName,
             Oldest = false,
             ReadMode = EventReadMode.StructuredData,
-            MaxEvents = maxEventsScanned,
+            MaxEvents = nativeReadLimit,
             RemoteConnectionTimeoutMilliseconds = Settings.SessionTimeoutMs,
             RemoteReadTimeoutMilliseconds =
                 Settings.QuerySessionTimeoutMs,

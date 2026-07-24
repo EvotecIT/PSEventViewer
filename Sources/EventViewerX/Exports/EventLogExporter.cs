@@ -514,7 +514,7 @@ public static class EventLogExporter {
         };
     }
 
-    private static EventLogBatchQuery CopyBatchQuery(
+    internal static EventLogBatchQuery CopyBatchQuery(
         EventLogBatchQuery source,
         EventReadMode readMode) {
 
@@ -543,6 +543,7 @@ public static class EventLogExporter {
             ? batches[0]
             : EventLogBatchQuery.Combine(batches);
         copy.MaxEvents = source.MaxEvents;
+        copy.MaxConcurrency = source.MaxConcurrency;
         copy.ContinueOnError = source.ContinueOnError;
         copy.FailureHandler = source.FailureHandler;
         return copy;

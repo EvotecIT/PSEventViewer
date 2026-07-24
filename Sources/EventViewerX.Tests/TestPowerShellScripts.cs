@@ -137,6 +137,37 @@ namespace EventViewerX.Tests {
         }
 
         [Fact]
+        public void ScanLimitUsesOneCandidateLookahead() {
+            var exact = new PowerShellScriptScanLimit(
+                maximumEvents: 2);
+
+            Assert.Equal(3, exact.NativeReadLimit);
+            Assert.True(exact.TryAcceptCandidate());
+            Assert.True(exact.TryAcceptCandidate());
+            Assert.False(exact.LimitReached);
+
+            var truncated = new PowerShellScriptScanLimit(
+                maximumEvents: 2);
+
+            Assert.True(truncated.TryAcceptCandidate());
+            Assert.True(truncated.TryAcceptCandidate());
+            Assert.False(
+                truncated.TryAcceptCandidate());
+            Assert.Equal(2, truncated.EventsScanned);
+            Assert.True(truncated.LimitReached);
+        }
+
+        [Fact]
+        public void UnlimitedScanDoesNotImposeANativeReadCap() {
+            var limit = new PowerShellScriptScanLimit(
+                maximumEvents: 0);
+
+            Assert.Equal(0, limit.NativeReadLimit);
+            Assert.True(limit.TryAcceptCandidate());
+            Assert.False(limit.LimitReached);
+        }
+
+        [Fact]
         public void GetPowerShellScriptsRejectsInvalidBoundsBeforeOpeningTheLog() {
             Assert.Throws<ArgumentOutOfRangeException>(() => PowerShellEventEngine.GetPowerShellScripts(
                 PowerShellEdition.WindowsPowerShell,

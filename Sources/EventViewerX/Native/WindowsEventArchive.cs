@@ -169,7 +169,7 @@ internal static class WindowsEventArchive {
         cancellationToken.ThrowIfCancellationRequested();
     }
 
-    private static string ResolveSingleStructuredFileSource(
+    internal static string ResolveSingleStructuredFileSource(
         string queryXml) {
 
         XDocument document;
@@ -206,7 +206,13 @@ internal static class WindowsEventArchive {
             throw new NotSupportedException(
                 "Native EVTX export can select several channels but cannot merge several offline log files. Use CSV, JSON Lines, or XML for a multi-file QueryList.");
         }
-        return sources[0];
+        string source = sources[0];
+        return source.StartsWith(
+            "file://",
+            StringComparison.OrdinalIgnoreCase)
+                ? EventLogStructuredQueryParser.GetFilePath(source)
+                : Path.GetFullPath(
+                    source.Trim().Trim('"', '\''));
     }
 
     internal static long GetFileRecordCount(string path) {
