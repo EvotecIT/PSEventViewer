@@ -36,7 +36,9 @@ public static class EventLogBatchConsolidator {
                         string.Empty).ToUpperInvariant(),
                     input.SourceKind,
                     SourceIdentity =
-                        input.SourceIdentity.ToUpperInvariant()
+                        input.SourceIdentity.ToUpperInvariant(),
+                    input.TolerateQueryErrors,
+                    input.FailureHandler
                 })
             .Select(CreateStructuredQuery)
             .ToArray();
@@ -101,15 +103,9 @@ public static class EventLogBatchConsolidator {
                 BookmarkOffset = profile.BookmarkOffset,
                 StrictBookmark = profile.StrictBookmark,
                 TolerateQueryErrors =
-                    inputs.Any(static input =>
-                        input.TolerateQueryErrors),
-                FailureHandler = SelectFailureHandler(
-                    inputs
-                        .Select(static input =>
-                            input.FailureHandler)
-                        .Where(static handler =>
-                            handler != null)
-                        .Cast<Action<EventLogQueryFailure>>())
+                    inputs[0].TolerateQueryErrors,
+                FailureHandler =
+                    inputs[0].FailureHandler
             };
         return structured;
     }
@@ -184,13 +180,6 @@ public static class EventLogBatchConsolidator {
                 "Select",
                 new XAttribute("Path", source),
                 xpath));
-    }
-
-    private static Action<EventLogQueryFailure>?
-        SelectFailureHandler(
-            IEnumerable<Action<EventLogQueryFailure>> handlers) {
-
-        return handlers.FirstOrDefault();
     }
 
     private sealed class QueryInput {

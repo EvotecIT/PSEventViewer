@@ -67,6 +67,52 @@ public sealed class TestEventLogBatchEngine {
     }
 
     [Fact]
+    public async Task AsyncPrimingFailureReleasesSuccessfulSourceCursors() {
+        if (!OperatingSystem.IsWindows()) return;
+        string root = Path.Combine(
+            Path.GetTempPath(),
+            $"EventViewerX-BatchCleanup-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(root);
+        string validPath = Path.Combine(
+            root,
+            "valid.evtx");
+        string missingPath = Path.Combine(
+            root,
+            "missing.evtx");
+        File.Copy(
+            GetFixturePath(),
+            validPath);
+        try {
+            var query = EventLogBatchQuery.ForFiles(new[] {
+                new EventLogFileQuery(validPath) {
+                    ReadMode = EventReadMode.Metadata
+                },
+                new EventLogFileQuery(missingPath) {
+                    ReadMode = EventReadMode.Metadata
+                }
+            });
+            query.MaxConcurrency = 2;
+
+            await Assert.ThrowsAsync<FileNotFoundException>(
+                async () => {
+                    await foreach (EventObject _ in
+                                   EventLogBatchEngine.ReadAsync(
+                                       query)) {
+                    }
+                });
+
+            File.Delete(validPath);
+            Assert.False(File.Exists(validPath));
+        } finally {
+            if (Directory.Exists(root)) {
+                Directory.Delete(
+                    root,
+                    recursive: true);
+            }
+        }
+    }
+
+    [Fact]
     public void ConsolidatedFileBatchDeduplicatesOverlappingNativeSelects() {
         if (!OperatingSystem.IsWindows()) return;
         string path = GetFixturePath();
@@ -181,6 +227,59 @@ public sealed class TestEventLogBatchEngine {
                     new[] { structured }));
 
         Assert.Empty(EventLogBatchEngine.Read(consolidated));
+    }
+
+    [Fact]
+    public void ConsolidationKeepsStructuredErrorPoliciesOnSeparateNativeHandles() {
+        const string firstQuery =
+            "<QueryList><Query Id=\"0\" Path=\"System\">" +
+            "<Select Path=\"System\">*</Select>" +
+            "</Query></QueryList>";
+        const string secondQuery =
+            "<QueryList><Query Id=\"1\" Path=\"Application\">" +
+            "<Select Path=\"Application\">*</Select>" +
+            "</Query></QueryList>";
+        Action<EventLogQueryFailure> firstHandler =
+            static _ => { };
+        Action<EventLogQueryFailure> secondHandler =
+            static _ => { };
+        EventLogStructuredQuery[] sources = {
+            new EventLogStructuredQuery(firstQuery) {
+                TolerateQueryErrors = false
+            },
+            new EventLogStructuredQuery(secondQuery) {
+                TolerateQueryErrors = true,
+                FailureHandler = firstHandler
+            },
+            new EventLogStructuredQuery(secondQuery) {
+                TolerateQueryErrors = true,
+                FailureHandler = secondHandler
+            }
+        };
+
+        EventLogBatchQuery consolidated =
+            EventLogBatchConsolidator.Consolidate(
+                EventLogBatchQuery.ForStructured(
+                    sources));
+
+        Assert.Equal(
+            3,
+            consolidated.StructuredQueries.Count);
+        Assert.Contains(
+            consolidated.StructuredQueries,
+            static query =>
+                !query.TolerateQueryErrors &&
+                query.FailureHandler == null);
+        Assert.Contains(
+            consolidated.StructuredQueries,
+            query =>
+                query.TolerateQueryErrors &&
+                query.FailureHandler == firstHandler);
+        Assert.Contains(
+            consolidated.StructuredQueries,
+            query =>
+                query.TolerateQueryErrors &&
+                query.FailureHandler == secondHandler);
     }
 
     [Fact]

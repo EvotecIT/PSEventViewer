@@ -187,18 +187,30 @@ internal static class WindowsEventArchive {
         }
         string[] sources = document
             .Descendants()
-            .Where(element =>
+            .Where(static element =>
                 string.Equals(
                     element.Name.LocalName,
-                    "Select",
-                    StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(
-                    element.Name.LocalName,
-                    "Suppress",
+                    "Query",
                     StringComparison.OrdinalIgnoreCase))
-            .Select(element =>
-                (string?)element.Attribute("Path") ??
-                string.Empty)
+            .SelectMany(static query => {
+                string queryPath =
+                    (string?)query.Attribute("Path") ??
+                    string.Empty;
+                return query
+                    .Elements()
+                    .Where(static element =>
+                        string.Equals(
+                            element.Name.LocalName,
+                            "Select",
+                            StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(
+                            element.Name.LocalName,
+                            "Suppress",
+                            StringComparison.OrdinalIgnoreCase))
+                    .Select(element =>
+                        (string?)element.Attribute("Path") ??
+                        queryPath);
+            })
             .Where(static path => path.Length > 0)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();

@@ -44,9 +44,18 @@ public static partial class EventLogBatchEngine {
                         concurrencyGate,
                         cancellationToken))
                 .ToArray();
-        EventSourceCursor?[] primed =
-            await Task.WhenAll(primeTasks)
+        EventSourceCursor?[] primed;
+        try {
+            primed = await Task.WhenAll(primeTasks)
                 .ConfigureAwait(false);
+        } catch {
+            foreach (Task<EventSourceCursor?> task in primeTasks) {
+                if (task.Status == TaskStatus.RanToCompletion) {
+                    task.Result?.Dispose();
+                }
+            }
+            throw;
+        }
         var cursors = primed
             .Where(static cursor => cursor != null)
             .Cast<EventSourceCursor>()

@@ -262,6 +262,30 @@ public sealed class TestEventLogExporter {
     }
 
     [Fact]
+    public void StructuredNativeExportUsesQueryPathWhenSelectorOmitsPath() {
+        using var fixture = new ExportFixture();
+        string sourceUri =
+            "file://" +
+            Path.GetFullPath(fixture.SourcePath);
+        string queryXml =
+            "<QueryList>" +
+            $"<Query Id=\"0\" Path=\"{sourceUri}\">" +
+            "<Select>*</Select>" +
+            "</Query>" +
+            "</QueryList>";
+
+        string source =
+            WindowsEventArchive
+                .ResolveSingleStructuredFileSource(
+                    queryXml);
+
+        Assert.Equal(
+            Path.GetFullPath(fixture.SourcePath),
+            source,
+            ignoreCase: true);
+    }
+
+    [Fact]
     public void BatchExportStreamsOneGloballyOrderedOutput() {
         if (!OperatingSystem.IsWindows()) return;
         using var fixture = new ExportFixture();
