@@ -296,7 +296,12 @@ native-output, and EvtxECmd-native cases process all events; common Message, Str
 the same first 100,000 events. Times are end-to-end medians and lower is better.
 
 <!-- event-log-common-benchmark:start -->
-_Generated common-work benchmark pending final candidate validation._
+| Scenario | Host | Operation | PSEventViewer | DotNet | EventViewerX | GetWinEvent | Result |
+| --- | --- | --- | ---: | ---: | ---: | ---: | --- |
+| Large-Common-Sample-Full | Core-7.6.4 | Scan | 1.00x (10.75s) | 3.14x (33.76s) | 0.82x (8.80s) | 3.70x (39.82s) | PSEventViewer slower than EventViewerX |
+| Large-Common-Sample-Message | Core-7.6.4 | Scan | 1.00x (8.40s) | 4.02x (33.81s) | 0.82x (6.92s) | 4.62x (38.82s) | PSEventViewer slower than EventViewerX |
+| Large-Common-Sample-StructuredData | Core-7.6.4 | Scan | 1.00x (2.63s) | 0.55x (1.46s) | 0.74x (1.94s) | 6.93x (18.25s) | PSEventViewer slower than DotNet |
+| Large-Common-Scan-Metadata | Core-7.6.4 | Scan | 1.00x (1.38s) | 0.68x (931ms) | 0.61x (834ms) | 11.94x (16.45s) | PSEventViewer slower than EventViewerX |
 <!-- event-log-common-benchmark:end -->
 
 `StructuredData` is intentionally richer than the raw .NET baseline: EventViewerX materializes typed raw properties,
