@@ -345,7 +345,12 @@ The EvtxECmd comparison uses version `2026.5.0+bfc7f47ccbf65ffc9a3777cde5498db2f
 target only; it is not a source, runtime, package, or release dependency.
 
 <!-- event-log-evtx-native-benchmark:start -->
-_Generated EvtxECmd-native benchmark pending final candidate validation._
+| Scenario | Variables | Operation | Host | OS | RunMode | Engine | Samples | Failures | Median | Mean | P95 | StdDev | Status |
+| --- | --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| Large-Evtx-ForensicCsv |  | Scan | Core-7.6.4 | Windows | standard | EvtxECmd | 3 | 0 | 8806.3813 | 8806.7223 | 8865.28666 | 64.9395714796457 | Succeeded |
+| Large-Evtx-FullJson |  | Scan | Core-7.6.4 | Windows | standard | EvtxECmd | 3 | 0 | 13424.2192 | 13520.2447 | 13723.14646 | 205.665912410419 | Succeeded |
+| Large-Evtx-NativeParse |  | Scan | Core-7.6.4 | Windows | standard | EvtxECmd | 3 | 0 | 7997.5513 | 8026.4488 | 8282.79793 | 274.736641532377 | Succeeded |
+| Large-Evtx-Xml |  | Scan | Core-7.6.4 | Windows | standard | EvtxECmd | 3 | 0 | 11258.869 | 11400.2634 | 11665.87357 | 269.55414424195 | Succeeded |
 <!-- event-log-evtx-native-benchmark:end -->
 
 All benchmark classes record exact repository state, harness and engine hashes, culture, runtime, fixture provenance,
