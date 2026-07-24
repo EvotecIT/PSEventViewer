@@ -203,30 +203,25 @@ public static partial class NamedEventEngine {
         batch.FailureHandler =
             failure => HandleFailure(
                 failure,
-                executionInfo,
-                eventInfo.Keys);
+                executionInfo);
         return EventLogBatchConsolidator.Consolidate(
             batch);
     }
 
-    private static void HandleFailure(
+    internal static void HandleFailure(
         EventLogQueryFailure failure,
-        NamedEventsQueryExecutionInfo executionInfo,
-        IEnumerable<string> sourceLogNames) {
+        NamedEventsQueryExecutionInfo executionInfo) {
 
         if (EventLogRemoteQueryFailureClassifier.TryClassify(
                 failure.MachineName,
                 failure.Exception,
                 out EventLogRemoteQueryFailureKind kind)) {
-            foreach (string sourceLogName in
-                     sourceLogNames) {
-                executionInfo.RecordTargetFailure(
-                    new EventLogQueryTargetFailure(
-                        failure.MachineName!,
-                        sourceLogName,
-                        kind,
-                        failure.Exception.Message));
-            }
+            executionInfo.RecordTargetFailure(
+                new EventLogQueryTargetFailure(
+                    failure.MachineName!,
+                    failure.Source,
+                    kind,
+                    failure.Exception.Message));
             return;
         }
         throw failure.Exception;

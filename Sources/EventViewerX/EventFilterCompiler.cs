@@ -54,17 +54,7 @@ public static class EventFilterCompiler {
                 nameof(filter));
         }
 
-        string[]? levels = filter.Levels?
-            .Select(static value => {
-                var level = (System.Diagnostics.Tracing.EventLevel)value;
-                if (!Enum.IsDefined(typeof(System.Diagnostics.Tracing.EventLevel), level)) {
-                    throw new ArgumentOutOfRangeException(
-                        nameof(filter),
-                        $"Event level '{value}' is not supported by Windows Event Log.");
-                }
-                return level.ToString();
-            })
-            .ToArray();
+        string[]? levels = ToInvariantStrings(filter.Levels);
         return WindowsEventFilterBuilder.BuildWinEventFilter(
             id: ToInvariantStrings(filter.EventIds),
             eventRecordId: ToInvariantStrings(filter.RecordIds),

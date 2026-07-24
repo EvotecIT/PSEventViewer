@@ -59,6 +59,19 @@ Describe 'Get-EVXEvent provider-only binding' {
         } | Should -Not -Throw
     }
 
+    It 'uses a structured suppression for provider named-data exclusions' {
+        {
+            Get-EVXEvent `
+                -ProviderName Microsoft-Windows-Kernel-General `
+                -EventId 12 `
+                -NamedDataExcludeFilter @{
+                    FieldThatDoesNotExist = 'ExcludedValue'
+                } `
+                -MaxEvents 1 `
+                -ReadMode Metadata
+        } | Should -Not -Throw
+    }
+
     It 'preserves positional LogName binding' {
         $Command = Get-Command Get-EVXEvent
         $Generic = $Command.ParameterSets |

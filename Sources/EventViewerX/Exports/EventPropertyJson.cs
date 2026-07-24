@@ -61,10 +61,10 @@ internal static class EventPropertyJson {
                 writer.WriteNumberValue(number);
                 break;
             case float number:
-                writer.WriteNumberValue(number);
+                WriteFloatingPoint(writer, number);
                 break;
             case double number:
-                writer.WriteNumberValue(number);
+                WriteFloatingPoint(writer, number);
                 break;
             case decimal number:
                 writer.WriteNumberValue(number);
@@ -108,6 +108,36 @@ internal static class EventPropertyJson {
                     Convert.ToString(value, CultureInfo.InvariantCulture) ??
                     string.Empty);
                 break;
+        }
+    }
+
+    private static void WriteFloatingPoint(
+        Utf8JsonWriter writer,
+        float number) {
+
+        if (float.IsNaN(number)) {
+            writer.WriteStringValue("NaN");
+        } else if (float.IsPositiveInfinity(number)) {
+            writer.WriteStringValue("Infinity");
+        } else if (float.IsNegativeInfinity(number)) {
+            writer.WriteStringValue("-Infinity");
+        } else {
+            writer.WriteNumberValue(number);
+        }
+    }
+
+    private static void WriteFloatingPoint(
+        Utf8JsonWriter writer,
+        double number) {
+
+        if (double.IsNaN(number)) {
+            writer.WriteStringValue("NaN");
+        } else if (double.IsPositiveInfinity(number)) {
+            writer.WriteStringValue("Infinity");
+        } else if (double.IsNegativeInfinity(number)) {
+            writer.WriteStringValue("-Infinity");
+        } else {
+            writer.WriteNumberValue(number);
         }
     }
 }

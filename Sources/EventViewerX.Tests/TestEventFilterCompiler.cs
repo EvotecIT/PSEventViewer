@@ -40,6 +40,21 @@ public sealed class TestEventFilterCompiler {
     }
 
     [Fact]
+    public void TypedFilterSupportsCustomProviderLevelsAndEventIdZero() {
+        string xpath = EventFilterCompiler.BuildXPath(
+            new EventFilter {
+                EventIds = new[] { 0 },
+                ExcludedEventIds = new[] { 65535 },
+                Levels = new byte[] { 16, 255 }
+            });
+
+        Assert.Contains("EventID=0", xpath, StringComparison.Ordinal);
+        Assert.Contains("EventID!=65535", xpath, StringComparison.Ordinal);
+        Assert.Contains("Level=16", xpath, StringComparison.Ordinal);
+        Assert.Contains("Level=255", xpath, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void StructuredQuerySupportsSeveralChannelsAndSuppressions() {
         string queryXml = EventFilterCompiler.BuildChannelQueryXml(
             new[] { "System", "Application", "System" },

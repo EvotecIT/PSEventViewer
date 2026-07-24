@@ -41,7 +41,6 @@ namespace EventViewerX {
 
             var scanLimit = new PowerShellScriptScanLimit(
                 maxEventsScanned);
-            int returned = 0;
             foreach (EventObject eventObject in QueryPowerShellScriptEvents(
                          logName,
                          new[] { "4100" },
@@ -57,19 +56,13 @@ namespace EventViewerX {
                     }
                     queryInfo.EventsScanned =
                         scanLimit.EventsScanned;
+                    if (!queryInfo.TryRecordResult()) {
+                        break;
+                    }
 
                     string? contextInfo = eventObject.GetDataValueOrEmpty("ContextInfo");
                     var data = ParseContextInfo(contextInfo);
-                    returned++;
-                    queryInfo.ResultsReturned = returned;
-                    bool outputLimitReached = maxEvents > 0 && returned >= maxEvents;
-                    if (outputLimitReached) {
-                        queryInfo.OutputLimitReached = true;
-                    }
                     yield return new PowerShellScriptExecutionInfo(eventObject, data);
-                    if (outputLimitReached) {
-                        yield break;
-                    }
             }
             queryInfo.ScanLimitReached =
                 scanLimit.LimitReached;

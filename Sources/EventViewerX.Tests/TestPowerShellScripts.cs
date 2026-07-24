@@ -137,6 +137,25 @@ namespace EventViewerX.Tests {
         }
 
         [Fact]
+        public void OutputLimitRequiresOneAdditionalMatchingResult() {
+            var info = new PowerShellScriptQueryExecutionInfo();
+            info.Reset(
+                machineName: null,
+                eventLogPath: null,
+                maxResults: 2,
+                maxEventsScanned: 0);
+
+            Assert.True(info.TryRecordResult());
+            Assert.True(info.TryRecordResult());
+            Assert.False(info.OutputLimitReached);
+            Assert.Equal(2, info.ResultsReturned);
+
+            Assert.False(info.TryRecordResult());
+            Assert.True(info.OutputLimitReached);
+            Assert.Equal(2, info.ResultsReturned);
+        }
+
+        [Fact]
         public void ScanLimitUsesOneCandidateLookahead() {
             var exact = new PowerShellScriptScanLimit(
                 maximumEvents: 2);

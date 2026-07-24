@@ -96,7 +96,11 @@ public static partial class WindowsEventFilterBuilder {
         var filter = string.Empty;
         var suppressFilter = string.Empty;
         if (id != null && id.Length > 0) {
-            string[] validIds = ValidatePositiveNumericValues(id, int.MaxValue, nameof(id));
+            string[] validIds = ValidateNumericValues(
+                id,
+                minimum: 0,
+                maximum: int.MaxValue,
+                nameof(id));
             filter = JoinXPathFilter(InitializeXPathFilter(validIds, "EventID={0}", "*[System[{0}]]"), filter);
         }
         if (eventRecordId != null && eventRecordId.Length > 0) {
@@ -114,7 +118,11 @@ public static partial class WindowsEventFilterBuilder {
                 filter);
         }
         if (excludeId != null && excludeId.Length > 0) {
-            string[] validExcludedIds = ValidatePositiveNumericValues(excludeId, int.MaxValue, nameof(excludeId));
+            string[] validExcludedIds = ValidateNumericValues(
+                excludeId,
+                minimum: 0,
+                maximum: int.MaxValue,
+                nameof(excludeId));
             filter = JoinXPathFilter(InitializeXPathFilter(validExcludedIds, "EventID!={0}", "*[System[{0}]]", logic: "and"), filter);
         }
 
@@ -131,7 +139,9 @@ public static partial class WindowsEventFilterBuilder {
             filter = JoinXPathFilter(InitializeXPathFilter(providerName, "@Name={0}", "*[System[Provider[{0}]]]", formatStringLiterals: true, parameterName: nameof(providerName)), filter);
         }
         if (level != null && level.Length > 0) {
-            var levels = level.Select(l => ((int)Enum.Parse(typeof(System.Diagnostics.Tracing.EventLevel), l)).ToString());
+            string[] levels = NormalizeEventLevels(
+                level,
+                nameof(level));
             filter = JoinXPathFilter(InitializeXPathFilter(levels, "Level={0}", "*[System[{0}]]"), filter);
         }
         if (keywords != null && keywords.Length > 0) {
@@ -273,16 +283,67 @@ public static partial class WindowsEventFilterBuilder {
     }
 
     private static string[] ValidatePositiveNumericValues(string[] values, long maximum, string parameterName) {
+        return ValidateNumericValues(
+            values,
+            minimum: 1,
+            maximum,
+            parameterName);
+    }
+
+    private static string[] ValidateNumericValues(
+        string[] values,
+        long minimum,
+        long maximum,
+        string parameterName) {
+
         var normalized = new string[values.Length];
         for (int index = 0; index < values.Length; index++) {
             string? value = values[index];
-            if (!long.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out long parsed) || parsed <= 0 || parsed > maximum) {
-                throw new ArgumentException($"All {parameterName} values must be positive integers no greater than {maximum}.", parameterName);
+            if (!long.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out long parsed) ||
+                parsed < minimum ||
+                parsed > maximum) {
+                throw new ArgumentException(
+                    $"All {parameterName} values must be integers between {minimum} and {maximum}.",
+                    parameterName);
             }
 
             normalized[index] = parsed.ToString(CultureInfo.InvariantCulture);
         }
 
+        return normalized;
+    }
+
+    private static string[] NormalizeEventLevels(
+        string[] values,
+        string parameterName) {
+
+        var normalized = new string[values.Length];
+        for (int index = 0; index < values.Length; index++) {
+            string value = values[index];
+            if (byte.TryParse(
+                    value,
+                    NumberStyles.None,
+                    CultureInfo.InvariantCulture,
+                    out byte numericLevel)) {
+                normalized[index] = numericLevel.ToString(
+                    CultureInfo.InvariantCulture);
+                continue;
+            }
+            if (Enum.TryParse(
+                    value,
+                    ignoreCase: true,
+                    out System.Diagnostics.Tracing.EventLevel namedLevel) &&
+                Enum.IsDefined(
+                    typeof(System.Diagnostics.Tracing.EventLevel),
+                    namedLevel)) {
+                normalized[index] = ((byte)namedLevel).ToString(
+                    CultureInfo.InvariantCulture);
+                continue;
+            }
+            throw new ArgumentException(
+                $"All {parameterName} values must be standard event-level names or integers between 0 and 255.",
+                parameterName);
+        }
         return normalized;
     }
 }

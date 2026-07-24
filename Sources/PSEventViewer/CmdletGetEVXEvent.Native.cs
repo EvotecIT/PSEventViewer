@@ -128,6 +128,13 @@ public sealed partial class CmdletGetEVXEvent {
         EventFilter filter,
         EventFilter? suppress) {
 
+        EventFilterCompiler.SplitNamedDataExclusions(
+            filter,
+            out EventFilter? selectFilter,
+            out EventFilter? namedDataSuppression);
+        filter = selectFilter!;
+        IReadOnlyList<EventFilter> namedDataSuppressions =
+            PartitionSuppressions(namedDataSuppression);
         string[] providerPatterns = NormalizeRequiredValues(
             filter.ProviderNames ?? Array.Empty<string>(),
             nameof(ProviderName));
@@ -190,6 +197,11 @@ public sealed partial class CmdletGetEVXEvent {
             }
             IReadOnlyList<EventFilter> suppressions =
                 PartitionSuppressions(machineSuppress);
+            if (namedDataSuppressions.Count > 0) {
+                suppressions = suppressions
+                    .Concat(namedDataSuppressions)
+                    .ToArray();
+            }
             foreach (IGrouping<string, EventProviderMetadataSnapshot> group in
                      successful
                          .SelectMany(
@@ -247,17 +259,22 @@ public sealed partial class CmdletGetEVXEvent {
             }
         }
 
-        int sourceCount = suppress == null
-            ? channels.Count
-            : structured.Count;
+        int sourceCount = channels.Count + structured.Count;
         if (sourceCount == 0) {
             throw new ItemNotFoundException(
                 $"No event channels are linked to provider pattern(s): {string.Join(", ", providerPatterns)}.");
         }
         ValidateBookmarkFanOut(sourceCount);
-        EventLogBatchQuery batch = suppress == null
-            ? EventLogBatchQuery.ForChannels(channels)
-            : EventLogBatchQuery.ForStructured(structured);
+        var batches = new List<EventLogBatchQuery>();
+        if (channels.Count > 0) {
+            batches.Add(EventLogBatchQuery.ForChannels(channels));
+        }
+        if (structured.Count > 0) {
+            batches.Add(EventLogBatchQuery.ForStructured(structured));
+        }
+        EventLogBatchQuery batch = batches.Count == 1
+            ? batches[0]
+            : EventLogBatchQuery.Combine(batches);
         ConfigureBatch(batch);
         return batch;
     }

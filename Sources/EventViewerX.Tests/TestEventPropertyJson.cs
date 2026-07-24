@@ -29,4 +29,23 @@ public sealed class TestEventPropertyJson {
         Assert.Equal(JsonValueKind.Null, root[4][1].ValueKind);
         Assert.True(root[4][2].GetBoolean());
     }
+
+    [Fact]
+    public void SerializesNonFiniteFloatingPointPayloadsWithoutAbortingExport() {
+        object?[] values = {
+            float.NaN,
+            float.PositiveInfinity,
+            double.NegativeInfinity,
+            1.25D
+        };
+
+        string json = EventPropertyJson.Serialize(values);
+        using JsonDocument document = JsonDocument.Parse(json);
+
+        JsonElement root = document.RootElement;
+        Assert.Equal("NaN", root[0].GetString());
+        Assert.Equal("Infinity", root[1].GetString());
+        Assert.Equal("-Infinity", root[2].GetString());
+        Assert.Equal(1.25D, root[3].GetDouble());
+    }
 }

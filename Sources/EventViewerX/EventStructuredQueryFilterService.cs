@@ -311,14 +311,14 @@ public static class EventStructuredQueryFilterService {
 
         if (TryParseSignedIntegerLiteral(raw, out var numericLiteral)) {
             if (numericLiteral < 0) {
-                error = $"level must be one of: any, {string.Join(", ", LevelNames)}.";
+                error = $"level must be any, a standard name ({string.Join(", ", LevelNames)}), or an integer from 0 through 255.";
                 return false;
             }
         }
 
         var normalized = ToSnakeCase(raw ?? string.Empty);
         if (IsMalformedSignedToken(raw)) {
-            error = $"level must be one of: any, {string.Join(", ", LevelNames)}.";
+            error = $"level must be any, a standard name ({string.Join(", ", LevelNames)}), or an integer from 0 through 255.";
             return false;
         }
 
@@ -331,15 +331,16 @@ public static class EventStructuredQueryFilterService {
             return true;
         }
 
-        if (int.TryParse(normalized, NumberStyles.Integer, CultureInfo.InvariantCulture, out var numericLevel)) {
-            var value = (Level)numericLevel;
-            if (Enum.IsDefined(typeof(Level), value)) {
-                level = value;
-                return true;
-            }
+        if (byte.TryParse(
+                normalized,
+                NumberStyles.None,
+                CultureInfo.InvariantCulture,
+                out byte numericLevel)) {
+            level = (Level)numericLevel;
+            return true;
         }
 
-        error = $"level must be one of: any, {string.Join(", ", LevelNames)}.";
+        error = $"level must be any, a standard name ({string.Join(", ", LevelNames)}), or an integer from 0 through 255.";
         return false;
     }
 

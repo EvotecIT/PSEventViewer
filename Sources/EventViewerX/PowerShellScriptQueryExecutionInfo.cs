@@ -98,4 +98,14 @@ public sealed class PowerShellScriptQueryExecutionInfo {
         FailureKind = EventLogRemoteQueryFailureKind.None;
         FailureMessage = string.Empty;
     }
+
+    internal bool TryRecordResult() {
+        if (MaxResults > 0 &&
+            ResultsReturned >= MaxResults) {
+            OutputLimitReached = true;
+            return false;
+        }
+        ResultsReturned++;
+        return true;
+    }
 }

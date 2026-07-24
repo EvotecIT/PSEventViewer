@@ -85,6 +85,36 @@ namespace EventViewerX.Tests {
         }
 
         [Fact]
+        public void EventIdZeroIsAcceptedForManifestProviders() {
+            string result = WindowsEventFilterBuilder.BuildWinEventFilter(
+                id: ["0", "65535"],
+                excludeId: ["0"],
+                xpathOnly: true);
+
+            Assert.Contains("EventID=0", result, StringComparison.Ordinal);
+            Assert.Contains("EventID=65535", result, StringComparison.Ordinal);
+            Assert.Contains("EventID!=0", result, StringComparison.Ordinal);
+        }
+
+        [Theory]
+        [InlineData("Verbose", 5)]
+        [InlineData("16", 16)]
+        [InlineData("255", 255)]
+        public void EventLevelsAcceptStandardNamesAndCustomNumericValues(
+            string level,
+            int expected) {
+
+            string result = WindowsEventFilterBuilder.BuildWinEventFilter(
+                level: [level],
+                xpathOnly: true);
+
+            Assert.Contains(
+                $"Level={expected}",
+                result,
+                StringComparison.Ordinal);
+        }
+
+        [Fact]
         public void IdMultipleValuesXmlQuery() {
             var result = WindowsEventFilterBuilder.BuildWinEventFilter(id: ["1", "2"], logName: "Log");
             Assert.StartsWith("<QueryList>", result);
@@ -125,8 +155,8 @@ namespace EventViewerX.Tests {
         }
 
         [Theory]
-        [InlineData("0")]
         [InlineData("-1")]
+        [InlineData("2147483648")]
         [InlineData("1 or EventID=2")]
         [InlineData("")]
         public void InvalidEventIdIsRejectedBeforeBuildingXpath(string value) {
