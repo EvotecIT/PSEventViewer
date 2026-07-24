@@ -15,7 +15,7 @@ public sealed class EventProviderMetadataSnapshot {
         IReadOnlyList<EventProviderValue> tasks,
         IReadOnlyList<EventProviderValue> opcodes,
         IReadOnlyList<EventProviderValue> keywords,
-        IReadOnlyList<EventProviderEventDefinition> events,
+        IReadOnlyList<EventProviderEventMetadataSnapshot> events,
         IReadOnlyList<string> diagnostics) {
 
         Name = name;
@@ -59,7 +59,7 @@ public sealed class EventProviderMetadataSnapshot {
     /// <summary>Provider keywords.</summary>
     public IReadOnlyList<EventProviderValue> Keywords { get; }
     /// <summary>Event definitions when IncludeEvents was requested.</summary>
-    public IReadOnlyList<EventProviderEventDefinition> Events { get; }
+    public IReadOnlyList<EventProviderEventMetadataSnapshot> Events { get; }
     /// <summary>Non-fatal metadata properties that could not be materialized.</summary>
     public IReadOnlyList<string> Diagnostics { get; }
 }

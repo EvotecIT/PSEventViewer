@@ -32,7 +32,7 @@ public static class ManifestEventWriter {
                 .ToArray(),
             metadata.Events
                 .Select(eventMetadata =>
-                    new EventProviderEventDefinition(
+                    new EventProviderEventMetadataSnapshot(
                         eventMetadata.Id,
                         eventMetadata.Version,
                         eventMetadata.LogLink?.LogName ?? string.Empty,
@@ -85,11 +85,11 @@ public static class ManifestEventWriter {
         string providerName,
         Guid providerId,
         IReadOnlyList<string> logLinks,
-        IReadOnlyList<EventProviderEventDefinition> events,
+        IReadOnlyList<EventProviderEventMetadataSnapshot> events,
         int id,
         byte? version) {
 
-        EventProviderEventDefinition[] matches = events
+        EventProviderEventMetadataSnapshot[] matches = events
             .Where(candidate => candidate.Id == id)
             .ToArray();
         if (matches.Length == 0) {
@@ -98,7 +98,7 @@ public static class ManifestEventWriter {
                 nameof(id));
         }
 
-        EventProviderEventDefinition selected;
+        EventProviderEventMetadataSnapshot selected;
         if (version.HasValue) {
             selected = matches.FirstOrDefault(
                 candidate => candidate.Version == version.Value) ??
@@ -190,6 +190,50 @@ public static class ManifestEventWriter {
             PayloadCount = payload.Count,
             NativeStatus = status
         };
+    }
+
+    internal static IReadOnlyList<object?> OrderNamedPayload(
+        ManifestEventDefinition definition,
+        IReadOnlyDictionary<string, object?> values) {
+
+        if (definition == null) {
+            throw new ArgumentNullException(nameof(definition));
+        }
+        if (values == null) {
+            throw new ArgumentNullException(nameof(values));
+        }
+        var supplied = new Dictionary<string, object?>(
+            StringComparer.OrdinalIgnoreCase);
+        foreach (KeyValuePair<string, object?> value in values) {
+            if (supplied.ContainsKey(value.Key)) {
+                throw new ArgumentException(
+                    $"Payload field '{value.Key}' was supplied more than once.",
+                    nameof(values));
+            }
+            supplied.Add(value.Key, value.Value);
+        }
+        var ordered = new object?[definition.PayloadFields.Count];
+        for (int index = 0;
+             index < definition.PayloadFields.Count;
+             index++) {
+            string name = definition.PayloadFields[index].Name;
+            if (!supplied.TryGetValue(name, out object? value)) {
+                throw new ArgumentException(
+                    $"Required payload field '{name}' was not supplied.",
+                    nameof(values));
+            }
+            ordered[index] = value;
+            supplied.Remove(name);
+        }
+        if (supplied.Count > 0) {
+            throw new ArgumentException(
+                "Unknown payload field(s): " +
+                string.Join(", ", supplied.Keys.OrderBy(
+                    static name => name,
+                    StringComparer.OrdinalIgnoreCase)),
+                nameof(values));
+        }
+        return ordered;
     }
 
     internal static IReadOnlyList<ManifestEventPayloadField>

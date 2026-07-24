@@ -193,8 +193,7 @@ Describe 'Start-EVXWatcher - PowerShell event dispatch' {
     }
 
     It 'stops watchers and removes bridge subscribers when the module is removed' {
-        $Module = Get-Module PSEventViewer
-        $ModulePath = $Module.Path
+        $ModulePath = (Get-Command -Name Start-EVXWatcher -CommandType Cmdlet).Module.Path
         $ExternalIds = [Collections.Generic.List[int]]::new()
         $ExternalIds.Add(1)
         $ExternalNamedEvents = [Collections.Generic.List[EventViewerX.NamedEvents]]::new()
@@ -225,8 +224,7 @@ Describe 'Start-EVXWatcher - PowerShell event dispatch' {
     }
 
     It 'does not stop a watcher owned by another runspace module instance' {
-        $Module = Get-Module PSEventViewer
-        $ModulePath = $Module.Path
+        $ModulePath = (Get-Command -Name Start-EVXWatcher -CommandType Cmdlet).Module.Path
         $EscapedModulePath = $ModulePath.Replace("'", "''")
         $OtherRunspace = [RunspaceFactory]::CreateRunspace()
         $OtherPowerShell = [PowerShell]::Create()
@@ -269,8 +267,7 @@ Describe 'Start-EVXWatcher - PowerShell event dispatch' {
     }
 
     It 'keeps module ownership independent from user-mutable global variables' {
-        $Module = Get-Module PSEventViewer
-        $ModulePath = $Module.Path
+        $ModulePath = (Get-Command -Name Start-EVXWatcher -CommandType Cmdlet).Module.Path
         $Watcher = Start-EVXWatcher -Name ('PSEventViewer.MutableVariable.' + [Guid]::NewGuid().ToString('N')) -MachineName $env:COMPUTERNAME -LogName Application -EventId 1 -Action {}
         try {
             Set-Variable -Name PSEventViewer_WatcherOwnerId -Scope Global -Value ([Guid]::NewGuid()) -Force

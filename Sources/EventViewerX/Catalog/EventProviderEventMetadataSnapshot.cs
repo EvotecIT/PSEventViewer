@@ -1,8 +1,8 @@
 namespace EventViewerX;
 
-/// <summary>Detached event definition from a provider manifest.</summary>
-public sealed class EventProviderEventDefinition {
-    internal EventProviderEventDefinition(
+/// <summary>Detached event metadata snapshot from a registered provider manifest.</summary>
+public sealed class EventProviderEventMetadataSnapshot {
+    internal EventProviderEventMetadataSnapshot(
         long id,
         byte version,
         string logName,

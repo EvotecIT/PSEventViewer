@@ -210,10 +210,10 @@ public static partial class EventLogCatalog {
             Array.Empty<EventProviderValue>(),
             diagnostics,
             nameof(metadata.Keywords));
-        EventProviderEventDefinition[] events = includeEvents
+        EventProviderEventMetadataSnapshot[] events = includeEvents
             ? Read(
                 () => metadata.Events.Select(eventMetadata =>
-                    new EventProviderEventDefinition(
+                    new EventProviderEventMetadataSnapshot(
                         eventMetadata.Id,
                         eventMetadata.Version,
                         eventMetadata.LogLink?.LogName ?? string.Empty,
@@ -227,10 +227,10 @@ public static partial class EventLogCatalog {
                         eventMetadata.Template ?? string.Empty,
                         SafeString(() => eventMetadata.Description)))
                     .ToArray(),
-                Array.Empty<EventProviderEventDefinition>(),
+                Array.Empty<EventProviderEventMetadataSnapshot>(),
                 diagnostics,
                 nameof(metadata.Events))
-            : Array.Empty<EventProviderEventDefinition>();
+            : Array.Empty<EventProviderEventMetadataSnapshot>();
 
         return new EventProviderMetadataSnapshot(
             metadata.Name,

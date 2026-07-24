@@ -7,6 +7,56 @@ namespace EventViewerX.Tests;
 
 public sealed class TestManifestEventWriter {
     [Fact]
+    public void OrdersNamedValuesAndRejectsMissingOrUnknownFields() {
+        var definition = new ManifestEventDefinition {
+            ProviderName = "Provider",
+            ProviderId = Guid.NewGuid(),
+            Id = 42,
+            PayloadFields = new[] {
+                new ManifestEventPayloadField {
+                    Index = 0,
+                    Name = "ComputerName",
+                    InputType = "win:UnicodeString"
+                },
+                new ManifestEventPayloadField {
+                    Index = 1,
+                    Name = "FindingCount",
+                    InputType = "win:UInt32"
+                }
+            }
+        };
+
+        IReadOnlyList<object?> ordered =
+            ManifestEventWriter.OrderNamedPayload(
+                definition,
+                new Dictionary<string, object?> {
+                    ["findingcount"] = 7U,
+                    ["COMPUTERNAME"] = "EVOMAGIC"
+                });
+
+        Assert.Equal(
+            new object?[] {
+                "EVOMAGIC",
+                7U
+            },
+            ordered);
+        Assert.Throws<ArgumentException>(() =>
+            ManifestEventWriter.OrderNamedPayload(
+                definition,
+                new Dictionary<string, object?> {
+                    ["ComputerName"] = "EVOMAGIC"
+                }));
+        Assert.Throws<ArgumentException>(() =>
+            ManifestEventWriter.OrderNamedPayload(
+                definition,
+                new Dictionary<string, object?> {
+                    ["ComputerName"] = "EVOMAGIC",
+                    ["FindingCount"] = 7U,
+                    ["Unexpected"] = true
+                }));
+    }
+
+    [Fact]
     public void ParsesOrderedManifestPayloadFields() {
         const string template =
             "<template xmlns=\"http://schemas.microsoft.com/win/2004/08/events\">" +
@@ -39,7 +89,7 @@ public sealed class TestManifestEventWriter {
 
     [Fact]
     public void ResolvesDescriptorAndCombinesKeywords() {
-        EventProviderEventDefinition selected = CreateEvent(
+        EventProviderEventMetadataSnapshot selected = CreateEvent(
             42,
             version: 3,
             logName: "Operational",
@@ -70,7 +120,7 @@ public sealed class TestManifestEventWriter {
 
     [Fact]
     public void RequiresVersionWhenEventIdIsAmbiguous() {
-        EventProviderEventDefinition[] events = {
+        EventProviderEventMetadataSnapshot[] events = {
             CreateEvent(42, version: 0),
             CreateEvent(42, version: 1)
         };
@@ -266,7 +316,7 @@ public sealed class TestManifestEventWriter {
         return bytes;
     }
 
-    private static EventProviderEventDefinition CreateEvent(
+    private static EventProviderEventMetadataSnapshot CreateEvent(
         long id,
         byte version,
         string logName = "",
@@ -276,7 +326,7 @@ public sealed class TestManifestEventWriter {
         int? task = null,
         IReadOnlyList<long>? keywords = null) {
 
-        return new EventProviderEventDefinition(
+        return new EventProviderEventMetadataSnapshot(
             id,
             version,
             logName,

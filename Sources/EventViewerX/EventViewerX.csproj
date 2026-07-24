@@ -32,6 +32,8 @@
         <PackageReference Include="Microsoft.Bcl.AsyncInterfaces" Version="8.0.0" />
         <PackageReference Include="System.Threading.Channels" Version="8.0.0" />
         <PackageReference Include="System.Threading.Tasks.Extensions" Version="4.5.4" />
+        <Reference Include="System.IO.Compression" />
+        <Reference Include="System.IO.Compression.FileSystem" />
     </ItemGroup>
     <ItemGroup>
         <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">

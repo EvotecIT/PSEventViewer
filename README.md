@@ -263,6 +263,227 @@ versions, validates payload count and types, enforces native ETW size limits,
 and owns `EventRegister`, `EventWrite`, and `EventUnregister`. Windows still
 decides whether a provider's target channel is enabled.
 
+## Custom providers without SDK work on target machines
+
+EventViewerX can own the complete manifest-provider lifecycle. You describe
+named, typed fields once; build one portable `.evxprovider` package on a
+developer or CI machine; then install and use that package on ordinary Windows
+machines. Targets need PSEventViewer/EventViewerX and administrator rights for
+installation, but do not need the Windows SDK, Visual Studio, a C# compiler,
+generated source, or a package repository.
+
+### PowerShell: hashtable to working provider
+
+The concise form creates a conventional `<ProviderName>/Operational` channel.
+A single event or channel may be one hashtable; arrays are only needed when
+there is more than one.
+
+```powershell
+$provider = @{
+    ProviderName = 'Contoso.Scanner'
+    ProviderGuid = '7a87f315-4b5e-40a2-b748-b0cdd8adab41'
+    Version      = '1.0.0'
+    Events       = @{
+        Name    = 'ScanCompleted'
+        Id      = 1000
+        Message = 'Scan of {ComputerName} found {FindingCount} issues.'
+        Fields  = [ordered] @{
+            ComputerName = 'String'
+            FindingCount = 'UInt32'
+        }
+    }
+}
+
+# See the strongly typed result or validate it before invoking build tools.
+$definition = $provider | ConvertTo-EVXProviderDefinition
+$definition | Test-EVXProviderDefinition
+
+# Build once. mc.exe, rc.exe, and link.exe are discovered on this machine.
+New-EVXProviderPackage `
+    -Definition $provider `
+    -OutputPath .\Contoso.Scanner-1.0.0.evxprovider `
+    -CertificateThumbprint '0123456789ABCDEF0123456789ABCDEF01234567'
+
+# Run elevated on each target. No SDK/compiler is used here.
+Install-EVXProviderPackage `
+    -Path .\Contoso.Scanner-1.0.0.evxprovider `
+    -TrustMode RequireTrustedSignature
+
+# Hashtable order is irrelevant. Names are mapped to canonical manifest order.
+Write-EVXEvent `
+    -ProviderName Contoso.Scanner `
+    -EventName ScanCompleted `
+    -Data @{
+        FindingCount = 7
+        ComputerName = $env:COMPUTERNAME
+    }
+```
+
+`String`, `Int`, `UInt`, `Long`, `ULong`, `DateTime`, and `Bool` are friendly
+field aliases. Native names such as `UnicodeString`, `UInt32`, `FileTime`,
+`Guid`, `Sid`, `Binary`, and every supported output/map option remain
+available. For advanced providers, the same hashtable/JSON contract includes
+explicit channels, localization, levels, tasks, opcodes, keywords, value/bit
+maps, event versions, field length/count references, and channel policy.
+
+Use a new event `Version` when field order, names, types, dimensions, maps, or
+descriptor metadata changes. The package builder and installer refuse to
+rewrite an existing `(EventId, Version)` schema or remove metadata needed to
+render old records.
+
+```powershell
+# Compile v1.1 only if it remains compatible with the released v1 package.
+New-EVXProviderPackage `
+    -Definition $providerV11 `
+    -BaselinePath .\Contoso.Scanner-1.0.0.evxprovider `
+    -OutputPath .\Contoso.Scanner-1.1.0.evxprovider
+
+# Transactional upgrade: verify, stage, unregister v1, register and verify v1.1.
+# A failed activation restores v1.
+Install-EVXProviderPackage .\Contoso.Scanner-1.1.0.evxprovider
+
+# Active and retained versions remain visible and reinstallable.
+Get-EVXProviderPackage |
+    Where-Object ProviderName -eq Contoso.Scanner |
+    Select-Object ProviderName, PackageVersion, IsActive, IsRegistered, PackagePath
+
+# Keep resources by default so historical EVTX messages still render.
+Uninstall-EVXProviderPackage -ProviderName Contoso.Scanner
+```
+
+`-RemoveFiles` asks Windows to remove retained schema/resources too. Windows
+may briefly keep a message-resource DLL mapped after unregistering; the result
+then reports `FileRemovalPendingReboot = $true` and moves/schedules the
+retained tree safely instead of leaving it as an active managed version.
+
+### What is inside an `.evxprovider`
+
+The package is a constrained ZIP container:
+
+- `provider.definition.json` is the complete typed source of truth;
+- `provider.man` is the generated Windows instrumentation manifest;
+- `provider.resources.dll` contains message/schema resources and has no code
+  entry point;
+- `schema-lock.json` is the compatibility-critical identity snapshot;
+- `package.json` binds provider identity, build provenance, and SHA-256 for
+  every payload file.
+
+An optional RSA package signature covers `package.json`, including all file
+hashes. Package inspection always validates hashes and any present signature.
+Installation can allow unsigned packages, require a valid signature, or
+require a trusted signer. With `RequireTrustedSignature`, a supplied
+`TrustedSignerThumbprint` list is an exact signer allowlist. Without pins, the
+certificate must contain the Code Signing EKU and build a trusted Windows
+chain. A different chain-valid certificate is therefore not accepted when
+publisher pins are configured. This detached package signature is the
+`.evxprovider` trust contract; it is separate from Authenticode signing of
+PowerShell module files.
+
+```powershell
+# Pin a private enterprise signer even if its root is not in the machine store.
+Install-EVXProviderPackage .\Contoso.Scanner-1.0.0.evxprovider `
+    -TrustMode RequireTrustedSignature `
+    -TrustedSignerThumbprint '0123456789ABCDEF0123456789ABCDEF01234567'
+
+# Copy and install with ordinary PowerShell remoting.
+$session = New-PSSession -ComputerName APP01
+Copy-Item .\Contoso.Scanner-1.0.0.evxprovider `
+    -Destination C:\Windows\Temp\Contoso.Scanner.evxprovider `
+    -ToSession $session
+Invoke-Command -Session $session {
+    Import-Module PSEventViewer
+    Install-EVXProviderPackage `
+        C:\Windows\Temp\Contoso.Scanner.evxprovider `
+        -TrustMode RequireTrustedSignature `
+        -Confirm:$false
+}
+```
+
+Every activation is extracted from verified package bytes into a fresh,
+restricted directory. `SYSTEM` and Administrators receive full control;
+Local Service and local Users receive read/execute only. Installed JSON,
+manifests, and resource DLLs are checked against the retained package before
+reuse. Lifecycle changes for the same provider GUID are serialized across
+processes. If files were modified or somebody removed the registration with
+`wevtutil`, installing the exact package repairs it and reports `Repaired`.
+The default ProgramData provider root is a dedicated managed security boundary.
+A C# caller may select another root, but it must be dedicated to EventViewerX:
+installation refuses to claim a directory containing unrelated content, then
+sets and verifies the exact ACL throughout the managed tree.
+
+Released versions are immutable by default. For an intentional development
+replacement using the same semantic version, opt in explicitly:
+
+```powershell
+Install-EVXProviderPackage .\Contoso.Scanner-1.0.0.evxprovider `
+    -AllowSameVersionReplacement
+```
+
+The replacement receives its own activation directory, the former package is
+retained for historical rendering and rollback, and only one package is
+reported as `IsActive`. Prefer a new package version for published providers.
+
+### C#: typed schema and typed writes
+
+The C# layer is the owner; PowerShell only adapts hashtables and command
+semantics. Public payload properties become named manifest fields. Explicit
+attributes make ordering stable across refactors.
+
+```csharp
+using EventViewerX;
+using EventViewerX.Providers;
+
+public sealed class ScanCompletedPayload {
+    [EventProviderPayloadField(0)]
+    public string ComputerName { get; init; } = string.Empty;
+
+    [EventProviderPayloadField(1)]
+    public uint FindingCount { get; init; }
+}
+
+var provider = EventProviderDefinition.Create(
+        "Contoso.Scanner",
+        Guid.Parse("7a87f315-4b5e-40a2-b748-b0cdd8adab41"),
+        "1.0.0")
+    .AddChannel(EventProviderChannelDefinition.Operational(
+        "Operational",
+        "Contoso.Scanner/Operational"));
+
+var scanCompleted =
+    EventProviderEventDefinition.FromType<ScanCompletedPayload>(
+        "ScanCompleted",
+        1000,
+        "Operational");
+scanCompleted.Messages["en-US"] =
+    "Scan of {ComputerName} found {FindingCount} issues.";
+provider.AddEvent(scanCompleted);
+
+// Build/CI machine only.
+EventProviderPackageBuildResult package =
+    EventProviderPackageBuilder.Build(
+        provider,
+        "Contoso.Scanner-1.0.0.evxprovider");
+
+// Elevated target machine; no build toolchain.
+EventProviderPackageManager.Install(package.OutputPath);
+
+// One native registration is cached for high-volume writes.
+using var writer = ResolvedManifestEventWriter.Open(
+    "Contoso.Scanner",
+    "ScanCompleted");
+writer.Write(new ScanCompletedPayload {
+    ComputerName = Environment.MachineName,
+    FindingCount = 7
+});
+```
+
+Arrays and binary fields must declare an explicit fixed dimension or reference
+an earlier numeric count/length property. Typed inference rejects ambiguous
+arrays instead of silently publishing a schema that cannot encode its values.
+The runnable [custom-provider build script](Examples/Build-CustomProvider.ps1)
+and its [complete JSON definition](Examples/CustomProvider.definition.json)
+provide copyable starting points.
+
 ## C# quick start
 
 ```csharp
@@ -333,7 +554,8 @@ library and module, then a stronger reusable surface. A GUI clone of
 | --- | --- | --- |
 | `Get-WinEvent` live, remote, path, XPath, hashtable, XML, list log/provider | Covered | Bounded multi-source engine, named data filters, deterministic culture, typed filters, explicit diagnostics, direct exports. |
 | `Get-WinEvent` provider messages and raw event data | Covered | Five explicit read modes, render status, event-specific fallback culture, lazy expensive projections. |
-| `New-WinEvent` manifest provider writes | Covered by `Write-EVXEvent` | Template discovery, ambiguity checks, schema conversion, reusable resolved definitions, structured result. |
+| `New-WinEvent` manifest provider writes | Exceeded by `Write-EVXEvent` | Positional compatibility plus named dictionaries, typed payloads, cached registration, package event names, strict schema conversion, structured result. |
+| Custom manifest provider authoring and deployment | Additional capability | Typed/hashtable definitions, localization/maps, deterministic SDK build, signed portable package, SDK-free transactional install/upgrade/rollback/uninstall, immutable schema checks. |
 | `Get/New/Remove/Clear/Limit/Write-EventLog` classic APIs | Covered by canonical EVX administration cmdlets | Explicit source ownership, verification results, backup-before-clear, consistent local/remote boundaries. |
 | `EventLogWatcher` / native subscription | Covered | Bounded backpressure, cancellation, bookmarks, watcher lifecycle and PowerShell actions. |
 | `wevtutil` channel/export work | Covered for query, policy, archive, and export | Atomic output, hashes, culture/projection choices, compiled streaming. |
@@ -351,6 +573,7 @@ Version 4 intentionally exposes one canonical command for each responsibility:
 | Watchers and checkpoints | `Start-EVXWatcher`, `Get-EVXWatcher`, `Stop-EVXWatcher`, `Reset-EVXEventCheckpoint` |
 | Log and source administration | `New-EVXLog`, `Set-EVXLog`, `Clear-EVXLog`, `Remove-EVXLog`, `New-EVXSource`, `Remove-EVXSource`, `Update-EVXLogArchive` |
 | Event writing | `Write-EVXEntry`, `Write-EVXEvent` |
+| Custom providers | `ConvertTo-EVXProviderDefinition`, `Test-EVXProviderDefinition`, `New-EVXProviderPackage`, `Get-EVXProviderPackage`, `Install-EVXProviderPackage`, `Uninstall-EVXProviderPackage` |
 | Collector subscriptions | `Get-EVXCollectorSubscription`, `Set-EVXCollectorSubscription` |
 | PowerShell recovery | `Get-EVXPowerShellScript`, `Get-EVXPowerShellScriptExecution` |
 
