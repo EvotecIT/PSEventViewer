@@ -368,11 +368,10 @@ $result = [ordered] @{
     ElapsedMilliseconds  = $stopwatch.Elapsed.TotalMilliseconds
     OutputPath           = if ($csvFullPath) { $csvFullPath } else { $xmlFullPath }
     OutputBytes          = if ($xmlFullPath) { (Get-Item -LiteralPath $xmlFullPath).Length } else { 0 }
-    OutputSha256         = if ($xmlFullPath) {
-        (Get-FileHash -LiteralPath $xmlFullPath -Algorithm SHA256).Hash
-    } else {
-        $null
-    }
+    # PowerForge hashes every retained output in the post-operation validator.
+    # Keeping this null prevents integrity validation from contaminating the
+    # engine timing for the PowerShell-hosted runners.
+    OutputSha256         = $null
 }
 
 $resultDirectory = Split-Path -Parent ([IO.Path]::GetFullPath($ResultPath))
