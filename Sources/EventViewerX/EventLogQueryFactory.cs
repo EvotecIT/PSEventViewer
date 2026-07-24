@@ -19,10 +19,40 @@ public static class EventLogQueryFactory {
             nameof(logNames));
         string?[] machines = NormalizeMachines(
             machineNames);
+        EventFilter? namedDataSuppression =
+            EventFilterCompiler
+                .CreateExcludedNamedDataSuppression(
+                    filter);
         EventFilter[] filters = Partition(
-            filter);
+            EventFilterCompiler
+                .WithoutExcludedNamedData(filter));
         EventLogQueryOptions snapshot =
             SnapshotAndValidate(options);
+        if (namedDataSuppression != null) {
+            var structured =
+                new List<EventLogStructuredQuery>(
+                    checked(
+                        machines.Length *
+                        filters.Length));
+            foreach (string? machine in machines) {
+                foreach (EventFilter partition in filters) {
+                    structured.Add(
+                        CreateStructuredQuery(
+                            EventFilterCompiler
+                                .BuildChannelQueryXml(
+                                    logs,
+                                    partition,
+                                    namedDataSuppression),
+                            EventLogQuerySourceKind.Channel,
+                            machine,
+                            snapshot));
+                }
+            }
+            return Finalize(
+                EventLogBatchQuery.ForStructured(
+                    structured),
+                snapshot);
+        }
         var queries =
             new List<EventLogChannelQuery>(
                 checked(
@@ -90,14 +120,40 @@ public static class EventLogQueryFactory {
                 nameof(paths))
             .Select(Path.GetFullPath)
             .ToArray();
+        EventFilter? namedDataSuppression =
+            EventFilterCompiler
+                .CreateExcludedNamedDataSuppression(
+                    filter);
         EventFilter[] filters = Partition(
-            filter);
+            EventFilterCompiler
+                .WithoutExcludedNamedData(filter));
         EventLogQueryOptions snapshot =
             SnapshotAndValidate(options);
         if (snapshot.Credential != null) {
             throw new ArgumentException(
                 "Offline file queries cannot use remote credentials.",
                 nameof(options));
+        }
+        if (namedDataSuppression != null) {
+            var structured =
+                new List<EventLogStructuredQuery>(
+                    filters.Length);
+            foreach (EventFilter partition in filters) {
+                structured.Add(
+                    CreateStructuredQuery(
+                        EventFilterCompiler
+                            .BuildFileQueryXml(
+                                files,
+                                partition,
+                                namedDataSuppression),
+                        EventLogQuerySourceKind.File,
+                        machineName: null,
+                        snapshot));
+            }
+            return Finalize(
+                EventLogBatchQuery.ForStructured(
+                    structured),
+                snapshot);
         }
         var queries =
             new List<EventLogFileQuery>(
@@ -128,6 +184,46 @@ public static class EventLogQueryFactory {
             EventLogBatchQuery.ForFiles(
                 queries),
             snapshot);
+    }
+
+    private static EventLogStructuredQuery
+        CreateStructuredQuery(
+            string queryXml,
+            EventLogQuerySourceKind sourceKind,
+            string? machineName,
+            EventLogQueryOptions options) {
+
+        bool local =
+            EventLogTarget.IsLocalMachine(
+                machineName);
+        return new EventLogStructuredQuery(
+            queryXml) {
+            SourceKind = sourceKind,
+            MachineName =
+                local ? null : machineName,
+            Credential =
+                local
+                    ? null
+                    : options.Credential,
+            Authentication =
+                options.Authentication,
+            Oldest = options.Oldest,
+            ReadMode = options.ReadMode,
+            MessageCulture =
+                options.MessageCulture,
+            FallbackMessageCulture =
+                options.FallbackMessageCulture,
+            IncludeBookmark =
+                options.IncludeBookmark,
+            RemoteConnectionTimeoutMilliseconds =
+                options.RemoteConnectionTimeoutMilliseconds,
+            RemoteReadTimeoutMilliseconds =
+                options.RemoteReadTimeoutMilliseconds,
+            BufferCapacity =
+                options.BufferCapacity,
+            RpcEndpointPort =
+                options.RpcEndpointPort
+        };
     }
 
     private static EventLogBatchQuery Finalize(

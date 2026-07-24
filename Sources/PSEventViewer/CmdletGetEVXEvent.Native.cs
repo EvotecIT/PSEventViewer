@@ -270,10 +270,21 @@ public sealed partial class CmdletGetEVXEvent {
             EventLogTarget.NormalizeMachineNames(MachineName);
         ValidateRemoteCredentialTargets(machines);
         ValidateRawXPathCombination(rawXPath, filter);
+        EventFilterCompiler
+            .SplitNamedDataExclusions(
+                filter,
+                out EventFilter? selectFilter,
+                out EventFilter? namedDataSuppression);
+        filter = selectFilter!;
+        IReadOnlyList<EventFilter>
+            namedDataSuppressions =
+                PartitionSuppressions(
+                    namedDataSuppression);
         bool useStructured =
             !UsesCheckpoint &&
             string.IsNullOrWhiteSpace(rawXPath) &&
-            (suppress != null ||
+            (namedDataSuppressions.Count > 0 ||
+             suppress != null ||
              logNames.Count > 1 ||
              (filter.ProviderNames?.Count ?? 0) > 0);
         var channels = new List<EventLogChannelQuery>();
@@ -319,6 +330,11 @@ public sealed partial class CmdletGetEVXEvent {
             }
             IReadOnlyList<EventFilter> suppressions =
                 PartitionSuppressions(machineSuppress);
+            if (namedDataSuppressions.Count > 0) {
+                suppressions = suppressions
+                    .Concat(namedDataSuppressions)
+                    .ToArray();
+            }
 
             if (!string.IsNullOrWhiteSpace(rawXPath)) {
                 foreach (string logName in machineLogNames) {
@@ -356,10 +372,21 @@ public sealed partial class CmdletGetEVXEvent {
                 foreach (EventFilter chunk in
                          EventFilterPartitioner.Partition(
                              sourceFilter)) {
-                    channels.Add(CreateChannelQuery(
-                        logName,
-                        machine,
-                        EventFilterCompiler.BuildXPath(chunk)));
+                    if (namedDataSuppressions.Count > 0) {
+                        structured.Add(CreateStructuredQuery(
+                            EventFilterCompiler
+                                .BuildChannelQueryXmlWithSuppressions(
+                                    new[] { logName },
+                                    chunk,
+                                    suppressions),
+                            EventLogQuerySourceKind.Channel,
+                            machine));
+                    } else {
+                        channels.Add(CreateChannelQuery(
+                            logName,
+                            machine,
+                            EventFilterCompiler.BuildXPath(chunk)));
+                    }
                 }
             }
         }

@@ -41,6 +41,11 @@ public static class EventFilterCompiler {
         if (filter == null || !filter.HasAny) {
             return "*";
         }
+        if (HasExcludedNamedData(filter)) {
+            throw new ArgumentException(
+                "ExcludedNamedData requires a structured QueryList Suppress clause and cannot be compiled as raw XPath. Use BuildChannelQueryXml or BuildFileQueryXml.",
+                nameof(filter));
+        }
         if (filter.StartTime.HasValue &&
             filter.EndTime.HasValue &&
             filter.StartTime.Value > filter.EndTime.Value) {
@@ -165,8 +170,20 @@ public static class EventFilterCompiler {
                 nameof(sources));
         }
 
-        string selectXPath = BuildXPath(select);
-        string[] suppressXPaths = suppressions
+        EventFilter? namedDataSuppression =
+            CreateExcludedNamedDataSuppression(select);
+        EventFilter? normalizedSelect =
+            WithoutExcludedNamedData(select);
+        var combinedSuppressions =
+            new List<EventFilter>(suppressions);
+        if (namedDataSuppression != null) {
+            combinedSuppressions.Add(
+                namedDataSuppression);
+        }
+        IReadOnlyList<EventFilter> normalizedSuppressions =
+            NormalizeSuppressions(combinedSuppressions);
+        string selectXPath = BuildXPath(normalizedSelect);
+        string[] suppressXPaths = normalizedSuppressions
             .Select(BuildXPath)
             .Where(static xpath => xpath != "*")
             .Distinct(StringComparer.Ordinal)
@@ -213,6 +230,11 @@ public static class EventFilterCompiler {
         EventFilter[] normalized = suppressions
             .Where(static filter => filter != null && filter.HasAny)
             .ToArray();
+        if (normalized.Any(HasExcludedNamedData)) {
+            throw new ArgumentException(
+                "A suppression filter cannot itself contain ExcludedNamedData. Put excluded named values on the select filter so they can be translated into a positive Suppress clause.",
+                nameof(suppressions));
+        }
         if (normalized.Any(static filter =>
                 CountExpressions(filter) > MaximumXPathExpressions)) {
             throw new ArgumentException(
@@ -220,6 +242,69 @@ public static class EventFilterCompiler {
                 nameof(suppressions));
         }
         return normalized;
+    }
+
+    internal static bool HasExcludedNamedData(
+        EventFilter? filter) {
+
+        return (filter?.ExcludedNamedData?.Count ?? 0) > 0;
+    }
+
+    /// <summary>
+    /// Separates named-data exclusions from a typed selection filter.
+    /// Windows represents the exclusions as a positive QueryList Suppress
+    /// filter because raw XPath inequality drops events where the field is absent.
+    /// </summary>
+    /// <param name="filter">Typed source filter.</param>
+    /// <param name="select">Equivalent selection filter without named-data exclusions.</param>
+    /// <param name="suppress">Positive named-data filter to emit as a Suppress clause, or null.</param>
+    public static void SplitNamedDataExclusions(
+        EventFilter? filter,
+        out EventFilter? select,
+        out EventFilter? suppress) {
+
+        suppress =
+            CreateExcludedNamedDataSuppression(
+                filter);
+        select =
+            WithoutExcludedNamedData(
+                filter);
+    }
+
+    internal static EventFilter? CreateExcludedNamedDataSuppression(
+        EventFilter? filter) {
+
+        return HasExcludedNamedData(filter)
+            ? new EventFilter {
+                NamedData = filter!.ExcludedNamedData
+            }
+            : null;
+    }
+
+    internal static EventFilter? WithoutExcludedNamedData(
+        EventFilter? source) {
+
+        if (source == null ||
+            !HasExcludedNamedData(source)) {
+            return source;
+        }
+        return new EventFilter {
+            EventIds = source.EventIds,
+            RecordIds = source.RecordIds,
+            MinimumRecordIdExclusive =
+                source.MinimumRecordIdExclusive,
+            MaximumRecordIdExclusive =
+                source.MaximumRecordIdExclusive,
+            ProviderNames = source.ProviderNames,
+            Levels = source.Levels,
+            Keywords = source.Keywords,
+            StartTime = source.StartTime,
+            EndTime = source.EndTime,
+            UserIds = source.UserIds,
+            Data = source.Data,
+            NamedData = source.NamedData,
+            ExcludedEventIds = source.ExcludedEventIds
+        };
     }
 
     private static string[]? ToInvariantStrings<T>(

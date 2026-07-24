@@ -30,16 +30,38 @@ namespace EventViewerX.Tests {
         [Fact]
         public void NamedDataExcludeFilterSingleValue() {
             var ht = new Hashtable { { "FieldName", "Value1" } };
-            var result = WindowsEventFilterBuilder.BuildWinEventFilter(namedDataExcludeFilter: [ht], logName: "xx", xpathOnly: true);
-            Assert.Equal("*[EventData[Data[@Name='FieldName'] != 'Value1']]", result);
+            var result = WindowsEventFilterBuilder.BuildWinEventFilter(namedDataExcludeFilter: [ht], logName: "xx");
+            XElement query = XDocument.Parse(result).Root!.Element("Query")!;
+
+            Assert.Equal("*", query.Element("Select")!.Value);
+            Assert.Equal(
+                "*[EventData[Data[@Name='FieldName'] = 'Value1']]",
+                query.Element("Suppress")!.Value);
         }
 
         [Fact]
         public void NamedDataExcludeFilterTwoValues() {
             var ht = new Hashtable { { "FieldName", new[] { "Value1", "Value2" } } };
-            var result = WindowsEventFilterBuilder.BuildWinEventFilter(namedDataExcludeFilter: [ht], logName: "xx", xpathOnly: true);
-            Assert.Equal("*[EventData[Data[@Name='FieldName'] != 'Value1' and Data[@Name='FieldName'] != 'Value2']]", result);
+            var result = WindowsEventFilterBuilder.BuildWinEventFilter(namedDataExcludeFilter: [ht], logName: "xx");
+            XElement query = XDocument.Parse(result).Root!.Element("Query")!;
+
+            Assert.Equal(
+                "*[EventData[Data[@Name='FieldName'] = 'Value1' or Data[@Name='FieldName'] = 'Value2']]",
+                query.Element("Suppress")!.Value);
         }
+
+        [Fact]
+        public void NamedDataExcludeFilterRejectsUnsafeXpathOnlyProjection() {
+            var ht = new Hashtable { { "FieldName", "Value1" } };
+
+            ArgumentException exception = Assert.Throws<ArgumentException>(() =>
+                WindowsEventFilterBuilder.BuildWinEventFilter(
+                    namedDataExcludeFilter: [ht],
+                    xpathOnly: true));
+
+            Assert.Contains("Suppress", exception.Message, StringComparison.Ordinal);
+        }
+
         [Fact]
         public void PathQueryUsesFilePrefix() {
             var ht = new Hashtable { { "param4", "BITS" } };

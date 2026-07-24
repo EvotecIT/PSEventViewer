@@ -87,10 +87,14 @@ public sealed class EventLogSubscription : IDisposable {
                 _query.LogName,
                 _query.MessageCulture?.LCID ?? 0,
                 _query.FallbackMessageCulture?.LCID ?? 0);
+            bool structuredQuery =
+                IsStructuredQuery(_query.XPath);
             _subscription = WindowsEventNativeMethods.EvtSubscribe(
                 _session?.DangerousGetHandle() ?? IntPtr.Zero,
                 _signal.SafeWaitHandle.DangerousGetHandle(),
-                _query.LogName,
+                structuredQuery
+                    ? null
+                    : _query.LogName,
                 string.IsNullOrWhiteSpace(_query.XPath)
                     ? "*"
                     : _query.XPath,
@@ -255,9 +259,13 @@ public sealed class EventLogSubscription : IDisposable {
         }
         var nativeQuery = new NativeEventQuery(
             _session?.DangerousGetHandle() ?? IntPtr.Zero,
-            _query.LogName,
+            IsStructuredQuery(_query.XPath)
+                ? null
+                : _query.LogName,
             _query.XPath,
-            WindowsEventNativeMethods.QueryFlags.ChannelPath |
+            (IsStructuredQuery(_query.XPath)
+                ? 0
+                : WindowsEventNativeMethods.QueryFlags.ChannelPath) |
             WindowsEventNativeMethods.QueryFlags
                 .TolerateQueryErrors,
             _query.LogName,
@@ -271,6 +279,16 @@ public sealed class EventLogSubscription : IDisposable {
         WindowsEventQueryDiagnostics.ReportFailures(
             _subscription!,
             nativeQuery);
+    }
+
+    private static bool IsStructuredQuery(
+        string? query) {
+
+        return query?.TrimStart()
+            .StartsWith(
+                "<QueryList",
+                StringComparison.OrdinalIgnoreCase) ==
+            true;
     }
 
     private void ReportFailure(

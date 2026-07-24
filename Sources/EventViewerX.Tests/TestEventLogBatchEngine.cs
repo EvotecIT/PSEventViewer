@@ -33,6 +33,36 @@ public sealed class TestEventLogBatchEngine {
     }
 
     [Fact]
+    public void QueryFactoryUsesStructuredSuppressionForExcludedNamedData() {
+        EventLogBatchQuery query =
+            EventLogQueryFactory.ForFiles(
+                new[] { GetFixturePath() },
+                new EventFilter {
+                    EventIds = new[] { 7040 },
+                    ExcludedNamedData =
+                        new Dictionary<string, IReadOnlyList<string>> {
+                            ["param4"] = new[] { "BITS" }
+                        }
+                });
+
+        EventLogStructuredQuery structured =
+            Assert.Single(query.StructuredQueries);
+        Assert.Empty(query.FileQueries);
+        Assert.Contains(
+            "EventID=7040",
+            structured.QueryXml,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "<Suppress",
+            structured.QueryXml,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "Data[@Name='param4'] = 'BITS'",
+            structured.QueryXml,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task AsyncBatchMatchesSynchronousNativeSelection() {
         if (!OperatingSystem.IsWindows()) return;
         string path = GetFixturePath();

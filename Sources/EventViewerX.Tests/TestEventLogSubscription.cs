@@ -40,6 +40,52 @@ public sealed class TestEventLogSubscription {
     }
 
     [Fact]
+    public void OldestSubscriptionAcceptsStructuredNamedDataSuppression() {
+        if (!OperatingSystem.IsWindows()) return;
+        EventObject current = EventLogEngine.ReadChannel(
+            new EventLogChannelQuery("System") {
+                ReadMode = EventReadMode.Metadata,
+                MaxEvents = 1
+            }).Single();
+        Assert.True(current.RecordId.HasValue);
+        string queryXml =
+            EventFilterCompiler.BuildChannelQueryXml(
+                new[] { "System" },
+                new EventFilter {
+                    RecordIds = new[] {
+                        current.RecordId.Value
+                    },
+                    ExcludedNamedData =
+                        new Dictionary<string, IReadOnlyList<string>> {
+                            ["FieldThatDoesNotExist"] =
+                                new[] { "ExcludedValue" }
+                        }
+                });
+        using var delivered = new ManualResetEventSlim();
+        EventObject? received = null;
+        EventLogSubscriptionFailure? failure = null;
+        using var subscription = new EventLogSubscription(
+            new EventLogSubscriptionQuery("System") {
+                XPath = queryXml,
+                Start = EventLogSubscriptionStart.Oldest,
+                ReadMode = EventReadMode.Metadata
+            },
+            eventObject => {
+                received = eventObject;
+                delivered.Set();
+            },
+            subscriptionFailure => {
+                failure = subscriptionFailure;
+                delivered.Set();
+            });
+
+        Assert.True(delivered.Wait(TimeSpan.FromSeconds(10)));
+        Assert.Null(failure);
+        Assert.NotNull(received);
+        Assert.Equal(current.RecordId, received!.RecordId);
+    }
+
+    [Fact]
     public void SubscriptionRejectsBookmarkWithoutBookmarkStart() {
         var query = new EventLogSubscriptionQuery("System") {
             BookmarkXml = "<BookmarkList />"

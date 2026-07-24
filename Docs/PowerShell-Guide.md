@@ -33,8 +33,9 @@ Get-EVXEvent `
     -MaxEvents 10
 ```
 
-`Get-EVXFilter` produces the native XPath used by the engine. It is useful for
-inspection, diagnostics, or reuse in another Windows Event Log tool.
+`Get-EVXFilter` produces native QueryList XML by default. Add `-XPathOnly`
+when every requested condition can be represented safely as raw Windows Event
+Log XPath.
 
 ```powershell
 Get-EVXFilter `
@@ -42,6 +43,24 @@ Get-EVXFilter `
     -StartTime (Get-Date).AddHours(-1) `
     -Level Error, Warning
 ```
+
+Named-data exclusion uses a native `Suppress` clause so events without the
+named field remain in the result:
+
+```powershell
+$queryXml = Get-EVXFilter `
+    -LogName Security `
+    -ID 4624, 4625 `
+    -NamedDataExcludeFilter @{
+        TargetUserName = 'svc-noisy'
+    }
+
+Get-EVXEvent -FilterXml $queryXml -ReadMode StructuredData
+```
+
+Do not combine `-NamedDataExcludeFilter` with `-XPathOnly`. The Windows Event
+Log XPath subset cannot safely express “exclude this value but keep events
+where the field is absent,” so the command fails explicitly instead.
 
 ### Get-WinEvent-compatible filter hashtables
 

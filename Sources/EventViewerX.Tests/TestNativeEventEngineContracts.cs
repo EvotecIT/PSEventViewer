@@ -386,6 +386,57 @@ public sealed class TestNativeEventEngineContracts {
     }
 
     [Fact]
+    public void FailedBookmarkSetupReleasesTheOfflineQueryHandle() {
+        if (!OperatingSystem.IsWindows()) return;
+        string directory = CreateTemporaryDirectory();
+        string path = Path.Combine(directory, "bookmark-failure.evtx");
+        File.Copy(GetFixturePath(), path);
+        try {
+            Assert.ThrowsAny<Exception>(() =>
+                EventLogEngine.ReadFile(
+                    new EventLogFileQuery(path) {
+                        Oldest = true,
+                        ReadMode = EventReadMode.Metadata,
+                        BookmarkXml = "<not-a-bookmark />"
+                    }).ToList());
+
+            File.Delete(path);
+            Assert.False(File.Exists(path));
+        } finally {
+            if (Directory.Exists(directory)) {
+                Directory.Delete(directory, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public void NamedDataExclusionRetainsEventsWithoutTheNamedField() {
+        if (!OperatingSystem.IsWindows()) return;
+        string path = GetFixturePath();
+        long unfiltered = EventLogEngine.ReadFile(
+            new EventLogFileQuery(path) {
+                Oldest = true,
+                ReadMode = EventReadMode.Metadata
+            }).LongCount();
+        string queryXml = WindowsEventFilterBuilder.BuildWinEventFilter(
+            namedDataExcludeFilter: [
+                new System.Collections.Hashtable {
+                    { "FieldThatDoesNotExistInFixture", "ExcludedValue" }
+                }
+            ],
+            path: path);
+        long filtered = EventLogEngine.ReadStructured(
+            new EventLogStructuredQuery(queryXml) {
+                SourceKind = EventLogQuerySourceKind.File,
+                Oldest = true,
+                ReadMode = EventReadMode.Metadata
+            }).LongCount();
+
+        Assert.True(unfiltered > 0);
+        Assert.Equal(unfiltered, filtered);
+    }
+
+    [Fact]
     public void OfflineArchiveMetadataMatchesTheNativeRecordStream() {
         if (!OperatingSystem.IsWindows()) return;
         string path = GetFixturePath();

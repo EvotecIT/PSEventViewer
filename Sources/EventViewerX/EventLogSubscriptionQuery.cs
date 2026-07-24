@@ -27,7 +27,10 @@ public sealed class EventLogSubscriptionQuery {
     /// <summary>Authentication package for the remote session.</summary>
     public EventLogAuthentication Authentication { get; set; }
 
-    /// <summary>Native XPath applied by the subscription.</summary>
+    /// <summary>
+    /// Native XPath or QueryList XML applied by the subscription.
+    /// QueryList XML carries its own channel paths.
+    /// </summary>
     public string XPath { get; set; } = "*";
 
     /// <summary>Starting position.</summary>

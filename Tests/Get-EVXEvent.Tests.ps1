@@ -157,6 +157,15 @@ Describe 'Get-EVXEvent - Read events with NamedDataFilter' {
         $ret.param4 | Should -Be 'NgcCtnrSvc'
 
     }
+    It 'named exclude filter keeps events where the field is absent' {
+        $Expected = @(Get-EVXEvent -Path $FilePath -Oldest -ReadMode Metadata)
+        $Actual = @(Get-EVXEvent -Path $FilePath -Oldest -NamedDataExcludeFilter @{
+                FieldThatDoesNotExistInFixture = 'ExcludedValue'
+            } -ReadMode Metadata)
+
+        $Expected | Should -Not -BeNullOrEmpty
+        $Actual.RecordId | Should -Be $Expected.RecordId
+    }
     It 'named include filter' {
         $ret = Get-EVXEvent -Path $FilePath -Id 7040 -NamedDataFilter @{ param4 = ('BITS', 'TrustedInstaller') } -oldest -MaxEvents 1 -ReadMode StructuredData -AsArray -Expand
         $ret | Should -HaveCount 1

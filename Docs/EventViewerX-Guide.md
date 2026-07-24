@@ -150,6 +150,25 @@ foreach (EventObject item in EventLogBatchEngine.Read(batch)) {
 }
 ```
 
+Named-data exclusions are translated into native QueryList suppressions:
+
+```csharp
+EventLogBatchQuery batch = EventLogQueryFactory.ForChannels(
+    new[] { "Security" },
+    filter: new EventFilter {
+        EventIds = new[] { 4624, 4625 },
+        ExcludedNamedData =
+            new Dictionary<string, IReadOnlyList<string>> {
+                ["TargetUserName"] = new[] { "svc-noisy" }
+            }
+    });
+```
+
+Use `EventLogQueryFactory`, `BuildChannelQueryXml`, or `BuildFileQueryXml`
+for this filter. `EventFilterCompiler.BuildXPath` rejects
+`ExcludedNamedData` because the native raw-XPath subset cannot keep records
+where that field is absent while excluding a matching value.
+
 Use `EventLogStructuredQuery` for an existing native `QueryList` containing
 multiple Select/Suppress paths.
 
@@ -199,6 +218,9 @@ Console.ReadLine();
 
 Subscriptions support local/remote sessions, future/oldest/bookmark starts,
 strict or tolerant bookmarks, bounded handle queues, and cancellation.
+`EventLogSubscriptionQuery.XPath` also accepts QueryList XML when a
+subscription needs native `Suppress` clauses; build it with
+`EventFilterCompiler.BuildChannelQueryXml`.
 The higher-level `WatcherManager` adds named lifecycle, stop-after, timeout,
 and named-event projection.
 

@@ -63,6 +63,45 @@ public sealed class TestEventFilterCompiler {
     }
 
     [Fact]
+    public void ExcludedNamedDataBecomesAStructuredSuppression() {
+        string queryXml = EventFilterCompiler.BuildChannelQueryXml(
+            new[] { "System" },
+            new EventFilter {
+                EventIds = new[] { 7040 },
+                ExcludedNamedData =
+                    new Dictionary<string, IReadOnlyList<string>> {
+                        ["param4"] = new[] { "BITS" }
+                    }
+            });
+
+        XElement query = XDocument.Parse(queryXml)
+            .Root!
+            .Element("Query")!;
+        Assert.Contains(
+            "EventID=7040",
+            query.Element("Select")!.Value,
+            StringComparison.Ordinal);
+        Assert.Equal(
+            "*[EventData[Data[@Name='param4'] = 'BITS']]",
+            query.Element("Suppress")!.Value);
+    }
+
+    [Fact]
+    public void RawXpathRejectsExcludedNamedData() {
+        var filter = new EventFilter {
+            ExcludedNamedData =
+                new Dictionary<string, IReadOnlyList<string>> {
+                    ["FieldName"] = new[] { "Value1" }
+                }
+        };
+
+        ArgumentException exception = Assert.Throws<ArgumentException>(() =>
+            EventFilterCompiler.BuildXPath(filter));
+
+        Assert.Contains("QueryList", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void StructuredQueryAcceptsPartitionedSuppressionsBeyondNativeLimit() {
         var suppress = new EventFilter {
             EventIds = Enumerable.Range(1, 60).ToArray()

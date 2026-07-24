@@ -24,7 +24,7 @@ public static partial class WindowsEventFilterBuilder {
     /// <param name="level">Trace/Event levels to include (e.g., Error, Warning).</param>
     /// <param name="userId">SIDs or accounts to match in Security context.</param>
     /// <param name="namedDataFilter">Hashtable filters for EventData[@Name] equality.</param>
-    /// <param name="namedDataExcludeFilter">Hashtable filters for EventData[@Name] inequality.</param>
+    /// <param name="namedDataExcludeFilter">Hashtable filters emitted as QueryList suppressions so events without the named field remain selected.</param>
     /// <param name="excludeId">Event IDs to exclude.</param>
     /// <param name="logName">Log name (used when emitting QueryList XML).</param>
     /// <param name="path">Optional EVTX file path; when set, QueryList uses file://.</param>
@@ -57,7 +57,7 @@ public static partial class WindowsEventFilterBuilder {
             throw new ArgumentOutOfRangeException(nameof(maximumEventRecordIdExclusive), "Maximum event record ID must be greater than or equal to zero.");
         }
 
-        int expressionCount = CountWinEventFilterExpressions(
+        int selectExpressionCount = CountWinEventFilterExpressions(
             id,
             eventRecordId,
             startTime,
@@ -68,17 +68,33 @@ public static partial class WindowsEventFilterBuilder {
             level,
             userId,
             namedDataFilter,
-            namedDataExcludeFilter,
+            namedDataExcludeFilter: null,
             excludeId,
             minimumEventRecordIdExclusive,
             maximumEventRecordIdExclusive);
-        if (expressionCount >
+        int suppressExpressionCount =
+            CountNamedDataExpressions(
+                namedDataExcludeFilter);
+        if (selectExpressionCount >
             EventFilterCompiler.MaximumXPathExpressions) {
             throw new ArgumentException(
-                $"The filter contains {expressionCount} XPath expressions; Windows Event Log supports at most {EventFilterCompiler.MaximumXPathExpressions}. Split the query or reduce the filter values.");
+                $"The select filter contains {selectExpressionCount} XPath expressions; Windows Event Log supports at most {EventFilterCompiler.MaximumXPathExpressions}. Split the query or reduce the filter values.");
+        }
+        if (suppressExpressionCount >
+            EventFilterCompiler.MaximumXPathExpressions) {
+            throw new ArgumentException(
+                $"The named-data suppression contains {suppressExpressionCount} XPath expressions; Windows Event Log supports at most {EventFilterCompiler.MaximumXPathExpressions}. Split the query or reduce the excluded values.");
+        }
+        if (xpathOnly &&
+            namedDataExcludeFilter != null &&
+            namedDataExcludeFilter.Length > 0) {
+            throw new ArgumentException(
+                "Named-data exclusions cannot be represented correctly by the Windows Event Log XPath subset. Request QueryList XML instead of XPathOnly so the exclusion can be emitted as a Suppress clause.",
+                nameof(namedDataExcludeFilter));
         }
 
         var filter = string.Empty;
+        var suppressFilter = string.Empty;
         if (id != null && id.Length > 0) {
             string[] validIds = ValidatePositiveNumericValues(id, int.MaxValue, nameof(id));
             filter = JoinXPathFilter(InitializeXPathFilter(validIds, "EventID={0}", "*[System[{0}]]"), filter);
@@ -163,14 +179,17 @@ public static partial class WindowsEventFilterBuilder {
                     var keyName = FormatXPathStringLiteral(key?.ToString() ?? string.Empty, nameof(namedDataExcludeFilter));
                     var values = AsEnumerable(table[key!]);
                     if (values.Any()) {
-                        keyFilters.Add(InitializeXPathFilter(values, $"Data[@Name={keyName}] != {{0}}", "{0}", "and", true, formatStringLiterals: true, parameterName: nameof(namedDataExcludeFilter)));
+                        keyFilters.Add(InitializeXPathFilter(values, $"Data[@Name={keyName}] = {{0}}", "{0}", "or", true, formatStringLiterals: true, parameterName: nameof(namedDataExcludeFilter)));
                     } else {
                         keyFilters.Add($"Data[@Name={keyName}]");
                     }
                 }
                 items.Add(InitializeXPathFilter(keyFilters, "{0}", "{0}"));
             }
-            filter = JoinXPathFilter(InitializeXPathFilter(items, "{0}", "*[EventData[{0}]]"), filter);
+            suppressFilter = InitializeXPathFilter(
+                items,
+                "{0}",
+                "*[EventData[{0}]]");
         }
 
         if (!xpathOnly && !string.IsNullOrEmpty(filter)) {
@@ -191,11 +210,17 @@ public static partial class WindowsEventFilterBuilder {
         if (!string.IsNullOrEmpty(path)) {
             var selectFilter = EscapeXmlValue(string.IsNullOrEmpty(filter) ? "*" : filter);
             var escapedPath = EscapeXmlValue(path!);
-            return $"<QueryList><Query Id=\"0\" Path=\"file://{escapedPath}\"><Select>{selectFilter}</Select></Query></QueryList>";
+            var suppress = string.IsNullOrWhiteSpace(suppressFilter)
+                ? string.Empty
+                : $"<Suppress>{EscapeXmlValue(suppressFilter)}</Suppress>";
+            return $"<QueryList><Query Id=\"0\" Path=\"file://{escapedPath}\"><Select>{selectFilter}</Select>{suppress}</Query></QueryList>";
         }
         var escapedLog = EscapeXmlValue(logName ?? string.Empty);
         var escapedFilter = EscapeXmlValue(filter);
-        return $"<QueryList><Query Id=\"0\" Path=\"{escapedLog}\"><Select Path=\"{escapedLog}\">{escapedFilter}</Select></Query></QueryList>";
+        var channelSuppress = string.IsNullOrWhiteSpace(suppressFilter)
+            ? string.Empty
+            : $"<Suppress Path=\"{escapedLog}\">{EscapeXmlValue(suppressFilter)}</Suppress>";
+        return $"<QueryList><Query Id=\"0\" Path=\"{escapedLog}\"><Select Path=\"{escapedLog}\">{escapedFilter}</Select>{channelSuppress}</Query></QueryList>";
     }
 
     internal static int CountWinEventFilterExpressions(

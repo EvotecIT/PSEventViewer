@@ -318,7 +318,7 @@ internal static class WindowsEventNativeMethods {
     internal static extern EventHandle EvtSubscribe(
         IntPtr session,
         IntPtr signalEvent,
-        string channelPath,
+        string? channelPath,
         string? query,
         IntPtr bookmark,
         IntPtr context,

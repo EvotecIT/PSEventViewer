@@ -17,6 +17,16 @@ public sealed partial class CmdletGetEVXEvent {
                 "Offline event log files are read locally and cannot be combined with MachineName or Credential.");
         }
         ValidateRawXPathCombination(rawXPath, filter);
+        EventFilterCompiler
+            .SplitNamedDataExclusions(
+                filter,
+                out EventFilter? selectFilter,
+                out EventFilter? namedDataSuppression);
+        filter = selectFilter!;
+        IReadOnlyList<EventFilter>
+            namedDataSuppressions =
+                PartitionSuppressions(
+                    namedDataSuppression);
         if (ContainsWildcard(filter.ProviderNames)) {
             string[] patterns = NormalizeRequiredValues(
                 filter.ProviderNames!,
@@ -41,6 +51,7 @@ public sealed partial class CmdletGetEVXEvent {
         IReadOnlyList<EventFilter> filterChunks =
             EventFilterPartitioner.Partition(filter);
         if (expandSuppressProviders ||
+            namedDataSuppressions.Count > 0 ||
             suppressions.Count > 0 ||
             filterChunks.Count > 1) {
             var structured = new List<EventLogStructuredQuery>(
@@ -53,6 +64,11 @@ public sealed partial class CmdletGetEVXEvent {
                                 suppress!,
                                 path))
                         : suppressions;
+                if (namedDataSuppressions.Count > 0) {
+                    pathSuppressions = pathSuppressions
+                        .Concat(namedDataSuppressions)
+                        .ToArray();
+                }
                 EventFilter sourceFilter = CopyFilterWithCheckpoint(
                     filter,
                     machineName: null,

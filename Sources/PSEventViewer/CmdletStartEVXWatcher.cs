@@ -240,10 +240,25 @@ namespace PSEventViewer {
                 }
                 filter.ProviderNames = providerNames;
             }
+            EventFilterCompiler
+                .SplitNamedDataExclusions(
+                    filter,
+                    out EventFilter? selectFilter,
+                    out EventFilter?
+                        namedDataSuppression);
+            filter = selectFilter;
             string[] xpaths = ParameterSetName == "FilterXPath"
                 ? new[] { FilterXPath!.Trim() }
                 : EventFilterPartitioner.Partition(filter!)
-                    .Select(EventFilterCompiler.BuildXPath)
+                    .Select(partition =>
+                        namedDataSuppression == null
+                            ? EventFilterCompiler.BuildXPath(
+                                partition)
+                            : EventFilterCompiler
+                                .BuildChannelQueryXml(
+                                    new[] { LogName },
+                                    partition,
+                                    namedDataSuppression))
                     .ToArray();
             if (xpaths.Any(string.IsNullOrWhiteSpace)) {
                 throw new PSArgumentException(

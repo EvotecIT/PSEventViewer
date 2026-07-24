@@ -34,11 +34,16 @@ internal sealed class WindowsEventHandleEnumerator : IDisposable {
                 error,
                 $"Failed to query Windows event source '{eventQuery.DisplayName}'.");
         }
-        WindowsEventQueryDiagnostics.ReportFailures(_query, eventQuery);
-        SeekToBookmark();
-        _cancellationRegistration = cancellationToken.Register(
-            static state => ((WindowsEventHandleEnumerator)state!).CancelPendingRead(),
-            this);
+        try {
+            WindowsEventQueryDiagnostics.ReportFailures(_query, eventQuery);
+            SeekToBookmark();
+            _cancellationRegistration = cancellationToken.Register(
+                static state => ((WindowsEventHandleEnumerator)state!).CancelPendingRead(),
+                this);
+        } catch {
+            _query.Dispose();
+            throw;
+        }
     }
 
     internal IntPtr Current { get; private set; }

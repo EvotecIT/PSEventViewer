@@ -146,6 +146,12 @@ PSEventViewer additionally provides `-NamedDataFilter`,
 multi-source concurrency, per-source failure continuation, output expansion,
 native bookmarks, and durable checkpoints.
 
+Named-data exclusions are emitted as native QueryList `Suppress` clauses.
+This keeps events that do not contain the named field—something the Windows
+Event Log raw XPath subset cannot express safely with `!=`. Consequently,
+`Get-EVXFilter -NamedDataExcludeFilter` returns QueryList XML and rejects
+`-XPathOnly` rather than producing a subtly incorrect filter.
+
 ```powershell
 $xml = @'
 <QueryList>
