@@ -35,10 +35,10 @@ public sealed class TestEventLogBatchEngine {
     [Fact]
     public async Task AsyncBatchMatchesSynchronousNativeSelection() {
         if (!OperatingSystem.IsWindows()) return;
-        if (!TestEnv.CanReadLog("System")) return;
+        string path = GetFixturePath();
 
-        var syncQuery = EventLogBatchQuery.ForChannels(new[] {
-            new EventLogChannelQuery("System") {
+        var syncQuery = EventLogBatchQuery.ForFiles(new[] {
+            new EventLogFileQuery(path) {
                 ReadMode = EventReadMode.Metadata,
                 MaxEvents = 4
             }
@@ -49,8 +49,8 @@ public sealed class TestEventLogBatchEngine {
                 eventObject.RecordId ?? 0)
             .ToArray();
 
-        var asyncQuery = EventLogBatchQuery.ForChannels(new[] {
-            new EventLogChannelQuery("System") {
+        var asyncQuery = EventLogBatchQuery.ForFiles(new[] {
+            new EventLogFileQuery(path) {
                 ReadMode = EventReadMode.Metadata,
                 MaxEvents = 4
             }

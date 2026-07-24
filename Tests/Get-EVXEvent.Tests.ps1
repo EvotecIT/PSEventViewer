@@ -400,6 +400,12 @@ Describe 'Get-EVXEvent - Get-WinEvent compatible native filters' {
             LogName = 'System'
             Id = $Latest.Id
         }
+        $expected = @(
+            Get-EVXEvent `
+                -FilterHashtable $Filter `
+                -MaxEvents 10 `
+                -ReadMode Metadata
+        )
 
         $events = @(
             Get-EVXEvent `
@@ -408,9 +414,11 @@ Describe 'Get-EVXEvent - Get-WinEvent compatible native filters' {
                 -ReadMode Metadata
         )
 
-        $events | Should -HaveCount 10
+        $events | Should -HaveCount $expected.Count
+        (@($events.RecordId) -join ',') |
+            Should -Be (@($expected.RecordId) -join ',')
         @($events.RecordId | Sort-Object -Unique) |
-            Should -HaveCount 10
+            Should -HaveCount $events.Count
     }
 }
 
