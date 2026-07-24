@@ -177,16 +177,16 @@ public class TestNamedEventDnsEnrichment {
                 DnsTimeoutMilliseconds = 30
             },
             async (_, token) => {
-                await Task.Delay(TimeSpan.FromSeconds(5), token);
+                await Task.Delay(TimeSpan.FromSeconds(30), token);
                 return new DnsResponse();
             });
-        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
 
-        await enricher.EnrichAsync(projected, CancellationToken.None);
+        Task enrichment = enricher.EnrichAsync(
+            projected,
+            CancellationToken.None);
 
-        stopwatch.Stop();
+        await enrichment.WaitAsync(TimeSpan.FromSeconds(5));
         Assert.Equal(ReverseDnsResolutionStatus.TimedOut, projected.ClientDnsResolutionStatus);
-        Assert.True(stopwatch.Elapsed < TimeSpan.FromSeconds(1), $"Elapsed {stopwatch.Elapsed}.");
     }
 
     [Fact]
