@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics.Eventing.Reader;
+using System.IO;
 using System.Reflection;
 #if NET472
 using System.Reflection.Emit;
@@ -16,8 +17,15 @@ internal sealed class WindowsEventBookmarkRenderer : IDisposable {
 
     internal EventBookmark? Render(IntPtr eventHandle) {
         using WindowsEventNativeMethods.EventHandle bookmark = WindowsEventNativeMethods.EvtCreateBookmark(null);
-        if (bookmark.IsInvalid || !WindowsEventNativeMethods.EvtUpdateBookmark(bookmark, eventHandle)) {
-            return null;
+        if (bookmark.IsInvalid) {
+            throw new System.ComponentModel.Win32Exception(
+                Marshal.GetLastWin32Error(),
+                "Failed to create a Windows event bookmark.");
+        }
+        if (!WindowsEventNativeMethods.EvtUpdateBookmark(bookmark, eventHandle)) {
+            throw new System.ComponentModel.Win32Exception(
+                Marshal.GetLastWin32Error(),
+                "Failed to update a Windows event bookmark.");
         }
 
         if (!WindowsEventNativeMethods.EvtRenderRaw(
@@ -31,7 +39,9 @@ internal sealed class WindowsEventBookmarkRenderer : IDisposable {
 
             int error = Marshal.GetLastWin32Error();
             if (error != WindowsEventNativeMethods.ErrorInsufficientBuffer) {
-                return null;
+                throw new System.ComponentModel.Win32Exception(
+                    error,
+                    "Failed to render a Windows event bookmark.");
             }
 
             _buffer.EnsureCapacity(bufferUsed);
@@ -43,13 +53,16 @@ internal sealed class WindowsEventBookmarkRenderer : IDisposable {
                     _buffer.Pointer,
                     out bufferUsed,
                     out _)) {
-                return null;
+                throw new System.ComponentModel.Win32Exception(
+                    Marshal.GetLastWin32Error(),
+                    "Failed to render a Windows event bookmark.");
             }
         }
 
         string bookmarkXml = Marshal.PtrToStringUni(_buffer.Pointer) ?? string.Empty;
         if (string.IsNullOrEmpty(bookmarkXml)) {
-            return null;
+            throw new InvalidDataException(
+                "The Windows Event Log API returned an empty bookmark.");
         }
 #if NET472
         return CreateEventBookmark(bookmarkXml);

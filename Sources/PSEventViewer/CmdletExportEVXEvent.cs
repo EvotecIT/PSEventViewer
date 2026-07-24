@@ -94,11 +94,18 @@ public sealed class CmdletExportEVXEvent : PSCmdlet {
     public int MaxEvents { get; set; }
 
     /// <summary>
-    /// Maximum time for remote connection establishment and each remote read.
+    /// Maximum time for remote RPC probing, worker admission, and session establishment.
     /// </summary>
     [Parameter(ParameterSetName = "Channel")]
     [ValidateRange(1, int.MaxValue)]
-    public int RemoteTimeoutMilliseconds { get; set; } = 5000;
+    public int RemoteConnectionTimeoutMilliseconds { get; set; } = 5000;
+
+    /// <summary>
+    /// Maximum time without remote read progress. Zero keeps the read unbounded.
+    /// </summary>
+    [Parameter(ParameterSetName = "Channel")]
+    [ValidateRange(0, int.MaxValue)]
+    public int RemoteReadTimeoutMilliseconds { get; set; }
 
     /// <summary>
     /// Maximum number of detached remote events buffered between the native reader and exporter.
@@ -118,6 +125,13 @@ public sealed class CmdletExportEVXEvent : PSCmdlet {
     /// </summary>
     [Parameter]
     public SwitchParameter Force { get; set; }
+
+    /// <summary>
+    /// Skips the final SHA-256 pass. Use this for maximum throughput when another system
+    /// already provides integrity validation.
+    /// </summary>
+    [Parameter]
+    public SwitchParameter SkipHash { get; set; }
 
     /// <inheritdoc />
     protected override void ProcessRecord() {
@@ -139,7 +153,9 @@ public sealed class CmdletExportEVXEvent : PSCmdlet {
                 ReadMode = ReadMode,
                 MaxEvents = MaxEvents,
                 MessageCulture = MessageCulture,
-                RemoteTimeoutMilliseconds = RemoteTimeoutMilliseconds,
+                RemoteConnectionTimeoutMilliseconds =
+                    RemoteConnectionTimeoutMilliseconds,
+                RemoteReadTimeoutMilliseconds = RemoteReadTimeoutMilliseconds,
                 BufferCapacity = BufferCapacity
             };
             result = EventLogExporter.ExportChannel(
@@ -147,7 +163,8 @@ public sealed class CmdletExportEVXEvent : PSCmdlet {
                 OutputPath,
                 Format,
                 Force.IsPresent,
-                _cancellation.Token);
+                _cancellation.Token,
+                computeSha256: !SkipHash.IsPresent);
         } else {
             var query = new EventLogFileQuery(Path) {
                 XPath = XPath,
@@ -161,7 +178,8 @@ public sealed class CmdletExportEVXEvent : PSCmdlet {
                 OutputPath,
                 Format,
                 Force.IsPresent,
-                _cancellation.Token);
+                _cancellation.Token,
+                computeSha256: !SkipHash.IsPresent);
         }
         WriteObject(result);
     }

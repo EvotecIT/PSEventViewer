@@ -121,6 +121,43 @@ public sealed class TestEventLogExporter {
         Assert.Contains("cannot overwrite the source", exception.Message);
     }
 
+    [Fact]
+    public void PromotionWithoutOverwritePreservesAConcurrentDestination() {
+        using var fixture = new ExportFixture();
+        string temporaryPath = fixture.GetPath("events.tmp");
+        string destinationPath = fixture.GetPath("events.jsonl");
+        File.WriteAllText(temporaryPath, "new-output");
+        File.WriteAllText(destinationPath, "concurrent-output");
+
+        Assert.Throws<IOException>(() =>
+            EventLogExporter.PromoteTemporaryFile(
+                temporaryPath,
+                destinationPath,
+                overwrite: false));
+
+        Assert.Equal("concurrent-output", File.ReadAllText(destinationPath));
+        Assert.Equal("new-output", File.ReadAllText(temporaryPath));
+    }
+
+    [Fact]
+    public void ExportCanSkipTheFinalHashPass() {
+        if (!OperatingSystem.IsWindows()) return;
+        using var fixture = new ExportFixture();
+        var query = fixture.CreateQuery(EventReadMode.Metadata, maxEvents: 3);
+        string outputPath = fixture.GetPath("events-no-hash.jsonl");
+
+        EventExportResult result = EventLogExporter.ExportFile(
+            query,
+            outputPath,
+            EventExportFormat.JsonLines,
+            computeSha256: false);
+
+        Assert.Equal(3, result.EventCount);
+        Assert.Null(result.Sha256);
+        Assert.True(result.Bytes > 0);
+        Assert.True(File.Exists(outputPath));
+    }
+
     private sealed class ExportFixture : IDisposable {
         internal ExportFixture() {
             DirectoryPath = Path.Combine(

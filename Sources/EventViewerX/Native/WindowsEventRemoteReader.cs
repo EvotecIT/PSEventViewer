@@ -16,7 +16,8 @@ internal static class WindowsEventRemoteReader {
         EventReadMode readMode,
         int messageLocale,
         int maxEvents,
-        int timeoutMilliseconds,
+        int connectionTimeoutMilliseconds,
+        int readTimeoutMilliseconds,
         int bufferCapacity,
         int rpcEndpointPort,
         CancellationToken cancellationToken) {
@@ -29,7 +30,8 @@ internal static class WindowsEventRemoteReader {
             readMode,
             messageLocale,
             maxEvents,
-            timeoutMilliseconds,
+            connectionTimeoutMilliseconds,
+            readTimeoutMilliseconds,
             bufferCapacity,
             rpcEndpointPort,
             cancellationToken);
@@ -43,26 +45,31 @@ internal static class WindowsEventRemoteReader {
         EventReadMode readMode,
         int messageLocale,
         int maxEvents,
-        int timeoutMilliseconds,
+        int connectionTimeoutMilliseconds,
+        int readTimeoutMilliseconds,
         int bufferCapacity,
         int rpcEndpointPort,
         CancellationToken cancellationToken) {
 
-        string timeoutMessage =
-            $"Timed out reading '{logName}' on '{machineName}' after {timeoutMilliseconds} ms without progress.";
+        string connectionTimeoutMessage =
+            $"Timed out connecting to '{logName}' on '{machineName}' after {connectionTimeoutMilliseconds} ms.";
+        string readTimeoutMessage =
+            $"Timed out reading '{logName}' on '{machineName}' after {readTimeoutMilliseconds} ms without progress.";
         if (!RpcEndpointProbe.TryConnect(
                 machineName,
                 rpcEndpointPort,
-                timeoutMilliseconds)) {
+                connectionTimeoutMilliseconds)) {
             throw new System.ComponentModel.Win32Exception(
                 1722,
                 $"The RPC endpoint for '{machineName}' is unavailable.");
         }
         IDisposable operationSlot = BoundedNativeOperation.Acquire(
-            timeoutMilliseconds,
-            timeoutMessage);
+            connectionTimeoutMilliseconds,
+            connectionTimeoutMessage);
         var results = new BlockingCollection<EventObject>(bufferCapacity);
         var failures = new ConcurrentQueue<Exception>();
+        var sessionOpened = new TaskCompletionSource<object?>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
         using var workerCancellation =
             CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         Task producer;
@@ -79,9 +86,10 @@ internal static class WindowsEventRemoteReader {
                         readMode,
                         messageLocale,
                         maxEvents,
-                        timeoutMilliseconds,
+                        readTimeoutMilliseconds,
                         results,
                         failures,
+                        sessionOpened,
                         operationSlot,
                         workerCancellation.Token);
                     completion.TrySetResult(null);
@@ -101,23 +109,36 @@ internal static class WindowsEventRemoteReader {
         }
 
         var inactivity = Stopwatch.StartNew();
+        bool observedOpenSession = false;
         try {
             while (true) {
                 cancellationToken.ThrowIfCancellationRequested();
                 if (results.TryTake(
                         out EventObject? eventObject,
-                        Math.Min(100, timeoutMilliseconds),
+                        100,
                         cancellationToken)) {
                     inactivity.Restart();
+                    observedOpenSession = true;
                     yield return eventObject;
                     continue;
                 }
                 if (results.IsCompleted) {
                     break;
                 }
-                if (inactivity.ElapsedMilliseconds >= timeoutMilliseconds) {
+                if (!observedOpenSession &&
+                    sessionOpened.Task.Status == TaskStatus.RanToCompletion) {
+                    observedOpenSession = true;
+                    inactivity.Restart();
+                }
+                int activeTimeout = observedOpenSession
+                    ? readTimeoutMilliseconds
+                    : connectionTimeoutMilliseconds;
+                if (activeTimeout > 0 &&
+                    inactivity.ElapsedMilliseconds >= activeTimeout) {
                     workerCancellation.Cancel();
-                    throw new TimeoutException(timeoutMessage);
+                    throw new TimeoutException(observedOpenSession
+                        ? readTimeoutMessage
+                        : connectionTimeoutMessage);
                 }
             }
 
@@ -150,9 +171,10 @@ internal static class WindowsEventRemoteReader {
         EventReadMode readMode,
         int messageLocale,
         int maxEvents,
-        int timeoutMilliseconds,
+        int readTimeoutMilliseconds,
         BlockingCollection<EventObject> results,
         ConcurrentQueue<Exception> failures,
+        TaskCompletionSource<object?> sessionOpened,
         IDisposable operationSlot,
         CancellationToken cancellationToken) {
 
@@ -166,6 +188,7 @@ internal static class WindowsEventRemoteReader {
                         Password = IntPtr.Zero,
                         Flags = 0
                     });
+                sessionOpened.TrySetResult(null);
                 var nativeQuery = new NativeEventQuery(
                     session.DangerousGetHandle(),
                     logName,
@@ -173,7 +196,7 @@ internal static class WindowsEventRemoteReader {
                     flags,
                     $"{logName} on {machineName}",
                     messageLocale: messageLocale,
-                    nextTimeoutMilliseconds: timeoutMilliseconds);
+                    nextTimeoutMilliseconds: readTimeoutMilliseconds);
                 int returned = 0;
                 foreach (EventObject eventObject in WindowsEventReader.Read(
                              nativeQuery,

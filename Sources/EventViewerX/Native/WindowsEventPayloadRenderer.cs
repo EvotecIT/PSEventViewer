@@ -44,7 +44,9 @@ internal sealed class WindowsEventPayloadRenderer : IDisposable {
 
             int error = Marshal.GetLastWin32Error();
             if (error != WindowsEventNativeMethods.ErrorInsufficientBuffer) {
-                return Array.Empty<EventPropertyValue>();
+                throw new System.ComponentModel.Win32Exception(
+                    error,
+                    "Failed to render Windows event payload values.");
             }
 
             _valueBuffer.EnsureCapacity(bufferUsed);
@@ -56,7 +58,9 @@ internal sealed class WindowsEventPayloadRenderer : IDisposable {
                     _valueBuffer.Pointer,
                     out bufferUsed,
                     out propertyCount)) {
-                return Array.Empty<EventPropertyValue>();
+                throw new System.ComponentModel.Win32Exception(
+                    Marshal.GetLastWin32Error(),
+                    "Failed to render Windows event payload values.");
             }
         }
 

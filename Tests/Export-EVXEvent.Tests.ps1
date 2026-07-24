@@ -84,4 +84,20 @@ Describe 'Export-EVXEvent direct streaming contract' {
         $Lines.Count | Should -Be 2
         ($Lines[0] | ConvertFrom-Json).providerName | Should -Not -BeNullOrEmpty
     }
+
+    It 'can skip the final hash pass for maximum throughput' {
+        $OutputPath = [System.IO.Path]::Combine($OutputDirectory, 'no-hash.jsonl')
+
+        $Result = Export-EVXEvent `
+            -Path $SourcePath `
+            -OutputPath $OutputPath `
+            -Format JsonLines `
+            -ReadMode Metadata `
+            -MaxEvents 2 `
+            -SkipHash
+
+        $Result.EventCount | Should -Be 2
+        $Result.Sha256 | Should -BeNullOrEmpty
+        [System.IO.File]::Exists($OutputPath) | Should -BeTrue
+    }
 }

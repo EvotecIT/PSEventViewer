@@ -19,13 +19,15 @@ public static class EventLogExporter {
     /// <param name="format">Streaming output format.</param>
     /// <param name="overwrite">Whether an existing destination may be replaced after a successful export.</param>
     /// <param name="cancellationToken">Token used to cancel enumeration and leave the existing destination unchanged.</param>
+    /// <param name="computeSha256">Whether to hash the completed temporary output before atomic promotion.</param>
     /// <returns>Count, size, and SHA-256 for the completed output.</returns>
     public static EventExportResult ExportFile(
         EventLogFileQuery query,
         string outputPath,
         EventExportFormat format,
         bool overwrite = false,
-        CancellationToken cancellationToken = default) {
+        CancellationToken cancellationToken = default,
+        bool computeSha256 = true) {
 
         if (query == null) {
             throw new ArgumentNullException(nameof(query));
@@ -41,6 +43,7 @@ public static class EventLogExporter {
             destination,
             format,
             overwrite,
+            computeSha256,
             stream => WriteFile(query, format, stream, cancellationToken));
     }
 
@@ -52,13 +55,15 @@ public static class EventLogExporter {
     /// <param name="format">Streaming output format.</param>
     /// <param name="overwrite">Whether an existing destination may be replaced after a successful export.</param>
     /// <param name="cancellationToken">Token used to cancel enumeration and leave the existing destination unchanged.</param>
+    /// <param name="computeSha256">Whether to hash the completed temporary output before atomic promotion.</param>
     /// <returns>Count, size, and SHA-256 for the completed output.</returns>
     public static EventExportResult ExportChannel(
         EventLogChannelQuery query,
         string outputPath,
         EventExportFormat format,
         bool overwrite = false,
-        CancellationToken cancellationToken = default) {
+        CancellationToken cancellationToken = default,
+        bool computeSha256 = true) {
 
         if (query == null) {
             throw new ArgumentNullException(nameof(query));
@@ -68,6 +73,7 @@ public static class EventLogExporter {
             ResolveDestination(outputPath),
             format,
             overwrite,
+            computeSha256,
             stream => WriteChannel(query, format, stream, cancellationToken));
     }
 
@@ -75,6 +81,7 @@ public static class EventLogExporter {
         string destination,
         EventExportFormat format,
         bool overwrite,
+        bool computeSha256,
         Func<Stream, long> write) {
 
         string? directory = Path.GetDirectoryName(destination);
@@ -101,23 +108,39 @@ public static class EventLogExporter {
                 stream.Flush(flushToDisk: true);
             }
 
-            if (File.Exists(destination)) {
-                File.Replace(temporaryPath, destination, null);
-            } else {
-                File.Move(temporaryPath, destination);
-            }
-
-            var info = new FileInfo(destination);
-            return new EventExportResult(
-                destination,
-                format,
-                count,
-                info.Length,
-                ComputeSha256(destination));
+            var temporaryInfo = new FileInfo(temporaryPath);
+            long bytes = temporaryInfo.Length;
+            string? sha256 = computeSha256
+                ? ComputeSha256(temporaryPath)
+                : null;
+            PromoteTemporaryFile(temporaryPath, destination, overwrite);
+            return new EventExportResult(destination, format, count, bytes, sha256);
         } finally {
             if (File.Exists(temporaryPath)) {
                 File.Delete(temporaryPath);
             }
+        }
+    }
+
+    internal static void PromoteTemporaryFile(
+        string temporaryPath,
+        string destination,
+        bool overwrite) {
+
+        if (!overwrite) {
+            File.Move(temporaryPath, destination);
+            return;
+        }
+
+        if (File.Exists(destination)) {
+            File.Replace(temporaryPath, destination, null);
+            return;
+        }
+
+        try {
+            File.Move(temporaryPath, destination);
+        } catch (IOException) when (File.Exists(destination)) {
+            File.Replace(temporaryPath, destination, null);
         }
     }
 
@@ -202,7 +225,9 @@ public static class EventLogExporter {
             ReadMode = readMode,
             MessageCulture = source.MessageCulture,
             MaxEvents = source.MaxEvents,
-            RemoteTimeoutMilliseconds = source.RemoteTimeoutMilliseconds,
+            RemoteConnectionTimeoutMilliseconds =
+                source.RemoteConnectionTimeoutMilliseconds,
+            RemoteReadTimeoutMilliseconds = source.RemoteReadTimeoutMilliseconds,
             BufferCapacity = source.BufferCapacity,
             RpcEndpointPort = source.RpcEndpointPort
         };

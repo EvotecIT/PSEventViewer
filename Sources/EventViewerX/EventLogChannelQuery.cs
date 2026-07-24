@@ -38,8 +38,13 @@ public sealed class EventLogChannelQuery {
     /// <summary>Maximum number of records returned. Zero streams every match.</summary>
     public int MaxEvents { get; set; }
 
-    /// <summary>Maximum time for remote session establishment and each remote native read.</summary>
-    public int RemoteTimeoutMilliseconds { get; set; } = 5000;
+    /// <summary>Maximum time for the RPC probe, worker slot, and remote session establishment.</summary>
+    public int RemoteConnectionTimeoutMilliseconds { get; set; } = 5000;
+
+    /// <summary>
+    /// Maximum time without remote read progress. Zero keeps the read unbounded.
+    /// </summary>
+    public int RemoteReadTimeoutMilliseconds { get; set; }
 
     /// <summary>Maximum detached event snapshots buffered between the remote native worker and caller.</summary>
     public int BufferCapacity { get; set; } = 64;

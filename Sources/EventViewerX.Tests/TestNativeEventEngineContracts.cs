@@ -7,6 +7,14 @@ namespace EventViewerX.Tests;
 
 public sealed class TestNativeEventEngineContracts {
     [Fact]
+    public void RemoteChannelDefaultsToBoundedConnectionAndUnboundedRead() {
+        var query = new EventLogChannelQuery("System");
+
+        Assert.Equal(5000, query.RemoteConnectionTimeoutMilliseconds);
+        Assert.Equal(0, query.RemoteReadTimeoutMilliseconds);
+    }
+
+    [Fact]
     public void FileQueryIsSnapshottedBeforeEnumerationStarts() {
         if (!OperatingSystem.IsWindows()) return;
         string path = GetFixturePath();

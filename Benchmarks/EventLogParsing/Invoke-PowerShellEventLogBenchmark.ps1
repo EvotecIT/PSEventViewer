@@ -236,6 +236,7 @@ if ($Engine -eq 'PSEventViewer') {
             -Oldest `
             -MaxEvents $MaxEvents `
             -MessageCulture $MessageCulture `
+            -SkipHash `
             -Force
         $projection = [pscustomobject] @{
             Count                = [long] $exportResult.EventCount

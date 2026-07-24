@@ -4,4 +4,4 @@ internal sealed record ExportMeasurement(
     string Path,
     long EventCount,
     long Bytes,
-    string Sha256);
+    string? Sha256);

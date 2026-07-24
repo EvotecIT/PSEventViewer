@@ -115,7 +115,9 @@ internal static class EventEnumerationRunner {
         EventExportResult result = EventLogExporter.ExportFile(
             query,
             options.OutputPath!,
-            options.OutputFormat!.Value);
+            options.OutputFormat!.Value,
+            cancellationToken: default,
+            computeSha256: false);
         return new ExportMeasurement(
             result.Path,
             result.EventCount,

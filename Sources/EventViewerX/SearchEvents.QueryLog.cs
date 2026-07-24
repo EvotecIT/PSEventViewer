@@ -218,9 +218,10 @@ public partial class SearchEvents : Settings {
             MaxEvents = maxEvents,
             ReadMode = readMode,
             MessageCulture = messageCulture,
-            RemoteTimeoutMilliseconds = effectiveTimeout > 0
+            RemoteConnectionTimeoutMilliseconds = effectiveTimeout > 0
                 ? effectiveTimeout
                 : Settings.SessionTimeoutMs,
+            RemoteReadTimeoutMilliseconds = effectiveTimeout,
             RpcEndpointPort = Settings.RpcProbePort
         };
         foreach (EventObject eventObject in EventLogEngine.ReadChannel(

@@ -26,10 +26,15 @@ public static class EventLogEngine {
         if (query.MaxEvents < 0) {
             throw new ArgumentOutOfRangeException(nameof(query), "Maximum events must be greater than or equal to zero.");
         }
-        if (query.RemoteTimeoutMilliseconds <= 0) {
+        if (query.RemoteConnectionTimeoutMilliseconds <= 0) {
             throw new ArgumentOutOfRangeException(
                 nameof(query),
-                "Remote timeout must be greater than zero.");
+                "Remote connection timeout must be greater than zero.");
+        }
+        if (query.RemoteReadTimeoutMilliseconds < 0) {
+            throw new ArgumentOutOfRangeException(
+                nameof(query),
+                "Remote read timeout must be greater than or equal to zero.");
         }
         if (query.BufferCapacity <= 0 || query.BufferCapacity > 4096) {
             throw new ArgumentOutOfRangeException(
@@ -49,7 +54,9 @@ public static class EventLogEngine {
         EventReadMode readMode = query.ReadMode;
         int messageLocale = query.MessageCulture?.LCID ?? 0;
         int maxEvents = query.MaxEvents;
-        int remoteTimeoutMilliseconds = query.RemoteTimeoutMilliseconds;
+        int remoteConnectionTimeoutMilliseconds =
+            query.RemoteConnectionTimeoutMilliseconds;
+        int remoteReadTimeoutMilliseconds = query.RemoteReadTimeoutMilliseconds;
         int bufferCapacity = query.BufferCapacity;
         int rpcEndpointPort = query.RpcEndpointPort;
 
@@ -61,7 +68,8 @@ public static class EventLogEngine {
             readMode,
             messageLocale,
             maxEvents,
-            remoteTimeoutMilliseconds,
+            remoteConnectionTimeoutMilliseconds,
+            remoteReadTimeoutMilliseconds,
             bufferCapacity,
             rpcEndpointPort,
             cancellationToken);
@@ -205,7 +213,8 @@ public static class EventLogEngine {
         EventReadMode readMode,
         int messageLocale,
         int maxEvents,
-        int remoteTimeoutMilliseconds,
+        int remoteConnectionTimeoutMilliseconds,
+        int remoteReadTimeoutMilliseconds,
         int bufferCapacity,
         int rpcEndpointPort,
         CancellationToken cancellationToken) {
@@ -228,7 +237,8 @@ public static class EventLogEngine {
                          readMode,
                          messageLocale,
                          maxEvents,
-                         remoteTimeoutMilliseconds,
+                         remoteConnectionTimeoutMilliseconds,
+                         remoteReadTimeoutMilliseconds,
                          bufferCapacity,
                          rpcEndpointPort,
                          cancellationToken)) {

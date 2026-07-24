@@ -270,6 +270,8 @@ Export-EVXEvent -Path C:\Logs\DC01-Security.evtx -OutputPath C:\Exports\Security
 CSV and JSON Lines honor `ReadMode`. XML intentionally ignores it and streams raw native event XML inside one
 well-formed `Events` document. Exports write to a temporary file in the destination directory, flush it, and only then
 promote it; cancellation, corrupt input, or rendering failure does not replace an existing destination.
+By default the temporary output is hashed before promotion and the result includes SHA-256. Add `-SkipHash` to avoid
+that final read pass when an external storage or transfer layer already validates integrity; `Sha256` is then null.
 
 The native engine batches Windows event handles, reuses native and managed buffers, closes each handle promptly, and
 keeps remote buffering bounded. It does not load an EVTX file or export into memory. EventViewerX owns this engine and
@@ -336,8 +338,9 @@ The retained outputs make the unequal schemas concrete:
 
 EvtxECmd CSV is a map-enriched forensic schema and its `--fj true` output is raw-event JSON derived from XML.
 EventViewerX `Full` JSON also includes provider-formatted messages, typed properties, named payload fields, render
-status, and bookmark information. Native CSV/JSON timings therefore must be read together with output byte counts in
-the retained PowerForge artifacts; faster time alone does not imply equivalent content.
+status, raw XML, and attachments. The in-memory `EventObject` carries a bookmark, but direct CSV/JSON does not
+serialize it. Native CSV/JSON timings therefore must be read together with output byte counts in the retained
+PowerForge artifacts; faster time alone does not imply equivalent content.
 
 The EvtxECmd comparison uses version `2026.5.0+bfc7f47ccbf65ffc9a3777cde5498db2fdd94664` (executable SHA-256
 `DE169B2AC7F6B1E54A684E0CDDDA30223651937B75941B21EA53A98F5A2502EE`) and its explicit 386-file map set

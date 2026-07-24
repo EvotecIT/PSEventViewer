@@ -1,5 +1,4 @@
 using System.Diagnostics.Eventing.Reader;
-using System.Security.Cryptography;
 using System.Text;
 using System.Xml;
 
@@ -50,9 +49,6 @@ internal static class RawXmlExport {
         }
 
         var info = new FileInfo(outputPath);
-        using SHA256 sha256 = SHA256.Create();
-        using FileStream input = File.OpenRead(outputPath);
-        string hash = Convert.ToHexString(sha256.ComputeHash(input));
-        return new ExportMeasurement(outputPath, count, info.Length, hash);
+        return new ExportMeasurement(outputPath, count, info.Length, null);
     }
 }

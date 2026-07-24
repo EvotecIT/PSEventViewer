@@ -7,7 +7,7 @@ public sealed class EventExportResult {
         EventExportFormat format,
         long eventCount,
         long bytes,
-        string sha256) {
+        string? sha256) {
 
         Path = path;
         Format = format;
@@ -28,6 +28,8 @@ public sealed class EventExportResult {
     /// <summary>Final file size.</summary>
     public long Bytes { get; }
 
-    /// <summary>Uppercase SHA-256 of the completed file.</summary>
-    public string Sha256 { get; }
+    /// <summary>
+    /// Uppercase SHA-256 of the completed file, or null when hashing was skipped.
+    /// </summary>
+    public string? Sha256 { get; }
 }
