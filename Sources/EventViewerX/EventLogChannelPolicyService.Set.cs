@@ -7,6 +7,9 @@ namespace EventViewerX;
 /// Channel policy mutation over the supported Windows Event Log channel API.
 /// </summary>
 public static partial class EventLogChannelPolicyService {
+    private const int VerificationAttemptCount = 10;
+    private const int VerificationDelayMilliseconds = 100;
+
     /// <summary>
     /// Applies the provided policy and returns true only when every requested
     /// property was already correct or was saved successfully.
@@ -97,16 +100,16 @@ public static partial class EventLogChannelPolicyService {
             }
 
             try {
-                using var refreshed =
-                    new EventLogConfiguration(
-                        policy.LogName,
-                        session);
-                result.After = CreateSnapshot(
-                    refreshed,
+                result.After = ReadVerifiedSnapshot(
+                    policy,
+                    session,
                     policy.MachineName,
                     policy.Credential,
                     policy.Authentication,
-                    policy.ConnectionTimeoutMilliseconds);
+                    policy.ConnectionTimeoutMilliseconds,
+                    pendingChanges.Count > 0 &&
+                    result.Errors.Count == 0,
+                    cancellationToken);
                 VerifyRequestedProperties(
                     policy,
                     result.After,
@@ -136,6 +139,122 @@ public static partial class EventLogChannelPolicyService {
             !result.Success &&
             completedCount > 0;
         return result;
+    }
+
+    private static ChannelPolicy ReadVerifiedSnapshot(
+        ChannelPolicy requested,
+        EventLogSession session,
+        string? machineName,
+        NetworkCredential? credential,
+        EventLogAuthentication authentication,
+        int connectionTimeoutMilliseconds,
+        bool reapplyRequestedValues,
+        CancellationToken cancellationToken) {
+
+        ChannelPolicy? lastSnapshot = null;
+        Exception? lastException = null;
+        for (int attempt = 0;
+             attempt < VerificationAttemptCount;
+             attempt++) {
+            cancellationToken.ThrowIfCancellationRequested();
+            try {
+                using var refreshed =
+                    new EventLogConfiguration(
+                        requested.LogName,
+                        session);
+                lastSnapshot = CreateSnapshot(
+                    refreshed,
+                    machineName,
+                    credential,
+                    authentication,
+                    connectionTimeoutMilliseconds);
+                lastException = null;
+                if (RequestedPropertiesMatch(
+                        requested,
+                        lastSnapshot)) {
+                    return lastSnapshot;
+                }
+                if (reapplyRequestedValues) {
+                    ApplyRequestedValues(
+                        requested,
+                        refreshed);
+                    cancellationToken
+                        .ThrowIfCancellationRequested();
+                    refreshed.SaveChanges();
+                }
+            } catch (OperationCanceledException)
+                when (cancellationToken.IsCancellationRequested) {
+                throw;
+            } catch (Exception exception) {
+                lastException = exception;
+            }
+
+            if (attempt + 1 >= VerificationAttemptCount) {
+                break;
+            }
+            if (cancellationToken.WaitHandle.WaitOne(
+                    VerificationDelayMilliseconds)) {
+                cancellationToken.ThrowIfCancellationRequested();
+            }
+        }
+        if (lastSnapshot != null) {
+            return lastSnapshot;
+        }
+        throw new InvalidOperationException(
+            "Windows did not expose the saved channel policy during verification.",
+            lastException);
+    }
+
+    private static void ApplyRequestedValues(
+        ChannelPolicy requested,
+        EventLogConfiguration configuration) {
+
+        if (requested.IsEnabled.HasValue) {
+            configuration.IsEnabled =
+                requested.IsEnabled.Value;
+        }
+        if (requested.MaximumSizeInBytes.HasValue) {
+            configuration.MaximumSizeInBytes =
+                requested.MaximumSizeInBytes.Value;
+        }
+        if (requested.LogFilePath != null) {
+            configuration.LogFilePath =
+                requested.LogFilePath;
+        }
+        if (requested.Mode.HasValue) {
+            configuration.LogMode =
+                requested.Mode.Value;
+        }
+        if (requested.SecurityDescriptor != null) {
+            configuration.SecurityDescriptor =
+                requested.SecurityDescriptor;
+        }
+    }
+
+    private static bool RequestedPropertiesMatch(
+        ChannelPolicy requested,
+        ChannelPolicy actual) {
+
+        return
+            (!requested.IsEnabled.HasValue ||
+             requested.IsEnabled ==
+             actual.IsEnabled) &&
+            (!requested.MaximumSizeInBytes.HasValue ||
+             requested.MaximumSizeInBytes ==
+             actual.MaximumSizeInBytes) &&
+            (requested.LogFilePath == null ||
+             string.Equals(
+                 requested.LogFilePath,
+                 actual.LogFilePath,
+                 StringComparison.OrdinalIgnoreCase)) &&
+            (!requested.Mode.HasValue ||
+             requested.Mode ==
+             actual.Mode) &&
+            (requested.SecurityDescriptor == null ||
+             string.Equals(
+                 requested.SecurityDescriptor,
+                 actual.SecurityDescriptor,
+                 StringComparison.Ordinal));
     }
 
     private static void ApplyRequestedProperties(

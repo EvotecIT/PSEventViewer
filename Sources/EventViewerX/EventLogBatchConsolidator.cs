@@ -59,10 +59,17 @@ public static class EventLogBatchConsolidator {
         }
 
         var root = new XElement("QueryList");
+        var queryKeys = new HashSet<string>(
+            StringComparer.Ordinal);
         int id = 0;
         foreach (QueryInput input in inputs) {
             foreach (XElement sourceQuery in input.Queries) {
                 var query = new XElement(sourceQuery);
+                string queryKey = query.ToString(
+                    SaveOptions.DisableFormatting);
+                if (!queryKeys.Add(queryKey)) {
+                    continue;
+                }
                 query.SetAttributeValue(
                     "Id",
                     id.ToString(CultureInfo.InvariantCulture));

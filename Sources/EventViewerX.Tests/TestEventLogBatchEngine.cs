@@ -89,6 +89,12 @@ public sealed class TestEventLogBatchEngine {
         query.MaxEvents = 20;
         EventLogBatchQuery consolidated =
             EventLogBatchConsolidator.Consolidate(query);
+        EventLogStructuredQuery structured =
+            Assert.Single(consolidated.StructuredQueries);
+        Assert.Single(
+            System.Xml.Linq.XDocument
+                .Parse(structured.QueryXml)
+                .Descendants("Select"));
 
         EventObject[] actual =
             EventLogBatchEngine.Read(consolidated).ToArray();
