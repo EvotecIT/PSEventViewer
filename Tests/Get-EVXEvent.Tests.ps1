@@ -380,6 +380,41 @@ Describe 'Get-EVXEvent - Get-WinEvent compatible native filters' {
         }
     }
 
+    It 'scopes offline provider wildcards to their own FilterHashtable source' {
+        $FilePath = [System.IO.Path]::Combine(
+            $PSScriptRoot,
+            'Logs',
+            'NamedFilterExamples.evtx')
+        $SystemEvent = Get-EVXEvent `
+            -LogName System `
+            -MaxEvents 1 `
+            -ReadMode Metadata
+        $events = @(
+            Get-EVXEvent `
+                -FilterHashtable @(
+                    @{
+                        Path = $FilePath
+                        Id = 7040
+                        ProviderName = 'Service*'
+                    },
+                    @{
+                        LogName = 'System'
+                        Id = $SystemEvent.Id
+                        StartTime = $SystemEvent.TimeCreated.AddSeconds(-1)
+                        EndTime = $SystemEvent.TimeCreated.AddSeconds(1)
+                    }
+                ) `
+                -ReadMode Metadata
+        )
+
+        $events.GatheredFrom | Should -Contain $FilePath
+        $events.ContainerLog | Should -Contain 'System'
+        @(
+            $events |
+                Where-Object GatheredFrom -EQ $FilePath
+        ).ProviderName | Should -BeLike 'Service*'
+    }
+
     It 'accepts LogName and Path together in one FilterHashtable' {
         $FilePath = [System.IO.Path]::Combine(
             $PSScriptRoot,
@@ -548,6 +583,31 @@ Describe 'Get-EVXEvent - pipeline parity' {
 
         $events | Should -HaveCount 1
         $events[0].Id | Should -Be 117
+    }
+
+    It 'infers FilterXml sources from Path attributes instead of XPath text' {
+        $Latest = Get-EVXEvent `
+            -LogName System `
+            -MaxEvents 1 `
+            -ReadMode Metadata
+        [xml] $Query = @"
+<QueryList>
+  <Query Id="0" Path="System">
+    <Select Path="System">*[System[EventRecordID=$($Latest.RecordId)] or EventData[Data='file://server/share/item']]</Select>
+  </Query>
+</QueryList>
+"@
+
+        $events = @(
+            Get-EVXEvent `
+                -FilterXml $Query `
+                -MaxEvents 1 `
+                -ReadMode Metadata
+        )
+
+        $events | Should -HaveCount 1
+        $events[0].RecordId | Should -Be $Latest.RecordId
+        $events[0].ContainerLog | Should -Be 'System'
     }
 
     It 'converts a direct FilterXml string to XmlDocument' {

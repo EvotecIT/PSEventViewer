@@ -286,6 +286,53 @@ public sealed class TestEventLogExporter {
     }
 
     [Fact]
+    public void StructuredChannelExportIgnoresFileUriTextInsideXPathValues() {
+        if (!OperatingSystem.IsWindows()) {
+            return;
+        }
+        using var fixture = new ExportFixture();
+        EventObject current = EventLogEngine.ReadChannel(
+            new EventLogChannelQuery("System") {
+                ReadMode = EventReadMode.Metadata,
+                MaxEvents = 1
+            }).Single();
+        string queryXml =
+            "<QueryList>" +
+            "<Query Id=\"0\" Path=\"System\">" +
+            "<Select Path=\"System\">" +
+            $"*[System[EventRecordID={current.RecordId!.Value}] or " +
+            "EventData[Data='file://server/share/item']]" +
+            "</Select></Query>" +
+            "</QueryList>";
+        var query =
+            new EventLogStructuredQuery(queryXml) {
+                SourceKind = EventLogQuerySourceKind.Auto,
+                Oldest = true
+            };
+        string outputPath =
+            fixture.GetPath("channel-file-text.evtx");
+
+        Assert.Equal(
+            new[] { EventLogQuerySourceKind.Channel },
+            query.ResolveSourceKinds());
+        EventExportResult result =
+            EventLogExporter.ExportStructured(
+                query,
+                outputPath,
+                EventExportFormat.Evtx);
+        EventObject[] reopened = EventLogEngine.ReadFile(
+            new EventLogFileQuery(outputPath) {
+                ReadMode = EventReadMode.Metadata
+            }).ToArray();
+
+        Assert.Equal(1, result.EventCount);
+        Assert.Single(reopened);
+        Assert.Equal(
+            current.RecordId,
+            reopened[0].RecordId);
+    }
+
+    [Fact]
     public void BatchExportStreamsOneGloballyOrderedOutput() {
         if (!OperatingSystem.IsWindows()) return;
         using var fixture = new ExportFixture();

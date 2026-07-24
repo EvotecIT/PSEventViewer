@@ -57,6 +57,19 @@ internal static class EventLogStructuredQueryParser {
             : declaredKind;
     }
 
+    internal static EventLogQuerySourceKind[] ResolveSourceKinds(
+        string queryXml,
+        EventLogQuerySourceKind declaredKind) {
+
+        return ParseQueries(queryXml)
+            .Select(query =>
+                ResolveSourceKind(
+                    query,
+                    declaredKind))
+            .Distinct()
+            .ToArray();
+    }
+
     internal static string GetFileSourceIdentity(
         XElement query) {
 

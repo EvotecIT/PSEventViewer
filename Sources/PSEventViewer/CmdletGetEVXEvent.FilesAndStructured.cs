@@ -4,11 +4,16 @@ using System.Net;
 namespace PSEventViewer;
 
 public sealed partial class CmdletGetEVXEvent {
+    private readonly Dictionary<string, string[]>
+        _offlineProvidersByPath =
+            new(StringComparer.OrdinalIgnoreCase);
+
     private EventLogBatchQuery CreateFileBatch(
         IReadOnlyList<string> paths,
         EventFilter filter,
         EventFilter? suppress,
-        string? rawXPath) {
+        string? rawXPath,
+        bool allowManagedProviderFilter = true) {
 
         if (Credential != null ||
             (MachineName != null && MachineName.Any(
@@ -27,7 +32,10 @@ public sealed partial class CmdletGetEVXEvent {
             namedDataSuppressions =
                 PartitionSuppressions(
                     namedDataSuppression);
-        if (ContainsWildcard(filter.ProviderNames)) {
+        bool expandSelectProviders =
+            ContainsWildcard(filter.ProviderNames);
+        if (expandSelectProviders &&
+            allowManagedProviderFilter) {
             string[] patterns = NormalizeRequiredValues(
                 filter.ProviderNames!,
                 nameof(ProviderName));
@@ -40,6 +48,7 @@ public sealed partial class CmdletGetEVXEvent {
             filter = WithProviders(
                 filter,
                 Array.Empty<string>());
+            expandSelectProviders = false;
         }
         bool expandSuppressProviders =
             suppress != null &&
@@ -49,18 +58,29 @@ public sealed partial class CmdletGetEVXEvent {
                 ? Array.Empty<EventFilter>()
                 : PartitionSuppressions(suppress);
         IReadOnlyList<EventFilter> filterChunks =
-            EventFilterPartitioner.Partition(filter);
-        if (expandSuppressProviders ||
+            expandSelectProviders
+                ? Array.Empty<EventFilter>()
+                : EventFilterPartitioner.Partition(filter);
+        if (expandSelectProviders ||
+            expandSuppressProviders ||
             namedDataSuppressions.Count > 0 ||
             suppressions.Count > 0 ||
             filterChunks.Count > 1) {
             var structured = new List<EventLogStructuredQuery>(
-                checked(paths.Count * filterChunks.Count));
+                checked(
+                    paths.Count *
+                    Math.Max(filterChunks.Count, 1)));
             foreach (string path in paths) {
+                EventFilter pathFilter =
+                    expandSelectProviders
+                        ? ExpandOfflineProviderPatterns(
+                            filter,
+                            path)
+                        : filter;
                 IReadOnlyList<EventFilter> pathSuppressions =
                     expandSuppressProviders
                         ? PartitionSuppressions(
-                            ExpandOfflineSuppressProviderPatterns(
+                            ExpandOfflineProviderPatterns(
                                 suppress!,
                                 path))
                         : suppressions;
@@ -70,7 +90,7 @@ public sealed partial class CmdletGetEVXEvent {
                         .ToArray();
                 }
                 EventFilter sourceFilter = CopyFilterWithCheckpoint(
-                    filter,
+                    pathFilter,
                     machineName: null,
                     path);
                 foreach (EventFilter chunk in
@@ -111,48 +131,60 @@ public sealed partial class CmdletGetEVXEvent {
         return batch;
     }
 
-    private static EventFilter
-        ExpandOfflineSuppressProviderPatterns(
-            EventFilter suppress,
+    private EventFilter ExpandOfflineProviderPatterns(
+            EventFilter filter,
             string path) {
 
         string[] patterns = NormalizeRequiredValues(
-            suppress.ProviderNames ??
+            filter.ProviderNames ??
             Array.Empty<string>(),
-            nameof(FilterHashtable));
+            nameof(ProviderName));
         WildcardPattern[] wildcards = patterns
             .Select(pattern => new WildcardPattern(
                 pattern,
                 WildcardOptions.IgnoreCase |
                 WildcardOptions.CultureInvariant))
             .ToArray();
-        var providers = new HashSet<string>(
-            StringComparer.OrdinalIgnoreCase);
-        foreach (EventObject eventObject in
-                 EventLogEngine.ReadFile(
-                     new EventLogFileQuery(path) {
-                         Oldest = true,
-                         ReadMode =
-                             EventReadMode.Metadata
-                     })) {
-            if (wildcards.Any(pattern =>
-                    pattern.IsMatch(
-                        eventObject.ProviderName))) {
-                providers.Add(
-                    eventObject.ProviderName);
-            }
-        }
+        string[] providers = GetOfflineProviders(path)
+            .Where(provider =>
+                wildcards.Any(pattern =>
+                    pattern.IsMatch(provider)))
+            .ToArray();
         return WithProviders(
-            suppress,
-            providers.Count > 0
+            filter,
+            providers.Length > 0
                 ? providers
-                    .OrderBy(
-                        static provider => provider,
-                        StringComparer.OrdinalIgnoreCase)
-                    .ToArray()
                 : new[] {
                     "__EventViewerX_No_Matching_Provider__"
                 });
+    }
+
+    private string[] GetOfflineProviders(string path) {
+        string fullPath =
+            System.IO.Path.GetFullPath(path);
+        if (_offlineProvidersByPath.TryGetValue(
+                fullPath,
+                out string[]? providers)) {
+            return providers;
+        }
+        providers = EventLogEngine.ReadFile(
+                new EventLogFileQuery(fullPath) {
+                    Oldest = true,
+                    ReadMode = EventReadMode.Metadata
+                })
+            .Select(static eventObject =>
+                eventObject.ProviderName)
+            .Where(static provider =>
+                !string.IsNullOrWhiteSpace(provider))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(
+                static provider => provider,
+                StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        _offlineProvidersByPath.Add(
+            fullPath,
+            providers);
+        return providers;
     }
 
     private static IReadOnlyList<EventFilter> PartitionSuppressions(
@@ -171,9 +203,12 @@ public sealed partial class CmdletGetEVXEvent {
             throw new PSArgumentException(
                 "FilterXml cannot be null, empty, or whitespace.");
         }
-        bool usesFiles = queryXml.IndexOf(
-            "file://",
-            StringComparison.OrdinalIgnoreCase) >= 0;
+        var sourceProbe =
+            new EventLogStructuredQuery(queryXml) {
+                SourceKind = sourceKind
+            };
+        bool usesFiles = sourceProbe.ResolveSourceKinds()
+            .Contains(EventLogQuerySourceKind.File);
         if (usesFiles &&
             (Credential != null ||
              (MachineName != null &&

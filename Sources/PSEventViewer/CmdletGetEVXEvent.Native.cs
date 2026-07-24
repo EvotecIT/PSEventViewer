@@ -95,7 +95,9 @@ public sealed partial class CmdletGetEVXEvent {
                         nameof(FilterHashtable)),
                     binding.Select,
                     binding.Suppress,
-                    rawXPath: null));
+                    rawXPath: null,
+                    allowManagedProviderFilter:
+                        bindings.Length == 1));
             }
         }
         EventLogBatchQuery batch = batches.Count == 1
@@ -372,7 +374,7 @@ public sealed partial class CmdletGetEVXEvent {
                 foreach (EventFilter chunk in
                          EventFilterPartitioner.Partition(
                              sourceFilter)) {
-                    if (namedDataSuppressions.Count > 0) {
+                    if (suppressions.Count > 0) {
                         structured.Add(CreateStructuredQuery(
                             EventFilterCompiler
                                 .BuildChannelQueryXmlWithSuppressions(

@@ -117,14 +117,14 @@ internal static class WindowsEventArchive {
                 "Credentials can only be used with a remote event log export.",
                 nameof(query));
         }
-        EventLogQuerySourceKind sourceKind =
-            query.SourceKind == EventLogQuerySourceKind.Auto
-                ? query.QueryXml.IndexOf(
-                      "file://",
-                      StringComparison.OrdinalIgnoreCase) >= 0
-                    ? EventLogQuerySourceKind.File
-                    : EventLogQuerySourceKind.Channel
-                : query.SourceKind;
+        IReadOnlyList<EventLogQuerySourceKind> sourceKinds =
+            query.ResolveSourceKinds();
+        if (sourceKinds.Count != 1) {
+            throw new ArgumentException(
+                "A native structured EVTX export cannot mix channel and offline-file Query elements.",
+                nameof(query));
+        }
+        EventLogQuerySourceKind sourceKind = sourceKinds[0];
         if (sourceKind == EventLogQuerySourceKind.File && remote) {
             throw new ArgumentException(
                 "A file-based structured export must run locally.",

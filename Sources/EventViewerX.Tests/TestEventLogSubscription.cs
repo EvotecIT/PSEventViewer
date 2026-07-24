@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using Xunit;
 
 namespace EventViewerX.Tests;
@@ -83,6 +84,159 @@ public sealed class TestEventLogSubscription {
         Assert.Null(failure);
         Assert.NotNull(received);
         Assert.Equal(current.RecordId, received!.RecordId);
+    }
+
+    [Fact]
+    public void EventCallbackCanDisposeItsSubscriptionWithoutDeadlock() {
+        if (!OperatingSystem.IsWindows()) {
+            return;
+        }
+        _ = EventLogEngine.ReadChannel(
+            new EventLogChannelQuery("System") {
+                ReadMode = EventReadMode.Metadata,
+                MaxEvents = 1
+            }).Single();
+        using var assigned = new ManualResetEventSlim();
+        using var callbackCompleted = new ManualResetEventSlim();
+        EventLogSubscription? subscription = null;
+        EventLogSubscriptionFailure? failure = null;
+        int callbacks = 0;
+        try {
+            subscription = new EventLogSubscription(
+                new EventLogSubscriptionQuery("System") {
+                    XPath = "*",
+                    Start = EventLogSubscriptionStart.Oldest,
+                    ReadMode = EventReadMode.Metadata
+                },
+                _ => {
+                    Interlocked.Increment(ref callbacks);
+                    if (!assigned.Wait(TimeSpan.FromSeconds(10))) {
+                        return;
+                    }
+                    subscription!.Dispose();
+                    callbackCompleted.Set();
+                },
+                subscriptionFailure => {
+                    failure = subscriptionFailure;
+                    callbackCompleted.Set();
+                });
+            assigned.Set();
+
+            Assert.True(
+                callbackCompleted.Wait(TimeSpan.FromSeconds(10)));
+            Assert.Null(failure);
+            Thread.Sleep(100);
+            Assert.Equal(
+                1,
+                Volatile.Read(ref callbacks));
+        } finally {
+            subscription?.Dispose();
+        }
+    }
+
+    [Fact]
+    public void FailureCallbackCanDisposeItsSubscriptionWithoutDeadlock() {
+        if (!OperatingSystem.IsWindows()) {
+            return;
+        }
+        EventObject current = EventLogEngine.ReadChannel(
+            new EventLogChannelQuery("System") {
+                ReadMode = EventReadMode.Metadata,
+                MaxEvents = 1
+            }).Single();
+        using var assigned = new ManualResetEventSlim();
+        using var callbackCompleted = new ManualResetEventSlim();
+        EventLogSubscription? subscription = null;
+        EventLogSubscriptionFailure? failure = null;
+        try {
+            subscription = new EventLogSubscription(
+                new EventLogSubscriptionQuery("System") {
+                    XPath =
+                        $"*[System[EventRecordID={current.RecordId!.Value}]]",
+                    Start = EventLogSubscriptionStart.Oldest,
+                    ReadMode = EventReadMode.Metadata
+                },
+                _ => throw new InvalidOperationException(
+                    "callback failure"),
+                subscriptionFailure => {
+                    failure = subscriptionFailure;
+                    if (!assigned.Wait(TimeSpan.FromSeconds(10))) {
+                        return;
+                    }
+                    subscription!.Dispose();
+                    callbackCompleted.Set();
+                });
+            assigned.Set();
+
+            Assert.True(
+                callbackCompleted.Wait(TimeSpan.FromSeconds(10)));
+            Assert.NotNull(failure);
+            Assert.False(failure!.Terminal);
+            Assert.IsType<InvalidOperationException>(
+                failure.Exception);
+        } finally {
+            subscription?.Dispose();
+        }
+    }
+
+    [Fact]
+    public void StructuredSubscriptionUsesEachEventsNativeContainerLog() {
+        if (!OperatingSystem.IsWindows()) {
+            return;
+        }
+        EventObject system = EventLogEngine.ReadChannel(
+            new EventLogChannelQuery("System") {
+                ReadMode = EventReadMode.Metadata,
+                MaxEvents = 1
+            }).Single();
+        EventObject application = EventLogEngine.ReadChannel(
+            new EventLogChannelQuery("Application") {
+                ReadMode = EventReadMode.Metadata,
+                MaxEvents = 1
+            }).Single();
+        string queryXml =
+            "<QueryList>" +
+            "<Query Id=\"0\" Path=\"System\">" +
+            "<Select Path=\"System\">" +
+            $"*[System[EventRecordID={system.RecordId!.Value}]]" +
+            "</Select></Query>" +
+            "<Query Id=\"1\" Path=\"Application\">" +
+            "<Select Path=\"Application\">" +
+            $"*[System[EventRecordID={application.RecordId!.Value}]]" +
+            "</Select></Query>" +
+            "</QueryList>";
+        var received =
+            new ConcurrentDictionary<string, EventObject>(
+                StringComparer.OrdinalIgnoreCase);
+        using var delivered = new CountdownEvent(2);
+        EventLogSubscriptionFailure? failure = null;
+        using var subscription = new EventLogSubscription(
+            new EventLogSubscriptionQuery("System") {
+                XPath = queryXml,
+                Start = EventLogSubscriptionStart.Oldest,
+                ReadMode = EventReadMode.Metadata
+            },
+            eventObject => {
+                if (received.TryAdd(
+                        eventObject.LogName,
+                        eventObject)) {
+                    delivered.Signal();
+                }
+            },
+            subscriptionFailure => {
+                failure = subscriptionFailure;
+            });
+
+        Assert.True(delivered.Wait(TimeSpan.FromSeconds(10)));
+        Assert.Null(failure);
+        Assert.Equal(
+            "System",
+            received["System"].ContainerLog,
+            ignoreCase: true);
+        Assert.Equal(
+            "Application",
+            received["Application"].ContainerLog,
+            ignoreCase: true);
     }
 
     [Fact]

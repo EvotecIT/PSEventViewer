@@ -1,4 +1,34 @@
 Describe 'Get-EVXEvent checkpoint compatibility' {
+    It 'preserves SuppressHashFilter for checkpointed channel queries' {
+        $CheckpointPath = Join-Path $TestDrive 'suppressed-checkpoint.json'
+        $Latest = Get-EVXEvent `
+            -LogName System `
+            -MaxEvents 1 `
+            -ReadMode Metadata
+        if (-not $Latest) {
+            Set-ItResult -Skipped -Because 'The System event log contained no events.'
+            return
+        }
+
+        $Events = @(
+            Get-EVXEvent `
+                -FilterHashtable @{
+                    LogName = 'System'
+                    StartTime = $Latest.TimeCreated.AddSeconds(-1)
+                    EndTime = $Latest.TimeCreated.AddSeconds(1)
+                    SuppressHashFilter = @{
+                        Id = $Latest.Id
+                    }
+                } `
+                -RecordIdFile $CheckpointPath `
+                -RecordIdKey 'suppressed' `
+                -MaxEvents 10 `
+                -ReadMode Metadata
+        )
+
+        $Events.Id | Should -Not -Contain $Latest.Id
+    }
+
     It 'honors legacy default keys instead of replaying records after upgrade' {
         $Latest = Get-EVXEvent -LogName System -MaxEvents 1 -ReadMode Metadata | Select-Object -First 1
         if (-not $Latest -or -not $Latest.RecordId) {

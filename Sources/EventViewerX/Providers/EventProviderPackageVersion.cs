@@ -4,9 +4,9 @@ internal sealed class EventProviderPackageVersion :
     IComparable<EventProviderPackageVersion> {
 
     private EventProviderPackageVersion(
-        int major,
-        int minor,
-        int patch,
+        string major,
+        string minor,
+        string patch,
         string prerelease) {
 
         Major = major;
@@ -15,9 +15,9 @@ internal sealed class EventProviderPackageVersion :
         Prerelease = prerelease;
     }
 
-    internal int Major { get; }
-    internal int Minor { get; }
-    internal int Patch { get; }
+    internal string Major { get; }
+    internal string Minor { get; }
+    internal string Patch { get; }
     internal string Prerelease { get; }
 
     internal static EventProviderPackageVersion Parse(string value) {
@@ -40,9 +40,9 @@ internal sealed class EventProviderPackageVersion :
             2);
         string[] numbers = releaseParts[0].Split('.');
         if (numbers.Length != 3 ||
-            !TryNumber(numbers[0], out int major) ||
-            !TryNumber(numbers[1], out int minor) ||
-            !TryNumber(numbers[2], out int patch)) {
+            !IsValidCoreNumber(numbers[0]) ||
+            !IsValidCoreNumber(numbers[1]) ||
+            !IsValidCoreNumber(numbers[2])) {
             throw new FormatException(
                 $"Provider package version '{value}' must be SemVer in major.minor.patch form.");
         }
@@ -58,9 +58,9 @@ internal sealed class EventProviderPackageVersion :
                 $"Provider package version '{value}' contains an invalid prerelease identifier.");
         }
         return new EventProviderPackageVersion(
-            major,
-            minor,
-            patch,
+            numbers[0],
+            numbers[1],
+            numbers[2],
             prerelease);
     }
 
@@ -68,15 +68,21 @@ internal sealed class EventProviderPackageVersion :
         if (other == null) {
             return 1;
         }
-        int comparison = Major.CompareTo(other.Major);
+        int comparison = CompareNumericIdentifiers(
+            Major,
+            other.Major);
         if (comparison != 0) {
             return comparison;
         }
-        comparison = Minor.CompareTo(other.Minor);
+        comparison = CompareNumericIdentifiers(
+            Minor,
+            other.Minor);
         if (comparison != 0) {
             return comparison;
         }
-        comparison = Patch.CompareTo(other.Patch);
+        comparison = CompareNumericIdentifiers(
+            Patch,
+            other.Patch);
         if (comparison != 0) {
             return comparison;
         }
@@ -97,14 +103,14 @@ internal sealed class EventProviderPackageVersion :
             if (index >= right.Length) {
                 return 1;
             }
-            bool leftNumeric = int.TryParse(
-                left[index],
-                out int leftNumber);
-            bool rightNumeric = int.TryParse(
-                right[index],
-                out int rightNumber);
+            bool leftNumeric =
+                IsNumericIdentifier(left[index]);
+            bool rightNumeric =
+                IsNumericIdentifier(right[index]);
             if (leftNumeric && rightNumeric) {
-                comparison = leftNumber.CompareTo(rightNumber);
+                comparison = CompareNumericIdentifiers(
+                    left[index],
+                    right[index]);
             } else if (leftNumeric) {
                 comparison = -1;
             } else if (rightNumeric) {
@@ -121,12 +127,27 @@ internal sealed class EventProviderPackageVersion :
         return 0;
     }
 
-    private static bool TryNumber(string value, out int number) {
-        if (value.Length > 1 && value[0] == '0') {
-            number = 0;
-            return false;
-        }
-        return int.TryParse(value, out number) && number >= 0;
+    private static int CompareNumericIdentifiers(
+        string left,
+        string right) {
+
+        int lengthComparison =
+            left.Length.CompareTo(right.Length);
+        return lengthComparison != 0
+            ? lengthComparison
+            : string.CompareOrdinal(left, right);
+    }
+
+    private static bool IsValidCoreNumber(string value) {
+        return IsNumericIdentifier(value) &&
+               (value.Length == 1 || value[0] != '0');
+    }
+
+    private static bool IsNumericIdentifier(string value) {
+        return value.Length > 0 &&
+               value.All(static character =>
+                   character >= '0' &&
+                   character <= '9');
     }
 
     private static bool ValidIdentifiers(
@@ -139,17 +160,23 @@ internal sealed class EventProviderPackageVersion :
         foreach (string identifier in value.Split('.')) {
             if (identifier.Length == 0 ||
                 identifier.Any(static character =>
-                    !char.IsLetterOrDigit(character) &&
+                    !IsAsciiLetterOrDigit(character) &&
                     character != '-')) {
                 return false;
             }
             if (rejectNumericLeadingZero &&
                 identifier.Length > 1 &&
                 identifier[0] == '0' &&
-                identifier.All(char.IsDigit)) {
+                IsNumericIdentifier(identifier)) {
                 return false;
             }
         }
         return true;
+    }
+
+    private static bool IsAsciiLetterOrDigit(char character) {
+        return character >= '0' && character <= '9' ||
+               character >= 'A' && character <= 'Z' ||
+               character >= 'a' && character <= 'z';
     }
 }

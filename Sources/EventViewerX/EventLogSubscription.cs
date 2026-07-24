@@ -19,6 +19,7 @@ public sealed class EventLogSubscription : IDisposable {
     private readonly ManualResetEvent _signal = new(initialState: false);
     private readonly CancellationTokenSource _stop = new();
     private readonly CancellationToken _stopToken;
+    private readonly AsyncLocal<int> _callbackDepth = new();
     private readonly WindowsEventNativeMethods.EventHandle? _session;
     private readonly WindowsEventNativeMethods.EventHandle? _bookmark;
     private readonly WindowsEventSnapshotProjector? _projector;
@@ -29,8 +30,6 @@ public sealed class EventLogSubscription : IDisposable {
     private int _stopping;
     private int _disposed;
     private int _resourcesDisposed;
-    private int _producerThreadId;
-    private int _consumerThreadId;
     private long _eventsDelivered;
 
     /// <summary>Starts a native subscription.</summary>
@@ -78,17 +77,19 @@ public sealed class EventLogSubscription : IDisposable {
                 }
             }
 
+            bool structuredQuery =
+                IsStructuredQuery(_query.XPath);
             _projector = new WindowsEventSnapshotProjector(
                 _query.ReadMode,
                 _session?.DangerousGetHandle() ?? IntPtr.Zero,
                 string.IsNullOrWhiteSpace(machineName)
                     ? Environment.MachineName
                     : machineName,
-                _query.LogName,
+                structuredQuery
+                    ? string.Empty
+                    : _query.LogName,
                 _query.MessageCulture?.LCID ?? 0,
                 _query.FallbackMessageCulture?.LCID ?? 0);
-            bool structuredQuery =
-                IsStructuredQuery(_query.XPath);
             _subscription = WindowsEventNativeMethods.EvtSubscribe(
                 _session?.DangerousGetHandle() ?? IntPtr.Zero,
                 _signal.SafeWaitHandle.DangerousGetHandle(),
@@ -133,9 +134,6 @@ public sealed class EventLogSubscription : IDisposable {
         Volatile.Read(ref _stopping) != 0;
 
     private async Task ProduceAsync() {
-        Volatile.Write(
-            ref _producerThreadId,
-            Environment.CurrentManagedThreadId);
         try {
             WaitHandle[] waits = {
                 _signal,
@@ -165,7 +163,6 @@ public sealed class EventLogSubscription : IDisposable {
             _ = Task.Run(Dispose);
         } finally {
             _events.Writer.TryComplete();
-            Volatile.Write(ref _producerThreadId, 0);
         }
     }
 
@@ -224,16 +221,16 @@ public sealed class EventLogSubscription : IDisposable {
     }
 
     private async Task ConsumeAsync() {
-        Volatile.Write(
-            ref _consumerThreadId,
-            Environment.CurrentManagedThreadId);
         try {
             while (await _events.Reader.WaitToReadAsync(
                        _stopToken).ConfigureAwait(false)) {
                 while (_events.Reader.TryRead(
                            out EventObject? eventObject)) {
+                    if (_stopToken.IsCancellationRequested) {
+                        return;
+                    }
                     try {
-                        _eventHandler(eventObject);
+                        InvokeEventHandler(eventObject);
                         Interlocked.Increment(
                             ref _eventsDelivered);
                     } catch (Exception exception) {
@@ -249,7 +246,16 @@ public sealed class EventLogSubscription : IDisposable {
         } finally {
             while (_events.Reader.TryRead(out _)) {
             }
-            Volatile.Write(ref _consumerThreadId, 0);
+        }
+    }
+
+    private void InvokeEventHandler(EventObject eventObject) {
+        int previousDepth = _callbackDepth.Value;
+        _callbackDepth.Value = previousDepth + 1;
+        try {
+            _eventHandler(eventObject);
+        } finally {
+            _callbackDepth.Value = previousDepth;
         }
     }
 
@@ -296,12 +302,21 @@ public sealed class EventLogSubscription : IDisposable {
         bool terminal) {
 
         try {
-            _failureHandler?.Invoke(
-                new EventLogSubscriptionFailure(
-                    _query.LogName,
-                    _query.MachineName,
-                    exception,
-                    terminal));
+            if (_failureHandler == null) {
+                return;
+            }
+            int previousDepth = _callbackDepth.Value;
+            _callbackDepth.Value = previousDepth + 1;
+            try {
+                _failureHandler(
+                    new EventLogSubscriptionFailure(
+                        _query.LogName,
+                        _query.MachineName,
+                        exception,
+                        terminal));
+            } finally {
+                _callbackDepth.Value = previousDepth;
+            }
         } catch {
             // Failure reporting cannot unwind producer or consumer ownership.
         }
@@ -329,12 +344,7 @@ public sealed class EventLogSubscription : IDisposable {
 
         RequestStop();
         _externalCancellation.Dispose();
-        int currentThread =
-            Environment.CurrentManagedThreadId;
-        if (currentThread ==
-                Volatile.Read(ref _producerThreadId) ||
-            currentThread ==
-                Volatile.Read(ref _consumerThreadId)) {
+        if (_callbackDepth.Value > 0) {
             _ = Task.Run(WaitAndReleaseResources);
             return;
         }

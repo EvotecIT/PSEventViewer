@@ -409,6 +409,7 @@ public sealed partial class CmdletGetEVXEvent : AsyncPSCmdlet {
         _eventsOutput = 0;
         _managedProviderPatterns =
             Array.Empty<WildcardPattern>();
+        _offlineProvidersByPath.Clear();
         ValidateRecordOptions();
         InitializeCheckpointKey();
 

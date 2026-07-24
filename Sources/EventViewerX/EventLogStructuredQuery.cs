@@ -48,6 +48,16 @@ public sealed class EventLogStructuredQuery {
     /// <summary>Kind of source referenced by the QueryList.</summary>
     public EventLogQuerySourceKind SourceKind { get; set; }
 
+    /// <summary>
+    /// Resolves and validates the distinct channel or offline-file source kinds
+    /// declared by the QueryList paths.
+    /// </summary>
+    public IReadOnlyList<EventLogQuerySourceKind> ResolveSourceKinds() {
+        return EventLogStructuredQueryParser.ResolveSourceKinds(
+            QueryXml,
+            SourceKind);
+    }
+
     /// <summary>Remote computer name. A null or empty value targets the local computer.</summary>
     public string? MachineName { get; set; }
 
