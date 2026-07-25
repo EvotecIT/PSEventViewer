@@ -71,25 +71,29 @@ public sealed class TestRemoteConnectionBudget {
                 .ToArray();
         Task[] producers =
             buffers.Select(buffer =>
-                    Task.Run(() => {
-                        using IEnumerator<EventObject> events =
-                            Enumerable.Range(0, 3)
-                                .Select(index =>
-                                    CreateEvent(index))
-                                .GetEnumerator();
-                        try {
-                            WindowsEventRemoteReader.CopyToBuffer(
-                                events,
-                                buffer,
-                                maxEvents: 0,
-                                readTimeoutMilliseconds: 1000,
-                                slotTimeoutMessage:
-                                    "Timed out waiting for a native read slot.",
-                                cancellation.Token);
-                        } catch (OperationCanceledException)
-                            when (cancellation.IsCancellationRequested) {
-                        }
-                    }))
+                    Task.Factory.StartNew(
+                        () => {
+                            using IEnumerator<EventObject> events =
+                                Enumerable.Range(0, 3)
+                                    .Select(index =>
+                                        CreateEvent(index))
+                                    .GetEnumerator();
+                            try {
+                                WindowsEventRemoteReader.CopyToBuffer(
+                                    events,
+                                    buffer,
+                                    maxEvents: 0,
+                                    readTimeoutMilliseconds: 1000,
+                                    slotTimeoutMessage:
+                                        "Timed out waiting for a native read slot.",
+                                    cancellation.Token);
+                            } catch (OperationCanceledException)
+                                when (cancellation.IsCancellationRequested) {
+                            }
+                        },
+                        CancellationToken.None,
+                        TaskCreationOptions.LongRunning,
+                        TaskScheduler.Default))
                 .ToArray();
         try {
             Assert.True(
