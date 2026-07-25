@@ -39,7 +39,7 @@ public sealed class CmdletGetEVXPowerShellScript : PowerShellScriptQueryCmdletBa
 
     /// <summary>Retrieves matching scripts and writes each result or saved path to the pipeline.</summary>
     protected override Task ProcessRecordAsync() {
-        string?[] machines = MachineName ?? new string?[] { null };
+        string?[] machines = GetQueryTargets();
         foreach (string? machine in machines) {
             CancelToken.ThrowIfCancellationRequested();
             var queryInfo = new PowerShellScriptQueryExecutionInfo();

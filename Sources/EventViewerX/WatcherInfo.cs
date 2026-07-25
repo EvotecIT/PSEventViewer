@@ -60,6 +60,7 @@ namespace EventViewerX {
             Timeout = timeout;
             _staging = staging;
             Watcher = new WatchEvents(new InternalLogger(false));
+            Watcher.Stopped += OnWatcherStopped;
             SubscriptionQueries = new[] {
                 subscriptionQuery == null
                     ? CreateSubscriptionQuery(
@@ -268,6 +269,13 @@ namespace EventViewerX {
             }
         }
 
+        private void OnWatcherStopped(
+            object? sender,
+            EventArgs args) {
+
+            ScheduleStop();
+        }
+
         /// <summary>Stops the watcher, disposes resources, and records end time.</summary>
         public void Stop() {
             bool stoppedNow = false;
@@ -277,6 +285,7 @@ namespace EventViewerX {
                 }
                 _stopped = true;
                 Cancellation.Cancel();
+                Watcher.Stopped -= OnWatcherStopped;
                 Watcher.Dispose();
                 Cancellation.Dispose();
                 _cancellationDisposed = true;

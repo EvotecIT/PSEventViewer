@@ -5,6 +5,23 @@ namespace EventViewerX.Tests;
 
 public sealed class TestEventLogSubscription {
     [Fact]
+    public void LogicalSubscriptionStopsOnlyAfterEveryPartitionTerminates() {
+        var lifetime =
+            new EventLogSubscriptionLifetime(
+                subscriptionCount: 2);
+
+        Assert.False(
+            lifetime.MarkTerminal(
+                subscriptionIndex: 0));
+        Assert.False(
+            lifetime.MarkTerminal(
+                subscriptionIndex: 0));
+        Assert.True(
+            lifetime.MarkTerminal(
+                subscriptionIndex: 1));
+    }
+
+    [Fact]
     public void OldestSubscriptionDeliversAnExistingExactRecord() {
         if (!OperatingSystem.IsWindows()) return;
         var currentQuery = new EventLogChannelQuery("System") {

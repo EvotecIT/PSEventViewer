@@ -16,7 +16,7 @@ public sealed class CmdletGetEVXPowerShellScriptExecution : PowerShellScriptQuer
 
     /// <summary>Retrieves execution-context records and writes completion information when requested.</summary>
     protected override Task ProcessRecordAsync() {
-        string?[] machines = MachineName ?? new string?[] { null };
+        string?[] machines = GetQueryTargets();
         foreach (string? machine in machines) {
             CancelToken.ThrowIfCancellationRequested();
             var queryInfo = new PowerShellScriptQueryExecutionInfo();

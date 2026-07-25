@@ -98,13 +98,15 @@ public static class EventLogProbe {
                         probeCancellation.Token),
                     out scanned);
 
-            recordCount = TryReadRecordCount(
-                logName,
-                machineName,
-                credential,
-                authentication,
-                effectiveTimeout -
-                stopwatch.Elapsed);
+            recordCount = RunCancelableProbeStage(
+                () => TryReadRecordCount(
+                    logName,
+                    machineName,
+                    credential,
+                    authentication,
+                    effectiveTimeout -
+                    stopwatch.Elapsed),
+                probeCancellation.Token);
             if (eventTimeUtc.HasValue) {
                 return new EventLogProbeResult(
                     logName,
@@ -174,6 +176,20 @@ public static class EventLogProbe {
                 .ToUniversalTime();
         }
         return null;
+    }
+
+    internal static T RunCancelableProbeStage<T>(
+        Func<T> stage,
+        CancellationToken cancellationToken) {
+
+        if (stage == null) {
+            throw new ArgumentNullException(
+                nameof(stage));
+        }
+        cancellationToken.ThrowIfCancellationRequested();
+        T result = stage();
+        cancellationToken.ThrowIfCancellationRequested();
+        return result;
     }
 
     private static long? TryReadRecordCount(

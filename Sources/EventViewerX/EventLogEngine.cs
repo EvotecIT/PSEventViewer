@@ -156,6 +156,13 @@ public static partial class EventLogEngine {
                     .GetFileSourceIdentity(source.Query))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
+        if (!string.IsNullOrWhiteSpace(
+                query.BookmarkXml) &&
+            query.GetIndependentSourceCount() > 1) {
+            throw new ArgumentException(
+                "A native bookmark can only resume one independent structured-query source.",
+                nameof(query));
+        }
         if (sourceKinds.Length > 1 ||
             fileSources.Length > 1) {
             var splitBatch =

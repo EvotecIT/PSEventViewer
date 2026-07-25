@@ -6,16 +6,29 @@ using System.Security.Principal;
 namespace EventViewerX.Native;
 
 internal sealed class WindowsEventSystemRenderer : IDisposable {
-    private readonly NativeEventBuffer _buffer = new();
+    private readonly NativeEventBuffer _buffer;
     private readonly WindowsEventNativeMethods.EventHandle _renderContext;
 
     internal WindowsEventSystemRenderer() {
-        _renderContext = WindowsEventNativeMethods.EvtCreateRenderContext(
+        WindowsEventNativeMethods.EventHandle renderContext =
+            WindowsEventNativeMethods.EvtCreateRenderContext(
             0,
             null,
             WindowsEventNativeMethods.RenderContextFlags.System);
-        if (_renderContext.IsInvalid) {
-            throw new Win32Exception(Marshal.GetLastWin32Error(), "Failed to create the Windows event system render context.");
+        if (renderContext.IsInvalid) {
+            int error = Marshal.GetLastWin32Error();
+            renderContext.Dispose();
+            throw new Win32Exception(
+                error,
+                "Failed to create the Windows event system render context.");
+        }
+
+        try {
+            _buffer = new NativeEventBuffer();
+            _renderContext = renderContext;
+        } catch {
+            renderContext.Dispose();
+            throw;
         }
     }
 

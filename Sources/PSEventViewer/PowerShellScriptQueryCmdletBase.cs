@@ -11,12 +11,18 @@ public abstract class PowerShellScriptQueryCmdletBase : AsyncPSCmdlet {
     [Parameter(Mandatory = true, Position = 0)]
     public PowerShellEdition Type { get; set; }
 
-    /// <summary>Computer names to query. When omitted, the local machine is used.</summary>
+    /// <summary>
+    /// Computer names to query. When omitted, the local machine is used.
+    /// This cannot be combined with <see cref="EventLogPath"/>.
+    /// </summary>
     [Alias("ComputerName")]
     [Parameter]
     public string?[]? MachineName { get; set; }
 
-    /// <summary>Exported EVTX file to query instead of a live operational log.</summary>
+    /// <summary>
+    /// Exported EVTX file to query locally instead of a live operational log.
+    /// This cannot be combined with <see cref="MachineName"/>.
+    /// </summary>
     [Parameter]
     public string? EventLogPath { get; set; }
 
@@ -36,6 +42,25 @@ public abstract class PowerShellScriptQueryCmdletBase : AsyncPSCmdlet {
     /// <summary>Emits a machine-readable completion record after each computer.</summary>
     [Parameter]
     public SwitchParameter IncludeQueryInfo { get; set; }
+
+    /// <summary>
+    /// Returns the live targets or the single local offline-file target after
+    /// validating that mutually exclusive source models were not combined.
+    /// </summary>
+    protected string?[] GetQueryTargets() {
+        if (!string.IsNullOrWhiteSpace(
+                EventLogPath)) {
+            if (MachineName is { Length: > 0 }) {
+                throw new PSArgumentException(
+                    "EventLogPath reads a local EVTX file and cannot be combined with MachineName.",
+                    nameof(MachineName));
+            }
+            return new string?[] { null };
+        }
+        return MachineName is { Length: > 0 }
+            ? MachineName
+            : new string?[] { null };
+    }
 
     /// <summary>Writes incomplete-query diagnostics and optionally emits the completion record.</summary>
     protected void WriteQueryCompletion(PowerShellScriptQueryExecutionInfo queryInfo) {

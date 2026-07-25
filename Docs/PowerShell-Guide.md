@@ -431,6 +431,17 @@ Get-EVXPowerShellScriptExecution `
     -MaxEventsScanned 50000
 ```
 
+Use `-EventLogPath` without `-MachineName` to recover from one local exported
+operational log. The file is queried exactly once:
+
+```powershell
+Get-EVXPowerShellScript `
+    -Type WindowsPowerShell `
+    -EventLogPath C:\Logs\WindowsPowerShell-Operational.evtx `
+    -Path C:\RecoveredScripts `
+    -MaxScripts 100
+```
+
 The scan limits are intentional resource bounds, not result counts. The engine
 uses a one-record lookahead so hitting a limit is reported as truncation only
 when another matching record actually exists. See

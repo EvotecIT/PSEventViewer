@@ -14,6 +14,17 @@ Describe 'Get-EVXPowerShellScript bounded query contract' {
         { Get-EVXPowerShellScript -Type WindowsPowerShell -MaxPendingScripts 0 } | Should -Throw
     }
 
+    It 'Rejects machine fan-out for a local offline event log' {
+        $EventLogPath = Join-Path $PSScriptRoot 'Logs\NamedFilterExamples.evtx'
+
+        {
+            Get-EVXPowerShellScript -Type WindowsPowerShell -EventLogPath $EventLogPath -MachineName 'server-1', 'server-2'
+        } | Should -Throw '*EventLogPath*cannot be combined with MachineName*'
+        {
+            Get-EVXPowerShellScriptExecution -Type WindowsPowerShell -EventLogPath $EventLogPath -MachineName 'server-1'
+        } | Should -Throw '*EventLogPath*cannot be combined with MachineName*'
+    }
+
     It 'exposes execution records through a dedicated canonical cmdlet' {
         $command = Get-Command -Name Get-EVXPowerShellScriptExecution -ErrorAction Stop
 

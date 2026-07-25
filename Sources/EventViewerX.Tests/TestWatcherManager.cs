@@ -295,6 +295,56 @@ namespace EventViewerX.Tests {
         }
 
         [Fact]
+        public void LastTerminalSubscriptionRetiresTheLogicalWatcher() {
+            WatcherManager.StopAll();
+            string watcherName =
+                "unit-terminal-" +
+                Guid.NewGuid().ToString("N");
+            WatcherInfo? info = null;
+            try {
+                info = WatcherManager.StartWatcher(
+                    watcherName,
+                    Environment.MachineName,
+                    "Application",
+                    new List<int> { 1 },
+                    new List<NamedEvents>(),
+                    _ => { },
+                    false,
+                    false,
+                    0,
+                    null);
+                EventHandler? stopped =
+                    Assert.IsType<EventHandler>(
+                        typeof(WatchEvents)
+                            .GetField(
+                                "Stopped",
+                                BindingFlags.Instance |
+                                BindingFlags.NonPublic)!
+                            .GetValue(info.Watcher));
+
+                stopped(
+                    info.Watcher,
+                    EventArgs.Empty);
+
+                Assert.True(
+                    SpinWait.SpinUntil(
+                        () => info.IsStopped,
+                        TimeSpan.FromSeconds(5)));
+                Assert.DoesNotContain(
+                    info,
+                    WatcherManager.GetWatchers(
+                        watcherName));
+            } finally {
+                if (info != null &&
+                    !info.IsStopped) {
+                    WatcherManager.StopWatcher(
+                        info.Id);
+                }
+                WatcherManager.StopAll();
+            }
+        }
+
+        [Fact]
         public void StartWatcherIsThreadSafe() {
             WatcherManager.StopAll();
             var tasks = new List<Task<WatcherInfo>>();

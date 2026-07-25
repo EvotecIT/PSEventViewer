@@ -170,7 +170,10 @@ for this filter. `EventFilterCompiler.BuildXPath` rejects
 where that field is absent while excluding a matching value.
 
 Use `EventLogStructuredQuery` for an existing native `QueryList` containing
-multiple Select/Suppress paths.
+multiple Select/Suppress paths. A native bookmark identifies one independent
+query handle, so bookmarked structured reads must target one channel session
+or one offline file; split multi-file or mixed-source reads reject one shared
+bookmark instead of seeking unrelated sources.
 
 ## Export without object-per-record application code
 
@@ -217,7 +220,10 @@ Console.ReadLine();
 ```
 
 Subscriptions support local/remote sessions, future/oldest/bookmark starts,
-strict or tolerant bookmarks, bounded handle queues, and cancellation.
+strict or tolerant bookmarks, bounded handle queues, and cancellation. A
+managed watcher remains active while any partitioned native subscription is
+healthy and retires itself after the last subscription reports a terminal
+failure.
 `EventLogSubscriptionQuery.XPath` also accepts QueryList XML when a
 subscription needs native `Suppress` clauses; build it with
 `EventFilterCompiler.BuildChannelQueryXml`.

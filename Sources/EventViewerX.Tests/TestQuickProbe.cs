@@ -83,6 +83,20 @@ namespace EventViewerX.Tests {
         }
 
         [Fact]
+        public void OptionalProbeStageCannotReportSuccessAfterCancellation() {
+            using var cancellation =
+                new CancellationTokenSource();
+
+            Assert.Throws<OperationCanceledException>(() =>
+                EventLogProbe.RunCancelableProbeStage(
+                    () => {
+                        cancellation.Cancel();
+                        return 1L;
+                    },
+                    cancellation.Token));
+        }
+
+        [Fact]
         public void ProbeLatestEventRejectsCredentialsForLocalSessions() {
             var credential = new NetworkCredential(
                 "eventviewerx-test",

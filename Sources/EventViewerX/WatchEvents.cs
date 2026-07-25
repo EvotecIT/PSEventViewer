@@ -15,6 +15,8 @@ namespace EventViewerX {
         private readonly List<EventLogSubscription> _subscriptions = new();
         private CancellationTokenRegistration _cancellationRegistration;
         private bool _hasCancellationRegistration;
+        private EventLogSubscriptionLifetime?
+            _subscriptionLifetime;
         private Action<EventObject>? _eventAction;
         private string? _machineName;
         private int _eventsFound;
@@ -36,6 +38,9 @@ namespace EventViewerX {
 
         /// <summary>Raised when the native subscription reports a recoverable or terminal failure.</summary>
         public event EventHandler<EventLogSubscriptionFailure>? SubscriptionFailed;
+
+        /// <summary>Raised when every native subscription owned by this logical watcher has terminated.</summary>
+        public event EventHandler? Stopped;
 
         /// <summary>Indicates whether staging event ID 350 is included.</summary>
         public bool StagingEnabled { get; private set; }
@@ -240,13 +245,26 @@ namespace EventViewerX {
                 StartTime = DateTime.UtcNow;
                 StagingEnabled = staging;
                 StagingEnabledBy = staging ? enabledBy ?? Environment.UserName : null;
+                var subscriptionLifetime =
+                    new EventLogSubscriptionLifetime(
+                        queries.Count);
+                _subscriptionLifetime =
+                    subscriptionLifetime;
 
                 try {
-                    foreach (EventLogSubscriptionQuery query in queries) {
+                    for (int index = 0;
+                         index < queries.Count;
+                         index++) {
+                        EventLogSubscriptionQuery query =
+                            queries[index];
+                        int subscriptionIndex = index;
                         _subscriptions.Add(new EventLogSubscription(
                             query,
                             DetectEvent,
-                            DetectFailure));
+                            failure => DetectFailure(
+                                subscriptionLifetime,
+                                subscriptionIndex,
+                                failure)));
                     }
                 } catch {
                     DisposeCore();
@@ -287,8 +305,25 @@ namespace EventViewerX {
             }
         }
 
-        private void DetectFailure(EventLogSubscriptionFailure failure) {
-            LastFailure = failure;
+        private void DetectFailure(
+            EventLogSubscriptionLifetime subscriptionLifetime,
+            int subscriptionIndex,
+            EventLogSubscriptionFailure failure) {
+
+            bool stopped = false;
+            lock (_lifecycleSync) {
+                if (!ReferenceEquals(
+                        _subscriptionLifetime,
+                        subscriptionLifetime)) {
+                    return;
+                }
+                LastFailure = failure;
+                if (failure.Terminal) {
+                    stopped =
+                        subscriptionLifetime.MarkTerminal(
+                            subscriptionIndex);
+                }
+            }
             _instanceLogger.WriteWarning(
                 "Event log subscription failed: {0}",
                 failure.Exception.Message.Trim());
@@ -297,6 +332,18 @@ namespace EventViewerX {
             } catch (Exception exception) {
                 _instanceLogger.WriteWarning(
                     "Event watcher failure callback threw: {0}",
+                    exception.Message.Trim());
+            }
+            if (!stopped) {
+                return;
+            }
+            try {
+                Stopped?.Invoke(
+                    this,
+                    EventArgs.Empty);
+            } catch (Exception exception) {
+                _instanceLogger.WriteWarning(
+                    "Event watcher stopped callback threw: {0}",
                     exception.Message.Trim());
             }
         }
@@ -348,6 +395,7 @@ namespace EventViewerX {
                 subscription.Dispose();
             }
             _subscriptions.Clear();
+            _subscriptionLifetime = null;
             _watchEventIds = new HashSet<int>();
             _eventAction = null;
             StagingEnabled = false;

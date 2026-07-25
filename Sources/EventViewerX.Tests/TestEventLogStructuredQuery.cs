@@ -32,4 +32,26 @@ public class TestEventLogStructuredQuery {
             1,
             query.GetIndependentSourceCount());
     }
+
+    [Fact]
+    public void MultiSourceStructuredReadRejectsOneBookmarkBeforeSplitting() {
+        EventLogStructuredQuery query =
+            EventLogStructuredQuery.ForFiles(
+                new[] {
+                    Path.GetFullPath("first.evtx"),
+                    Path.GetFullPath("second.evtx")
+                });
+        query.BookmarkXml = "<BookmarkList />";
+
+        ArgumentException exception =
+            Assert.Throws<ArgumentException>(() =>
+                EventLogEngine
+                    .ReadStructured(query)
+                    .ToArray());
+
+        Assert.Contains(
+            "one independent structured-query source",
+            exception.Message,
+            StringComparison.OrdinalIgnoreCase);
+    }
 }
