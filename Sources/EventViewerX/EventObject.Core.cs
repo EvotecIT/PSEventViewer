@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics.Eventing.Reader;
 using System.Linq;
 using System.Security.Principal;
+using EventViewerX.Native;
 
 namespace EventViewerX;
 
@@ -73,6 +74,15 @@ public partial class EventObject {
     /// the low-allocation path; set IncludeBookmark on the query when a native bookmark is required.
     /// </summary>
     public EventBookmark? Bookmark { get; }
+
+    /// <summary>
+    /// Portable XML representation of <see cref="Bookmark"/> that can be passed to a subsequent query.
+    /// </summary>
+    /// <remarks>
+    /// Unlike the framework bookmark object, this property is available consistently on .NET Framework,
+    /// modern .NET, Windows PowerShell 5.1, and PowerShell 7.
+    /// </remarks>
+    public string? BookmarkXml => Bookmark == null ? null : EventBookmarkXml.Get(Bookmark);
 
     /// <summary>Provider-formatted event message, when requested by <see cref="ReadMode"/>.</summary>
     public string Message => _message;

@@ -103,12 +103,7 @@ public sealed partial class CmdletGetEVXEvent {
         EventLogBatchQuery batch = batches.Count == 1
             ? batches[0]
             : EventLogBatchQuery.Combine(batches);
-        int sourceCount =
-            batch.ChannelQueries.Count +
-            batch.FileQueries.Count +
-            batch.StructuredQueries.Count;
-        ValidateBookmarkFanOut(sourceCount);
-        batch = EventLogBatchConsolidator.Consolidate(batch);
+        batch = ConsolidateAndValidateBookmarkFanOut(batch);
         ConfigureBatch(batch);
         return batch;
     }
@@ -259,12 +254,10 @@ public sealed partial class CmdletGetEVXEvent {
             }
         }
 
-        int sourceCount = channels.Count + structured.Count;
-        if (sourceCount == 0) {
+        if (channels.Count + structured.Count == 0) {
             throw new ItemNotFoundException(
                 $"No event channels are linked to provider pattern(s): {string.Join(", ", providerPatterns)}.");
         }
-        ValidateBookmarkFanOut(sourceCount);
         var batches = new List<EventLogBatchQuery>();
         if (channels.Count > 0) {
             batches.Add(EventLogBatchQuery.ForChannels(channels));
@@ -275,6 +268,7 @@ public sealed partial class CmdletGetEVXEvent {
         EventLogBatchQuery batch = batches.Count == 1
             ? batches[0]
             : EventLogBatchQuery.Combine(batches);
+        batch = ConsolidateAndValidateBookmarkFanOut(batch);
         ConfigureBatch(batch);
         return batch;
     }
@@ -409,11 +403,10 @@ public sealed partial class CmdletGetEVXEvent {
                 }
             }
         }
-        int sourceCount = channels.Count + structured.Count;
-        ValidateBookmarkFanOut(sourceCount);
         EventLogBatchQuery batch = structured.Count > 0
             ? EventLogBatchQuery.ForStructured(structured)
             : EventLogBatchQuery.ForChannels(channels);
+        batch = ConsolidateAndValidateBookmarkFanOut(batch);
         ConfigureBatch(batch);
         return batch;
     }

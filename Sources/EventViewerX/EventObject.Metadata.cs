@@ -120,6 +120,18 @@ public partial class EventObject {
         string containerLog)
         : this(
             metadata,
+            bookmark: null,
+            queriedMachine,
+            containerLog) {
+    }
+
+    internal EventObject(
+        NativeEventMetadata metadata,
+        EventBookmark? bookmark,
+        string queriedMachine,
+        string containerLog)
+        : this(
+            metadata,
             EventReadMode.Metadata,
             queriedMachine,
             containerLog,
@@ -127,7 +139,7 @@ public partial class EventObject {
             string.Empty,
             EventMessageRenderStatus.NotRequested,
             0,
-            null,
+            bookmark,
             Array.Empty<EventPropertyValue>(),
             LevelToDisplayName(metadata.Level),
             string.Empty,

@@ -108,6 +108,30 @@ $query = @'
 Get-EVXEvent -FilterXml $query -ReadMode Message -MaxEvents 100
 ```
 
+### Resume from a bookmark
+
+Bookmark creation is opt-in so ordinary large scans do not pay for it. Save
+the event's `BookmarkXml` string rather than the framework-specific bookmark
+object; the string works in Windows PowerShell 5.1 and PowerShell 7.
+
+```powershell
+$last = Get-EVXEvent `
+    -LogName System `
+    -ReadMode Metadata `
+    -IncludeBookmark `
+    -MaxEvents 1
+
+$last.BookmarkXml | Set-Content -LiteralPath .\system.bookmark.xml
+
+Get-EVXEvent `
+    -LogName System `
+    -ReadMode Metadata `
+    -BookmarkXml (Get-Content -LiteralPath .\system.bookmark.xml -Raw)
+```
+
+The default bookmark offset resumes after the saved event. Use
+`-BookmarkOffset 0` when the saved event itself must be returned again.
+
 ### Offline EVTX files
 
 ```powershell

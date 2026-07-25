@@ -15,8 +15,12 @@ internal static class WindowsEventReader {
 
         switch (readMode) {
             case EventReadMode.Metadata:
-                foreach (NativeEventMetadata metadata in ReadMetadata(query, cancellationToken)) {
-                    yield return new EventObject(metadata, queriedMachine, containerLog);
+                foreach (EventObject eventObject in ReadMetadataEvents(
+                             query,
+                             queriedMachine,
+                             containerLog,
+                             cancellationToken)) {
+                    yield return eventObject;
                 }
                 break;
             case EventReadMode.Message:
@@ -65,6 +69,28 @@ internal static class WindowsEventReader {
                      cancellationToken,
                      renderer.Render)) {
             yield return metadata;
+        }
+    }
+
+    private static IEnumerable<EventObject> ReadMetadataEvents(
+        NativeEventQuery query,
+        string queriedMachine,
+        string containerLog,
+        CancellationToken cancellationToken) {
+
+        using var systemRenderer = new WindowsEventSystemRenderer();
+        using var bookmarkRenderer = query.IncludeBookmark
+            ? new WindowsEventBookmarkRenderer()
+            : null;
+        foreach (EventObject eventObject in ReadEvents(
+                     query,
+                     cancellationToken,
+                     eventHandle => new EventObject(
+                         systemRenderer.Render(eventHandle),
+                         bookmarkRenderer?.Render(eventHandle),
+                         queriedMachine,
+                         containerLog))) {
+            yield return eventObject;
         }
     }
 

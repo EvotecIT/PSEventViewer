@@ -67,6 +67,32 @@ foreach (EventObject item in EventLogEngine.ReadFiles(
 `ReadFile` and `ReadFiles` use the same typed filtering and projection
 contracts as live channels.
 
+## Resume from a bookmark
+
+Bookmark creation is opt-in. `EventObject.BookmarkXml` exposes the same
+portable string on .NET Framework 4.7.2 and modern .NET:
+
+```csharp
+EventObject last = EventLogEngine.ReadChannel(
+    new EventLogChannelQuery("System") {
+        ReadMode = EventReadMode.Metadata,
+        IncludeBookmark = true,
+        MaxEvents = 1
+    }).Single();
+
+var resumedQuery = new EventLogChannelQuery("System") {
+    ReadMode = EventReadMode.Metadata,
+    BookmarkXml = last.BookmarkXml
+};
+
+foreach (EventObject item in EventLogEngine.ReadChannel(resumedQuery)) {
+    // Starts after the bookmarked event by default.
+}
+```
+
+Persist `BookmarkXml`, not the framework bookmark object. Set
+`BookmarkOffset = 0` when the bookmarked event should be included again.
+
 ## Read several hosts or channels asynchronously
 
 ```csharp

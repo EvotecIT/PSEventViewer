@@ -114,9 +114,11 @@ explicit mode for automation and benchmarks.
 | `RawXml` | Metadata and raw event XML without provider formatting or typed payload projection. | Lowest-cost XML streaming and custom downstream parsers. |
 | `Full` | Message and structured data together, including decoded attachments when present. | Consumers that genuinely need every projection. |
 
-Bookmarks are opt-in with `-IncludeBookmark`. Provider formatting is often the
-largest per-record cost; use `Metadata`, `RawXml`, or `StructuredData` when a
-formatted message is not needed.
+Bookmarks are opt-in with `-IncludeBookmark`. The returned event's
+`BookmarkXml` property is portable across Windows PowerShell 5.1 and
+PowerShell 7 and can be passed directly to a later `-BookmarkXml` query.
+Provider formatting is often the largest per-record cost; use `Metadata`,
+`RawXml`, or `StructuredData` when a formatted message is not needed.
 
 ```powershell
 # English first, then another installed resource culture if English is absent.

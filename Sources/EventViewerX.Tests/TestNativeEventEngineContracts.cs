@@ -59,6 +59,14 @@ public sealed class TestNativeEventEngineContracts {
                         IncludeBookmark = true
                     })
                 .Single();
+        EventObject metadataWithBookmark =
+            EventLogEngine.ReadFile(
+                    new EventLogFileQuery(path) {
+                        MaxEvents = 1,
+                        ReadMode = EventReadMode.Metadata,
+                        IncludeBookmark = true
+                    })
+                .Single();
         EventObject rawXmlWithoutBookmark =
             EventLogEngine.ReadFile(
                     new EventLogFileQuery(path) {
@@ -77,6 +85,8 @@ public sealed class TestNativeEventEngineContracts {
 
         Assert.Null(withoutBookmark.Bookmark);
         Assert.NotNull(withBookmark.Bookmark);
+        Assert.NotNull(metadataWithBookmark.Bookmark);
+        Assert.False(string.IsNullOrWhiteSpace(metadataWithBookmark.BookmarkXml));
         Assert.Null(rawXmlWithoutBookmark.Bookmark);
         Assert.NotNull(rawXmlWithBookmark.Bookmark);
         Assert.False(string.IsNullOrWhiteSpace(

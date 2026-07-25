@@ -52,6 +52,26 @@ public sealed class TestEventProviderPackages {
     }
 
     [Fact]
+    public void RejectsUndefinedMapKindsDuringValidation() {
+        EventProviderDefinition definition = CreateDefinition();
+        definition.Maps.Add(
+            new EventProviderMapDefinition {
+                Name = "Unsupported",
+                Kind = (EventProviderMapKind)int.MaxValue
+            });
+
+        EventProviderValidationResult result =
+            EventProviderDefinitionValidator.Validate(
+                definition);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(
+            result.Issues,
+            issue => issue.Code == "MapKindInvalid" &&
+                     issue.Path == "Maps[0].Kind");
+    }
+
+    [Fact]
     public void RejectsSchemaChangesWithoutAnEventVersionBump() {
         EventProviderDefinition baseline = CreateDefinition();
         EventProviderDefinition candidate = CreateDefinition();

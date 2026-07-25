@@ -339,6 +339,15 @@ public static partial class EventProviderDefinitionValidator {
                 "MapNameRequired",
                 $"Maps[{mapIndex}].Name",
                 issues);
+            if (!Enum.IsDefined(
+                    typeof(EventProviderMapKind),
+                    map.Kind)) {
+                Error(
+                    "MapKindInvalid",
+                    $"Maps[{mapIndex}].Kind",
+                    $"Map kind '{map.Kind}' is not supported.",
+                    issues);
+            }
             var values = new HashSet<long>();
             for (int entryIndex = 0;
                  entryIndex < map.Entries.Count;

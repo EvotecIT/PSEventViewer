@@ -256,6 +256,21 @@ public sealed partial class CmdletGetEVXEvent {
         }
     }
 
+    private EventLogBatchQuery ConsolidateAndValidateBookmarkFanOut(
+        EventLogBatchQuery batch) {
+
+        EventLogBatchQuery consolidated =
+            EventLogBatchConsolidator.Consolidate(batch);
+        int sourceCount = checked(
+            consolidated.ChannelQueries.Count +
+            consolidated.FileQueries.Count +
+            consolidated.StructuredQueries.Sum(
+                static query =>
+                    query.GetIndependentSourceCount()));
+        ValidateBookmarkFanOut(sourceCount);
+        return consolidated;
+    }
+
     private long GetNativeCandidateLimit() {
         if (MaxEventsScanned > 0) {
             return MaxEventsScanned;

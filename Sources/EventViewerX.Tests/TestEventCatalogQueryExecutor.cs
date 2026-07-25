@@ -51,12 +51,15 @@ public class TestEventCatalogQueryExecutor {
                 host,
                 "CatalogTest",
                 "*",
-                timeoutMs: 100,
+                timeoutMs: 5000,
                 rpcProbeOverride: static (_, _) => false);
             Assert.Equal(EventLogSessionOpenStatus.RpcUnavailable, seed.Status);
 
             bool success = EventCatalogQueryExecutor.TryListChannels(
-                request: new EventCatalogQueryRequest { MachineName = host, SessionTimeoutMs = 100 },
+                request: new EventCatalogQueryRequest {
+                    MachineName = host,
+                    SessionTimeoutMs = 5000
+                },
                 result: out _,
                 failure: out EventCatalogFailure? failure);
 

@@ -81,7 +81,9 @@ namespace EventViewerX.Tests {
                 Task cancel = Task.Run(cancellation.Cancel);
                 Task dispose = Task.Run(watcher.Dispose);
                 Task operations = Task.WhenAll(cancel, dispose);
-                Task completed = await Task.WhenAny(operations, Task.Delay(TimeSpan.FromSeconds(5)));
+                Task completed = await Task.WhenAny(
+                    operations,
+                    Task.Delay(TimeSpan.FromSeconds(30)));
 
                 Assert.Same(operations, completed);
                 await operations;

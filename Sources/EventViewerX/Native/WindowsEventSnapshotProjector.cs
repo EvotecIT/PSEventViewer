@@ -36,12 +36,14 @@ internal sealed class WindowsEventSnapshotProjector : IDisposable {
             readMode == EventReadMode.Full) {
             _payloadRenderer = new WindowsEventPayloadRenderer();
         }
+        if (includeBookmark &&
+            (readMode == EventReadMode.Metadata ||
+             readMode == EventReadMode.RawXml)) {
+            _bookmarkRenderer =
+                new WindowsEventBookmarkRenderer();
+        }
         if (readMode == EventReadMode.RawXml) {
             _xmlRenderer = new WindowsEventXmlRenderer();
-            if (includeBookmark) {
-                _bookmarkRenderer =
-                    new WindowsEventBookmarkRenderer();
-            }
         }
     }
 
@@ -51,6 +53,7 @@ internal sealed class WindowsEventSnapshotProjector : IDisposable {
             case EventReadMode.Metadata:
                 return new EventObject(
                     metadata,
+                    _bookmarkRenderer?.Render(eventHandle),
                     _queriedMachine,
                     _containerLog);
             case EventReadMode.Message:

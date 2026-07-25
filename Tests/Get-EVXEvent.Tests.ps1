@@ -750,4 +750,40 @@ Describe 'Get-EVXEvent - bookmark projection' {
         $without.Bookmark | Should -BeNullOrEmpty
         $with.Bookmark | Should -Not -BeNullOrEmpty
     }
+
+    It 'accepts one bookmark after consolidating a partitioned channel filter' {
+        $Latest = Get-EVXEvent `
+            -LogName System `
+            -MaxEvents 1 `
+            -ReadMode Metadata `
+            -IncludeBookmark
+        if ($null -eq $Latest) {
+            Set-ItResult -Skipped -Because 'The System event log is empty.'
+            return
+        }
+
+        $EventIds = [Collections.Generic.List[int]]::new()
+        $EventIds.Add([int] $Latest.Id)
+        $Candidate = 1000001
+        while ($EventIds.Count -lt 23) {
+            if ($Candidate -ne $Latest.Id) {
+                $EventIds.Add($Candidate)
+            }
+            $Candidate++
+        }
+        $Latest.BookmarkXml | Should -Not -BeNullOrEmpty
+
+        $Resumed = @(
+            Get-EVXEvent `
+                -LogName System `
+                -EventId $EventIds `
+                -BookmarkXml $Latest.BookmarkXml `
+                -BookmarkOffset 0 `
+                -MaxEvents 1 `
+                -ReadMode Metadata
+        )
+
+        $Resumed | Should -HaveCount 1
+        $Resumed[0].RecordId | Should -Be $Latest.RecordId
+    }
 }

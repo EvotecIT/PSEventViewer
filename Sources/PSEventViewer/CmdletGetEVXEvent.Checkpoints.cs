@@ -131,6 +131,8 @@ public sealed partial class CmdletGetEVXEvent {
             MessageRegex == null ? string.Empty : CultureInfo.CurrentCulture.Name,
             "MessageCulture",
             MessageCulture?.Name ?? string.Empty,
+            "FallbackMessageCulture",
+            FallbackMessageCulture?.Name ?? string.Empty,
             "Oldest",
             EffectiveOldest.ToString(CultureInfo.InvariantCulture)
         };

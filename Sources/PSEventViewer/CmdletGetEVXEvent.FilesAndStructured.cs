@@ -108,9 +108,11 @@ public sealed partial class CmdletGetEVXEvent {
                         machineName: null));
                 }
             }
-            ValidateBookmarkFanOut(structured.Count);
             EventLogBatchQuery structuredBatch =
                 EventLogBatchQuery.ForStructured(structured);
+            structuredBatch =
+                ConsolidateAndValidateBookmarkFanOut(
+                    structuredBatch);
             ConfigureBatch(structuredBatch);
             return structuredBatch;
         }

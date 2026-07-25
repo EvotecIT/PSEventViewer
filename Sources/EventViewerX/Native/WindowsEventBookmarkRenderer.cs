@@ -65,10 +65,12 @@ internal sealed class WindowsEventBookmarkRenderer : IDisposable {
                 "The Windows Event Log API returned an empty bookmark.");
         }
 #if NET472
-        return CreateEventBookmark(bookmarkXml);
+        EventBookmark eventBookmark = CreateEventBookmark(bookmarkXml);
 #else
-        return new EventBookmark(bookmarkXml);
+        EventBookmark eventBookmark = new(bookmarkXml);
 #endif
+        EventBookmarkXml.Register(eventBookmark, bookmarkXml);
+        return eventBookmark;
     }
 
 #if NET472

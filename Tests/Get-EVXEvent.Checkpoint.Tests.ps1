@@ -141,6 +141,35 @@ Describe 'Get-EVXEvent checkpoint compatibility' {
         @($Persisted.PSObject.Properties).Count | Should -Be 2
     }
 
+    It 'uses distinct default checkpoints for distinct fallback message cultures' {
+        $CheckpointPath = Join-Path $TestDrive 'fallback-culture-identities.json'
+
+        $null = @(
+            Get-EVXEvent `
+                -LogName System `
+                -RecordIdFile $CheckpointPath `
+                -MessageRegex '(?!)' `
+                -MessageCulture en-US `
+                -FallbackMessageCulture pl-PL `
+                -MaxEventsScanned 1 `
+                -ReadMode Message
+        )
+        $null = @(
+            Get-EVXEvent `
+                -LogName System `
+                -RecordIdFile $CheckpointPath `
+                -MessageRegex '(?!)' `
+                -MessageCulture en-US `
+                -FallbackMessageCulture de-DE `
+                -MaxEventsScanned 1 `
+                -ReadMode Message
+        )
+
+        $Persisted = Get-Content -LiteralPath $CheckpointPath -Raw |
+            ConvertFrom-Json
+        @($Persisted.PSObject.Properties).Count | Should -Be 2
+    }
+
     It 'advances capped polling through a contiguous oldest-first prefix' {
         $CheckpointPath = Join-Path $TestDrive 'contiguous-checkpoint.json'
 
