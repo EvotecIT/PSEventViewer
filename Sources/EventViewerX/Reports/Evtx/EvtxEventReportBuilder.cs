@@ -45,25 +45,11 @@ public static class EvtxEventReportBuilder {
         if (!EvtxQueryExecutor.TryForEachEventWithInfo(
                 request,
                 ev => {
-                    rows.Add(new EvtxEventReportRow {
-                        TimeCreatedUtc =
-                            FormatTimeCreatedUtc(
-                                ev.TimeCreated),
-                        Id = ev.Id,
-                        RecordId = ev.RecordId ?? 0,
-                        LogName = ev.LogName ?? string.Empty,
-                        ProviderName = ev.ProviderName ?? string.Empty,
-                        Level = (long)(ev.Level ?? 0),
-                        LevelDisplayName = ev.LevelDisplayName ?? string.Empty,
-                        ComputerName = ev.ComputerName ?? string.Empty,
-                        QueriedMachine = ev.QueriedMachine ?? string.Empty,
-                        GatheredFrom = ev.GatheredFrom ?? string.Empty,
-                        MessageSubject = ev.MessageSubject ?? string.Empty,
-                        UserSid = EventProjectionHelpers.SafeGetUserSid(ev),
-                        Data = EventProjectionHelpers.NormalizeDict(ev.Data),
-                        MessageData = EventProjectionHelpers.NormalizeDict(ev.MessageData),
-                        Message = includeMessage ? EventProjectionHelpers.TruncateSafe(EventProjectionHelpers.SafeGetMessage(ev), maxMessageChars) : null
-                    });
+                    rows.Add(
+                        ProjectRow(
+                            ev,
+                            includeMessage,
+                            maxMessageChars));
                     return true;
                 },
                 out EvtxQueryExecutionInfo executionInfo,
@@ -92,4 +78,46 @@ public static class EvtxEventReportBuilder {
             : timeCreated
                 .ToUniversalTime()
                 .ToString("O");
+
+    internal static EvtxEventReportRow ProjectRow(
+        EventObject eventObject,
+        bool includeMessage,
+        int maxMessageChars) {
+
+        return new EvtxEventReportRow {
+            TimeCreatedUtc =
+                FormatTimeCreatedUtc(
+                    eventObject.TimeCreated),
+            Id = eventObject.Id,
+            RecordId = eventObject.RecordId,
+            LogName = eventObject.LogName ?? string.Empty,
+            ProviderName = eventObject.ProviderName ?? string.Empty,
+            Level = (long)(eventObject.Level ?? 0),
+            LevelDisplayName =
+                eventObject.LevelDisplayName ?? string.Empty,
+            ComputerName =
+                eventObject.ComputerName ?? string.Empty,
+            QueriedMachine =
+                eventObject.QueriedMachine ?? string.Empty,
+            GatheredFrom =
+                eventObject.GatheredFrom ?? string.Empty,
+            MessageSubject =
+                eventObject.MessageSubject ?? string.Empty,
+            UserSid =
+                EventProjectionHelpers.SafeGetUserSid(
+                    eventObject),
+            Data =
+                EventProjectionHelpers.NormalizeDict(
+                    eventObject.Data),
+            MessageData =
+                EventProjectionHelpers.NormalizeDict(
+                    eventObject.MessageData),
+            Message = includeMessage
+                ? EventProjectionHelpers.TruncateSafe(
+                    EventProjectionHelpers.SafeGetMessage(
+                        eventObject),
+                    maxMessageChars)
+                : null
+        };
+    }
 }

@@ -18,9 +18,9 @@ public sealed class EvtxEventReportRow {
     public int Id { get; set; }
 
     /// <summary>
-    /// Event record ID.
+    /// Event record ID, when present.
     /// </summary>
-    public long RecordId { get; set; }
+    public long? RecordId { get; set; }
 
     /// <summary>
     /// Source log name.

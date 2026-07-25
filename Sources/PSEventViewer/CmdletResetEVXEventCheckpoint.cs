@@ -26,7 +26,7 @@ public sealed class CmdletResetEVXEventCheckpoint : AsyncPSCmdlet {
     [ValidateNotNullOrEmpty]
     public string Path { get; set; } = string.Empty;
 
-    /// <summary>Optional checkpoint key. When omitted, every existing key starts a new generation.</summary>
+    /// <summary>Optional checkpoint key. The exact key and its existing per-source derived keys start new generations. When omitted, every existing key starts a new generation.</summary>
     [Parameter(Position = 1)]
     [Alias("RecordIdKey")]
     [ValidateNotNullOrEmpty]

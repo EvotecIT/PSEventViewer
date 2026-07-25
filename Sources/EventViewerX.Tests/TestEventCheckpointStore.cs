@@ -213,6 +213,68 @@ public class TestEventCheckpointStore {
     }
 
     [Fact]
+    public void ResetKeyAlsoResetsItsDerivedSourceCheckpoints() {
+        string root = CreateTemporaryDirectory();
+        try {
+            string path = Path.Combine(root, "checkpoint.json");
+            EventCheckpointSnapshot initial = EventCheckpointStore.Update(
+                path,
+                new[] {
+                    new EventCheckpointUpdate("CriticalEvents|AD1|System", 100, Guid.Empty),
+                    new EventCheckpointUpdate("CriticalEvents|AD2|System", 200, Guid.Empty),
+                    new EventCheckpointUpdate("CriticalEvents2|AD1|System", 300, Guid.Empty)
+                });
+            Guid firstGeneration =
+                initial.Checkpoints["CriticalEvents|AD1|System"]
+                    .GenerationId;
+            Guid secondGeneration =
+                initial.Checkpoints["CriticalEvents|AD2|System"]
+                    .GenerationId;
+
+            EventCheckpointSnapshot reset =
+                EventCheckpointStore.Reset(
+                    path,
+                    "CriticalEvents");
+
+            Assert.Null(
+                reset.Checkpoints["CriticalEvents"].RecordId);
+            Assert.Null(
+                reset.Checkpoints["CriticalEvents|AD1|System"]
+                    .RecordId);
+            Assert.Null(
+                reset.Checkpoints["CriticalEvents|AD2|System"]
+                    .RecordId);
+            Assert.NotEqual(
+                firstGeneration,
+                reset.Checkpoints["CriticalEvents|AD1|System"]
+                    .GenerationId);
+            Assert.NotEqual(
+                secondGeneration,
+                reset.Checkpoints["CriticalEvents|AD2|System"]
+                    .GenerationId);
+            Assert.Equal(
+                300,
+                reset.Records["CriticalEvents2|AD1|System"]);
+
+            EventCheckpointSnapshot staleResult =
+                EventCheckpointStore.Update(
+                    path,
+                    new[] {
+                        new EventCheckpointUpdate(
+                            "CriticalEvents|AD1|System",
+                            101,
+                            firstGeneration)
+                    });
+
+            Assert.DoesNotContain(
+                "CriticalEvents|AD1|System",
+                staleResult.Records.Keys);
+        } finally {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public void ResetAllPreservesOtherKeysAsGenerationTombstones() {
         string root = CreateTemporaryDirectory();
         try {

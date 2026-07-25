@@ -358,6 +358,16 @@ Get-EVXEvent `
     -ReadMode StructuredData
 ```
 
+Reset that workflow with the same key. The reset starts a new generation for
+the base key and every existing per-source entry derived from it:
+
+```powershell
+Reset-EVXEventCheckpoint `
+    -Path C:\State\CriticalEvents.json `
+    -RecordIdKey CriticalEvents `
+    -Confirm:$false
+```
+
 Use bookmarks when another component owns native bookmark XML. Use checkpoints
 for a file-backed polling workflow owned by PSEventViewer.
 

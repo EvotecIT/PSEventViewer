@@ -18,6 +18,27 @@ Describe 'Reset-EVXEventCheckpoint' {
         $Snapshot.Checkpoints['one'].GenerationId | Should -Not -Be $Initial.Checkpoints['one'].GenerationId
     }
 
+    It 'resets every derived source checkpoint for a RecordIdKey alias' {
+        $CheckpointPath = Join-Path $TestDrive 'reset-derived-sources.json'
+        $Initial = [EventViewerX.EventCheckpointStore]::Update(
+            $CheckpointPath,
+            [EventViewerX.EventCheckpointUpdate[]] @(
+                [EventViewerX.EventCheckpointUpdate]::new('CriticalEvents|AD1|System', 10, [guid]::Empty),
+                [EventViewerX.EventCheckpointUpdate]::new('CriticalEvents|AD2|System', 20, [guid]::Empty),
+                [EventViewerX.EventCheckpointUpdate]::new('CriticalEvents2|AD1|System', 30, [guid]::Empty)
+            ))
+
+        $Snapshot = Reset-EVXEventCheckpoint -Path $CheckpointPath -RecordIdKey CriticalEvents -PassThru -Confirm:$false
+
+        $Snapshot.Records.ContainsKey('CriticalEvents|AD1|System') | Should -BeFalse
+        $Snapshot.Records.ContainsKey('CriticalEvents|AD2|System') | Should -BeFalse
+        $Snapshot.Records['CriticalEvents2|AD1|System'] | Should -Be 30
+        $Snapshot.Checkpoints['CriticalEvents|AD1|System'].GenerationId |
+            Should -Not -Be $Initial.Checkpoints['CriticalEvents|AD1|System'].GenerationId
+        $Snapshot.Checkpoints['CriticalEvents|AD2|System'].GenerationId |
+            Should -Not -Be $Initial.Checkpoints['CriticalEvents|AD2|System'].GenerationId
+    }
+
     It 'supports WhatIf without changing persisted progress' {
         $CheckpointPath = Join-Path $TestDrive 'reset-whatif.json'
         $Initial = [EventViewerX.EventCheckpointStore]::Update(

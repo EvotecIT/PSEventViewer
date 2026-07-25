@@ -225,6 +225,9 @@ $watcher = Start-EVXWatcher -Name FailedLogons `
 Stop-EVXWatcher -Id $watcher.Id -Confirm:$false
 ```
 
+When `-Key` (or its `-RecordIdKey` alias) is supplied, the reset covers both
+the base key and every existing per-source checkpoint derived from it.
+
 The C# `EventLogSubscription` uses native `EvtSubscribe`, bounded channels,
 real backpressure, explicit start/bookmark behavior, cancellation, and
 terminal/non-terminal failure reporting.

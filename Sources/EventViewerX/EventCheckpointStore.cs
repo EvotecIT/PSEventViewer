@@ -205,14 +205,14 @@ public static class EventCheckpointStore {
     }
 
     /// <summary>
-    /// Atomically starts a new checkpoint generation for one key or every existing key.
+    /// Atomically starts a new checkpoint generation for one key and its derived source keys, or every existing key.
     /// </summary>
     /// <remarks>
     /// Use this method instead of deleting only the compatibility checkpoint file. Generation tombstones are retained
     /// in the authoritative companion state so an in-flight writer from the previous generation cannot restore progress.
     /// </remarks>
     /// <param name="path">Compatibility checkpoint path supplied to event queries.</param>
-    /// <param name="key">Optional checkpoint key. Null resets every existing key.</param>
+    /// <param name="key">Optional checkpoint key. The exact key and existing source keys prefixed with <c>key|</c> are reset. Null resets every existing key.</param>
     /// <param name="lockTimeout">Optional cross-process lock timeout.</param>
     /// <returns>The persisted generation-aware checkpoint snapshot.</returns>
     public static EventCheckpointSnapshot Reset(
@@ -233,7 +233,20 @@ public static class EventCheckpointStore {
                     values[existingKey] = CreateResetValue();
                 }
             } else {
-                values[key.Trim()] = CreateResetValue();
+                string normalizedKey = key.Trim();
+                string derivedPrefix =
+                    normalizedKey + "|";
+                string[] derivedKeys = values.Keys
+                    .Where(existingKey =>
+                        existingKey.StartsWith(
+                            derivedPrefix,
+                            StringComparison.OrdinalIgnoreCase))
+                    .ToArray();
+
+                values[normalizedKey] = CreateResetValue();
+                foreach (string derivedKey in derivedKeys) {
+                    values[derivedKey] = CreateResetValue();
+                }
             }
 
             WriteState(checkpointPath, values);

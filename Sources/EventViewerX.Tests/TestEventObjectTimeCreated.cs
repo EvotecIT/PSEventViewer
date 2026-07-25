@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics.Eventing.Reader;
 using System.Runtime.Serialization;
 using System.Security.Principal;
+using EventViewerX.Reports.Evtx;
 using EventViewerX.Reports.Live;
 using EventViewerX.Reports.Stats;
 using Xunit;
@@ -49,6 +50,24 @@ public class TestEventObjectTimeCreated
 
         LiveEventRow row =
             LiveEventQueryExecutor.ProjectRow(
+                eventObject,
+                includeMessage: false,
+                maxMessageChars: 0);
+
+        Assert.Null(row.TimeCreatedUtc);
+        Assert.Null(row.RecordId);
+    }
+
+    [Fact]
+    public void EvtxProjectionPreservesMissingTimeAndRecordId() {
+        var eventObject =
+            new EventObject(
+                new NullTimeEventRecord(),
+                "local",
+                EventReadMode.Metadata);
+
+        EvtxEventReportRow row =
+            EvtxEventReportBuilder.ProjectRow(
                 eventObject,
                 includeMessage: false,
                 maxMessageChars: 0);
