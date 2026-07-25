@@ -230,6 +230,25 @@ namespace EventViewerX.Tests {
         }
 
         [Fact]
+        public void RestorePowerShellScriptsSnapshotsTextFiltersAtCallTime() {
+            int enumerations = 0;
+
+            IEnumerable<string> EnumerateFilters() {
+                enumerations++;
+                yield return "Get-Date";
+            }
+
+            IEnumerable<RestoredPowerShellScript> scripts =
+                PowerShellEventEngine.RestorePowerShellScripts(
+                    PowerShellEdition.WindowsPowerShell,
+                    eventLogPath: "not-opened.evtx",
+                    containsText: EnumerateFilters());
+
+            Assert.Equal(1, enumerations);
+            Assert.NotNull(scripts);
+        }
+
+        [Fact]
         public void GetPowerShellScriptsHonorsPreCancelledRequestsBeforeOpeningTheLog() {
             using var cancellation = new CancellationTokenSource();
             cancellation.Cancel();

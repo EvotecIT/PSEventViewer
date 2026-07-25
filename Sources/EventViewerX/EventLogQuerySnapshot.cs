@@ -1,5 +1,4 @@
 using System.Globalization;
-using System.Net;
 
 namespace EventViewerX;
 
@@ -16,7 +15,9 @@ internal static class EventLogQuerySnapshot {
         }
         return new EventLogChannelQuery(source.LogName) {
             MachineName = source.MachineName,
-            Credential = CopyCredential(source.Credential),
+            Credential =
+                EventLogCredentialIdentity.Copy(
+                    source.Credential),
             Authentication = source.Authentication,
             XPath = source.XPath,
             Oldest = source.Oldest,
@@ -70,7 +71,9 @@ internal static class EventLogQuerySnapshot {
         return new EventLogStructuredQuery(source.QueryXml) {
             SourceKind = source.SourceKind,
             MachineName = source.MachineName,
-            Credential = CopyCredential(source.Credential),
+            Credential =
+                EventLogCredentialIdentity.Copy(
+                    source.Credential),
             Authentication = source.Authentication,
             Oldest = source.Oldest,
             ReadMode = source.ReadMode,
@@ -91,17 +94,6 @@ internal static class EventLogQuerySnapshot {
             TolerateQueryErrors = source.TolerateQueryErrors,
             FailureHandler = source.FailureHandler
         };
-    }
-
-    private static NetworkCredential? CopyCredential(
-        NetworkCredential? credential) {
-
-        return credential == null
-            ? null
-            : new NetworkCredential(
-                credential.UserName,
-                credential.Password,
-                credential.Domain);
     }
 
     private static CultureInfo? CopyCulture(

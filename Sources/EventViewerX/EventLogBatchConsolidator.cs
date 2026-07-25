@@ -37,6 +37,8 @@ public static class EventLogBatchConsolidator {
                     input.SourceKind,
                     SourceIdentity =
                         input.SourceIdentity.ToUpperInvariant(),
+                    ConsolidationScope =
+                        input.ConsolidationScope.ToUpperInvariant(),
                     input.TolerateQueryErrors,
                     input.FailureHandler
                 })
@@ -120,33 +122,52 @@ public static class EventLogBatchConsolidator {
             query.StructuredQueries.Count);
         foreach (EventLogChannelQuery channel in
                  query.ChannelQueries) {
+            QueryProfile profile =
+                QueryProfile.From(channel);
             inputs.Add(new QueryInput(
-                QueryProfile.From(channel),
+                profile,
                 EventLogQuerySourceKind.Channel,
                 sourceIdentity: string.Empty,
                 new[] {
                     CreateQueryElement(
                         channel.LogName,
                         channel.XPath)
-                }));
+                },
+                consolidationScope:
+                    GetConsolidationScope(
+                        profile,
+                        channel.LogName)));
         }
         foreach (EventLogFileQuery file in
                  query.FileQueries) {
             string source =
                 "file://" +
                 Path.GetFullPath(file.Path);
+            QueryProfile profile =
+                QueryProfile.From(file);
             inputs.Add(new QueryInput(
-                QueryProfile.From(file),
+                profile,
                 EventLogQuerySourceKind.File,
                 "file://" + Path.GetFullPath(file.Path),
                 new[] {
                     CreateQueryElement(
                         source,
                         file.XPath)
-                }));
+                },
+                consolidationScope:
+                    GetConsolidationScope(
+                        profile,
+                        source)));
         }
         foreach (EventLogStructuredQuery structured in
                  query.StructuredQueries) {
+            QueryProfile profile =
+                QueryProfile.From(structured);
+            string consolidationScope =
+                GetConsolidationScope(
+                    profile,
+                    GetStructuredSourceScope(
+                        structured));
             XElement[] queries =
                 EventLogStructuredQueryParser.ParseQueries(
                     structured.QueryXml);
@@ -156,18 +177,48 @@ public static class EventLogBatchConsolidator {
                         queryElement,
                         structured.SourceKind);
                 inputs.Add(new QueryInput(
-                    QueryProfile.From(structured),
+                    profile,
                     sourceKind,
                     sourceKind == EventLogQuerySourceKind.File
                         ? EventLogStructuredQueryParser
                             .GetFileSourceIdentity(queryElement)
                         : string.Empty,
                     new[] { new XElement(queryElement) },
+                    consolidationScope,
                     structured.TolerateQueryErrors,
                     structured.FailureHandler));
             }
         }
         return inputs.ToArray();
+    }
+
+    private static string GetStructuredSourceScope(
+        EventLogStructuredQuery query) {
+
+        return string.Join(
+            "|",
+            EventLogStructuredQueryParser
+                .ResolveSources(
+                    query.QueryXml,
+                    query.SourceKind)
+                .Select(static source =>
+                    ((int)source.Kind).ToString(
+                        CultureInfo.InvariantCulture) +
+                    ":" +
+                    source.Source)
+                .OrderBy(
+                    static source =>
+                        source,
+                    StringComparer.OrdinalIgnoreCase));
+    }
+
+    private static string GetConsolidationScope(
+        QueryProfile profile,
+        string sourceIdentity) {
+
+        return profile.MaxEvents > 0
+            ? sourceIdentity
+            : string.Empty;
     }
 
     private static XElement CreateQueryElement(
@@ -189,6 +240,7 @@ public static class EventLogBatchConsolidator {
             EventLogQuerySourceKind sourceKind,
             string sourceIdentity,
             IReadOnlyList<XElement> queries,
+            string consolidationScope = "",
             bool tolerateQueryErrors = false,
             Action<EventLogQueryFailure>? failureHandler = null) {
 
@@ -196,6 +248,7 @@ public static class EventLogBatchConsolidator {
             SourceKind = sourceKind;
             SourceIdentity = sourceIdentity;
             Queries = queries;
+            ConsolidationScope = consolidationScope;
             TolerateQueryErrors = tolerateQueryErrors;
             FailureHandler = failureHandler;
         }
@@ -204,6 +257,7 @@ public static class EventLogBatchConsolidator {
         internal EventLogQuerySourceKind SourceKind { get; }
         internal string SourceIdentity { get; }
         internal IReadOnlyList<XElement> Queries { get; }
+        internal string ConsolidationScope { get; }
         internal bool TolerateQueryErrors { get; }
         internal Action<EventLogQueryFailure>? FailureHandler {
             get;
@@ -249,7 +303,8 @@ public static class EventLogBatchConsolidator {
             return new QueryProfile {
                 MachineName = NormalizeMachine(
                     query.MachineName),
-                Credential = query.Credential,
+                Credential = EventLogCredentialIdentity.Copy(
+                    query.Credential),
                 Authentication = query.Authentication,
                 Oldest = query.Oldest,
                 ReadMode = query.ReadMode,
@@ -293,7 +348,8 @@ public static class EventLogBatchConsolidator {
             return new QueryProfile {
                 MachineName = NormalizeMachine(
                     query.MachineName),
-                Credential = query.Credential,
+                Credential = EventLogCredentialIdentity.Copy(
+                    query.Credential),
                 Authentication = query.Authentication,
                 Oldest = query.Oldest,
                 ReadMode = query.ReadMode,
@@ -357,5 +413,6 @@ public static class EventLogBatchConsolidator {
                 ? null
                 : machineName?.Trim();
         }
+
     }
 }

@@ -19,5 +19,7 @@ public enum EventLogProbeStatus {
     /// <summary>The target host or Event Log RPC endpoint is unavailable.</summary>
     HostUnavailable,
     /// <summary>Probe failed due to another error.</summary>
-    Error
+    Error,
+    /// <summary>The complete matching result set contained no usable event timestamp.</summary>
+    NoUsableTimestamp
 }

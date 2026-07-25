@@ -1,6 +1,5 @@
 using System.Diagnostics.Eventing.Reader;
 using System.Globalization;
-using System.Net;
 using System.Text.RegularExpressions;
 using System.Threading;
 using EventViewerX.Native;
@@ -437,12 +436,9 @@ public static partial class EventLogCatalog {
             MachineName = string.IsNullOrWhiteSpace(machineName)
                 ? null
                 : machineName,
-            Credential = query.Credential == null
-                ? null
-                : new NetworkCredential(
-                    query.Credential.UserName,
-                    query.Credential.Password,
-                    query.Credential.Domain),
+            Credential =
+                EventLogCredentialIdentity.Copy(
+                    query.Credential),
             Authentication = query.Authentication,
             ConnectionTimeoutMilliseconds =
                 query.ConnectionTimeoutMilliseconds,

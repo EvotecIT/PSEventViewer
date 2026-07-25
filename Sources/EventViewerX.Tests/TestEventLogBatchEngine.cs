@@ -424,6 +424,84 @@ namespace EventViewerX.Tests;
     }
 
     [Fact]
+    public void ConsolidationPreservesEachBoundedChannelSource() {
+        EventLogChannelQuery[] sources = {
+            new("Application") {
+                MaxEvents = 10,
+                ReadMode = EventReadMode.Metadata
+            },
+            new("System") {
+                MaxEvents = 10,
+                ReadMode = EventReadMode.Metadata
+            }
+        };
+
+        EventLogBatchQuery consolidated =
+            EventLogBatchConsolidator.Consolidate(
+                EventLogBatchQuery.ForChannels(
+                    sources));
+
+        Assert.Equal(
+            2,
+            consolidated.StructuredQueries.Count);
+        Assert.All(
+            consolidated.StructuredQueries,
+            static query =>
+                Assert.Equal(10, query.MaxEvents));
+        Assert.Contains(
+            consolidated.StructuredQueries,
+            static query =>
+                query.QueryXml.Contains(
+                    "Application",
+                    StringComparison.Ordinal));
+        Assert.Contains(
+            consolidated.StructuredQueries,
+            static query =>
+                query.QueryXml.Contains(
+                    "System",
+                    StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void ConsolidationClonesRemoteCredentials() {
+        var credential =
+            new System.Net.NetworkCredential(
+                "before",
+                "secret",
+                "domain");
+        var source =
+            new EventLogChannelQuery(
+                "Application") {
+                MachineName = "remote.example.test",
+                Credential = credential
+            };
+
+        EventLogStructuredQuery consolidated =
+            Assert.Single(
+                EventLogBatchConsolidator
+                    .Consolidate(
+                        EventLogBatchQuery.ForChannels(
+                            new[] { source }))
+                    .StructuredQueries);
+        credential.UserName = "after";
+        credential.Password = "changed";
+        credential.Domain = "other";
+
+        Assert.NotSame(
+            credential,
+            consolidated.Credential);
+        Assert.Equal(
+            "before",
+            consolidated.Credential!.UserName);
+        Assert.Equal(
+            "secret",
+            consolidated.Credential.Password);
+        Assert.Equal(
+            "domain",
+            consolidated.Credential.Domain);
+    }
+
+    [Fact]
     public void ConsolidationKeepsChannelAndFileQueriesOnSeparateNativeHandles() {
         if (!OperatingSystem.IsWindows()) return;
         string path = GetFixturePath();

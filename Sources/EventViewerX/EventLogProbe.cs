@@ -58,6 +58,7 @@ public static class EventLogProbe {
         string target =
             ResolveProbeTarget(machineName);
         int scanned = 0;
+        bool scanLimitReached = false;
         long? recordCount = null;
 
         using var probeCancellation =
@@ -81,7 +82,10 @@ public static class EventLogProbe {
                     Oldest = false,
                     ReadMode =
                         EventReadMode.Metadata,
-                    MaxEvents = maxEventsToScan,
+                    MaxEvents =
+                        checked(
+                            (long)maxEventsToScan +
+                            1),
                     RemoteConnectionTimeoutMilliseconds =
                         timeoutMilliseconds,
                     RemoteReadTimeoutMilliseconds =
@@ -98,7 +102,9 @@ public static class EventLogProbe {
                     EventLogEngine.ReadChannel(
                         query,
                         probeCancellation.Token),
-                    out scanned);
+                    maxEventsToScan,
+                    out scanned,
+                    out scanLimitReached);
 
             recordCount = RunCancelableProbeStage(
                 () => TryReadRecordCount(
@@ -124,15 +130,21 @@ public static class EventLogProbe {
                     stopwatch.Elapsed,
                     nativeQueryVerified: true);
             }
+            EventLogProbeStatus status =
+                scanned == 0
+                    ? EventLogProbeStatus.NoEvent
+                    : scanLimitReached
+                        ? EventLogProbeStatus.LimitReached
+                        : EventLogProbeStatus.NoUsableTimestamp;
             return ProbeFailure(
                 logName,
                 target,
-                scanned == 0
-                    ? EventLogProbeStatus.NoEvent
-                    : EventLogProbeStatus.LimitReached,
+                status,
                 scanned == 0
                     ? "No event matched the native query."
-                    : $"The first {scanned} matching events did not contain a usable timestamp.",
+                    : scanLimitReached
+                        ? $"The first {scanned} matching events did not contain a usable timestamp and additional matches remain."
+                        : $"All {scanned} matching events were scanned, but none contained a usable timestamp.",
                 scanned,
                 recordCount,
                 stopwatch.Elapsed,
@@ -168,10 +180,22 @@ public static class EventLogProbe {
 
     internal static DateTime? FindFirstUsableTimestampUtc(
         IEnumerable<EventObject> events,
-        out int scanned) {
+        int maxEventsToScan,
+        out int scanned,
+        out bool limitReached) {
 
+        if (maxEventsToScan <= 0) {
+            throw new ArgumentOutOfRangeException(
+                nameof(maxEventsToScan),
+                "Maximum events to scan must be positive.");
+        }
         scanned = 0;
+        limitReached = false;
         foreach (EventObject eventObject in events) {
+            if (scanned >= maxEventsToScan) {
+                limitReached = true;
+                break;
+            }
             scanned++;
             if (eventObject.TimeCreated ==
                 DateTime.MinValue) {

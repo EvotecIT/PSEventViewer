@@ -364,7 +364,9 @@ public static class EventLogQueryFactory {
             MaxEvents = options.MaxEvents,
             IncludeBookmark =
                 options.IncludeBookmark,
-            Credential = options.Credential,
+            Credential =
+                EventLogCredentialIdentity.Copy(
+                    options.Credential),
             Authentication =
                 options.Authentication,
             RemoteConnectionTimeoutMilliseconds =

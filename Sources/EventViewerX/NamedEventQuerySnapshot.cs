@@ -1,5 +1,4 @@
 using System.Globalization;
-using System.Net;
 
 namespace EventViewerX;
 
@@ -29,7 +28,7 @@ internal static class NamedEventQuerySnapshot {
             Oldest = source.Oldest,
             ReadMode = source.ReadMode,
             IncludeBookmark = source.IncludeBookmark,
-            Credential = CopyCredential(
+            Credential = EventLogCredentialIdentity.Copy(
                 source.Credential),
             Authentication = source.Authentication,
             RemoteConnectionTimeoutMilliseconds =
@@ -50,17 +49,6 @@ internal static class NamedEventQuerySnapshot {
             ContinueOnRemoteFailure =
                 source.ContinueOnRemoteFailure
         };
-    }
-
-    private static NetworkCredential? CopyCredential(
-        NetworkCredential? credential) {
-
-        return credential == null
-            ? null
-            : new NetworkCredential(
-                credential.UserName,
-                credential.Password,
-                credential.Domain);
     }
 
     private static CultureInfo? CopyCulture(

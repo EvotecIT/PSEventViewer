@@ -315,14 +315,17 @@ namespace EventViewerX.Tests {
                         missing,
                         usable
                     },
-                    out int scanned);
+                    maxEventsToScan: 2,
+                    out int scanned,
+                    out bool limitReached);
 
             Assert.Equal(2, scanned);
             Assert.Equal(expected, actual);
+            Assert.False(limitReached);
         }
 
         [Fact]
-        public void ProbeTimestampScanReportsTheExhaustedLimit() {
+        public void ProbeTimestampScanDistinguishesAnExhaustedSource() {
             DateTime? actual =
                 EventLogProbe.FindFirstUsableTimestampUtc(
                     new[] {
@@ -331,10 +334,34 @@ namespace EventViewerX.Tests {
                         CreateEventWithTimestamp(
                             DateTime.MinValue)
                     },
-                    out int scanned);
+                    maxEventsToScan: 2,
+                    out int scanned,
+                    out bool limitReached);
 
             Assert.Equal(2, scanned);
             Assert.Null(actual);
+            Assert.False(limitReached);
+        }
+
+        [Fact]
+        public void ProbeTimestampScanReportsOnlyRealTruncation() {
+            DateTime? actual =
+                EventLogProbe.FindFirstUsableTimestampUtc(
+                    new[] {
+                        CreateEventWithTimestamp(
+                            DateTime.MinValue),
+                        CreateEventWithTimestamp(
+                            DateTime.MinValue),
+                        CreateEventWithTimestamp(
+                            DateTime.MinValue)
+                    },
+                    maxEventsToScan: 2,
+                    out int scanned,
+                    out bool limitReached);
+
+            Assert.Equal(2, scanned);
+            Assert.Null(actual);
+            Assert.True(limitReached);
         }
 
         [Fact]

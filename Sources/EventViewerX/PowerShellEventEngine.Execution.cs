@@ -120,6 +120,40 @@ namespace EventViewerX {
             string logName =
                 GetPowerShellLogName(type);
 
+            return RestorePowerShellScriptsIterator(
+                logName,
+                machineName,
+                eventLogPath,
+                dateFrom,
+                dateTo,
+                format,
+                textFilters,
+                maxScripts,
+                maxEventsScanned,
+                maxPendingScripts,
+                maxCachedEvents,
+                cancellationToken,
+                queryInfo,
+                ownsQueryInfo);
+        }
+
+        private static IEnumerable<RestoredPowerShellScript>
+            RestorePowerShellScriptsIterator(
+                string logName,
+                string? machineName,
+                string? eventLogPath,
+                DateTime? dateFrom,
+                DateTime? dateTo,
+                bool format,
+                IReadOnlyList<string> textFilters,
+                int maxScripts,
+                int maxEventsScanned,
+                int maxPendingScripts,
+                int maxCachedEvents,
+                CancellationToken cancellationToken,
+                PowerShellScriptQueryExecutionInfo queryInfo,
+                bool ownsQueryInfo) {
+
             var cache = new PowerShellScriptFragmentCache(maxPendingScripts, maxCachedEvents);
             List<KeyValuePair<long, RestoredPowerShellScript>>? boundedScripts = maxScripts > 0
                 ? new List<KeyValuePair<long, RestoredPowerShellScript>>(Math.Min(maxScripts, 256))

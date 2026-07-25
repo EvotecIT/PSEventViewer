@@ -7,6 +7,20 @@ namespace EventViewerX;
 /// Log sessions.
 /// </summary>
 internal static class EventLogCredentialIdentity {
+    /// <summary>
+    /// Creates an independent credential snapshot for deferred event-log work.
+    /// </summary>
+    internal static NetworkCredential? Copy(
+        NetworkCredential? credential) {
+
+        return credential == null
+            ? null
+            : new NetworkCredential(
+                credential.UserName,
+                credential.Password,
+                credential.Domain);
+    }
+
     internal static bool AreEqual(
         NetworkCredential? left,
         NetworkCredential? right) {

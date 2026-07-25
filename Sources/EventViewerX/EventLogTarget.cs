@@ -1,3 +1,5 @@
+using System.Net.NetworkInformation;
+
 namespace EventViewerX;
 
 /// <summary>Normalizes and classifies local and remote Windows Event Log targets.</summary>
@@ -62,10 +64,33 @@ public static class EventLogTarget {
 
     private static string ResolveLocalMachineName() {
         try {
-            return System.Net.Dns.GetHostEntry(
-                string.Empty).HostName;
+            return BuildLocalMachineName(
+                Environment.MachineName,
+                IPGlobalProperties
+                    .GetIPGlobalProperties()
+                    .DomainName);
         } catch {
             return Environment.MachineName;
         }
+    }
+
+    internal static string BuildLocalMachineName(
+        string machineName,
+        string? domainName) {
+
+        string normalizedMachine =
+            machineName.Trim().TrimEnd('.');
+        string normalizedDomain =
+            domainName?.Trim().Trim('.') ??
+            string.Empty;
+        if (normalizedDomain.Length == 0 ||
+            normalizedMachine.EndsWith(
+                "." + normalizedDomain,
+                StringComparison.OrdinalIgnoreCase)) {
+            return normalizedMachine;
+        }
+        return normalizedMachine +
+               "." +
+               normalizedDomain;
     }
 }
