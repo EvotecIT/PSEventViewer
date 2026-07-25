@@ -278,6 +278,46 @@ public sealed class TestManifestEventWriter {
             Read(buffer.Descriptors[1]));
     }
 
+    [Theory]
+    [InlineData("win:UnicodeString")]
+    [InlineData("win:AnsiString")]
+    public void RejectsOversizedReferencedStringLengthsBeforePadding(
+        string inputType) {
+
+        ManifestEventDefinition definition = CreateDefinition(
+            Field("TextLength", "win:UInt32"),
+            Field(
+                "Text",
+                inputType,
+                length: "TextLength"));
+
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new ManifestEventPayloadBuffer(
+                definition,
+                new object?[] {
+                    int.MaxValue,
+                    "A"
+                }));
+    }
+
+    [Fact]
+    public void RejectsOversizedReferencedCountsBeforeEnumeratingValues() {
+        ManifestEventDefinition definition = CreateDefinition(
+            Field("ValueCount", "win:UInt32"),
+            Field(
+                "Values",
+                "win:UInt32",
+                count: "ValueCount"));
+
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new ManifestEventPayloadBuffer(
+                definition,
+                new object?[] {
+                    int.MaxValue,
+                    Array.Empty<uint>()
+                }));
+    }
+
     [Fact]
     public void EncodesZeroLengthAndCountedBinaryPayloadsWithoutPadding() {
         ManifestEventDefinition definition = CreateDefinition(

@@ -73,6 +73,152 @@ internal static class EventProviderManifestNames {
             parts[1]);
     }
 
+    internal static bool IsSupportedOutputType(
+        EventProviderFieldType inputType,
+        string outputType) {
+
+        if (!IsDeclaredQualifiedName(outputType)) {
+            return false;
+        }
+        return inputType switch {
+            EventProviderFieldType.UnicodeString =>
+                IsOneOf(
+                    outputType,
+                    "xs:string",
+                    "win:Xml",
+                    "win:Json"),
+            EventProviderFieldType.AnsiString =>
+                IsOneOf(
+                    outputType,
+                    "xs:string",
+                    "win:Xml",
+                    "win:Json",
+                    "win:Utf8"),
+            EventProviderFieldType.Int8 =>
+                IsOneOf(
+                    outputType,
+                    "xs:byte",
+                    "xs:string"),
+            EventProviderFieldType.UInt8 =>
+                IsOneOf(
+                    outputType,
+                    "xs:unsignedByte",
+                    "win:HexInt8",
+                    "xs:string",
+                    "xs:boolean"),
+            EventProviderFieldType.Int16 =>
+                IsOneOf(
+                    outputType,
+                    "xs:short"),
+            EventProviderFieldType.UInt16 =>
+                IsOneOf(
+                    outputType,
+                    "xs:unsignedShort",
+                    "win:Port",
+                    "win:HexInt16",
+                    "xs:string"),
+            EventProviderFieldType.Int32 =>
+                IsOneOf(
+                    outputType,
+                    "xs:int",
+                    "win:HResult"),
+            EventProviderFieldType.UInt32 =>
+                IsOneOf(
+                    outputType,
+                    "xs:unsignedInt",
+                    "win:PID",
+                    "win:TID",
+                    "win:IPv4",
+                    "win:ETWTIME",
+                    "win:ErrorCode",
+                    "win:Win32Error",
+                    "win:NTSTATUS",
+                    "win:HexInt32",
+                    "win:CodePointer"),
+            EventProviderFieldType.Int64 =>
+                IsOneOf(
+                    outputType,
+                    "xs:long"),
+            EventProviderFieldType.UInt64 =>
+                IsOneOf(
+                    outputType,
+                    "xs:unsignedLong",
+                    "win:ETWTIME",
+                    "win:HexInt64",
+                    "win:CodePointer"),
+            EventProviderFieldType.Float =>
+                IsOneOf(
+                    outputType,
+                    "xs:float"),
+            EventProviderFieldType.Double =>
+                IsOneOf(
+                    outputType,
+                    "xs:double"),
+            EventProviderFieldType.Boolean =>
+                IsOneOf(
+                    outputType,
+                    "xs:boolean"),
+            EventProviderFieldType.Binary =>
+                IsOneOf(
+                    outputType,
+                    "xs:hexBinary",
+                    "win:IPv6",
+                    "win:SocketAddress",
+                    "win:Pkcs7WithTypeInfo"),
+            EventProviderFieldType.Guid =>
+                IsOneOf(
+                    outputType,
+                    "xs:GUID"),
+            EventProviderFieldType.Pointer =>
+                IsOneOf(
+                    outputType,
+                    "win:HexInt64",
+                    "win:CodePointer",
+                    "xs:long",
+                    "xs:unsignedLong"),
+            EventProviderFieldType.FileTime or
+            EventProviderFieldType.SystemTime =>
+                IsOneOf(
+                    outputType,
+                    "xs:dateTime",
+                    "win:DateTimeCultureInsensitive",
+                    "win:DateTimeUtc"),
+            EventProviderFieldType.Sid =>
+                IsOneOf(
+                    outputType,
+                    "xs:string"),
+            EventProviderFieldType.HexInt32 =>
+                IsOneOf(
+                    outputType,
+                    "win:HexInt32",
+                    "win:ErrorCode",
+                    "win:Win32Error",
+                    "win:NTSTATUS",
+                    "win:CodePointer"),
+            EventProviderFieldType.HexInt64 =>
+                IsOneOf(
+                    outputType,
+                    "win:HexInt64",
+                    "win:CodePointer"),
+            _ => false
+        };
+    }
+
+    private static bool IsOneOf(
+        string value,
+        params string[] supported) {
+
+        foreach (string candidate in supported) {
+            if (string.Equals(
+                    value,
+                    candidate,
+                    StringComparison.Ordinal)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private static bool IsAsciiLetterOrDigit(char value) {
         return value is >= 'A' and <= 'Z' or
             >= 'a' and <= 'z' or

@@ -66,17 +66,28 @@ public static class LiveStatsQueryExecutor {
                 }
 
                 scanned++;
-                var createdUtc = ev.TimeCreated.ToUniversalTime();
-                if (!IsWithinRange(createdUtc, request.StartTimeUtc, request.EndTimeUtc)) {
+                bool hasCreatedTime =
+                    TryNormalizeCreatedTimeUtc(
+                        ev.TimeCreated,
+                        out DateTime createdUtc);
+                if (hasCreatedTime &&
+                    !IsWithinRange(
+                        createdUtc,
+                        request.StartTimeUtc,
+                        request.EndTimeUtc)) {
                     continue;
                 }
 
                 matched++;
-                if (!minUtc.HasValue || createdUtc < minUtc.Value) {
-                    minUtc = createdUtc;
-                }
-                if (!maxUtc.HasValue || createdUtc > maxUtc.Value) {
-                    maxUtc = createdUtc;
+                if (hasCreatedTime) {
+                    if (!minUtc.HasValue ||
+                        createdUtc < minUtc.Value) {
+                        minUtc = createdUtc;
+                    }
+                    if (!maxUtc.HasValue ||
+                        createdUtc > maxUtc.Value) {
+                        maxUtc = createdUtc;
+                    }
                 }
 
                 builder.Add(ev);
@@ -167,6 +178,20 @@ public static class LiveStatsQueryExecutor {
             };
             return false;
         }
+    }
+
+    internal static bool TryNormalizeCreatedTimeUtc(
+        DateTime created,
+        out DateTime createdUtc) {
+
+        if (created == DateTime.MinValue) {
+            createdUtc = default;
+            return false;
+        }
+        createdUtc = created.Kind == DateTimeKind.Utc
+            ? created
+            : created.ToUniversalTime();
+        return true;
     }
 
     private static bool TryValidateRequest(

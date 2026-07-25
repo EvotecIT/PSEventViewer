@@ -45,6 +45,76 @@ public sealed class TestNativeEventEngineContracts {
     }
 
     [Fact]
+    public async Task CatalogEnumerationCancellationReturnsBeforeNativeWorkAndRetainsSession() {
+        using var started =
+            new ManualResetEventSlim();
+        using var release =
+            new ManualResetEventSlim();
+        using var disposed =
+            new ManualResetEventSlim();
+        using var cancellation =
+            new CancellationTokenSource();
+        var lifetime =
+            new Native.RetainedDisposable<
+                CallbackDisposable>(
+                new CallbackDisposable(
+                    disposed.Set));
+        Task<string[]> enumeration = Task.Run(() =>
+            EventLogCatalog.EnumerateNamesBounded(
+                () => {
+                    started.Set();
+                    release.Wait();
+                    return new[] {
+                        "Application"
+                    };
+                },
+                5000,
+                "catalog enumeration timed out",
+                cancellation.Token,
+                lifetime.Retain()));
+        Assert.True(
+            started.Wait(
+                TimeSpan.FromSeconds(5)));
+
+        cancellation.Cancel();
+        Task completed = await Task.WhenAny(
+            enumeration,
+            Task.Delay(
+                TimeSpan.FromSeconds(5)));
+        try {
+            Assert.Same(
+                enumeration,
+                completed);
+            await Assert.ThrowsAnyAsync<
+                OperationCanceledException>(
+                async () =>
+                    await enumeration);
+            lifetime.Dispose();
+            Assert.False(
+                disposed.IsSet);
+        } finally {
+            release.Set();
+            Assert.True(
+                disposed.Wait(
+                    TimeSpan.FromSeconds(5)));
+            lifetime.Dispose();
+        }
+    }
+
+    [Fact]
+    public void ProviderCatalogValidatesBeforeReturningDeferredResults() {
+        var query =
+            new EventLogCatalogQuery {
+                ConnectionTimeoutMilliseconds = 0
+            };
+
+        Assert.Throws<
+            ArgumentOutOfRangeException>(() =>
+                EventLogCatalog.GetProviders(
+                    query));
+    }
+
+    [Fact]
     public async Task LocalClearReturnsOnCancellationWhileNativeWorkRetainsOwnership() {
         using var started =
             new ManualResetEventSlim();

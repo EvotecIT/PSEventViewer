@@ -385,6 +385,8 @@ public sealed class TestEventProviderPackages {
     [InlineData("custom:Value")]
     [InlineData("win:")]
     [InlineData("win:Value:Extra")]
+    [InlineData("win:NotARealType")]
+    [InlineData("xs:notAType")]
     public void RejectsInvalidOrUndeclaredCustomOutputTypeNames(
         string customOutputType) {
 
@@ -407,8 +409,8 @@ public sealed class TestEventProviderPackages {
     }
 
     [Theory]
-    [InlineData("win:HexInt32")]
     [InlineData("xs:string")]
+    [InlineData("win:Xml")]
     public void AcceptsCustomOutputTypesFromDeclaredNamespaces(
         string customOutputType) {
 
@@ -426,6 +428,64 @@ public sealed class TestEventProviderPackages {
             result.Issues,
             issue => issue.Code ==
                      "FieldCustomOutputTypeInvalid");
+    }
+
+    [Fact]
+    public void AcceptsCustomOutputTypeCompatibleWithNumericInput() {
+        EventProviderDefinition definition =
+            CreateDefinition();
+        definition.Events[0].Fields[1]
+            .CustomOutputType =
+                "win:HexInt32";
+
+        EventProviderValidationResult result =
+            EventProviderDefinitionValidator.Validate(
+                definition);
+
+        Assert.DoesNotContain(
+            result.Issues,
+            issue => issue.Code ==
+                     "FieldCustomOutputTypeInvalid");
+    }
+
+    [Fact]
+    public void RejectsKnownOutputTypeWhenItIsIncompatibleWithInput() {
+        EventProviderDefinition definition =
+            CreateDefinition();
+        definition.Events[0].Fields[0]
+            .CustomOutputType =
+                "win:HexInt32";
+
+        EventProviderValidationResult result =
+            EventProviderDefinitionValidator.Validate(
+                definition);
+
+        Assert.Contains(
+            result.Issues,
+            issue => issue.Code ==
+                         "FieldCustomOutputTypeInvalid" &&
+                     issue.Path ==
+                         "Events[0].Fields[0].CustomOutputType");
+    }
+
+    [Fact]
+    public void ValidationRejectsAnInvalidGeneratedFallbackMessage() {
+        EventProviderDefinition definition =
+            CreateDefinition();
+        definition.Events[0].Name =
+            "CPU 100%";
+        definition.Events[0].Messages.Clear();
+
+        EventProviderValidationResult result =
+            EventProviderDefinitionValidator.Validate(
+                definition);
+
+        Assert.Contains(
+            result.Issues,
+            issue => issue.Code ==
+                         "EventFallbackMessageInvalid" &&
+                     issue.Path ==
+                         "Events[0].FallbackMessage");
     }
 
     [Fact]

@@ -79,6 +79,20 @@ public class TestLiveStatsQueryExecutor {
     }
 
     [Fact]
+    public void MissingTimestampsAreNotProjectedIntoLiveBounds() {
+        bool available =
+            LiveStatsQueryExecutor
+                .TryNormalizeCreatedTimeUtc(
+                    DateTime.MinValue,
+                    out DateTime createdUtc);
+
+        Assert.False(available);
+        Assert.Equal(
+            default,
+            createdUtc);
+    }
+
+    [Fact]
     public void TryBuild_ExecutesCustomSelectorWithManagedTimeRange() {
         if (!OperatingSystem.IsWindows()) return;
         if (!TestEnv.CanReadLog("System")) return;

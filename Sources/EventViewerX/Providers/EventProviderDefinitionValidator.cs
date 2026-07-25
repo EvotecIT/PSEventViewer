@@ -597,6 +597,19 @@ public static partial class EventProviderDefinitionValidator {
                         issues);
                 }
             }
+            try {
+                _ = EventProviderMessageTemplateCompiler.Compile(
+                    EventProviderManifestGenerator
+                        .CreateFallbackEventMessage(
+                            eventDefinition),
+                    eventDefinition.Fields);
+            } catch (FormatException exception) {
+                Error(
+                    "EventFallbackMessageInvalid",
+                    path + ".FallbackMessage",
+                    exception.Message,
+                    issues);
+            }
         }
     }
 
@@ -656,14 +669,42 @@ public static partial class EventProviderDefinitionValidator {
             }
             if (!string.IsNullOrWhiteSpace(
                     field.CustomOutputType) &&
-                !EventProviderManifestNames
-                    .IsDeclaredQualifiedName(
-                        field.CustomOutputType)) {
+                (!Enum.IsDefined(
+                     typeof(EventProviderFieldType),
+                     field.Type) ||
+                 !EventProviderManifestNames
+                     .IsSupportedOutputType(
+                         field.Type,
+                         field.CustomOutputType))) {
                 Error(
                     "FieldCustomOutputTypeInvalid",
                     fieldPath + ".CustomOutputType",
-                    "Custom output types must be qualified XML names using the declared win or xs namespace prefix.",
+                    $"Custom output type '{field.CustomOutputType}' is not supported for Windows input type '{field.Type}'.",
                     issues);
+            }
+            if (string.IsNullOrWhiteSpace(
+                    field.CustomOutputType) &&
+                Enum.IsDefined(
+                    typeof(EventProviderFieldType),
+                    field.Type) &&
+                field.Type != EventProviderFieldType.Auto &&
+                Enum.IsDefined(
+                    typeof(EventProviderFieldOutputType),
+                    field.OutputType)) {
+                string outputType =
+                    EventProviderManifestNames.OutputTypeName(
+                        field);
+                if (outputType.Length > 0 &&
+                    !EventProviderManifestNames
+                        .IsSupportedOutputType(
+                            field.Type,
+                            outputType)) {
+                    Error(
+                        "FieldOutputTypeIncompatible",
+                        fieldPath + ".OutputType",
+                        $"Output type '{outputType}' is not supported for Windows input type '{field.Type}'.",
+                        issues);
+                }
             }
             if (!string.IsNullOrWhiteSpace(field.Map) &&
                 !maps.Contains(field.Map)) {

@@ -92,24 +92,53 @@ public sealed class EventLogSubscription : IDisposable {
                     : _query.LogName,
                 _query.MessageCulture?.LCID ?? 0,
                 _query.FallbackMessageCulture?.LCID ?? 0);
-            _subscription = WindowsEventNativeMethods.EvtSubscribe(
-                _session?.DangerousGetHandle() ?? IntPtr.Zero,
-                _signal.SafeWaitHandle.DangerousGetHandle(),
-                _structuredQuery
-                    ? null
-                    : _query.LogName,
-                string.IsNullOrWhiteSpace(_query.XPath)
-                    ? "*"
-                    : _query.XPath,
-                _bookmark?.DangerousGetHandle() ?? IntPtr.Zero,
-                IntPtr.Zero,
-                callback: null,
-                GetSubscribeFlags(_query));
-            if (_subscription.IsInvalid) {
-                throw new Win32Exception(
-                    Marshal.GetLastWin32Error(),
-                    $"Failed to subscribe to Windows event channel '{_query.LogName}'.");
-            }
+            SafeHandleOperationLease operationLease =
+                SafeHandleOperationLease.Capture(
+                    _session,
+                    _signal.SafeWaitHandle,
+                    _bookmark);
+            IntPtr sessionHandle =
+                _session?.DangerousGetHandle() ??
+                IntPtr.Zero;
+            IntPtr signalHandle =
+                _signal.SafeWaitHandle
+                    .DangerousGetHandle();
+            IntPtr bookmarkHandle =
+                _bookmark?.DangerousGetHandle() ??
+                IntPtr.Zero;
+            _subscription = CreateSubscriptionBounded(
+                () => {
+                    WindowsEventNativeMethods.EventHandle
+                        subscription =
+                            WindowsEventNativeMethods
+                                .EvtSubscribe(
+                                    sessionHandle,
+                                    signalHandle,
+                                    _structuredQuery
+                                        ? null
+                                        : _query.LogName,
+                                    string.IsNullOrWhiteSpace(
+                                        _query.XPath)
+                                        ? "*"
+                                        : _query.XPath,
+                                    bookmarkHandle,
+                                    IntPtr.Zero,
+                                    callback: null,
+                                    GetSubscribeFlags(
+                                        _query));
+                    if (!subscription.IsInvalid) {
+                        return subscription;
+                    }
+                    int error =
+                        Marshal.GetLastWin32Error();
+                    subscription.Dispose();
+                    throw new Win32Exception(
+                        error,
+                        $"Failed to subscribe to Windows event channel '{_query.LogName}'.");
+                },
+                _query.RemoteConnectionTimeoutMilliseconds,
+                cancellationToken,
+                operationLease);
 
             ReportInitialQueryFailures();
             _producer = Task.Run(ProduceAsync);
@@ -125,6 +154,28 @@ public sealed class EventLogSubscription : IDisposable {
             ReleaseSetupResources();
             throw;
         }
+    }
+
+    internal static WindowsEventNativeMethods.EventHandle
+        CreateSubscriptionBounded(
+            Func<WindowsEventNativeMethods.EventHandle> subscribe,
+            int timeoutMilliseconds,
+            CancellationToken cancellationToken,
+            IDisposable? operationLease = null) {
+
+        if (subscribe == null) {
+            operationLease?.Dispose();
+            throw new ArgumentNullException(
+                nameof(subscribe));
+        }
+        return BoundedNativeOperation.Execute(
+            subscribe,
+            timeoutMilliseconds,
+            $"Timed out starting the Windows event subscription after {timeoutMilliseconds} ms.",
+            cancellationToken,
+            static lateSubscription =>
+                lateSubscription.Dispose(),
+            operationLease);
     }
 
     /// <summary>Number of events successfully delivered to the consumer.</summary>

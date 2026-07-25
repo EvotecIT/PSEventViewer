@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Diagnostics.Eventing.Reader;
+using System.Threading;
 using EventViewerX.Native;
 
 namespace EventViewerX;
@@ -16,6 +17,23 @@ internal static class EventLogNativeOperation {
             operation,
             timeoutMilliseconds,
             timeoutMessage,
+            lateResultCleanup,
+            operationLease);
+    }
+
+    internal static T Execute<T>(
+        Func<T> operation,
+        int timeoutMilliseconds,
+        string timeoutMessage,
+        CancellationToken cancellationToken,
+        Action<T>? lateResultCleanup = null,
+        IDisposable? operationLease = null) {
+
+        return BoundedNativeOperation.Execute(
+            operation,
+            timeoutMilliseconds,
+            timeoutMessage,
+            cancellationToken,
             lateResultCleanup,
             operationLease);
     }

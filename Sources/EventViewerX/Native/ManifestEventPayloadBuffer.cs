@@ -33,7 +33,8 @@ internal sealed class ManifestEventPayloadBuffer : IDisposable {
                 byte[] bytes = Encode(
                     definition.PayloadFields,
                     payload,
-                    i);
+                    i,
+                    MaximumPayloadBytes - TotalBytes);
                 Add(bytes, i);
             }
         } catch {
@@ -84,7 +85,8 @@ internal sealed class ManifestEventPayloadBuffer : IDisposable {
     private static byte[] Encode(
         IReadOnlyList<ManifestEventPayloadField> fields,
         IReadOnlyList<object?> payload,
-        int index) {
+        int index,
+        int remainingBytes) {
 
         ManifestEventPayloadField field = fields[index];
         object? value = payload[index];
@@ -114,33 +116,38 @@ internal sealed class ManifestEventPayloadBuffer : IDisposable {
                 value,
                 inputType,
                 count.Value,
-                length);
+                length,
+                remainingBytes);
         }
 
         return EncodeScalar(
             field,
             value,
             inputType,
-            length);
+            length,
+            remainingBytes);
     }
 
     private static byte[] EncodeScalar(
         ManifestEventPayloadField field,
         object? value,
         string inputType,
-        int? length) {
+        int? length,
+        int remainingBytes) {
 
         switch (inputType) {
             case "unicodestring":
                 return EncodeUnicodeString(
                     field,
                     value,
-                    length);
+                    length,
+                    remainingBytes);
             case "ansistring":
                 return EncodeAnsiString(
                     field,
                     value,
-                    length);
+                    length,
+                    remainingBytes);
             case "int8":
                 return new[] {
                     unchecked((byte)Convert.ToSByte(
@@ -203,6 +210,10 @@ internal sealed class ManifestEventPayloadBuffer : IDisposable {
                     field,
                     bytes.Length,
                     length);
+                ValidateFitsPayload(
+                    field,
+                    bytes.Length,
+                    remainingBytes);
                 return bytes;
             case "guid":
                 return ConvertGuid(field, value).ToByteArray();
@@ -229,16 +240,33 @@ internal sealed class ManifestEventPayloadBuffer : IDisposable {
         object? value,
         string inputType,
         int count,
-        int? elementLength) {
+        int? elementLength,
+        int remainingBytes) {
 
         if (count < 0) {
             throw new ArgumentOutOfRangeException(
                 field.Name,
                 $"Manifest payload field '{field.Name}' has a negative count.");
         }
+        if (count > MaximumPayloadBytes) {
+            throw new ArgumentOutOfRangeException(
+                field.Name,
+                $"Manifest payload field '{field.Name}' count {count} exceeds the bounded event payload capacity.");
+        }
         if (count == 0 &&
             value == null) {
             return Array.Empty<byte>();
+        }
+        int minimumElementBytes =
+            GetMinimumEncodedSize(
+                inputType,
+                elementLength);
+        if (minimumElementBytes > 0 &&
+            count > remainingBytes /
+                minimumElementBytes) {
+            throw new ArgumentOutOfRangeException(
+                field.Name,
+                $"Manifest payload field '{field.Name}' cannot encode {count} values within the remaining {remainingBytes}-byte event payload budget.");
         }
         if (inputType == "binary" &&
             value is byte[] binaryValue) {
@@ -247,7 +275,8 @@ internal sealed class ManifestEventPayloadBuffer : IDisposable {
                     field,
                     binaryValue,
                     inputType,
-                    elementLength);
+                    elementLength,
+                    remainingBytes);
             }
             if (count == 0 &&
                 binaryValue.Length == 0) {
@@ -264,7 +293,8 @@ internal sealed class ManifestEventPayloadBuffer : IDisposable {
                     field,
                     value,
                     inputType,
-                    elementLength);
+                    elementLength,
+                    remainingBytes);
             }
             throw new ArgumentException(
                 $"Manifest payload field '{field.Name}' requires {count} values.",
@@ -273,6 +303,11 @@ internal sealed class ManifestEventPayloadBuffer : IDisposable {
 
         var values = new List<object?>();
         foreach (object? item in enumerable) {
+            if (values.Count >= count) {
+                throw new ArgumentException(
+                    $"Manifest payload field '{field.Name}' requires {count} values, but more values were supplied.",
+                    field.Name);
+            }
             values.Add(item);
         }
         if (values.Count != count) {
@@ -287,7 +322,14 @@ internal sealed class ManifestEventPayloadBuffer : IDisposable {
                 field,
                 item,
                 inputType,
-                elementLength);
+                elementLength,
+                remainingBytes -
+                checked((int)stream.Length));
+            ValidateFitsPayload(
+                field,
+                encoded.Length,
+                remainingBytes -
+                checked((int)stream.Length));
             stream.Write(
                 encoded,
                 0,
@@ -378,18 +420,48 @@ internal sealed class ManifestEventPayloadBuffer : IDisposable {
     private static byte[] EncodeUnicodeString(
         ManifestEventPayloadField field,
         object? value,
-        int? length) {
+        int? length,
+        int remainingBytes) {
 
         string text = Convert.ToString(
             value,
             CultureInfo.InvariantCulture) ?? string.Empty;
         if (length.HasValue) {
+            int encodedBytes;
+            try {
+                encodedBytes = checked(
+                    length.Value * sizeof(char));
+            } catch (OverflowException) {
+                throw new ArgumentOutOfRangeException(
+                    field.Name,
+                    length.Value,
+                    $"Manifest payload field '{field.Name}' length is too large.");
+            }
+            ValidateFitsPayload(
+                field,
+                encodedBytes,
+                remainingBytes);
             return Encoding.Unicode.GetBytes(
                 PadFixedLengthString(
                     field,
                     text,
                     length.Value));
         }
+        int nullTerminatedBytes;
+        try {
+            nullTerminatedBytes = checked(
+                (text.Length + 1) *
+                sizeof(char));
+        } catch (OverflowException) {
+            throw new ArgumentOutOfRangeException(
+                field.Name,
+                text.Length,
+                $"Manifest payload field '{field.Name}' is too large.");
+        }
+        ValidateFitsPayload(
+            field,
+            nullTerminatedBytes,
+            remainingBytes);
         return Encoding.Unicode.GetBytes(
             text + '\0');
     }
@@ -397,7 +469,8 @@ internal sealed class ManifestEventPayloadBuffer : IDisposable {
     private static byte[] EncodeAnsiString(
         ManifestEventPayloadField field,
         object? value,
-        int? length) {
+        int? length,
+        int remainingBytes) {
 
         string text = Convert.ToString(
             value,
@@ -417,6 +490,24 @@ internal sealed class ManifestEventPayloadBuffer : IDisposable {
                 "Failed to measure the ANSI event payload.");
         }
         if (length.HasValue) {
+            int paddingBytes =
+                Math.Max(
+                    0,
+                    length.Value - text.Length);
+            int encodedBytes;
+            try {
+                encodedBytes = checked(
+                    size + paddingBytes);
+            } catch (OverflowException) {
+                throw new ArgumentOutOfRangeException(
+                    field.Name,
+                    length.Value,
+                    $"Manifest payload field '{field.Name}' length is too large.");
+            }
+            ValidateFitsPayload(
+                field,
+                encodedBytes,
+                remainingBytes);
             text = PadFixedLengthString(
                 field,
                 text,
@@ -435,6 +526,11 @@ internal sealed class ManifestEventPayloadBuffer : IDisposable {
                     Marshal.GetLastWin32Error(),
                     "Failed to measure the fixed-length ANSI event payload.");
             }
+        } else {
+            ValidateFitsPayload(
+                field,
+                checked(size + 1),
+                remainingBytes);
         }
         byte[] bytes = new byte[
             size + (length.HasValue ? 0 : 1)];
@@ -455,6 +551,53 @@ internal sealed class ManifestEventPayloadBuffer : IDisposable {
             }
         }
         return bytes;
+    }
+
+    private static int GetMinimumEncodedSize(
+        string inputType,
+        int? elementLength) {
+
+        return inputType switch {
+            "unicodestring" => elementLength.HasValue
+                ? elementLength.Value >
+                  MaximumPayloadBytes / sizeof(char)
+                    ? MaximumPayloadBytes + 1
+                    : elementLength.Value * sizeof(char)
+                : sizeof(char),
+            "ansistring" => elementLength.HasValue &&
+                            elementLength.Value >
+                            MaximumPayloadBytes
+                ? MaximumPayloadBytes + 1
+                : elementLength ?? 1,
+            "int8" or "uint8" => 1,
+            "int16" or "uint16" => 2,
+            "int32" or "uint32" or "hexint32" or
+            "float" or "boolean" => 4,
+            "int64" or "uint64" or "hexint64" or
+            "double" or "filetime" => 8,
+            "guid" or "systemtime" => 16,
+            "pointer" => IntPtr.Size,
+            "binary" => elementLength.HasValue &&
+                        elementLength.Value >
+                        MaximumPayloadBytes
+                ? MaximumPayloadBytes + 1
+                : elementLength ?? 0,
+            "sid" => 8,
+            _ => 0
+        };
+    }
+
+    private static void ValidateFitsPayload(
+        ManifestEventPayloadField field,
+        int encodedBytes,
+        int remainingBytes) {
+
+        if (encodedBytes < 0 ||
+            encodedBytes > remainingBytes) {
+            throw new ArgumentOutOfRangeException(
+                field.Name,
+                $"Manifest payload field '{field.Name}' requires {encodedBytes} encoded bytes, exceeding the remaining {remainingBytes}-byte event payload budget.");
+        }
     }
 
     private static string PadFixedLengthString(

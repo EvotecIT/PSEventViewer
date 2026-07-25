@@ -5,6 +5,16 @@ namespace EventViewerX.Tests;
 
 public sealed class TestNamedEventQuerySnapshot {
     [Fact]
+    public void QueryRejectsUndefinedNamedEventValues() {
+        Assert.Throws<
+            ArgumentOutOfRangeException>(() =>
+                new NamedEventQuery(
+                    new[] {
+                        (NamedEvents)int.MaxValue
+                    }));
+    }
+
+    [Fact]
     public async Task ReadAsyncFreezesTheQueryBeforeEnumeration() {
         NamedEvents namedEvent =
             Enum.GetValues(typeof(NamedEvents))

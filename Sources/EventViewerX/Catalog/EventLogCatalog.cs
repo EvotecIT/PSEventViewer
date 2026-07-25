@@ -50,6 +50,18 @@ public static partial class EventLogCatalog {
         cancellationToken.ThrowIfCancellationRequested();
         EventLogCatalogQuery snapshot = SnapshotAndValidate(query);
         Regex[] patterns = CompilePatterns(providerPatterns);
+        return EnumerateProviders(
+            snapshot,
+            patterns,
+            cancellationToken);
+    }
+
+    private static IEnumerable<EventProviderCatalogResult>
+        EnumerateProviders(
+            EventLogCatalogQuery snapshot,
+            Regex[] patterns,
+            CancellationToken cancellationToken) {
+
         using var sessionLifetime =
             new RetainedDisposable<EventLogSession>(
                 OpenSession(
@@ -186,9 +198,9 @@ public static partial class EventLogCatalog {
                 },
                 timeoutMilliseconds,
                 $"Timed out reading the type of event log '{logName}' after {timeoutMilliseconds} ms.",
+                cancellationToken,
                 operationLease:
                     operationLease);
-            cancellationToken.ThrowIfCancellationRequested();
             return result;
         } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
             throw;
@@ -218,9 +230,9 @@ public static partial class EventLogCatalog {
                 () => enumerate().ToArray(),
                 timeoutMilliseconds,
                 timeoutMessage,
+                cancellationToken,
                 operationLease:
                     operationLease);
-        cancellationToken.ThrowIfCancellationRequested();
         return names;
     }
 

@@ -298,6 +298,49 @@ public sealed class TestEventLogSubscription {
     }
 
     [Fact]
+    public async Task SubscriptionStartupReturnsWhenNativeCreationIsCancelled() {
+        using var started =
+            new ManualResetEventSlim();
+        using var release =
+            new ManualResetEventSlim();
+        using var cancellation =
+            new CancellationTokenSource();
+        Task<Native.WindowsEventNativeMethods.EventHandle>
+            subscription = Task.Run(() =>
+                EventLogSubscription
+                    .CreateSubscriptionBounded(
+                        () => {
+                            started.Set();
+                            release.Wait();
+                            return new Native
+                                .WindowsEventNativeMethods
+                                .EventHandle();
+                        },
+                        5000,
+                        cancellation.Token));
+        Assert.True(
+            started.Wait(
+                TimeSpan.FromSeconds(5)));
+
+        cancellation.Cancel();
+        Task completed = await Task.WhenAny(
+            subscription,
+            Task.Delay(
+                TimeSpan.FromSeconds(5)));
+        try {
+            Assert.Same(
+                subscription,
+                completed);
+            await Assert.ThrowsAnyAsync<
+                OperationCanceledException>(
+                async () =>
+                    await subscription);
+        } finally {
+            release.Set();
+        }
+    }
+
+    [Fact]
     public void FutureSubscriptionIsSignaledAndDeliversANewEvent() {
         if (!OperatingSystem.IsWindows()) return;
         if (!TestEnv.IsAdmin()) return;

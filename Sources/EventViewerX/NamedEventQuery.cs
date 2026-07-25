@@ -23,6 +23,16 @@ public sealed class NamedEventQuery {
                 "At least one named event is required.",
                 nameof(namedEvents));
         }
+        foreach (NamedEvents namedEvent in NamedEvents) {
+            if (!Enum.IsDefined(
+                    typeof(NamedEvents),
+                    namedEvent)) {
+                throw new ArgumentOutOfRangeException(
+                    nameof(namedEvents),
+                    namedEvent,
+                    $"Named event value '{namedEvent}' is not registered.");
+            }
+        }
     }
 
     /// <summary>Named-event rules selected by this query.</summary>
