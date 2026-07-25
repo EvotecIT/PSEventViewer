@@ -76,6 +76,21 @@ Describe 'Custom manifest provider lifecycle' {
         } | Should -Throw '*Evnts*'
     }
 
+    It 'returns structured validation for explicit null JSON members' {
+        $DefinitionPath = Join-Path $TestDrive 'null-provider.json'
+        [System.IO.File]::WriteAllText(
+            $DefinitionPath,
+            '{"name":null,"id":"0c47facd-a6c5-45bf-9e0d-035274510a28","packageVersion":"1.0.0"}'
+        )
+
+        $Result = Test-EVXProviderDefinition `
+            -Path $DefinitionPath `
+            -ErrorAction Stop
+
+        $Result.IsValid | Should -BeFalse
+        $Result.Errors.Code | Should -Contain 'ProviderNameRequired'
+    }
+
     It 'builds, installs, writes, reads, and removes a provider package' -Skip:(-not ($IsElevated -and $HasToolchain)) {
         $Suffix = [guid]::NewGuid().ToString('N')
         $ProviderName = "Evotec-EventViewerX-Pester-$Suffix"
@@ -141,7 +156,7 @@ Describe 'Custom manifest provider lifecycle' {
             )
             $AclSids | Should -Not -Contain 'S-1-1-0'
 
-            $Marker = 'EVX-' + [guid]::NewGuid().ToString('N')
+            $Marker = 'EVX-%1-100%-' + [guid]::NewGuid().ToString('N')
             $StartTime = (Get-Date).AddSeconds(-1)
             $Write = Write-EVXEvent `
                 -ProviderName $ProviderName `
@@ -187,6 +202,8 @@ Describe 'Custom manifest provider lifecycle' {
             $WinEvent | Should -Not -BeNullOrEmpty
             $EVXEvent | Should -Not -BeNullOrEmpty
             $EVXEvent.Message | Should -Be $WinEvent.Message
+            $EVXEvent.Message |
+                Should -Match ([regex]::Escape($Marker))
             $EVXEvent.Data.Values |
                 Should -Be $WinEvent.Properties.Value
             (

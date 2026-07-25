@@ -27,6 +27,31 @@ public sealed class TestEventProviderPackages {
     }
 
     [Fact]
+    public void RejectsLiteralPercentSequencesBeforeResourceCompilation() {
+        EventProviderDefinition definition = CreateDefinition();
+
+        FormatException exception =
+            Assert.Throws<FormatException>(() =>
+                EventProviderMessageTemplateCompiler.Compile(
+                    "Literal %1 and %0; field {ComputerName}; 100%.",
+                    definition.Events[0].Fields));
+
+        Assert.Contains(
+            "payload field",
+            exception.Message,
+            StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void GeneratedManifestSymbolsContainOnlyAsciiIdentifiers() {
+        Assert.Equal(
+            "M_NCHEN_1",
+            EventProviderManifestNames.Symbol(
+                "München-1",
+                "Fallback"));
+    }
+
+    [Fact]
     public void RejectsSchemaChangesWithoutAnEventVersionBump() {
         EventProviderDefinition baseline = CreateDefinition();
         EventProviderDefinition candidate = CreateDefinition();
@@ -42,6 +67,25 @@ public sealed class TestEventProviderPackages {
         Assert.Contains(
             result.Issues,
             issue => issue.Code == "EventFieldTypeChanged");
+    }
+
+    [Fact]
+    public void RejectsCaseOnlyFieldNameChangesWithoutAnEventVersionBump() {
+        EventProviderDefinition baseline = CreateDefinition();
+        EventProviderDefinition candidate = CreateDefinition();
+        candidate.Events[0].Fields[0].Name =
+            "computerName";
+
+        EventProviderCompatibilityResult result =
+            EventProviderCompatibility.Compare(
+                baseline,
+                candidate);
+
+        Assert.False(result.IsCompatible);
+        Assert.Contains(
+            result.Issues,
+            issue => issue.Code ==
+                     "EventFieldNameChanged");
     }
 
     [Fact]
@@ -88,9 +132,11 @@ public sealed class TestEventProviderPackages {
                 DateTimeOffset.UtcNow.AddMinutes(-1),
                 DateTimeOffset.UtcNow.AddDays(1));
         try {
+            EventProviderDefinition definition =
+                CreateDefinition();
             EventProviderPackageBuildResult result =
                 EventProviderPackageBuilder.Build(
-                    CreateDefinition(),
+                    definition,
                     packagePath,
                     new EventProviderPackageBuildOptions {
                         SigningCertificate = certificate
@@ -147,6 +193,13 @@ public sealed class TestEventProviderPackages {
                 "code signing",
                 missingCodeSigning.Message,
                 StringComparison.OrdinalIgnoreCase);
+            Assert.Throws<ArgumentOutOfRangeException>(() =>
+                EventProviderPackageTrust.EnsureAllowed(
+                    package,
+                    new EventProviderPackageInstallOptions {
+                        TrustMode =
+                            (EventProviderPackageTrustMode)int.MaxValue
+                    }));
 
             string extractedPath = Path.Combine(
                 root,
@@ -170,6 +223,38 @@ public sealed class TestEventProviderPackages {
         } finally {
             Directory.Delete(root, recursive: true);
         }
+    }
+
+    [Theory]
+    [InlineData(
+        "{\"name\":null,\"id\":\"520ecea3-f786-459c-8b02-2a288cbef31c\",\"packageVersion\":\"1.0.0\"}",
+        "ProviderNameRequired",
+        "Name")]
+    [InlineData(
+        "{\"name\":\"Provider\",\"id\":\"520ecea3-f786-459c-8b02-2a288cbef31c\",\"packageVersion\":null}",
+        "PackageVersionRequired",
+        "PackageVersion")]
+    [InlineData(
+        "{\"name\":\"Provider\",\"id\":\"520ecea3-f786-459c-8b02-2a288cbef31c\",\"packageVersion\":\"1.0.0\",\"channels\":null}",
+        "DefinitionMemberNull",
+        "Channels")]
+    [InlineData(
+        "{\"name\":\"Provider\",\"id\":\"520ecea3-f786-459c-8b02-2a288cbef31c\",\"packageVersion\":\"1.0.0\",\"events\":[null]}",
+        "DefinitionMemberNull",
+        "Events[0]")]
+    public void NullJsonMembersProduceStructuredValidation(
+        string json,
+        string code,
+        string path) {
+
+        EventProviderValidationException exception =
+            Assert.Throws<EventProviderValidationException>(() =>
+                EventProviderDefinitionJson.Parse(json));
+
+        Assert.Contains(
+            exception.Result.Issues,
+            issue => issue.Code == code &&
+                     issue.Path == path);
     }
 
     [Fact]

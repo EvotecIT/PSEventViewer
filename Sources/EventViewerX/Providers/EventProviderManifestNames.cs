@@ -22,10 +22,11 @@ internal static class EventProviderManifestNames {
         string source = string.IsNullOrWhiteSpace(value)
             ? fallback
             : value;
+        source ??= "Value";
         var builder = new StringBuilder(source.Length + 1);
         foreach (char character in source) {
             builder.Append(
-                char.IsLetterOrDigit(character)
+                IsAsciiLetterOrDigit(character)
                     ? char.ToUpperInvariant(character)
                     : '_');
         }
@@ -36,6 +37,12 @@ internal static class EventProviderManifestNames {
             builder.Insert(0, '_');
         }
         return builder.ToString();
+    }
+
+    private static bool IsAsciiLetterOrDigit(char value) {
+        return value is >= 'A' and <= 'Z' or
+            >= 'a' and <= 'z' or
+            >= '0' and <= '9';
     }
 
     internal static string TypeName(EventProviderFieldType type) {

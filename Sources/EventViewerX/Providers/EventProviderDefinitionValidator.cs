@@ -28,6 +28,12 @@ public static partial class EventProviderDefinitionValidator {
             throw new ArgumentNullException(nameof(definition));
         }
         var issues = new List<EventProviderValidationIssue>();
+        if (!ValidateObjectGraph(
+                definition,
+                issues)) {
+            return new EventProviderValidationResult(
+                issues);
+        }
         ValidateProvider(definition, issues);
         ValidateChannels(definition, issues);
         ValidateMetadata(definition, issues);
@@ -53,7 +59,7 @@ public static partial class EventProviderDefinitionValidator {
         List<EventProviderValidationIssue> issues) {
 
         Required(definition.Name, "ProviderNameRequired", "Name", issues);
-        if (definition.Name.Length > 255) {
+        if (definition.Name?.Length > 255) {
             Error(
                 "ProviderNameTooLong",
                 "Name",
@@ -83,23 +89,32 @@ public static partial class EventProviderDefinitionValidator {
                     exception.Message,
                     issues);
             }
+            if (definition.PackageVersion.IndexOfAny(
+                    Path.GetInvalidFileNameChars()) >= 0) {
+                Error(
+                    "PackageVersionInvalid",
+                    "PackageVersion",
+                    "PackageVersion must be safe to use as a directory name.",
+                    issues);
+            }
         }
-        if (definition.PackageVersion.IndexOfAny(
-                Path.GetInvalidFileNameChars()) >= 0) {
-            Error(
-                "PackageVersionInvalid",
-                "PackageVersion",
-                "PackageVersion must be safe to use as a directory name.",
-                issues);
-        }
-        try {
-            _ = CultureInfo.GetCultureInfo(definition.DefaultCulture);
-        } catch (CultureNotFoundException) {
-            Error(
-                "DefaultCultureInvalid",
-                "DefaultCulture",
-                $"'{definition.DefaultCulture}' is not a recognized culture.",
-                issues);
+        Required(
+            definition.DefaultCulture,
+            "DefaultCultureRequired",
+            "DefaultCulture",
+            issues);
+        if (!string.IsNullOrWhiteSpace(
+                definition.DefaultCulture)) {
+            try {
+                _ = CultureInfo.GetCultureInfo(
+                    definition.DefaultCulture);
+            } catch (CultureNotFoundException) {
+                Error(
+                    "DefaultCultureInvalid",
+                    "DefaultCulture",
+                    $"'{definition.DefaultCulture}' is not a recognized culture.",
+                    issues);
+            }
         }
         if (definition.Channels.Count == 0) {
             Error(
@@ -148,6 +163,7 @@ public static partial class EventProviderDefinitionValidator {
                 path + ".Name",
                 issues);
             if (!string.IsNullOrWhiteSpace(definition.Name) &&
+                !string.IsNullOrWhiteSpace(channel.Name) &&
                 !channel.Name.StartsWith(
                     definition.Name + "/",
                     StringComparison.OrdinalIgnoreCase)) {
@@ -196,6 +212,11 @@ public static partial class EventProviderDefinitionValidator {
             issues);
         for (int index = 0; index < definition.Levels.Count; index++) {
             EventProviderLevelDefinition level = definition.Levels[index];
+            Required(
+                level.Name,
+                "LevelNameRequired",
+                $"Levels[{index}].Name",
+                issues);
             if (level.Value < 16) {
                 Error(
                     "CustomLevelReserved",
@@ -224,6 +245,35 @@ public static partial class EventProviderDefinitionValidator {
             "DuplicateOpcodeName",
             "Opcodes",
             issues);
+        for (int taskIndex = 0;
+             taskIndex < definition.Tasks.Count;
+             taskIndex++) {
+            EventProviderTaskDefinition task =
+                definition.Tasks[taskIndex];
+            Required(
+                task.Name,
+                "TaskNameRequired",
+                $"Tasks[{taskIndex}].Name",
+                issues);
+            for (int opcodeIndex = 0;
+                 opcodeIndex < task.Opcodes.Count;
+                 opcodeIndex++) {
+                Required(
+                    task.Opcodes[opcodeIndex].Name,
+                    "OpcodeNameRequired",
+                    $"Tasks[{taskIndex}].Opcodes[{opcodeIndex}].Name",
+                    issues);
+            }
+        }
+        for (int opcodeIndex = 0;
+             opcodeIndex < definition.Opcodes.Count;
+             opcodeIndex++) {
+            Required(
+                definition.Opcodes[opcodeIndex].Name,
+                "OpcodeNameRequired",
+                $"Opcodes[{opcodeIndex}].Name",
+                issues);
+        }
         foreach (EventProviderOpcodeDefinition opcode in
                  definition.Opcodes.Concat(
                      definition.Tasks.SelectMany(static task =>
@@ -247,6 +297,11 @@ public static partial class EventProviderDefinitionValidator {
         for (int index = 0; index < definition.Keywords.Count; index++) {
             EventProviderKeywordDefinition keyword =
                 definition.Keywords[index];
+            Required(
+                keyword.Name,
+                "KeywordNameRequired",
+                $"Keywords[{index}].Name",
+                issues);
             if (keyword.Mask == 0 ||
                 (keyword.Mask & (keyword.Mask - 1)) != 0 ||
                 keyword.Mask > 0x0000FFFFFFFFFFFFUL) {

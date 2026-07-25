@@ -176,6 +176,18 @@ New-EVXProviderPackage `
 The JSON contract supports the same complete model as C#: explicit channels,
 localized strings, levels, tasks, opcodes, keywords, value maps, bit maps,
 event versions, field length/count references, and channel policy.
+Explicit `null` values for required members or typed collections are returned
+as structured validation errors by `Test-EVXProviderDefinition`; they do not
+fall through as deserializer or null-reference failures.
+
+Friendly event messages use `{FieldName}` placeholders. Windows reserves
+percent sequences while rendering message resources, including `%n`, `%0`, and
+`%%n`, so the validator rejects literal `%` characters in static message text
+instead of publishing a message that renders incorrectly. Put percent-bearing
+text such as `100%` or `literal %1` in a named string payload field; insertion
+values are treated as data. Manifest symbols are normalized to uppercase ASCII
+identifiers, so display names may still contain localized characters without
+producing invalid C symbols.
 
 ## Field types
 
@@ -327,6 +339,10 @@ Create a new event version when changing:
 - field order, name, native type, length, or count;
 - map identity or output semantics;
 - channel, level, task, opcode, keyword, or descriptor identity.
+
+Compatibility checks preserve the exact casing of manifest identifiers.
+Changing `UserName` to `username`, for example, requires a new event version
+because named `EventData` filters and downstream parsers can be case-sensitive.
 
 Build upgrades against the released package:
 

@@ -106,6 +106,13 @@ public static class EventProviderCompatibility {
                 continue;
             }
             Equal(
+                previous.Id,
+                current.Id,
+                "ChannelIdChanged",
+                $"Channels[{previous.Id}].Id",
+                "Channel identifier",
+                issues);
+            Equal(
                 previous.Name,
                 current.Name,
                 "ChannelNameChanged",
@@ -204,6 +211,13 @@ public static class EventProviderCompatibility {
                 continue;
             }
             Equal(
+                previous.Name,
+                current.Name,
+                "MapNameChanged",
+                $"Maps[{previous.Name}].Name",
+                "Map name",
+                issues);
+            Equal(
                 previous.Kind,
                 current.Kind,
                 "MapKindChanged",
@@ -278,10 +292,14 @@ public static class EventProviderCompatibility {
                 path + ".Opcode",
                 "Event opcode",
                 issues);
-            if (!previous.Keywords.OrderBy(static value => value)
+            if (!previous.Keywords.OrderBy(
+                    static value => value,
+                    StringComparer.Ordinal)
                 .SequenceEqual(
-                    current.Keywords.OrderBy(static value => value),
-                    StringComparer.OrdinalIgnoreCase)) {
+                    current.Keywords.OrderBy(
+                        static value => value,
+                        StringComparer.Ordinal),
+                    StringComparer.Ordinal)) {
                 Add(
                     "EventKeywordsChanged",
                     path + ".Keywords",
@@ -388,6 +406,13 @@ public static class EventProviderCompatibility {
                 continue;
             }
             Equal(
+                previousName,
+                name(current),
+                kind + "NameChanged",
+                kind + "s[" + previousName + "].Name",
+                kind + " name",
+                issues);
+            Equal(
                 value(previous),
                 value(current),
                 kind + "ValueChanged",
@@ -410,7 +435,7 @@ public static class EventProviderCompatibility {
             ? string.Equals(
                 left,
                 right,
-                StringComparison.OrdinalIgnoreCase)
+                StringComparison.Ordinal)
             : EqualityComparer<T>.Default.Equals(
                 baseline,
                 candidate);

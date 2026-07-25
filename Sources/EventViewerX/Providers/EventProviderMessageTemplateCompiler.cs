@@ -73,6 +73,10 @@ public static class EventProviderMessageTemplateCompiler {
                 throw new FormatException(
                     "Event message contains an unmatched '}'. Use '}}' for a literal brace.");
             }
+            if (character == '%') {
+                throw new FormatException(
+                    "Event messages cannot contain a literal '%'. Windows interprets percent sequences while rendering message resources; place percent-bearing text in a named string payload field instead.");
+            }
             output.Append(character);
         }
         return output.ToString();

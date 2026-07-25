@@ -8,6 +8,14 @@ internal static class EventProviderPackageTrust {
         EventProviderPackage package,
         EventProviderPackageInstallOptions options) {
 
+        if (!Enum.IsDefined(
+                typeof(EventProviderPackageTrustMode),
+                options.TrustMode)) {
+            throw new ArgumentOutOfRangeException(
+                nameof(options.TrustMode),
+                options.TrustMode,
+                "Unsupported provider package trust mode.");
+        }
         if (!package.IsSigned) {
             if (options.TrustMode !=
                 EventProviderPackageTrustMode.AllowUnsigned) {
