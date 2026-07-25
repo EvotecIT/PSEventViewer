@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics.Eventing.Reader;
 using System.Runtime.Serialization;
 using System.Security.Principal;
+using EventViewerX.Reports.Stats;
 using Xunit;
 
 namespace EventViewerX.Tests;
@@ -16,6 +17,25 @@ public class TestEventObjectTimeCreated
         var eo = new EventObject(record, "local", EventReadMode.Metadata);
 
         Assert.Equal(DateTime.MinValue, eo.TimeCreated);
+    }
+
+    [Fact]
+    public void MissingTimeDoesNotBecomeAStatisticsExtremum()
+    {
+        var record = new NullTimeEventRecord();
+        var eventObject =
+            new EventObject(
+                record,
+                "local",
+                EventReadMode.Metadata);
+        var builder =
+            new EvtxStatsReportBuilder();
+
+        builder.Add(eventObject);
+
+        Assert.Equal(1, builder.Scanned);
+        Assert.Null(builder.MinUtc);
+        Assert.Null(builder.MaxUtc);
     }
 
     private sealed class NullTimeEventRecord : EventRecord

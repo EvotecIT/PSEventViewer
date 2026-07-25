@@ -35,9 +35,8 @@ namespace EventViewerX {
             cancellationToken.ThrowIfCancellationRequested();
             PowerShellScriptQueryExecutionInfo queryInfo = executionInfo ?? new PowerShellScriptQueryExecutionInfo();
             queryInfo.Reset(machineName, eventLogPath, maxEvents, maxEventsScanned);
-            string logName = type == PowerShellEdition.WindowsPowerShell
-                ? "Microsoft-Windows-PowerShell/Operational"
-                : "PowerShellCore/Operational";
+            string logName =
+                GetPowerShellLogName(type);
 
             var scanLimit = new PowerShellScriptScanLimit(
                 maxEventsScanned);
@@ -118,9 +117,8 @@ namespace EventViewerX {
             string[] textFilters = containsText?
                 .Where(static term => term != null)
                 .ToArray() ?? Array.Empty<string>();
-            string logName = type == PowerShellEdition.WindowsPowerShell
-                ? "Microsoft-Windows-PowerShell/Operational"
-                : "PowerShellCore/Operational";
+            string logName =
+                GetPowerShellLogName(type);
 
             var cache = new PowerShellScriptFragmentCache(maxPendingScripts, maxCachedEvents);
             List<KeyValuePair<long, RestoredPowerShellScript>>? boundedScripts = maxScripts > 0
@@ -306,6 +304,21 @@ namespace EventViewerX {
             if (maxEventsScanned < 0) {
                 throw new ArgumentOutOfRangeException(nameof(maxEventsScanned), "Maximum scanned events must be greater than or equal to zero.");
             }
+        }
+
+        private static string GetPowerShellLogName(
+            PowerShellEdition type) {
+
+            return type switch {
+                PowerShellEdition.WindowsPowerShell =>
+                    "Microsoft-Windows-PowerShell/Operational",
+                PowerShellEdition.PowerShell =>
+                    "PowerShellCore/Operational",
+                _ => throw new ArgumentOutOfRangeException(
+                    nameof(type),
+                    type,
+                    "The PowerShell edition is not supported.")
+            };
         }
 
         private static int ParseBoundedFragmentNumber(string? value, out bool invalid) {

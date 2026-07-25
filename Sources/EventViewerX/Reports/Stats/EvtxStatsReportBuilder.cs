@@ -35,7 +35,9 @@ public sealed class EvtxStatsReportBuilder {
 
         Add(
             id: ev.Id,
-            timeCreatedUtc: ev.TimeCreated.ToUniversalTime(),
+            timeCreatedUtc: ev.TimeCreated == DateTime.MinValue
+                ? DateTime.MinValue
+                : ev.TimeCreated.ToUniversalTime(),
             providerName: ev.ProviderName,
             computerName: ev.ComputerName,
             level: (int)(ev.Level ?? 0),
@@ -55,8 +57,16 @@ public sealed class EvtxStatsReportBuilder {
 
         _scanned++;
 
-        if (!_minUtc.HasValue || timeCreatedUtc < _minUtc.Value) _minUtc = timeCreatedUtc;
-        if (!_maxUtc.HasValue || timeCreatedUtc > _maxUtc.Value) _maxUtc = timeCreatedUtc;
+        if (timeCreatedUtc != DateTime.MinValue) {
+            if (!_minUtc.HasValue ||
+                timeCreatedUtc < _minUtc.Value) {
+                _minUtc = timeCreatedUtc;
+            }
+            if (!_maxUtc.HasValue ||
+                timeCreatedUtc > _maxUtc.Value) {
+                _maxUtc = timeCreatedUtc;
+            }
+        }
 
         ReportAggregates.AddCount(_byEventId, id);
         ReportAggregates.AddCount(_byProviderName, providerName, useUnknownPlaceholder: true);

@@ -654,6 +654,45 @@ public sealed class TestNativeEventEngineContracts {
     }
 
     [Fact]
+    public void QuerySnapshotsCloneMutableCredentials() {
+        var credential =
+            new System.Net.NetworkCredential(
+                "original-user",
+                "original-password",
+                "original-domain");
+        var channel = new EventLogChannelQuery("System") {
+            MachineName = "remote.example",
+            Credential = credential
+        };
+        EventLogStructuredQuery structured =
+            EventLogStructuredQuery.ForChannels(
+                new[] { "System" });
+        structured.MachineName = "remote.example";
+        structured.Credential = credential;
+
+        EventLogChannelQuery channelSnapshot =
+            EventLogQuerySnapshot.Copy(channel);
+        EventLogStructuredQuery structuredSnapshot =
+            EventLogQuerySnapshot.Copy(structured);
+        credential.UserName = "changed-user";
+        credential.Password = "changed-password";
+        credential.Domain = "changed-domain";
+
+        Assert.NotSame(
+            credential,
+            channelSnapshot.Credential);
+        Assert.Equal(
+            "original-user",
+            channelSnapshot.Credential!.UserName);
+        Assert.Equal(
+            "original-password",
+            structuredSnapshot.Credential!.Password);
+        Assert.Equal(
+            "original-domain",
+            structuredSnapshot.Credential.Domain);
+    }
+
+    [Fact]
     public async Task AsyncFileStreamStopsBeforeDrainingBufferedEventsAfterCancellation() {
         if (!OperatingSystem.IsWindows()) return;
         var query = new EventLogFileQuery(GetFixturePath()) {

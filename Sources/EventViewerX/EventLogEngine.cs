@@ -25,6 +25,7 @@ public static partial class EventLogEngine {
         if (query == null) {
             throw new ArgumentNullException(nameof(query));
         }
+        query = EventLogQuerySnapshot.Copy(query);
         EventReadModeValidation.EnsureDefined(
             query.ReadMode,
             nameof(query));
@@ -119,6 +120,7 @@ public static partial class EventLogEngine {
         if (query == null) {
             throw new ArgumentNullException(nameof(query));
         }
+        query = EventLogQuerySnapshot.Copy(query);
         EventReadModeValidation.EnsureDefined(
             query.ReadMode,
             nameof(query));

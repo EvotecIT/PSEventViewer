@@ -126,7 +126,8 @@ public sealed class CmdletGetEVXLog : AsyncPSCmdlet {
                          IncludeEventTimes,
                          Credential?.GetNetworkCredential(),
                          Authentication,
-                         Force)) {
+                         Force,
+                         CancelToken)) {
                 if (AsResult) {
                     WriteObject(result);
                 } else {

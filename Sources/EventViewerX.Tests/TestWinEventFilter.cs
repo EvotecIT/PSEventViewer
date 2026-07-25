@@ -21,6 +21,33 @@ namespace EventViewerX.Tests {
         }
 
         [Fact]
+        public void NamedDataFilterCombinesDistinctKeysWithAnd() {
+            var ht = new Hashtable {
+                { "User", new[] { "Alice", "Bob" } },
+                { "Address", "10.0.0.1" }
+            };
+
+            string result =
+                WindowsEventFilterBuilder.BuildWinEventFilter(
+                    namedDataFilter: [ht],
+                    logName: "xx",
+                    xpathOnly: true);
+
+            Assert.Contains(
+                "Data[@Name='User'] = 'Alice' or Data[@Name='User'] = 'Bob'",
+                result,
+                StringComparison.Ordinal);
+            Assert.Contains(
+                "and",
+                result,
+                StringComparison.Ordinal);
+            Assert.Contains(
+                "Data[@Name='Address'] = '10.0.0.1'",
+                result,
+                StringComparison.Ordinal);
+        }
+
+        [Fact]
         public void NamedDataFilterEscapesSpecialCharacters() {
             var ht = new Hashtable { { "Field", "O'Reilly & Co" } };
             var result = WindowsEventFilterBuilder.BuildWinEventFilter(namedDataFilter: [ht], logName: "xx", xpathOnly: true);
@@ -48,6 +75,28 @@ namespace EventViewerX.Tests {
             Assert.Equal(
                 "*[EventData[Data[@Name='FieldName'] = 'Value1' or Data[@Name='FieldName'] = 'Value2']]",
                 query.Element("Suppress")!.Value);
+        }
+
+        [Fact]
+        public void NamedDataExcludeFilterCombinesDistinctKeysWithAnd() {
+            var ht = new Hashtable {
+                { "User", "Alice" },
+                { "Address", "10.0.0.1" }
+            };
+
+            string result =
+                WindowsEventFilterBuilder.BuildWinEventFilter(
+                    namedDataExcludeFilter: [ht],
+                    logName: "xx");
+            XElement query =
+                XDocument.Parse(result)
+                    .Root!
+                    .Element("Query")!;
+
+            Assert.Contains(
+                "and",
+                query.Element("Suppress")!.Value,
+                StringComparison.Ordinal);
         }
 
         [Fact]

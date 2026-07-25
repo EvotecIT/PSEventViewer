@@ -177,7 +177,12 @@ public static partial class WindowsEventFilterBuilder {
                         keyFilters.Add($"Data[@Name={keyName}]");
                     }
                 }
-                items.Add(InitializeXPathFilter(keyFilters, "{0}", "{0}"));
+                items.Add(
+                    InitializeXPathFilter(
+                        keyFilters,
+                        "{0}",
+                        "{0}",
+                        logic: "and"));
             }
             filter = JoinXPathFilter(InitializeXPathFilter(items, "{0}", "*[EventData[{0}]]"), filter);
         }
@@ -194,7 +199,12 @@ public static partial class WindowsEventFilterBuilder {
                         keyFilters.Add($"Data[@Name={keyName}]");
                     }
                 }
-                items.Add(InitializeXPathFilter(keyFilters, "{0}", "{0}"));
+                items.Add(
+                    InitializeXPathFilter(
+                        keyFilters,
+                        "{0}",
+                        "{0}",
+                        logic: "and"));
             }
             suppressFilter = InitializeXPathFilter(
                 items,

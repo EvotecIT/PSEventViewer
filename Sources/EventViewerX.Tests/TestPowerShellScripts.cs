@@ -215,6 +215,21 @@ namespace EventViewerX.Tests {
         }
 
         [Fact]
+        public void PowerShellQueriesRejectUndefinedEditionsBeforeOpeningTheLog() {
+            PowerShellEdition invalid =
+                (PowerShellEdition)int.MaxValue;
+
+            Assert.Throws<ArgumentOutOfRangeException>(() =>
+                PowerShellEventEngine.GetPowerShellScriptExecution(
+                        invalid)
+                    .ToList());
+            Assert.Throws<ArgumentOutOfRangeException>(() =>
+                PowerShellEventEngine.RestorePowerShellScripts(
+                        invalid)
+                    .ToList());
+        }
+
+        [Fact]
         public void GetPowerShellScriptsHonorsPreCancelledRequestsBeforeOpeningTheLog() {
             using var cancellation = new CancellationTokenSource();
             cancellation.Cancel();
