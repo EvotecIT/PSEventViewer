@@ -172,7 +172,7 @@ public static partial class EventLogCatalog {
         EventLogCatalogQuery snapshot = SnapshotAndValidate(query);
         string[] normalizedPatterns =
             NormalizePatterns(channelPatterns);
-        Regex[] patterns = CompilePatterns(channelPatterns);
+        Regex[] patterns = CompilePatterns(normalizedPatterns);
         var explicitNames = new HashSet<string>(
             normalizedPatterns.Where(static pattern =>
                 !ContainsWildcard(pattern)),

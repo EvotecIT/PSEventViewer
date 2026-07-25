@@ -5,6 +5,53 @@ namespace EventViewerX.Tests;
 
 public sealed class TestWindowsEventArchiveCancellation {
     [Fact]
+    public void CancellationBeforeNativeWorkerAdmissionRemovesTheTemporaryCopy() {
+        string root = Path.Combine(
+            Path.GetTempPath(),
+            "EventViewerX.Tests",
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        string path = Path.Combine(
+            root,
+            "source.evtx");
+        byte[] original = { 1, 2, 3, 4 };
+        File.WriteAllBytes(
+            path,
+            original);
+        using var cancellation = new CancellationTokenSource();
+        bool archiveCalled = false;
+        try {
+            Assert.ThrowsAny<OperationCanceledException>(() =>
+                WindowsEventArchive.ArchiveFileResources(
+                    path,
+                    0,
+                    cancellation.Token,
+                    (_, _) => archiveCalled = true,
+                    (sourcePath, temporaryPath, _) => {
+                        File.Copy(
+                            sourcePath,
+                            temporaryPath);
+                        cancellation.Cancel();
+                    }));
+
+            Assert.False(archiveCalled);
+            Assert.Equal(
+                original,
+                File.ReadAllBytes(path));
+            Assert.Empty(
+                Directory.EnumerateFiles(
+                    root,
+                    "*.archive.evtx"));
+        } finally {
+            if (Directory.Exists(root)) {
+                Directory.Delete(
+                    root,
+                    recursive: true);
+            }
+        }
+    }
+
+    [Fact]
     public async Task CancellationLeavesOriginalUntouchedUntilNativeWorkerFinishes() {
         string root = Path.Combine(
             Path.GetTempPath(),

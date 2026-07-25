@@ -11,7 +11,8 @@ internal static class WindowsEventReader {
         EventReadMode readMode,
         string queriedMachine,
         string containerLog,
-        CancellationToken cancellationToken) {
+        CancellationToken cancellationToken,
+        Action? queryOpened = null) {
 
         switch (readMode) {
             case EventReadMode.Metadata:
@@ -19,17 +20,24 @@ internal static class WindowsEventReader {
                              query,
                              queriedMachine,
                              containerLog,
-                             cancellationToken)) {
+                             cancellationToken,
+                             queryOpened)) {
                     yield return eventObject;
                 }
                 break;
             case EventReadMode.Message:
-                foreach (NativeEventMessage message in ReadMessages(query, cancellationToken)) {
+                foreach (NativeEventMessage message in ReadMessagesIterator(
+                             query,
+                             cancellationToken,
+                             queryOpened)) {
                     yield return new EventObject(message, queriedMachine, containerLog);
                 }
                 break;
             case EventReadMode.StructuredData:
-                foreach (NativeEventStructured structured in ReadStructured(query, cancellationToken)) {
+                foreach (NativeEventStructured structured in ReadStructuredIterator(
+                             query,
+                             cancellationToken,
+                             queryOpened)) {
                     yield return new EventObject(structured, queriedMachine, containerLog);
                 }
                 break;
@@ -38,12 +46,16 @@ internal static class WindowsEventReader {
                              query,
                              queriedMachine,
                              containerLog,
-                             cancellationToken)) {
+                             cancellationToken,
+                             queryOpened)) {
                     yield return eventObject;
                 }
                 break;
             case EventReadMode.Full:
-                foreach (NativeEventFull full in ReadFull(query, cancellationToken)) {
+                foreach (NativeEventFull full in ReadFullIterator(
+                             query,
+                             cancellationToken,
+                             queryOpened)) {
                     yield return new EventObject(full, queriedMachine, containerLog);
                 }
                 break;
@@ -76,7 +88,8 @@ internal static class WindowsEventReader {
         NativeEventQuery query,
         string queriedMachine,
         string containerLog,
-        CancellationToken cancellationToken) {
+        CancellationToken cancellationToken,
+        Action? queryOpened = null) {
 
         using var systemRenderer = new WindowsEventSystemRenderer();
         using var bookmarkRenderer = query.IncludeBookmark
@@ -89,7 +102,8 @@ internal static class WindowsEventReader {
                          systemRenderer.Render(eventHandle),
                          bookmarkRenderer?.Render(eventHandle),
                          queriedMachine,
-                         containerLog))) {
+                         containerLog),
+                     queryOpened)) {
             yield return eventObject;
         }
     }
@@ -126,7 +140,8 @@ internal static class WindowsEventReader {
         NativeEventQuery query,
         string queriedMachine,
         string containerLog,
-        CancellationToken cancellationToken) {
+        CancellationToken cancellationToken,
+        Action? queryOpened = null) {
 
         using var systemRenderer = new WindowsEventSystemRenderer();
         using var xmlRenderer = new WindowsEventXmlRenderer();
@@ -141,7 +156,8 @@ internal static class WindowsEventReader {
                          xmlRenderer.Render(eventHandle),
                          bookmarkRenderer?.Render(eventHandle),
                          queriedMachine,
-                         containerLog))) {
+                         containerLog),
+                     queryOpened)) {
             yield return eventObject;
         }
     }
@@ -181,7 +197,8 @@ internal static class WindowsEventReader {
 
     private static IEnumerable<NativeEventMessage> ReadMessagesIterator(
         NativeEventQuery query,
-        CancellationToken cancellationToken) {
+        CancellationToken cancellationToken,
+        Action? queryOpened = null) {
 
         using var systemRenderer = new WindowsEventSystemRenderer();
         using var messageRenderer = new WindowsEventMessageRenderer(
@@ -199,14 +216,16 @@ internal static class WindowsEventReader {
                              eventHandle,
                              metadata,
                              query.IncludeBookmark);
-                     })) {
+                     },
+                     queryOpened)) {
             yield return message;
         }
     }
 
     private static IEnumerable<NativeEventStructured> ReadStructuredIterator(
         NativeEventQuery query,
-        CancellationToken cancellationToken) {
+        CancellationToken cancellationToken,
+        Action? queryOpened = null) {
 
         using var systemRenderer = new WindowsEventSystemRenderer();
         using var payloadRenderer = new WindowsEventPayloadRenderer();
@@ -220,14 +239,16 @@ internal static class WindowsEventReader {
                              eventHandle,
                              metadata,
                              query.IncludeBookmark);
-                     })) {
+                     },
+                     queryOpened)) {
             yield return structured;
         }
     }
 
     private static IEnumerable<NativeEventFull> ReadFullIterator(
         NativeEventQuery query,
-        CancellationToken cancellationToken) {
+        CancellationToken cancellationToken,
+        Action? queryOpened = null) {
 
         using var systemRenderer = new WindowsEventSystemRenderer();
         using var messageRenderer = new WindowsEventMessageRenderer(
@@ -249,7 +270,8 @@ internal static class WindowsEventReader {
                                  metadata,
                                  query.IncludeBookmark);
                          return new NativeEventFull(message, structured);
-                     })) {
+                     },
+                     queryOpened)) {
             yield return full;
         }
     }
@@ -257,11 +279,13 @@ internal static class WindowsEventReader {
     private static IEnumerable<T> ReadEvents<T>(
         NativeEventQuery eventQuery,
         CancellationToken cancellationToken,
-        Func<IntPtr, T> projector) {
+        Func<IntPtr, T> projector,
+        Action? queryOpened = null) {
 
         using var events = new WindowsEventHandleEnumerator(
             eventQuery,
             cancellationToken);
+        queryOpened?.Invoke();
         while (events.MoveNext()) {
             T result = projector(events.Current);
             events.ReleaseCurrent();

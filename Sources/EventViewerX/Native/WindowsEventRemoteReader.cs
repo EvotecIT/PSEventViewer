@@ -282,7 +282,6 @@ internal static class WindowsEventRemoteReader {
                         connectionTimeoutMilliseconds);
                 EventLogSessionManager.ClearNegativeCache(
                     machineName);
-                sessionOpened.TrySetResult(null);
                 var nativeQuery = new NativeEventQuery(
                     session.DangerousGetHandle(),
                     path,
@@ -304,17 +303,28 @@ internal static class WindowsEventRemoteReader {
                             readMode,
                             machineName,
                             containerLog,
-                            cancellationToken)
+                            cancellationToken,
+                            () => sessionOpened.TrySetResult(null))
                         .GetEnumerator();
+                bool hasFirst = enumerator.MoveNext();
                 setupSlot.Dispose();
                 setupSlot = null;
-                CopyToBuffer(
-                    enumerator,
-                    results,
-                    maxEvents,
-                    readTimeoutMilliseconds,
-                    $"Timed out waiting for an available native read slot for '{displayName}' on '{machineName}'.",
-                    cancellationToken);
+                if (hasFirst) {
+                    results.Add(
+                        enumerator.Current,
+                        cancellationToken);
+                    if (maxEvents == 0 || maxEvents > 1) {
+                        CopyToBuffer(
+                            enumerator,
+                            results,
+                            maxEvents > 0
+                                ? maxEvents - 1
+                                : 0,
+                            readTimeoutMilliseconds,
+                            $"Timed out waiting for an available native read slot for '{displayName}' on '{machineName}'.",
+                            cancellationToken);
+                    }
+                }
             } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
             } catch (Exception ex) {
                 failures.Enqueue(ex);

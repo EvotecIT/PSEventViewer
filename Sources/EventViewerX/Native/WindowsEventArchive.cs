@@ -32,7 +32,8 @@ internal static class WindowsEventArchive {
         string path,
         int locale,
         CancellationToken cancellationToken,
-        Action<string, int> archive) {
+        Action<string, int> archive,
+        Action<string, string, CancellationToken>? copyFile = null) {
 
         if (archive == null) {
             throw new ArgumentNullException(nameof(archive));
@@ -50,9 +51,9 @@ internal static class WindowsEventArchive {
         string temporaryPath = Path.Combine(
             directory,
             $".{Path.GetFileName(absolutePath)}.{Guid.NewGuid():N}.archive.evtx");
-        bool cleanupDeferred = false;
+        bool nativeWorkerOwnsTemporaryFile = false;
         try {
-            CopyFile(
+            (copyFile ?? CopyFile)(
                 absolutePath,
                 temporaryPath,
                 cancellationToken);
@@ -74,10 +75,15 @@ internal static class WindowsEventArchive {
                     $"Provider resources could not be archived into '{absolutePath}'.",
                     cancellationToken,
                     _ => DeleteTemporaryArchive(
-                        temporaryPath));
+                        temporaryPath),
+                    operationAccepted: () =>
+                        nativeWorkerOwnsTemporaryFile = true);
+                nativeWorkerOwnsTemporaryFile = false;
             } catch (OperationCanceledException)
                 when (cancellationToken.IsCancellationRequested) {
-                cleanupDeferred = true;
+                throw;
+            } catch {
+                nativeWorkerOwnsTemporaryFile = false;
                 throw;
             }
             cancellationToken.ThrowIfCancellationRequested();
@@ -86,7 +92,7 @@ internal static class WindowsEventArchive {
                 absolutePath,
                 overwrite: true);
         } finally {
-            if (!cleanupDeferred) {
+            if (!nativeWorkerOwnsTemporaryFile) {
                 DeleteTemporaryArchive(
                     temporaryPath);
             }

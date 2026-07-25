@@ -6,6 +6,7 @@ namespace EventViewerX.Native;
 
 internal static class WindowsEventCollector {
     private const uint WriteAccess = 2;
+    // EC_OPEN_EXISTING from the Windows SDK EvColl.h.
     private const uint OpenExisting = 2;
     private const uint ReservedFlags = 0;
 

@@ -66,7 +66,8 @@ internal static class BoundedNativeOperation {
         string timeoutMessage,
         CancellationToken cancellationToken,
         Action<T>? lateResultCleanup = null,
-        IDisposable? operationLease = null) {
+        IDisposable? operationLease = null,
+        Action? operationAccepted = null) {
 
         cancellationToken.ThrowIfCancellationRequested();
         if (timeoutMilliseconds <= 0) {
@@ -119,6 +120,14 @@ internal static class BoundedNativeOperation {
         } catch {
             Slots.Release();
             operationLease?.Dispose();
+            throw;
+        }
+        try {
+            operationAccepted?.Invoke();
+        } catch {
+            ObserveLateResult(
+                task,
+                lateResultCleanup);
             throw;
         }
 
