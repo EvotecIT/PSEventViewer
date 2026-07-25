@@ -38,7 +38,8 @@ internal static class BoundedNativeOperation {
         if (!Slots.Wait(
                 timeoutMilliseconds,
                 cancellationToken)) {
-            throw new TimeoutException(timeoutMessage);
+            throw new BoundedNativeOperationAdmissionTimeoutException(
+                timeoutMessage);
         }
         return new SlotLease();
     }
@@ -73,14 +74,16 @@ internal static class BoundedNativeOperation {
         if (!Slots.Wait(
                 timeoutMilliseconds,
                 cancellationToken)) {
-            throw new TimeoutException(timeoutMessage);
+            throw new BoundedNativeOperationAdmissionTimeoutException(
+                timeoutMessage);
         }
 
         int remainingTimeout = timeoutMilliseconds -
             (int)Math.Min(timeoutBudget.ElapsedMilliseconds, timeoutMilliseconds);
         if (remainingTimeout <= 0) {
             Slots.Release();
-            throw new TimeoutException(timeoutMessage);
+            throw new BoundedNativeOperationAdmissionTimeoutException(
+                timeoutMessage);
         }
 
         Task<T> task;

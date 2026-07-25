@@ -70,6 +70,91 @@ public static class EventFilterPartitioner {
         return partitions;
     }
 
+    internal static IReadOnlyList<EventFilter>
+        PartitionNamedDataSuppression(
+            EventFilter? suppression) {
+
+        if (suppression?.NamedData == null ||
+            suppression.NamedData.Count == 0) {
+            return Array.Empty<EventFilter>();
+        }
+        var atoms = new List<NamedDataAtom>();
+        foreach (KeyValuePair<string, IReadOnlyList<string>> entry in
+                 suppression.NamedData) {
+            if (entry.Value == null || entry.Value.Count == 0) {
+                atoms.Add(new NamedDataAtom(
+                    entry.Key,
+                    value: null,
+                    expressionCount: 1));
+                continue;
+            }
+            foreach (string value in entry.Value) {
+                atoms.Add(new NamedDataAtom(
+                    entry.Key,
+                    value,
+                    expressionCount: 2));
+            }
+        }
+
+        var partitions = new List<EventFilter>();
+        var values =
+            new Dictionary<string, List<string>>(
+                StringComparer.OrdinalIgnoreCase);
+        var existenceKeys = new List<string>();
+        int expressions = 0;
+        foreach (NamedDataAtom atom in atoms) {
+            if (expressions > 0 &&
+                expressions + atom.ExpressionCount >
+                EventFilterCompiler.MaximumXPathExpressions) {
+                partitions.Add(
+                    CreateNamedDataPartition(
+                        values,
+                        existenceKeys));
+                values = new Dictionary<string, List<string>>(
+                    StringComparer.OrdinalIgnoreCase);
+                existenceKeys = new List<string>();
+                expressions = 0;
+            }
+            if (atom.Value == null) {
+                existenceKeys.Add(atom.Key);
+            } else {
+                if (!values.TryGetValue(
+                        atom.Key,
+                        out List<string>? keyValues)) {
+                    keyValues = new List<string>();
+                    values.Add(atom.Key, keyValues);
+                }
+                keyValues.Add(atom.Value);
+            }
+            expressions += atom.ExpressionCount;
+        }
+        if (expressions > 0) {
+            partitions.Add(
+                CreateNamedDataPartition(
+                    values,
+                    existenceKeys));
+        }
+        return partitions;
+    }
+
+    private static EventFilter CreateNamedDataPartition(
+        IReadOnlyDictionary<string, List<string>> values,
+        IReadOnlyList<string> existenceKeys) {
+
+        var namedData =
+            new Dictionary<string, IReadOnlyList<string>>(
+                StringComparer.OrdinalIgnoreCase);
+        foreach (KeyValuePair<string, List<string>> entry in values) {
+            namedData[entry.Key] = entry.Value.ToArray();
+        }
+        foreach (string key in existenceKeys) {
+            namedData[key] = Array.Empty<string>();
+        }
+        return new EventFilter {
+            NamedData = namedData
+        };
+    }
+
     private static void AllocateCapacities(
         IReadOnlyList<Dimension> dimensions,
         int available) {
@@ -230,5 +315,21 @@ public static class EventFilterPartitioner {
         internal FilterDimension Kind { get; }
         internal int Count { get; }
         internal int Capacity { get; set; }
+    }
+
+    private sealed class NamedDataAtom {
+        internal NamedDataAtom(
+            string key,
+            string? value,
+            int expressionCount) {
+
+            Key = key;
+            Value = value;
+            ExpressionCount = expressionCount;
+        }
+
+        internal string Key { get; }
+        internal string? Value { get; }
+        internal int ExpressionCount { get; }
     }
 }

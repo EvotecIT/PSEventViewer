@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Xml;
 
 namespace EventViewerX.Providers;
 
@@ -37,6 +38,19 @@ internal static class EventProviderManifestNames {
             builder.Insert(0, '_');
         }
         return builder.ToString();
+    }
+
+    internal static bool IsUnqualifiedIdentifier(string value) {
+        if (string.IsNullOrWhiteSpace(value) ||
+            !string.Equals(value, value.Trim(), StringComparison.Ordinal)) {
+            return false;
+        }
+        try {
+            XmlConvert.VerifyNCName(value);
+            return true;
+        } catch (XmlException) {
+            return false;
+        }
     }
 
     private static bool IsAsciiLetterOrDigit(char value) {

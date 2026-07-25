@@ -376,6 +376,15 @@ public static partial class EventProviderDefinitionValidator {
                 "MapNameRequired",
                 $"Maps[{mapIndex}].Name",
                 issues);
+            if (!string.IsNullOrWhiteSpace(map.Name) &&
+                !EventProviderManifestNames
+                    .IsUnqualifiedIdentifier(map.Name)) {
+                Error(
+                    "MapNameInvalid",
+                    $"Maps[{mapIndex}].Name",
+                    "Map names must be valid unqualified XML identifiers.",
+                    issues);
+            }
             if (!Enum.IsDefined(
                     typeof(EventProviderMapKind),
                     map.Kind)) {

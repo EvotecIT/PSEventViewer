@@ -127,6 +127,43 @@ namespace EventViewerX.Tests;
     }
 
     [Fact]
+    public void QueryFactoryPartitionsLargeNamedDataSuppressions() {
+        var excluded =
+            Enumerable.Range(1, 12)
+                .ToDictionary(
+                    index => "Field" + index,
+                    index =>
+                        (IReadOnlyList<string>)new[] {
+                            "Value" + index
+                        });
+
+        EventLogBatchQuery fileQuery =
+            EventLogQueryFactory.ForFiles(
+                new[] { GetFixturePath() },
+                new EventFilter {
+                    ExcludedNamedData = excluded
+                });
+        EventLogBatchQuery channelQuery =
+            EventLogQueryFactory.ForChannels(
+                new[] { "Application" },
+                filter: new EventFilter {
+                    ExcludedNamedData = excluded
+                });
+
+        foreach (EventLogStructuredQuery structured in
+                 fileQuery.StructuredQueries.Concat(
+                     channelQuery.StructuredQueries)) {
+            Assert.Equal(
+                2,
+                structured.QueryXml
+                    .Split(
+                        "<Suppress",
+                        StringSplitOptions.None)
+                    .Length - 1);
+        }
+    }
+
+    [Fact]
     public void StructuredBatchExpansionExposesEveryIndependentFileSource() {
         EventLogStructuredQuery source =
             EventLogStructuredQuery.ForFiles(

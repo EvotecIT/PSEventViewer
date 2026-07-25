@@ -103,6 +103,25 @@ public sealed class TestEventProviderPackages {
     }
 
     [Fact]
+    public void RejectsMapNamesThatAreNotManifestIdentifiers() {
+        EventProviderDefinition definition = CreateDefinition();
+        definition.Maps.Add(
+            new EventProviderMapDefinition {
+                Name = "Result Map"
+            });
+
+        EventProviderValidationResult result =
+            EventProviderDefinitionValidator.Validate(
+                definition);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(
+            result.Issues,
+            issue => issue.Code == "MapNameInvalid" &&
+                     issue.Path == "Maps[0].Name");
+    }
+
+    [Fact]
     public void RejectsMapValuesOutsideTheWindowsUInt32Range() {
         EventProviderDefinition definition = CreateDefinition();
         definition.Maps.Add(

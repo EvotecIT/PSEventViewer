@@ -57,6 +57,42 @@ namespace EventViewerX.Tests {
         }
 
         [Fact]
+        public void AdmissionTimeoutDoesNotMarkAHealthyRemoteHostUnreachable() {
+            if (!OperatingSystem.IsWindows()) return;
+
+            const string host =
+                "eventviewerx-admission-timeout.invalid";
+            EventLogSessionManager.ClearHostCache(host);
+            try {
+                using EventLogSessionOpenResult result =
+                    EventLogSessionManager.CreateSessionResult(
+                        host,
+                        "QuickProbe",
+                        "Application",
+                        timeoutMs: 1000,
+                        rpcProbeOverride:
+                            static (_, _) => true,
+                        remoteSessionFactory:
+                            static _ => throw new Native
+                                .BoundedNativeOperationAdmissionTimeoutException(
+                                    "Native admission timed out."));
+
+                Assert.False(result.Success);
+                Assert.Equal(
+                    EventLogSessionOpenStatus.Timeout,
+                    result.Status);
+                Assert.Null(result.CachedUntilUtc);
+                Assert.False(
+                    EventLogSessionManager
+                        .TryGetHostNegativeCacheExpiry(
+                            host,
+                            out _));
+            } finally {
+                EventLogSessionManager.ClearHostCache(host);
+            }
+        }
+
+        [Fact]
         public void SessionCreationHonorsCancellationDuringRpcProbe() {
             if (!OperatingSystem.IsWindows()) return;
 

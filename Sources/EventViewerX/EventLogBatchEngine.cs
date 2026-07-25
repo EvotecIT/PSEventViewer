@@ -1,6 +1,3 @@
-using System.Globalization;
-using System.Net;
-
 namespace EventViewerX;
 
 /// <summary>
@@ -86,7 +83,7 @@ public static partial class EventLogBatchEngine {
             query.ChannelQueries
                 .Select(channel => {
                     EventLogChannelQuery snapshot =
-                        CopyChannelQuery(
+                        EventLogQuerySnapshot.Copy(
                             channel,
                             sourceLimit);
                     return new EventSourceSnapshot(
@@ -103,7 +100,7 @@ public static partial class EventLogBatchEngine {
             query.FileQueries
                 .Select(file => {
                     EventLogFileQuery snapshot =
-                        CopyFileQuery(
+                        EventLogQuerySnapshot.Copy(
                             file,
                             sourceLimit);
                     return new EventSourceSnapshot(
@@ -126,7 +123,7 @@ public static partial class EventLogBatchEngine {
             structuredSources
                 .Select((structured, index) => {
                     EventLogStructuredQuery snapshot =
-                        CopyStructuredQuery(
+                        EventLogQuerySnapshot.Copy(
                             structured,
                             sourceLimit);
                     return new EventSourceSnapshot(
@@ -169,120 +166,6 @@ public static partial class EventLogBatchEngine {
             .Consolidate(split)
             .StructuredQueries
             .ToArray();
-    }
-
-    private static EventLogChannelQuery CopyChannelQuery(
-        EventLogChannelQuery source,
-        long batchLimit) {
-
-        return new EventLogChannelQuery(source.LogName) {
-            MachineName = source.MachineName,
-            Credential = CopyCredential(
-                source.Credential),
-            Authentication = source.Authentication,
-            XPath = source.XPath,
-            Oldest = source.Oldest,
-            ReadMode = source.ReadMode,
-            MessageCulture = CopyCulture(
-                source.MessageCulture),
-            FallbackMessageCulture = CopyCulture(
-                source.FallbackMessageCulture),
-            MaxEvents = ApplySourceLimit(source.MaxEvents, batchLimit),
-            IncludeBookmark = source.IncludeBookmark,
-            RemoteConnectionTimeoutMilliseconds =
-                source.RemoteConnectionTimeoutMilliseconds,
-            RemoteReadTimeoutMilliseconds =
-                source.RemoteReadTimeoutMilliseconds,
-            BufferCapacity = source.BufferCapacity,
-            RpcEndpointPort = source.RpcEndpointPort,
-            BookmarkXml = source.BookmarkXml,
-            BookmarkOffset = source.BookmarkOffset,
-            StrictBookmark = source.StrictBookmark
-        };
-    }
-
-    private static EventLogFileQuery CopyFileQuery(
-        EventLogFileQuery source,
-        long batchLimit) {
-
-        return new EventLogFileQuery(source.Path) {
-            XPath = source.XPath,
-            Oldest = source.Oldest,
-            ReadMode = source.ReadMode,
-            MessageCulture = CopyCulture(
-                source.MessageCulture),
-            FallbackMessageCulture = CopyCulture(
-                source.FallbackMessageCulture),
-            MaxEvents = ApplySourceLimit(source.MaxEvents, batchLimit),
-            IncludeBookmark = source.IncludeBookmark,
-            BookmarkXml = source.BookmarkXml,
-            BookmarkOffset = source.BookmarkOffset,
-            StrictBookmark = source.StrictBookmark
-        };
-    }
-
-    private static EventLogStructuredQuery CopyStructuredQuery(
-        EventLogStructuredQuery source,
-        long batchLimit) {
-
-        return new EventLogStructuredQuery(source.QueryXml) {
-            SourceKind = source.SourceKind,
-            MachineName = source.MachineName,
-            Credential = CopyCredential(
-                source.Credential),
-            Authentication = source.Authentication,
-            Oldest = source.Oldest,
-            ReadMode = source.ReadMode,
-            MessageCulture = CopyCulture(
-                source.MessageCulture),
-            FallbackMessageCulture = CopyCulture(
-                source.FallbackMessageCulture),
-            MaxEvents = ApplySourceLimit(source.MaxEvents, batchLimit),
-            IncludeBookmark = source.IncludeBookmark,
-            RemoteConnectionTimeoutMilliseconds =
-                source.RemoteConnectionTimeoutMilliseconds,
-            RemoteReadTimeoutMilliseconds =
-                source.RemoteReadTimeoutMilliseconds,
-            BufferCapacity = source.BufferCapacity,
-            RpcEndpointPort = source.RpcEndpointPort,
-            BookmarkXml = source.BookmarkXml,
-            BookmarkOffset = source.BookmarkOffset,
-            StrictBookmark = source.StrictBookmark,
-            TolerateQueryErrors = source.TolerateQueryErrors,
-            FailureHandler = source.FailureHandler
-        };
-    }
-
-    private static NetworkCredential? CopyCredential(
-        NetworkCredential? credential) {
-
-        return credential == null
-            ? null
-            : new NetworkCredential(
-                credential.UserName,
-                credential.Password,
-                credential.Domain);
-    }
-
-    private static CultureInfo? CopyCulture(
-        CultureInfo? culture) {
-
-        return culture == null
-            ? null
-            : CultureInfo.GetCultureInfo(
-                culture.Name);
-    }
-
-    private static long ApplySourceLimit(
-        long sourceLimit,
-        long batchLimit) {
-        if (batchLimit <= 0) {
-            return sourceLimit;
-        }
-        if (sourceLimit <= 0) {
-            return batchLimit;
-        }
-        return Math.Min(sourceLimit, batchLimit);
     }
 
     private static IEnumerable<EventObject> ReadSynchronously(

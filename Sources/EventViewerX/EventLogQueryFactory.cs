@@ -23,6 +23,10 @@ public static class EventLogQueryFactory {
             EventFilterCompiler
                 .CreateExcludedNamedDataSuppression(
                     filter);
+        IReadOnlyList<EventFilter> suppressionPartitions =
+            EventFilterPartitioner
+                .PartitionNamedDataSuppression(
+                    namedDataSuppression);
         EventFilter[] filters = Partition(
             EventFilterCompiler
                 .WithoutExcludedNamedData(filter));
@@ -39,10 +43,10 @@ public static class EventLogQueryFactory {
                     structured.Add(
                         CreateStructuredQuery(
                             EventFilterCompiler
-                                .BuildChannelQueryXml(
+                                .BuildChannelQueryXmlWithSuppressions(
                                     logs,
                                     partition,
-                                    namedDataSuppression),
+                                    suppressionPartitions),
                             EventLogQuerySourceKind.Channel,
                             machine,
                             snapshot));
@@ -124,6 +128,10 @@ public static class EventLogQueryFactory {
             EventFilterCompiler
                 .CreateExcludedNamedDataSuppression(
                     filter);
+        IReadOnlyList<EventFilter> suppressionPartitions =
+            EventFilterPartitioner
+                .PartitionNamedDataSuppression(
+                    namedDataSuppression);
         EventFilter[] filters = Partition(
             EventFilterCompiler
                 .WithoutExcludedNamedData(filter));
@@ -142,10 +150,10 @@ public static class EventLogQueryFactory {
                 structured.Add(
                     CreateStructuredQuery(
                         EventFilterCompiler
-                            .BuildFileQueryXml(
+                            .BuildFileQueryXmlWithSuppressions(
                                 files,
                                 partition,
-                                namedDataSuppression),
+                                suppressionPartitions),
                         EventLogQuerySourceKind.File,
                         machineName: null,
                         snapshot));

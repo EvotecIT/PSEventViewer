@@ -552,6 +552,70 @@ public sealed class TestNativeEventEngineContracts {
     }
 
     [Fact]
+    public async Task AsyncFileStreamFreezesTheQueryBeforeEnumeration() {
+        if (!OperatingSystem.IsWindows()) return;
+        var query = new EventLogFileQuery(GetFixturePath()) {
+            Oldest = true,
+            MaxEvents = 1,
+            ReadMode = EventReadMode.Metadata
+        };
+
+        IAsyncEnumerable<EventObject> stream =
+            EventLogEngine.ReadFileAsync(query);
+        query.MaxEvents = 2;
+        query.ReadMode = (EventReadMode)int.MaxValue;
+        var records = new List<EventObject>();
+        await foreach (EventObject eventObject in stream) {
+            records.Add(eventObject);
+        }
+
+        Assert.Single(records);
+    }
+
+    [Fact]
+    public async Task AsyncStructuredStreamFreezesTheQueryBeforeEnumeration() {
+        if (!OperatingSystem.IsWindows()) return;
+        EventLogStructuredQuery query =
+            EventLogStructuredQuery.ForFiles(
+                new[] { GetFixturePath() });
+        query.Oldest = true;
+        query.MaxEvents = 1;
+        query.ReadMode = EventReadMode.Metadata;
+
+        IAsyncEnumerable<EventObject> stream =
+            EventLogEngine.ReadStructuredAsync(query);
+        query.MaxEvents = 2;
+        query.ReadMode = (EventReadMode)int.MaxValue;
+        var records = new List<EventObject>();
+        await foreach (EventObject eventObject in stream) {
+            records.Add(eventObject);
+        }
+
+        Assert.Single(records);
+    }
+
+    [Fact]
+    public async Task AsyncChannelStreamFreezesTheQueryBeforeEnumeration() {
+        if (!OperatingSystem.IsWindows()) return;
+        var query = new EventLogChannelQuery("System") {
+            Oldest = false,
+            MaxEvents = 1,
+            ReadMode = EventReadMode.Metadata
+        };
+
+        IAsyncEnumerable<EventObject> stream =
+            EventLogEngine.ReadChannelAsync(query);
+        query.MaxEvents = 2;
+        query.ReadMode = (EventReadMode)int.MaxValue;
+        var records = new List<EventObject>();
+        await foreach (EventObject eventObject in stream) {
+            records.Add(eventObject);
+        }
+
+        Assert.Single(records);
+    }
+
+    [Fact]
     public async Task AsyncFileStreamStopsBeforeDrainingBufferedEventsAfterCancellation() {
         if (!OperatingSystem.IsWindows()) return;
         var query = new EventLogFileQuery(GetFixturePath()) {

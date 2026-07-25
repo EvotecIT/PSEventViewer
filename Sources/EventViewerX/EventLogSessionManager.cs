@@ -166,6 +166,20 @@ public static class EventLogSessionManager {
         } catch (OperationCanceledException)
             when (cancellationToken.IsCancellationRequested) {
             throw;
+        } catch (BoundedNativeOperationAdmissionTimeoutException exception) {
+            if (emitDiagnostics) {
+                Settings._logger.WriteWarning(
+                    $"{operation}: {exception.Message}");
+            }
+            return SessionFailure(
+                machineName,
+                targetHost,
+                operation,
+                channel,
+                EventLogSessionOpenStatus.Timeout,
+                exception.Message,
+                budget,
+                exception.GetType().Name);
         } catch (TimeoutException exception) {
             if (emitDiagnostics) {
                 Settings._logger.WriteWarning(
@@ -240,6 +254,19 @@ public static class EventLogSessionManager {
         } catch (OperationCanceledException)
             when (cancellationToken.IsCancellationRequested) {
             throw;
+        } catch (BoundedNativeOperationAdmissionTimeoutException ex) {
+            if (emitDiagnostics) {
+                Settings._logger.WriteWarning($"{operation}: {ex.Message}");
+            }
+            return SessionFailure(
+                machineName,
+                targetHost,
+                operation,
+                channel,
+                EventLogSessionOpenStatus.Timeout,
+                ex.Message,
+                budget,
+                ex.GetType().Name);
         } catch (TimeoutException ex) {
             if (emitDiagnostics) {
                 Settings._logger.WriteWarning($"{operation}: {ex.Message}");

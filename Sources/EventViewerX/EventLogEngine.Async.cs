@@ -12,9 +12,11 @@ public static partial class EventLogEngine {
         if (query == null) {
             throw new ArgumentNullException(nameof(query));
         }
+        EventLogChannelQuery snapshot =
+            EventLogQuerySnapshot.Copy(query);
         return ReadAsync(
-            token => ReadChannel(query, token),
-            query.BufferCapacity,
+            token => ReadChannel(snapshot, token),
+            snapshot.BufferCapacity,
             cancellationToken);
     }
 
@@ -27,8 +29,10 @@ public static partial class EventLogEngine {
         if (query == null) {
             throw new ArgumentNullException(nameof(query));
         }
+        EventLogFileQuery snapshot =
+            EventLogQuerySnapshot.Copy(query);
         return ReadAsync(
-            token => ReadFile(query, token),
+            token => ReadFile(snapshot, token),
             bufferCapacity,
             cancellationToken);
     }
@@ -41,9 +45,11 @@ public static partial class EventLogEngine {
         if (query == null) {
             throw new ArgumentNullException(nameof(query));
         }
+        EventLogStructuredQuery snapshot =
+            EventLogQuerySnapshot.Copy(query);
         return ReadAsync(
-            token => ReadStructured(query, token),
-            query.BufferCapacity,
+            token => ReadStructured(snapshot, token),
+            snapshot.BufferCapacity,
             cancellationToken);
     }
 
