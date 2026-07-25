@@ -98,10 +98,25 @@ public sealed class EvtxStatsReportBuilder {
             Scanned = _scanned,
             MinUtc = _minUtc,
             MaxUtc = _maxUtc,
-            ByEventId = _byEventId,
-            ByProviderName = _byProviderName,
-            ByComputerName = _byComputerName,
-            ByLevel = _byLevel
+            ByEventId =
+                new Dictionary<int, long>(
+                    _byEventId),
+            ByProviderName =
+                new Dictionary<string, long>(
+                    _byProviderName,
+                    StringComparer.OrdinalIgnoreCase),
+            ByComputerName =
+                new Dictionary<string, long>(
+                    _byComputerName,
+                    StringComparer.OrdinalIgnoreCase),
+            ByLevel = _byLevel.ToDictionary(
+                static pair => pair.Key,
+                static pair =>
+                    new EvtxLevelStats(
+                        pair.Value.Level,
+                        pair.Value.LevelDisplayName) {
+                            Count = pair.Value.Count
+                        })
         };
     }
 

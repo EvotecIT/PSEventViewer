@@ -234,23 +234,43 @@ public sealed partial class CmdletGetEVXEvent {
                         .Select(static provider => provider.Name)
                         .Distinct(StringComparer.OrdinalIgnoreCase)
                         .ToArray());
-                foreach (EventFilter partition in
-                         EventFilterPartitioner.Partition(
-                             sourceFilter)) {
+                IReadOnlyList<EventFilter> partitions =
+                    EventFilterPartitioner.Partition(
+                        sourceFilter);
+                string[] partitionQueries =
+                    suppressions.Count == 0
+                        ? partitions
+                            .Select(
+                                EventFilterCompiler
+                                    .BuildXPath)
+                            .ToArray()
+                        : partitions
+                            .Select(partition =>
+                                EventFilterCompiler
+                                    .BuildChannelQueryXmlWithSuppressions(
+                                        new[] {
+                                            group.Key
+                                        },
+                                        partition,
+                                        suppressions))
+                            .ToArray();
+                string? batchSourceIdentity =
+                    CreateBatchSourceIdentity(
+                        partitionQueries);
+                foreach (string partitionQuery in
+                         partitionQueries) {
                     if (suppressions.Count == 0) {
                         channels.Add(CreateChannelQuery(
                             group.Key,
                             machine,
-                            EventFilterCompiler.BuildXPath(
-                                partition)));
+                            partitionQuery,
+                            batchSourceIdentity));
                     } else {
                         structured.Add(CreateStructuredQuery(
-                            EventFilterCompiler.BuildChannelQueryXmlWithSuppressions(
-                                new[] { group.Key },
-                                partition,
-                                suppressions),
+                            partitionQuery,
                             EventLogQuerySourceKind.Channel,
-                            machine));
+                            machine,
+                            batchSourceIdentity));
                     }
                 }
             }
@@ -345,14 +365,25 @@ public sealed partial class CmdletGetEVXEvent {
                     EventFilterPartitioner.Partition(
                         machineFilter);
                 if (useStructured) {
-                    foreach (EventFilter chunk in chunks) {
+                    string[] partitionQueries =
+                        chunks
+                            .Select(chunk =>
+                                EventFilterCompiler
+                                    .BuildChannelQueryXmlWithSuppressions(
+                                        machineLogNames,
+                                        chunk,
+                                        suppressions))
+                            .ToArray();
+                    string? batchSourceIdentity =
+                        CreateBatchSourceIdentity(
+                            partitionQueries);
+                    foreach (string partitionQuery in
+                             partitionQueries) {
                         structured.Add(CreateStructuredQuery(
-                            EventFilterCompiler.BuildChannelQueryXmlWithSuppressions(
-                                machineLogNames,
-                                chunk,
-                                suppressions),
+                            partitionQuery,
                             EventLogQuerySourceKind.Channel,
-                            machine));
+                            machine,
+                            batchSourceIdentity));
                     }
                     continue;
                 }
@@ -363,23 +394,43 @@ public sealed partial class CmdletGetEVXEvent {
                     machineFilter,
                     machine,
                     logName);
-                foreach (EventFilter chunk in
-                         EventFilterPartitioner.Partition(
-                             sourceFilter)) {
+                IReadOnlyList<EventFilter> chunks =
+                    EventFilterPartitioner.Partition(
+                        sourceFilter);
+                string[] partitionQueries =
+                    suppressions.Count > 0
+                        ? chunks
+                            .Select(chunk =>
+                                EventFilterCompiler
+                                    .BuildChannelQueryXmlWithSuppressions(
+                                        new[] {
+                                            logName
+                                        },
+                                        chunk,
+                                        suppressions))
+                            .ToArray()
+                        : chunks
+                            .Select(
+                                EventFilterCompiler
+                                    .BuildXPath)
+                            .ToArray();
+                string? batchSourceIdentity =
+                    CreateBatchSourceIdentity(
+                        partitionQueries);
+                foreach (string partitionQuery in
+                         partitionQueries) {
                     if (suppressions.Count > 0) {
                         structured.Add(CreateStructuredQuery(
-                            EventFilterCompiler
-                                .BuildChannelQueryXmlWithSuppressions(
-                                    new[] { logName },
-                                    chunk,
-                                    suppressions),
+                            partitionQuery,
                             EventLogQuerySourceKind.Channel,
-                            machine));
+                            machine,
+                            batchSourceIdentity));
                     } else {
                         channels.Add(CreateChannelQuery(
                             logName,
                             machine,
-                            EventFilterCompiler.BuildXPath(chunk)));
+                            partitionQuery,
+                            batchSourceIdentity));
                     }
                 }
             }

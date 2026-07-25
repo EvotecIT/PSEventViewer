@@ -69,7 +69,12 @@ internal static class BoundedNativeOperation {
         IDisposable? operationLease = null,
         Action? operationAccepted = null) {
 
-        cancellationToken.ThrowIfCancellationRequested();
+        try {
+            cancellationToken.ThrowIfCancellationRequested();
+        } catch {
+            operationLease?.Dispose();
+            throw;
+        }
         if (timeoutMilliseconds <= 0) {
             using (operationLease) {
                 return operation();

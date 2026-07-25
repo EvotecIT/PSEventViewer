@@ -52,9 +52,19 @@ public sealed class SecurityAccountLockoutsReportBuilder {
         _scanned++;
         _matched++;
 
-        var utc = ev.TimeCreated.ToUniversalTime();
-        if (!_minUtc.HasValue || utc < _minUtc.Value) _minUtc = utc;
-        if (!_maxUtc.HasValue || utc > _maxUtc.Value) _maxUtc = utc;
+        DateTime? utc =
+            SecurityAggregates.NormalizeUtc(
+                ev.TimeCreated);
+        if (utc.HasValue) {
+            if (!_minUtc.HasValue ||
+                utc.Value < _minUtc.Value) {
+                _minUtc = utc.Value;
+            }
+            if (!_maxUtc.HasValue ||
+                utc.Value > _maxUtc.Value) {
+                _maxUtc = utc.Value;
+            }
+        }
 
         SecurityAggregates.AddCount(_byComputer, ev.ComputerName ?? string.Empty);
 
@@ -167,12 +177,27 @@ public sealed class SecurityAccountLockoutsReportBuilder {
             Matched = _matched,
             MinUtc = _minUtc,
             MaxUtc = _maxUtc,
-            ByTargetUser = _byTargetUser,
-            ByTargetDomain = _byTargetDomain,
-            ByCallerComputerName = _byCallerComputer,
-            BySubjectUser = _bySubjectUser,
-            ByComputerName = _byComputer,
-            Samples = _samples
+            ByTargetUser =
+                new Dictionary<string, long>(
+                    _byTargetUser,
+                    StringComparer.OrdinalIgnoreCase),
+            ByTargetDomain =
+                new Dictionary<string, long>(
+                    _byTargetDomain,
+                    StringComparer.OrdinalIgnoreCase),
+            ByCallerComputerName =
+                new Dictionary<string, long>(
+                    _byCallerComputer,
+                    StringComparer.OrdinalIgnoreCase),
+            BySubjectUser =
+                new Dictionary<string, long>(
+                    _bySubjectUser,
+                    StringComparer.OrdinalIgnoreCase),
+            ByComputerName =
+                new Dictionary<string, long>(
+                    _byComputer,
+                    StringComparer.OrdinalIgnoreCase),
+            Samples = _samples.ToArray()
         };
     }
 

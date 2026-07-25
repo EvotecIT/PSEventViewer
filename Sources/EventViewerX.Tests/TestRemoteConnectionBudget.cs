@@ -31,6 +31,24 @@ public sealed class TestRemoteConnectionBudget {
     }
 
     [Fact]
+    public void CancelledNativeAdmissionDisposesItsOperationLease() {
+        using var cancellation =
+            new CancellationTokenSource();
+        var owner =
+            new TestDisposable();
+        cancellation.Cancel();
+
+        Assert.Throws<OperationCanceledException>(() =>
+            BoundedNativeOperation.Execute(
+                static () => true,
+                30000,
+                "timed out",
+                cancellation.Token,
+                operationLease: owner));
+        Assert.True(owner.IsDisposed);
+    }
+
+    [Fact]
     public void TimedOutNativeOperationRetainsItsOwnerUntilCompletion() {
         using var release = new ManualResetEventSlim();
         using var started = new ManualResetEventSlim();

@@ -516,6 +516,8 @@ public static class EventLogExporter {
             MessageCulture = source.MessageCulture,
             FallbackMessageCulture = source.FallbackMessageCulture,
             MaxEvents = source.MaxEvents,
+            BatchSourceIdentity =
+                source.BatchSourceIdentity,
             IncludeBookmark = source.IncludeBookmark,
             RemoteConnectionTimeoutMilliseconds =
                 source.RemoteConnectionTimeoutMilliseconds,
@@ -543,6 +545,8 @@ public static class EventLogExporter {
             FallbackMessageCulture =
                 source.FallbackMessageCulture,
             MaxEvents = source.MaxEvents,
+            BatchSourceIdentity =
+                source.BatchSourceIdentity,
             IncludeBookmark = source.IncludeBookmark,
             RemoteConnectionTimeoutMilliseconds =
                 source.RemoteConnectionTimeoutMilliseconds,
@@ -569,6 +573,8 @@ public static class EventLogExporter {
             MessageCulture = source.MessageCulture,
             FallbackMessageCulture = source.FallbackMessageCulture,
             MaxEvents = source.MaxEvents,
+            BatchSourceIdentity =
+                source.BatchSourceIdentity,
             IncludeBookmark = source.IncludeBookmark,
             BookmarkXml = source.BookmarkXml,
             BookmarkOffset = source.BookmarkOffset,

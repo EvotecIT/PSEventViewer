@@ -125,6 +125,8 @@ public sealed class EventLogStructuredQuery {
     /// <summary>Maximum number of records returned. Zero streams every match.</summary>
     public long MaxEvents { get; set; }
 
+    internal string? BatchSourceIdentity { get; set; }
+
     /// <summary>Materializes a native bookmark for every returned event.</summary>
     public bool IncludeBookmark { get; set; }
 
@@ -172,6 +174,7 @@ public sealed class EventLogStructuredQuery {
             MessageCulture = MessageCulture,
             FallbackMessageCulture = FallbackMessageCulture,
             MaxEvents = MaxEvents,
+            BatchSourceIdentity = BatchSourceIdentity,
             IncludeBookmark = IncludeBookmark,
             RemoteConnectionTimeoutMilliseconds =
                 RemoteConnectionTimeoutMilliseconds,

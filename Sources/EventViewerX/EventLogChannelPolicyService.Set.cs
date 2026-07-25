@@ -78,7 +78,9 @@ public static partial class EventLogChannelPolicyService {
                     cancellationToken),
                 int.MaxValue,
                 $"Channel policy update for '{policy.LogName}' did not complete.",
-                cancellationToken);
+                cancellationToken,
+                operationLease:
+                    ownedSession);
         } catch (OperationCanceledException)
             when (cancellationToken.IsCancellationRequested) {
             throw;

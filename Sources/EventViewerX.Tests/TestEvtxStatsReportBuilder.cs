@@ -103,4 +103,32 @@ public class TestEvtxStatsReportBuilder {
         Assert.Equal(valid, builder.MinUtc);
         Assert.Equal(valid, builder.MaxUtc);
     }
+
+    [Fact]
+    public void BuiltReportDoesNotChangeWhenBuilderIsReused() {
+        var builder =
+            new EvtxStatsReportBuilder();
+        builder.Add(
+            id: 1,
+            timeCreatedUtc: DateTime.UtcNow,
+            providerName: "Provider",
+            computerName: "Computer",
+            level: 4,
+            levelDisplayName: "Information");
+        EvtxStatsReport first =
+            builder.Build();
+
+        builder.Add(
+            id: 2,
+            timeCreatedUtc: DateTime.UtcNow,
+            providerName: "Provider",
+            computerName: "Computer",
+            level: 4,
+            levelDisplayName: "Information");
+
+        Assert.Equal(1, first.Scanned);
+        Assert.Single(first.ByEventId);
+        Assert.Equal(1, first.ByEventId[1]);
+        Assert.Equal(1, first.ByLevel[4].Count);
+    }
 }

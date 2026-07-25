@@ -51,6 +51,8 @@ public sealed class EventLogChannelQuery {
     /// <summary>Maximum number of records returned. Zero streams every match.</summary>
     public long MaxEvents { get; set; }
 
+    internal string? BatchSourceIdentity { get; set; }
+
     /// <summary>Materializes a native bookmark for every returned event.</summary>
     public bool IncludeBookmark { get; set; }
 

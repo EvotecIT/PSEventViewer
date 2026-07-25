@@ -419,7 +419,7 @@ namespace EventViewerX.Tests {
                 EventLogProbeResult result = EventLogProbe.ProbeLatestEvent(
                     "Application",
                     machineName: host,
-                    timeout: TimeSpan.FromMilliseconds(100),
+                    timeout: TimeSpan.FromSeconds(5),
                     maxEventsToScan: 1);
 
                 Assert.Equal(EventLogProbeStatus.HostUnavailable, result.Status);

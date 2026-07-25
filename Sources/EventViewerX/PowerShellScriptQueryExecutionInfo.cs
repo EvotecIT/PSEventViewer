@@ -119,4 +119,9 @@ public sealed class PowerShellScriptQueryExecutionInfo {
         _matchingResults++;
         return true;
     }
+
+    internal void RecordResult() {
+        _matchingResults++;
+        ResultsReturned++;
+    }
 }

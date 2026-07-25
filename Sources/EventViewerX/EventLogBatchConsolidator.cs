@@ -95,6 +95,8 @@ public static class EventLogBatchConsolidator {
                 FallbackMessageCulture =
                     profile.FallbackMessageCulture,
                 MaxEvents = profile.MaxEvents,
+                BatchSourceIdentity =
+                    profile.BatchSourceIdentity,
                 IncludeBookmark = profile.IncludeBookmark,
                 RemoteConnectionTimeoutMilliseconds =
                     profile.RemoteConnectionTimeoutMilliseconds,
@@ -199,23 +201,9 @@ public static class EventLogBatchConsolidator {
             return string.Empty;
         }
         if (!string.IsNullOrWhiteSpace(
-                profile.BookmarkXml)) {
-            return "bookmark:" +
-                   string.Join(
-                       "|",
-                       queries
-                           .SelectMany(static query =>
-                               query
-                                   .DescendantsAndSelf()
-                                   .Attributes("Path"))
-                           .Select(static path =>
-                               path.Value)
-                           .Distinct(
-                               StringComparer.OrdinalIgnoreCase)
-                           .OrderBy(
-                               static path =>
-                                   path,
-                               StringComparer.OrdinalIgnoreCase));
+                profile.BatchSourceIdentity)) {
+            return "logical:" +
+                   profile.BatchSourceIdentity;
         }
         return string.Join(
             "\n",
@@ -294,6 +282,7 @@ public static class EventLogBatchConsolidator {
             set;
         }
         internal long MaxEvents { get; set; }
+        internal string? BatchSourceIdentity { get; set; }
         internal bool IncludeBookmark { get; set; }
         internal int RemoteConnectionTimeoutMilliseconds {
             get;
@@ -324,6 +313,8 @@ public static class EventLogBatchConsolidator {
                 FallbackMessageCulture =
                     query.FallbackMessageCulture,
                 MaxEvents = query.MaxEvents,
+                BatchSourceIdentity =
+                    query.BatchSourceIdentity,
                 IncludeBookmark = query.IncludeBookmark,
                 RemoteConnectionTimeoutMilliseconds =
                     query.RemoteConnectionTimeoutMilliseconds,
@@ -347,6 +338,8 @@ public static class EventLogBatchConsolidator {
                 FallbackMessageCulture =
                     query.FallbackMessageCulture,
                 MaxEvents = query.MaxEvents,
+                BatchSourceIdentity =
+                    query.BatchSourceIdentity,
                 IncludeBookmark = query.IncludeBookmark,
                 BookmarkXml = query.BookmarkXml,
                 BookmarkOffset = query.BookmarkOffset,
@@ -369,6 +362,8 @@ public static class EventLogBatchConsolidator {
                 FallbackMessageCulture =
                     query.FallbackMessageCulture,
                 MaxEvents = query.MaxEvents,
+                BatchSourceIdentity =
+                    query.BatchSourceIdentity,
                 IncludeBookmark = query.IncludeBookmark,
                 RemoteConnectionTimeoutMilliseconds =
                     query.RemoteConnectionTimeoutMilliseconds,

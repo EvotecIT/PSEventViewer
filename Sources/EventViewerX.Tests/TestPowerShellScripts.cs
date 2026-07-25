@@ -156,6 +156,46 @@ namespace EventViewerX.Tests {
         }
 
         [Fact]
+        public void ExecutionLimitsRemainIndependentWhenDiagnosticsAreReused() {
+            var shared =
+                new PowerShellScriptQueryExecutionInfo();
+            int firstReturned = 0;
+            int secondReturned = 0;
+
+            shared.Reset(
+                machineName: null,
+                eventLogPath: null,
+                maxResults: 1,
+                maxEventsScanned: 0);
+            shared.Reset(
+                machineName: null,
+                eventLogPath: null,
+                maxResults: 0,
+                maxEventsScanned: 0);
+
+            Assert.True(
+                PowerShellEventEngine
+                    .TryRecordPowerShellScriptExecutionResult(
+                        maxEvents: 1,
+                        ref firstReturned,
+                        shared));
+            Assert.False(
+                PowerShellEventEngine
+                    .TryRecordPowerShellScriptExecutionResult(
+                        maxEvents: 1,
+                        ref firstReturned,
+                        shared));
+            Assert.True(
+                PowerShellEventEngine
+                    .TryRecordPowerShellScriptExecutionResult(
+                        maxEvents: 0,
+                        ref secondReturned,
+                        shared));
+            Assert.Equal(1, firstReturned);
+            Assert.Equal(1, secondReturned);
+        }
+
+        [Fact]
         public void ReconstructedOutputLimitUsesTheSameOneAdditionalMatchContract() {
             var info = new PowerShellScriptQueryExecutionInfo();
             info.Reset(

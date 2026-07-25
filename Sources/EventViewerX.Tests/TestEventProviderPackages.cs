@@ -147,6 +147,28 @@ public sealed class TestEventProviderPackages {
     }
 
     [Fact]
+    public void DuplicateFieldsReturnValidationIssuesWithoutThrowing() {
+        EventProviderDefinition definition =
+            CreateDefinition();
+        EventProviderEventDefinition eventDefinition =
+            definition.Events[0];
+        eventDefinition.Fields.Add(
+            EventProviderFieldDefinition.Create(
+                eventDefinition.Fields[0].Name,
+                EventProviderFieldType.UnicodeString));
+
+        EventProviderValidationResult result =
+            EventProviderDefinitionValidator.Validate(
+                definition);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(
+            result.Issues,
+            issue =>
+                issue.Code == "DuplicateFieldName");
+    }
+
+    [Fact]
     public void RejectsMapNamesThatAreNotManifestIdentifiers() {
         EventProviderDefinition definition = CreateDefinition();
         definition.Maps.Add(

@@ -580,13 +580,18 @@ public static partial class EventProviderDefinitionValidator {
                 path,
                 maps,
                 issues);
+            bool canCompileMessages =
+                HasValidMessageFieldNames(
+                    eventDefinition.Fields);
             foreach (KeyValuePair<string, string> message in
                      eventDefinition.Messages) {
                 try {
                     _ = CultureInfo.GetCultureInfo(message.Key);
-                    _ = EventProviderMessageTemplateCompiler.Compile(
-                        message.Value,
-                        eventDefinition.Fields);
+                    if (canCompileMessages) {
+                        _ = EventProviderMessageTemplateCompiler.Compile(
+                            message.Value,
+                            eventDefinition.Fields);
+                    }
                 } catch (Exception exception)
                     when (exception is CultureNotFoundException ||
                           exception is FormatException) {
@@ -597,20 +602,36 @@ public static partial class EventProviderDefinitionValidator {
                         issues);
                 }
             }
-            try {
-                _ = EventProviderMessageTemplateCompiler.Compile(
-                    EventProviderManifestGenerator
-                        .CreateFallbackEventMessage(
-                            eventDefinition),
-                    eventDefinition.Fields);
-            } catch (FormatException exception) {
-                Error(
-                    "EventFallbackMessageInvalid",
-                    path + ".FallbackMessage",
-                    exception.Message,
-                    issues);
+            if (canCompileMessages) {
+                try {
+                    _ = EventProviderMessageTemplateCompiler.Compile(
+                        EventProviderManifestGenerator
+                            .CreateFallbackEventMessage(
+                                eventDefinition),
+                        eventDefinition.Fields);
+                } catch (FormatException exception) {
+                    Error(
+                        "EventFallbackMessageInvalid",
+                        path + ".FallbackMessage",
+                        exception.Message,
+                        issues);
+                }
             }
         }
+    }
+
+    private static bool HasValidMessageFieldNames(
+        IReadOnlyList<EventProviderFieldDefinition> fields) {
+
+        var names = new HashSet<string>(
+            StringComparer.OrdinalIgnoreCase);
+        foreach (EventProviderFieldDefinition field in fields) {
+            if (string.IsNullOrWhiteSpace(field.Name) ||
+                !names.Add(field.Name)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static void ValidateFields(

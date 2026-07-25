@@ -26,6 +26,8 @@ internal static class EventLogQuerySnapshot {
             FallbackMessageCulture =
                 CopyCulture(source.FallbackMessageCulture),
             MaxEvents = ApplyLimit(source.MaxEvents, outerLimit),
+            BatchSourceIdentity =
+                source.BatchSourceIdentity,
             IncludeBookmark = source.IncludeBookmark,
             RemoteConnectionTimeoutMilliseconds =
                 source.RemoteConnectionTimeoutMilliseconds,
@@ -54,6 +56,8 @@ internal static class EventLogQuerySnapshot {
             FallbackMessageCulture =
                 CopyCulture(source.FallbackMessageCulture),
             MaxEvents = ApplyLimit(source.MaxEvents, outerLimit),
+            BatchSourceIdentity =
+                source.BatchSourceIdentity,
             IncludeBookmark = source.IncludeBookmark,
             BookmarkXml = source.BookmarkXml,
             BookmarkOffset = source.BookmarkOffset,
@@ -81,6 +85,8 @@ internal static class EventLogQuerySnapshot {
             FallbackMessageCulture =
                 CopyCulture(source.FallbackMessageCulture),
             MaxEvents = ApplyLimit(source.MaxEvents, outerLimit),
+            BatchSourceIdentity =
+                source.BatchSourceIdentity,
             IncludeBookmark = source.IncludeBookmark,
             RemoteConnectionTimeoutMilliseconds =
                 source.RemoteConnectionTimeoutMilliseconds,

@@ -39,6 +39,9 @@
         <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
             <_Parameter1>EventViewerX.Tests</_Parameter1>
         </AssemblyAttribute>
+        <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+            <_Parameter1>PSEventViewer</_Parameter1>
+        </AssemblyAttribute>
     </ItemGroup>
 
     <ItemGroup Condition="'$(TargetFramework)' == 'net8.0-windows'">

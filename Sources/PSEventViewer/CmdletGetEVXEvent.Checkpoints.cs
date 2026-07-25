@@ -361,11 +361,8 @@ public sealed partial class CmdletGetEVXEvent {
             sourceNames.Add(machineName!.Trim());
         } else {
             sourceNames.Add(Environment.MachineName);
-            try {
-                sourceNames.Add(Dns.GetHostEntry(Environment.MachineName).HostName);
-            } catch (System.Net.Sockets.SocketException) {
-                // The short local name remains a valid fallback when DNS is unavailable.
-            }
+            sourceNames.Add(
+                EventLogTarget.LocalMachineName);
         }
         return sourceNames;
     }

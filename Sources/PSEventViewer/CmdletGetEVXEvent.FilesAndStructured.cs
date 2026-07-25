@@ -96,18 +96,28 @@ public sealed partial class CmdletGetEVXEvent {
                     machineName: null,
                     path,
                     sourceIsFile: true);
-                foreach (EventFilter chunk in
-                         EventFilterPartitioner.Partition(
-                             sourceFilter)) {
-                    string queryXml =
-                        EventFilterCompiler.BuildFileQueryXmlWithSuppressions(
-                        new[] { path },
-                        chunk,
-                        pathSuppressions);
+                IReadOnlyList<EventFilter> chunks =
+                    EventFilterPartitioner.Partition(
+                        sourceFilter);
+                string[] partitionQueries =
+                    chunks
+                        .Select(chunk =>
+                            EventFilterCompiler
+                                .BuildFileQueryXmlWithSuppressions(
+                                    new[] { path },
+                                    chunk,
+                                    pathSuppressions))
+                        .ToArray();
+                string? batchSourceIdentity =
+                    CreateBatchSourceIdentity(
+                        partitionQueries);
+                foreach (string queryXml in
+                         partitionQueries) {
                     structured.Add(CreateStructuredQuery(
                         queryXml,
                         EventLogQuerySourceKind.File,
-                        machineName: null));
+                        machineName: null,
+                        batchSourceIdentity));
                 }
             }
             EventLogBatchQuery structuredBatch =
@@ -286,7 +296,8 @@ public sealed partial class CmdletGetEVXEvent {
     private EventLogChannelQuery CreateChannelQuery(
         string logName,
         string? machineName,
-        string xpath) {
+        string xpath,
+        string? batchSourceIdentity = null) {
 
         var query = new EventLogChannelQuery(logName) {
             MachineName = machineName,
@@ -298,6 +309,8 @@ public sealed partial class CmdletGetEVXEvent {
             MessageCulture = MessageCulture,
             FallbackMessageCulture = FallbackMessageCulture,
             MaxEvents = GetNativeCandidateLimit(),
+            BatchSourceIdentity =
+                batchSourceIdentity,
             IncludeBookmark = IncludeBookmark,
             RemoteReadTimeoutMilliseconds =
                 EffectiveRemoteReadTimeoutMilliseconds,
@@ -313,7 +326,8 @@ public sealed partial class CmdletGetEVXEvent {
 
     private EventLogFileQuery CreateFileQuery(
         string path,
-        string xpath) {
+        string xpath,
+        string? batchSourceIdentity = null) {
 
         return new EventLogFileQuery(path) {
             XPath = xpath,
@@ -322,6 +336,8 @@ public sealed partial class CmdletGetEVXEvent {
             MessageCulture = MessageCulture,
             FallbackMessageCulture = FallbackMessageCulture,
             MaxEvents = GetNativeCandidateLimit(),
+            BatchSourceIdentity =
+                batchSourceIdentity,
             IncludeBookmark = IncludeBookmark,
             BookmarkXml = BookmarkXml,
             BookmarkOffset = BookmarkOffset,
@@ -332,7 +348,8 @@ public sealed partial class CmdletGetEVXEvent {
     private EventLogStructuredQuery CreateStructuredQuery(
         string queryXml,
         EventLogQuerySourceKind sourceKind,
-        string? machineName) {
+        string? machineName,
+        string? batchSourceIdentity = null) {
 
         bool fileSource =
             sourceKind == EventLogQuerySourceKind.File;
@@ -350,6 +367,8 @@ public sealed partial class CmdletGetEVXEvent {
             MessageCulture = MessageCulture,
             FallbackMessageCulture = FallbackMessageCulture,
             MaxEvents = GetNativeCandidateLimit(),
+            BatchSourceIdentity =
+                batchSourceIdentity,
             IncludeBookmark = IncludeBookmark,
             RemoteReadTimeoutMilliseconds =
                 EffectiveRemoteReadTimeoutMilliseconds,
@@ -369,6 +388,29 @@ public sealed partial class CmdletGetEVXEvent {
         query.RemoteConnectionTimeoutMilliseconds =
             EffectiveRemoteConnectionTimeoutMilliseconds;
         return query;
+    }
+
+    private static string? CreateBatchSourceIdentity(
+        IReadOnlyList<string> partitionQueries) {
+
+        if (partitionQueries.Count <= 1) {
+            return null;
+        }
+        string canonical =
+            string.Join(
+                "\n",
+                partitionQueries.OrderBy(
+                    static query => query,
+                    StringComparer.Ordinal));
+        using var algorithm =
+            System.Security.Cryptography.SHA256.Create();
+        byte[] hash =
+            algorithm.ComputeHash(
+                System.Text.Encoding.UTF8.GetBytes(
+                    canonical));
+        return BitConverter
+            .ToString(hash)
+            .Replace("-", string.Empty);
     }
 
 }

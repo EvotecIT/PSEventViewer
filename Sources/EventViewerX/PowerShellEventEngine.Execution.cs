@@ -44,6 +44,7 @@ namespace EventViewerX {
                 eventLogPath,
                 dateFrom,
                 dateTo,
+                maxEvents,
                 maxEventsScanned,
                 cancellationToken,
                 queryInfo);
@@ -56,12 +57,14 @@ namespace EventViewerX {
                 string? eventLogPath,
                 DateTime? dateFrom,
                 DateTime? dateTo,
+                int maxEvents,
                 int maxEventsScanned,
                 CancellationToken cancellationToken,
                 PowerShellScriptQueryExecutionInfo queryInfo) {
 
             var scanLimit = new PowerShellScriptScanLimit(
                 maxEventsScanned);
+            int returned = 0;
             foreach (EventObject eventObject in QueryPowerShellScriptEvents(
                          logName,
                          new[] { "4100" },
@@ -77,7 +80,10 @@ namespace EventViewerX {
                     }
                     queryInfo.EventsScanned =
                         scanLimit.EventsScanned;
-                    if (!queryInfo.TryRecordResult()) {
+                    if (!TryRecordPowerShellScriptExecutionResult(
+                            maxEvents,
+                            ref returned,
+                            queryInfo)) {
                         break;
                     }
 
@@ -87,6 +93,22 @@ namespace EventViewerX {
             }
             queryInfo.ScanLimitReached =
                 scanLimit.LimitReached;
+        }
+
+        internal static bool
+            TryRecordPowerShellScriptExecutionResult(
+                int maxEvents,
+                ref int returned,
+                PowerShellScriptQueryExecutionInfo queryInfo) {
+
+            if (maxEvents > 0 &&
+                returned >= maxEvents) {
+                queryInfo.OutputLimitReached = true;
+                return false;
+            }
+            returned++;
+            queryInfo.RecordResult();
+            return true;
         }
 
         /// <summary>

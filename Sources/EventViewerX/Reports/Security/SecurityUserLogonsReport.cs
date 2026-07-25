@@ -44,8 +44,8 @@ public sealed class SecurityUserLogonsReport {
 /// Sample row for a single logon-related event.
 /// </summary>
 public sealed class SecurityUserLogonSample {
-    /// <summary>Event time (UTC).</summary>
-    public DateTime TimeCreatedUtc { get; set; }
+    /// <summary>Event time (UTC), or null when the source record has no timestamp.</summary>
+    public DateTime? TimeCreatedUtc { get; set; }
     /// <summary>Event ID.</summary>
     public int Id { get; set; }
     /// <summary>Computer name the event was logged on.</summary>
