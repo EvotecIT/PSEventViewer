@@ -144,6 +144,80 @@ namespace EventViewerX.Tests {
         }
 
         [Fact]
+        public void StartWatcherDoesNotReuseExplicitQueryForGeneratedDefault() {
+            WatcherManager.StopAll();
+            const string watcherName =
+                "unit-explicit-versus-generated";
+            Action<EventObject> action = _ => { };
+            var explicitQuery =
+                new EventLogSubscriptionQuery(
+                    "Application") {
+                    MachineName = Environment.MachineName,
+                    XPath = "*[System[EventID=2]]",
+                    Start = EventLogSubscriptionStart.Future,
+                    ReadMode = EventReadMode.Full,
+                    RemoteConnectionTimeoutMilliseconds =
+                        Settings.SessionTimeoutMs,
+                    BufferCapacity = 256
+                };
+            var existing = new WatcherInfo(
+                watcherName,
+                Environment.MachineName,
+                "Application",
+                new List<int> { 1 },
+                new List<NamedEvents>(),
+                action,
+                false,
+                false,
+                0,
+                null,
+                explicitQuery) {
+                    ActionIdentity = "script:stable"
+                };
+            var watchersField = typeof(WatcherManager).GetField(
+                "_watchers",
+                BindingFlags.NonPublic |
+                BindingFlags.Static);
+            var namesField = typeof(WatcherManager).GetField(
+                "_watchersByName",
+                BindingFlags.NonPublic |
+                BindingFlags.Static);
+            var watchers =
+                Assert.IsType<ConcurrentDictionary<Guid, WatcherInfo>>(
+                    watchersField!.GetValue(null));
+            var names =
+                Assert.IsType<ConcurrentDictionary<string, WatcherInfo>>(
+                    namesField!.GetValue(null));
+            watchers[existing.Id] = existing;
+            names[watcherName] = existing;
+
+            try {
+                InvalidOperationException exception =
+                    Assert.Throws<InvalidOperationException>(() =>
+                        WatcherManager.StartWatcher(
+                            watcherName,
+                            Environment.MachineName,
+                            "Application",
+                            new List<int> { 1 },
+                            new List<NamedEvents>(),
+                            _ => { },
+                            false,
+                            false,
+                            0,
+                            null,
+                            actionIdentity:
+                                "script:stable"));
+
+                Assert.Contains(
+                    "different configuration",
+                    exception.Message,
+                    StringComparison.OrdinalIgnoreCase);
+            } finally {
+                WatcherManager.StopAll();
+            }
+        }
+
+        [Fact]
         public void StartWatcherRejectsRotatedPasswordForNamedRemoteConfiguration() {
             WatcherManager.StopAll();
             const string watcherName = "unit-password-rotation";

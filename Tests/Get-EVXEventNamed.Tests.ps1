@@ -49,6 +49,7 @@ Describe 'Get-EVXEvent - Named Event' {
             return
         }
 
+        $Plain.Event.ReadMode | Should -Be ([EventViewerX.EventReadMode]::Full)
         $ExistingProperties = @($Plain.PSObject.Properties.Name)
         $PayloadKey = @($Plain.Event.Data.Keys | Where-Object { $_ -notin $ExistingProperties } | Select-Object -First 1)
         if (-not $PayloadKey) {

@@ -26,6 +26,11 @@ public static class EventProviderPackageBuilder {
                 nameof(outputPath));
         }
         options ??= new EventProviderPackageBuildOptions();
+        if (options.ToolTimeout <= TimeSpan.Zero) {
+            throw new ArgumentOutOfRangeException(
+                nameof(options.ToolTimeout),
+                "Provider build tool timeout must be greater than zero.");
+        }
         EventProviderValidationResult validation =
             EventProviderDefinitionValidator.ValidateOrThrow(definition);
         if (!string.IsNullOrWhiteSpace(options.BaselinePath)) {

@@ -169,20 +169,26 @@ namespace EventViewerX.Tests {
         [Fact]
         public void OptionalProbeStageHonorsItsAbsoluteDeadline() {
             var stopwatch = Stopwatch.StartNew();
+            using var release = new ManualResetEventSlim();
 
-            Assert.Throws<TimeoutException>(() =>
-                EventLogProbe.RunCancelableProbeStage(
-                    () => {
-                        Thread.Sleep(2000);
-                        return 1L;
-                    },
-                    TimeSpan.FromMilliseconds(100),
-                    CancellationToken.None));
+            try {
+                Assert.Throws<TimeoutException>(() =>
+                    EventLogProbe.RunCancelableProbeStage(
+                        () => {
+                            release.Wait(
+                                TimeSpan.FromSeconds(30));
+                            return 1L;
+                        },
+                        TimeSpan.FromSeconds(5),
+                        CancellationToken.None));
 
-            Assert.True(
-                stopwatch.Elapsed <
-                TimeSpan.FromSeconds(5),
-                $"Elapsed {stopwatch.Elapsed.TotalMilliseconds:F0} ms.");
+                Assert.True(
+                    stopwatch.Elapsed <
+                    TimeSpan.FromSeconds(10),
+                    $"Elapsed {stopwatch.Elapsed.TotalMilliseconds:F0} ms.");
+            } finally {
+                release.Set();
+            }
         }
 
         [Fact]

@@ -358,6 +358,17 @@ namespace EventViewerX {
             bool actionMatches = existing.ActionIdentity != null || actionIdentity != null
                 ? string.Equals(existing.ActionIdentity, actionIdentity, StringComparison.Ordinal)
                 : existing.Action.Equals(action);
+            IReadOnlyList<EventLogSubscriptionQuery>
+                requestedSubscriptionQueries =
+                    subscriptionQueries ??
+                    new[] {
+                        subscriptionQuery ??
+                        WatcherInfo.CreateSubscriptionQuery(
+                            machineName,
+                            logName,
+                            eventIds,
+                            staging)
+                    };
             return string.Equals(existing.MachineName, machineName, StringComparison.OrdinalIgnoreCase) &&
                    string.Equals(existing.LogName, logName, StringComparison.OrdinalIgnoreCase) &&
                    existing.EventIds.SequenceEqual(eventIds) &&
@@ -369,19 +380,13 @@ namespace EventViewerX {
                    existing.Timeout == timeout &&
                    SubscriptionQuerySetsEqual(
                        existing.SubscriptionQueries,
-                       subscriptionQueries ??
-                           (subscriptionQuery == null
-                               ? null
-                               : new[] { subscriptionQuery }));
+                       requestedSubscriptionQueries);
         }
 
         private static bool SubscriptionQuerySetsEqual(
             IReadOnlyList<EventLogSubscriptionQuery> existing,
-            IReadOnlyList<EventLogSubscriptionQuery>? requested) {
+            IReadOnlyList<EventLogSubscriptionQuery> requested) {
 
-            if (requested == null) {
-                return true;
-            }
             return existing.Count == requested.Count &&
                    existing
                        .Zip(
@@ -395,11 +400,8 @@ namespace EventViewerX {
 
         private static bool SubscriptionQueriesEqual(
             EventLogSubscriptionQuery existing,
-            EventLogSubscriptionQuery? requested) {
+            EventLogSubscriptionQuery requested) {
 
-            if (requested == null) {
-                return true;
-            }
             return string.Equals(
                        existing.LogName,
                        requested.LogName,

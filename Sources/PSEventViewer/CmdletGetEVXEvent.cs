@@ -277,6 +277,7 @@ public sealed partial class CmdletGetEVXEvent : AsyncPSCmdlet {
     /// <summary>
     /// Controls per-event materialization. Metadata skips provider messages, XML, attachments, and bookmarks;
     /// Message formats the provider message; StructuredData parses XML without formatting the message; Full includes all data.
+    /// Named-event queries default to Full so rule projections receive their structured payload; other query sets default to Message.
     /// </summary>
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
@@ -413,6 +414,11 @@ public sealed partial class CmdletGetEVXEvent : AsyncPSCmdlet {
         _managedProviderPatterns =
             Array.Empty<WildcardPattern>();
         _offlineProvidersByPath.Clear();
+        if (ParameterSetName == "NamedEvents" &&
+            !MyInvocation.BoundParameters.ContainsKey(
+                nameof(ReadMode))) {
+            ReadMode = EventReadMode.Full;
+        }
         ValidateRecordOptions();
         InitializeCheckpointKey();
 

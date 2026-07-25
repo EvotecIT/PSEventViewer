@@ -11,6 +11,37 @@ using ProviderEventDefinition =
 namespace EventViewerX.Tests;
 
 public sealed class TestEventProviderPackages {
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void RejectsNonPositiveBuildToolTimeoutBeforeDiscovery(
+        int timeoutMilliseconds) {
+
+        string root = Path.Combine(
+            Path.GetTempPath(),
+            "EventViewerX.Tests",
+            Guid.NewGuid().ToString("N"));
+        string packagePath = Path.Combine(
+            root,
+            "timeout-validation.evxprovider");
+        var options =
+            new EventProviderPackageBuildOptions {
+                ToolTimeout =
+                    TimeSpan.FromMilliseconds(
+                        timeoutMilliseconds)
+            };
+
+        ArgumentOutOfRangeException exception =
+            Assert.Throws<ArgumentOutOfRangeException>(() =>
+                EventProviderPackageBuilder.Build(
+                    CreateDefinition(),
+                    packagePath,
+                    options));
+
+        Assert.Equal("ToolTimeout", exception.ParamName);
+        Assert.False(Directory.Exists(root));
+    }
+
     [Fact]
     public void GeneratesNamedMessagesAndStableFields() {
         EventProviderDefinition definition = CreateDefinition();

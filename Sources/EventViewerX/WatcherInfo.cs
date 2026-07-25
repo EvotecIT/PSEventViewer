@@ -414,7 +414,7 @@ namespace EventViewerX {
             Stop();
         }
 
-        private static EventLogSubscriptionQuery CreateSubscriptionQuery(
+        internal static EventLogSubscriptionQuery CreateSubscriptionQuery(
             string machineName,
             string logName,
             IReadOnlyList<int> eventIds,
