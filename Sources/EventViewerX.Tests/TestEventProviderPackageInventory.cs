@@ -189,6 +189,84 @@ public sealed class TestEventProviderPackageInventory {
         }
     }
 
+    [Fact]
+    public void ValidReplacementArchiveCannotImpersonateActiveState() {
+        string root = Path.Combine(
+            Path.GetTempPath(),
+            "EventViewerX.Tests",
+            Guid.NewGuid().ToString("N"));
+        EventProviderDefinition original =
+            TestEventProviderPackages.CreateDefinition();
+        EventProviderDefinition replacement =
+            TestEventProviderPackages.CreateDefinition();
+        replacement.Name =
+            "EventViewerX.Tests.Replacement";
+        replacement.Id = Guid.NewGuid();
+        replacement.Channels[0].Name =
+            replacement.Name +
+            "/Operational";
+        string providerRoot = Path.Combine(
+            root,
+            original.Id.ToString("N"));
+        string activeDirectory = Path.Combine(
+            providerRoot,
+            "active");
+        string activePackage = Path.Combine(
+            activeDirectory,
+            EventProviderInstallationStore
+                .ArchivedPackageFileName);
+        string replacementPackage = Path.Combine(
+            root,
+            "replacement.evxprovider");
+        Directory.CreateDirectory(activeDirectory);
+        try {
+            EventProviderPackageBuildResult originalBuild =
+                EventProviderPackageBuilder.Build(
+                    original,
+                    activePackage);
+            EventProviderPackageBuilder.Build(
+                replacement,
+                replacementPackage);
+            EventProviderInstallationStore.Save(
+                providerRoot,
+                new EventProviderInstallationState {
+                    ProviderName = original.Name,
+                    ProviderId = original.Id,
+                    ActiveVersion =
+                        original.PackageVersion,
+                    ActiveDirectoryName = "active",
+                    PackageSha256 =
+                        originalBuild.PackageSha256,
+                    InstalledAtUtc =
+                        DateTimeOffset.UtcNow
+                });
+            File.Copy(
+                replacementPackage,
+                activePackage,
+                overwrite: true);
+
+            Assert.Empty(
+                EventProviderPackageManager
+                    .GetInstalled(root));
+            Assert.Throws<InvalidOperationException>(() =>
+                EventProviderPackageManager
+                    .GetDefinition(
+                        original.Name,
+                        root));
+            Assert.Throws<InvalidOperationException>(() =>
+                EventProviderPackageManager
+                    .GetDefinition(
+                        replacement.Name,
+                        root));
+        } finally {
+            if (Directory.Exists(root)) {
+                Directory.Delete(
+                    root,
+                    recursive: true);
+            }
+        }
+    }
+
     private static void CreateInstalledPackage(
         string root,
         EventProviderDefinition definition,

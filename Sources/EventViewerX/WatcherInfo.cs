@@ -107,11 +107,17 @@ namespace EventViewerX {
             _subscriptionQueries = subscriptionQueries
                 .Select(CloneSubscriptionQuery)
                 .ToArray();
+            _eventDeduplicator =
+                _subscriptionQueries.Count > 1
+                    ? new EventDeliveryDeduplicator()
+                    : null;
         }
 
         private readonly bool _staging;
         private readonly IReadOnlyList<EventLogSubscriptionQuery>
             _subscriptionQueries;
+        private readonly EventDeliveryDeduplicator?
+            _eventDeduplicator;
         private readonly object _stopSync = new();
         private bool _starting;
         private bool _started;
@@ -323,6 +329,10 @@ namespace EventViewerX {
         /// <summary>Invokes the user callback for each matching event and applies stop conditions.</summary>
         /// <param name="obj">Event object passed to the callback.</param>
         private void OnEvent(EventObject obj) {
+            if (_eventDeduplicator != null &&
+                !_eventDeduplicator.TryAccept(obj)) {
+                return;
+            }
             int acceptedEventNumber = TryAcceptEvent();
             if (acceptedEventNumber == 0) {
                 return;

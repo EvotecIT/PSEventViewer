@@ -69,17 +69,17 @@ Describe 'Start-EVXWatcher - Parameter validation' {
         }
     }
 
-    It 'partitions filters that exceed the native XPath expression limit' {
+    It 'consolidates partitioned filters into one native union subscription' {
         $watcher = Start-EVXWatcher `
             -LogName System `
             -EventId (1..40) `
             -ReadMode Metadata `
             -Action {}
         try {
-            $watcher.SubscriptionQueries.Count | Should -BeGreaterThan 1
-            foreach ($query in $watcher.SubscriptionQueries) {
-                $query.XPath | Should -Not -BeNullOrEmpty
-            }
+            $watcher.SubscriptionQueries.Count | Should -Be 1
+            [xml] $QueryXml = $watcher.SubscriptionQuery.XPath
+            @($QueryXml.QueryList.Query.Select).Count |
+                Should -BeGreaterThan 1
         } finally {
             Stop-EVXWatcher -Id $watcher.Id -ErrorAction SilentlyContinue
         }

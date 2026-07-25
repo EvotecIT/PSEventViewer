@@ -75,4 +75,34 @@ public sealed class TestNamedEventQuerySnapshot {
             2,
             snapshot.Enrichment!.DnsMaxConcurrency);
     }
+
+    [Fact]
+    public void ReadAsyncValidatesRemoteOptionsBeforeEnumeration() {
+        NamedEvents namedEvent =
+            Enum.GetValues(typeof(NamedEvents))
+                .Cast<NamedEvents>()
+                .First();
+
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            NamedEventEngine.ReadAsync(
+                new NamedEventQuery(
+                    new[] { namedEvent }) {
+                    Authentication =
+                        (EventLogAuthentication)int.MaxValue
+                }));
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            NamedEventEngine.ReadAsync(
+                new NamedEventQuery(
+                    new[] { namedEvent }) {
+                    RemoteConnectionTimeoutMilliseconds =
+                        0
+                }));
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            NamedEventEngine.ReadAsync(
+                new NamedEventQuery(
+                    new[] { namedEvent }) {
+                    RemoteReadTimeoutMilliseconds =
+                        -1
+                }));
+    }
 }

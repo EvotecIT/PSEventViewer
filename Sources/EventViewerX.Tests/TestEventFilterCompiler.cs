@@ -218,6 +218,34 @@ public sealed class TestEventFilterCompiler {
     }
 
     [Fact]
+    public void ChannelUnionQueryUsesOneQueryWithSeveralSelectClauses() {
+        string xml =
+            EventFilterCompiler
+                .BuildChannelUnionQueryXml(
+                    new[] { "Application" },
+                    new[] {
+                        new EventFilter {
+                            EventIds =
+                                new[] { 1 }
+                        },
+                        new EventFilter {
+                            EventIds =
+                                new[] { 2 }
+                        }
+                    });
+        var document =
+            System.Xml.Linq.XDocument.Parse(
+                xml);
+
+        Assert.Single(
+            document.Descendants("Query"));
+        Assert.Equal(
+            2,
+            document.Descendants("Select")
+                .Count());
+    }
+
+    [Fact]
     public void PartitionerPreservesNamedDataAcrossOtherDimensions() {
         var filter = new EventFilter {
             EventIds = Enumerable.Range(1, 30).ToArray(),
@@ -288,6 +316,32 @@ public sealed class TestEventFilterCompiler {
                                     (first, second))))
                 .ToHashSet();
         Assert.Equal(12 * 12, combinations.Count);
+    }
+
+    [Fact]
+    public void PartitionerRejectsExcessiveCartesianExpansionBeforeAllocation() {
+        var filter = new EventFilter {
+            NamedData = Enumerable.Range(1, 11)
+                .ToDictionary(
+                    index => "Field" + index,
+                    index =>
+                        (IReadOnlyList<string>)Enumerable
+                            .Range(1, 100)
+                            .Select(value =>
+                                $"Value-{index}-{value}")
+                            .ToArray())
+        };
+
+        ArgumentException exception =
+            Assert.Throws<ArgumentException>(() =>
+                EventFilterPartitioner.Partition(
+                    filter));
+
+        Assert.Contains(
+            EventFilterPartitioner.MaximumPartitions
+                .ToString(),
+            exception.Message,
+            StringComparison.Ordinal);
     }
 
     [Fact]

@@ -18,11 +18,20 @@ public static partial class EventLogCatalog {
         cancellationToken.ThrowIfCancellationRequested();
         EventLogCatalogQuery snapshot = SnapshotAndValidate(query);
         Regex[] patterns = CompilePatterns(providerPatterns);
-        using EventLogSession session = OpenSession(
-            snapshot,
-            cancellationToken);
+        using var sessionLifetime =
+            new RetainedDisposable<EventLogSession>(
+                OpenSession(
+                    snapshot,
+                    cancellationToken));
+        EventLogSession session =
+            sessionLifetime.Value;
         var providers = new List<string>();
-        foreach (string name in session.GetProviderNames()) {
+        foreach (string name in EnumerateNamesBounded(
+                     () => session.GetProviderNames(),
+                     snapshot.ConnectionTimeoutMilliseconds,
+                     $"Timed out enumerating event providers after {snapshot.ConnectionTimeoutMilliseconds} ms.",
+                     cancellationToken,
+                     sessionLifetime.Retain())) {
             cancellationToken.ThrowIfCancellationRequested();
             if (MatchesAny(name, patterns)) {
                 providers.Add(name);
@@ -41,10 +50,19 @@ public static partial class EventLogCatalog {
         cancellationToken.ThrowIfCancellationRequested();
         EventLogCatalogQuery snapshot = SnapshotAndValidate(query);
         Regex[] patterns = CompilePatterns(providerPatterns);
-        using EventLogSession session = OpenSession(
-            snapshot,
-            cancellationToken);
-        foreach (string providerName in session.GetProviderNames()
+        using var sessionLifetime =
+            new RetainedDisposable<EventLogSession>(
+                OpenSession(
+                    snapshot,
+                    cancellationToken));
+        EventLogSession session =
+            sessionLifetime.Value;
+        foreach (string providerName in EnumerateNamesBounded(
+                     () => session.GetProviderNames(),
+                     snapshot.ConnectionTimeoutMilliseconds,
+                     $"Timed out enumerating event providers after {snapshot.ConnectionTimeoutMilliseconds} ms.",
+                     cancellationToken,
+                     sessionLifetime.Retain())
                      .Where(name => MatchesAny(name, patterns))
                      .OrderBy(static name => name, StringComparer.OrdinalIgnoreCase)) {
             cancellationToken.ThrowIfCancellationRequested();
@@ -117,8 +135,14 @@ public static partial class EventLogCatalog {
                     cancellationToken));
         EventLogSession session =
             sessionLifetime.Value;
+        string[] logNames = EnumerateNamesBounded(
+            () => session.GetLogNames(),
+            snapshot.ConnectionTimeoutMilliseconds,
+            $"Timed out enumerating event logs after {snapshot.ConnectionTimeoutMilliseconds} ms.",
+            cancellationToken,
+            sessionLifetime.Retain());
         var channels = new List<string>();
-        foreach (string name in session.GetLogNames()) {
+        foreach (string name in logNames) {
             cancellationToken.ThrowIfCancellationRequested();
             if (!MatchesAny(name, patterns) ||
                 (!includeAnalyticDebug &&
@@ -128,7 +152,7 @@ public static partial class EventLogCatalog {
                      name,
                      snapshot.ConnectionTimeoutMilliseconds,
                      cancellationToken,
-                     sessionLifetime))) {
+                     sessionLifetime.Retain()))) {
                 continue;
             }
             channels.Add(name);
@@ -142,11 +166,13 @@ public static partial class EventLogCatalog {
         string logName,
         int timeoutMilliseconds,
         CancellationToken cancellationToken,
-        RetainedDisposable<EventLogSession>?
-            sessionLifetime = null) {
+        IDisposable? operationLease = null) {
 
-        try {
+        if (cancellationToken.IsCancellationRequested) {
+            operationLease?.Dispose();
             cancellationToken.ThrowIfCancellationRequested();
+        }
+        try {
             bool result = EventLogNativeOperation.Execute(
                 () => {
                     using var configuration =
@@ -161,7 +187,7 @@ public static partial class EventLogCatalog {
                 timeoutMilliseconds,
                 $"Timed out reading the type of event log '{logName}' after {timeoutMilliseconds} ms.",
                 operationLease:
-                    sessionLifetime?.Retain());
+                    operationLease);
             cancellationToken.ThrowIfCancellationRequested();
             return result;
         } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
@@ -169,6 +195,33 @@ public static partial class EventLogCatalog {
         } catch (EventLogException) {
             return false;
         }
+    }
+
+    internal static string[] EnumerateNamesBounded(
+        Func<IEnumerable<string>> enumerate,
+        int timeoutMilliseconds,
+        string timeoutMessage,
+        CancellationToken cancellationToken,
+        IDisposable? operationLease = null) {
+
+        if (enumerate == null) {
+            operationLease?.Dispose();
+            throw new ArgumentNullException(
+                nameof(enumerate));
+        }
+        if (cancellationToken.IsCancellationRequested) {
+            operationLease?.Dispose();
+            cancellationToken.ThrowIfCancellationRequested();
+        }
+        string[] names =
+            EventLogNativeOperation.Execute(
+                () => enumerate().ToArray(),
+                timeoutMilliseconds,
+                timeoutMessage,
+                operationLease:
+                    operationLease);
+        cancellationToken.ThrowIfCancellationRequested();
+        return names;
     }
 
     private static EventProviderMetadataSnapshot SnapshotProvider(

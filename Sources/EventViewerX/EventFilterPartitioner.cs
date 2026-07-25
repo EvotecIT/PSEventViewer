@@ -6,6 +6,11 @@ namespace EventViewerX;
 /// </summary>
 public static class EventFilterPartitioner {
     /// <summary>
+    /// Maximum number of native queries produced for one logical filter.
+    /// </summary>
+    public const int MaximumPartitions = 4096;
+
+    /// <summary>
     /// Splits OR-valued dimensions while preserving AND semantics between dimensions.
     /// </summary>
     public static IReadOnlyList<EventFilter> Partition(
@@ -79,7 +84,11 @@ public static class EventFilterPartitioner {
         return partitions;
     }
 
-    internal static IReadOnlyList<EventFilter>
+    /// <summary>
+    /// Partitions a named-data suppression filter into an equivalent union of
+    /// native-safe suppression expressions.
+    /// </summary>
+    public static IReadOnlyList<EventFilter>
         PartitionNamedDataSuppression(
             EventFilter? suppression) {
 
@@ -133,8 +142,11 @@ public static class EventFilterPartitioner {
         int chunkCount =
             (dimension.Count + dimension.Capacity - 1) /
             dimension.Capacity;
+        EnsurePartitionCount(
+            current.Count,
+            chunkCount);
         var output = new List<EventFilter>(
-            checked(current.Count * chunkCount));
+            current.Count * chunkCount);
         foreach (EventFilter partial in current) {
             for (int offset = 0;
                  offset < dimension.Count;
@@ -162,8 +174,11 @@ public static class EventFilterPartitioner {
             chunks = PartitionNamedDataGroups(
                 dimension.NamedDataGroups!,
                 dimension.Capacity);
+        EnsurePartitionCount(
+            current.Count,
+            chunks.Count);
         var output = new List<EventFilter>(
-            checked(current.Count * chunks.Count));
+            current.Count * chunks.Count);
         foreach (EventFilter partial in current) {
             foreach (IReadOnlyList<NamedDataAtom> chunk in chunks) {
                 EventFilter result = Copy(partial);
@@ -210,9 +225,12 @@ public static class EventFilterPartitioner {
         foreach (NamedDataGroup group in groups) {
             IReadOnlyList<IReadOnlyList<NamedDataAtom>>
                 chunks = ChunkNamedDataGroup(group);
+            EnsurePartitionCount(
+                partitions.Count,
+                chunks.Count);
             var expanded =
                 new List<IReadOnlyList<NamedDataAtom>>(
-                    checked(partitions.Count * chunks.Count));
+                    partitions.Count * chunks.Count);
             foreach (IReadOnlyList<NamedDataAtom> partition in
                      partitions) {
                 foreach (IReadOnlyList<NamedDataAtom> chunk in
@@ -224,6 +242,21 @@ public static class EventFilterPartitioner {
             partitions = expanded;
         }
         return partitions;
+    }
+
+    private static void EnsurePartitionCount(
+        int currentCount,
+        int multiplier) {
+
+        if (currentCount <= 0 ||
+            multiplier <= 0) {
+            return;
+        }
+        if (currentCount >
+            MaximumPartitions / multiplier) {
+            throw new ArgumentException(
+                $"The filter requires more than {MaximumPartitions} native query partitions. Reduce the number of alternatives or split the request into smaller logical queries.");
+        }
     }
 
     private static IReadOnlyList<IReadOnlyList<NamedDataAtom>>

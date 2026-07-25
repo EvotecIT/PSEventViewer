@@ -475,6 +475,54 @@ namespace EventViewerX.Tests {
         }
 
         [Fact]
+        public void PartitionedWatcherDeliversOneLogicalRecordOnce() {
+            int delivered = 0;
+            var queries =
+                new[] {
+                    new EventLogSubscriptionQuery(
+                        "Application") {
+                        XPath = "*[System[EventID=1]]"
+                    },
+                    new EventLogSubscriptionQuery(
+                        "Application") {
+                        XPath = "*[System[EventID=2]]"
+                    }
+                };
+            var info = new WatcherInfo(
+                "partitioned-dedup",
+                Environment.MachineName,
+                "Application",
+                new List<int>(),
+                new List<NamedEvents>(),
+                _ => Interlocked.Increment(
+                    ref delivered),
+                false,
+                false,
+                0,
+                null,
+                queries);
+            var duplicate =
+                (EventObject)FormatterServices
+                    .GetUninitializedObject(
+                        typeof(EventObject));
+            var method = typeof(WatcherInfo).GetMethod(
+                "OnEvent",
+                BindingFlags.Instance |
+                BindingFlags.NonPublic)!;
+
+            method.Invoke(
+                info,
+                new object[] { duplicate });
+            method.Invoke(
+                info,
+                new object[] { duplicate });
+
+            Assert.Equal(1, delivered);
+            Assert.Equal(1, info.EventsFound);
+            info.Dispose();
+        }
+
+        [Fact]
         public void StopDoesNotHoldStateLockWhileCancellingSubscriptions() {
             var info = new WatcherInfo(
                 "stop-lock",

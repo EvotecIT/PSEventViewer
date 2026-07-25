@@ -270,6 +270,23 @@ public static partial class NamedEventEngine {
         EventReadModeValidation.EnsureDefined(
             query.ReadMode,
             nameof(query));
+        if (!Enum.IsDefined(
+                typeof(EventLogAuthentication),
+                query.Authentication)) {
+            throw new ArgumentOutOfRangeException(
+                nameof(query),
+                "The remote authentication value is not supported.");
+        }
+        if (query.RemoteConnectionTimeoutMilliseconds <= 0) {
+            throw new ArgumentOutOfRangeException(
+                nameof(query),
+                "Remote connection timeout must be greater than zero.");
+        }
+        if (query.RemoteReadTimeoutMilliseconds < 0) {
+            throw new ArgumentOutOfRangeException(
+                nameof(query),
+                "Remote read timeout must be greater than or equal to zero.");
+        }
         if (query.MaxEvents < 0) {
             throw new ArgumentOutOfRangeException(
                 nameof(query),

@@ -53,6 +53,26 @@ internal static class EventProviderManifestNames {
         }
     }
 
+    internal static bool IsDeclaredQualifiedName(
+        string value) {
+
+        if (string.IsNullOrWhiteSpace(value) ||
+            !string.Equals(
+                value,
+                value.Trim(),
+                StringComparison.Ordinal)) {
+            return false;
+        }
+        string[] parts = value.Split(':');
+        if (parts.Length != 2 ||
+            (parts[0] != "win" &&
+             parts[0] != "xs")) {
+            return false;
+        }
+        return IsUnqualifiedIdentifier(
+            parts[1]);
+    }
+
     private static bool IsAsciiLetterOrDigit(char value) {
         return value is >= 'A' and <= 'Z' or
             >= 'a' and <= 'z' or

@@ -8,6 +8,43 @@ namespace EventViewerX.Tests;
 
 public sealed class TestNativeEventEngineContracts {
     [Fact]
+    public void CatalogEnumerationRetainsSessionUntilTimedOutWorkFinishes() {
+        using var release =
+            new ManualResetEventSlim();
+        using var disposed =
+            new ManualResetEventSlim();
+        var lifetime =
+            new Native.RetainedDisposable<
+                CallbackDisposable>(
+                new CallbackDisposable(
+                    disposed.Set));
+        try {
+            Assert.Throws<TimeoutException>(() =>
+                EventLogCatalog.EnumerateNamesBounded(
+                    () => {
+                        release.Wait();
+                        return new[] {
+                            "Application"
+                        };
+                    },
+                    100,
+                    "catalog enumeration timed out",
+                    CancellationToken.None,
+                    lifetime.Retain()));
+
+            lifetime.Dispose();
+            Assert.False(
+                disposed.IsSet);
+        } finally {
+            release.Set();
+            Assert.True(
+                disposed.Wait(
+                    TimeSpan.FromSeconds(5)));
+            lifetime.Dispose();
+        }
+    }
+
+    [Fact]
     public async Task LocalClearReturnsOnCancellationWhileNativeWorkRetainsOwnership() {
         using var started =
             new ManualResetEventSlim();
@@ -38,6 +75,21 @@ public sealed class TestNativeEventEngineContracts {
                     await clear);
         } finally {
             release.Set();
+        }
+    }
+
+    private sealed class CallbackDisposable :
+        IDisposable {
+        private readonly Action _dispose;
+
+        internal CallbackDisposable(
+            Action dispose) {
+
+            _dispose = dispose;
+        }
+
+        public void Dispose() {
+            _dispose();
         }
     }
 

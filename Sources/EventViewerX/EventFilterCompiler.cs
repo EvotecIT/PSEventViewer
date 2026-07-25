@@ -108,6 +108,63 @@ public static class EventFilterCompiler {
     }
 
     /// <summary>
+    /// Builds one structured channel query whose Select clauses are a native
+    /// union. This preserves one-record delivery when a logical filter is
+    /// partitioned across several overlapping XPath expressions.
+    /// </summary>
+    public static string BuildChannelUnionQueryXml(
+        IEnumerable<string> logNames,
+        IEnumerable<EventFilter> selects,
+        IEnumerable<EventFilter>? suppressions = null) {
+
+        if (selects == null) {
+            throw new ArgumentNullException(
+                nameof(selects));
+        }
+        EventFilter[] selectFilters =
+            selects
+                .Where(static filter => filter != null)
+                .ToArray();
+        if (selectFilters.Length == 0) {
+            throw new ArgumentException(
+                "At least one selection filter is required.",
+                nameof(selects));
+        }
+        var combinedSuppressions =
+            new List<EventFilter>(
+                suppressions ??
+                Array.Empty<EventFilter>());
+        var normalizedSelects =
+            new List<EventFilter?>();
+        foreach (EventFilter select in selectFilters) {
+            EventFilter? namedDataSuppression =
+                CreateExcludedNamedDataSuppression(
+                    select);
+            if (namedDataSuppression != null) {
+                combinedSuppressions.Add(
+                    namedDataSuppression);
+            }
+            normalizedSelects.Add(
+                WithoutExcludedNamedData(
+                    select));
+        }
+        return BuildQueryXmlCore(
+            NormalizeSources(
+                logNames),
+            filePaths: false,
+            normalizedSelects
+                .Select(BuildXPath)
+                .Distinct(StringComparer.Ordinal)
+                .ToArray(),
+            NormalizeSuppressions(
+                    combinedSuppressions)
+                .Select(BuildXPath)
+                .Where(static xpath => xpath != "*")
+                .Distinct(StringComparer.Ordinal)
+                .ToArray());
+    }
+
+    /// <summary>
     /// Builds a structured XML query that can select and suppress records across several event-log files.
     /// </summary>
     public static string BuildFileQueryXml(
@@ -149,16 +206,9 @@ public static class EventFilterCompiler {
         if (sources == null) {
             throw new ArgumentNullException(nameof(sources));
         }
-        string[] normalizedSources = sources
-            .Select(source => source?.Trim() ?? string.Empty)
-            .Where(static source => source.Length > 0)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToArray();
-        if (normalizedSources.Length == 0) {
-            throw new ArgumentException(
-                "At least one event source is required.",
-                nameof(sources));
-        }
+        string[] normalizedSources =
+            NormalizeSources(
+                sources);
 
         EventFilter? namedDataSuppression =
             CreateExcludedNamedDataSuppression(select);
@@ -178,6 +228,19 @@ public static class EventFilterCompiler {
             .Where(static xpath => xpath != "*")
             .Distinct(StringComparer.Ordinal)
             .ToArray();
+        return BuildQueryXmlCore(
+            normalizedSources,
+            filePaths,
+            new[] { selectXPath },
+            suppressXPaths);
+    }
+
+    private static string BuildQueryXmlCore(
+        IReadOnlyList<string> normalizedSources,
+        bool filePaths,
+        IReadOnlyList<string> selectXPaths,
+        IReadOnlyList<string> suppressXPaths) {
+
         var builder = new StringBuilder();
         var settings = new XmlWriterSettings {
             OmitXmlDeclaration = true,
@@ -185,7 +248,7 @@ public static class EventFilterCompiler {
         };
         using (XmlWriter writer = XmlWriter.Create(builder, settings)) {
             writer.WriteStartElement("QueryList");
-            for (int index = 0; index < normalizedSources.Length; index++) {
+            for (int index = 0; index < normalizedSources.Count; index++) {
                 string source = filePaths
                     ? "file://" + Path.GetFullPath(normalizedSources[index])
                     : normalizedSources[index];
@@ -194,10 +257,12 @@ public static class EventFilterCompiler {
                     "Id",
                     index.ToString(CultureInfo.InvariantCulture));
                 writer.WriteAttributeString("Path", source);
-                writer.WriteStartElement("Select");
-                writer.WriteAttributeString("Path", source);
-                writer.WriteString(selectXPath);
-                writer.WriteEndElement();
+                foreach (string selectXPath in selectXPaths) {
+                    writer.WriteStartElement("Select");
+                    writer.WriteAttributeString("Path", source);
+                    writer.WriteString(selectXPath);
+                    writer.WriteEndElement();
+                }
                 foreach (string suppressXPath in suppressXPaths) {
                     writer.WriteStartElement("Suppress");
                     writer.WriteAttributeString("Path", source);
@@ -209,6 +274,29 @@ public static class EventFilterCompiler {
             writer.WriteEndElement();
         }
         return builder.ToString();
+    }
+
+    private static string[] NormalizeSources(
+        IEnumerable<string> sources) {
+
+        if (sources == null) {
+            throw new ArgumentNullException(
+                nameof(sources));
+        }
+        string[] normalizedSources = sources
+            .Select(source =>
+                source?.Trim() ?? string.Empty)
+            .Where(static source =>
+                source.Length > 0)
+            .Distinct(
+                StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        if (normalizedSources.Length == 0) {
+            throw new ArgumentException(
+                "At least one event source is required.",
+                nameof(sources));
+        }
+        return normalizedSources;
     }
 
     private static IReadOnlyList<EventFilter> NormalizeSuppressions(

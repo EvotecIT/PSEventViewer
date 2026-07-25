@@ -247,19 +247,35 @@ namespace PSEventViewer {
                     out EventFilter?
                         namedDataSuppression);
             filter = selectFilter;
-            string[] xpaths = ParameterSetName == "FilterXPath"
-                ? new[] { FilterXPath!.Trim() }
-                : EventFilterPartitioner.Partition(filter!)
-                    .Select(partition =>
-                        namedDataSuppression == null
-                            ? EventFilterCompiler.BuildXPath(
-                                partition)
-                            : EventFilterCompiler
-                                .BuildChannelQueryXml(
+            string[] xpaths;
+            if (ParameterSetName == "FilterXPath") {
+                xpaths = new[] {
+                    FilterXPath!.Trim()
+                };
+            } else {
+                IReadOnlyList<EventFilter> partitions =
+                    EventFilterPartitioner.Partition(
+                        filter!);
+                IReadOnlyList<EventFilter>
+                    suppressionPartitions =
+                        EventFilterPartitioner
+                            .PartitionNamedDataSuppression(
+                                namedDataSuppression);
+                xpaths =
+                    partitions.Count == 1 &&
+                    suppressionPartitions.Count == 0
+                        ? new[] {
+                            EventFilterCompiler.BuildXPath(
+                                partitions[0])
+                        }
+                        : new[] {
+                            EventFilterCompiler
+                                .BuildChannelUnionQueryXml(
                                     new[] { LogName },
-                                    partition,
-                                    namedDataSuppression))
-                    .ToArray();
+                                    partitions,
+                                    suppressionPartitions)
+                        };
+            }
             if (xpaths.Any(string.IsNullOrWhiteSpace)) {
                 throw new PSArgumentException(
                     "FilterXPath cannot be empty or whitespace.");

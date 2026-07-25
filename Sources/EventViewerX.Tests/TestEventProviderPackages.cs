@@ -380,6 +380,54 @@ public sealed class TestEventProviderPackages {
                      "Events[0].Fields[0].OutputType");
     }
 
+    [Theory]
+    [InlineData("Invalid Type")]
+    [InlineData("custom:Value")]
+    [InlineData("win:")]
+    [InlineData("win:Value:Extra")]
+    public void RejectsInvalidOrUndeclaredCustomOutputTypeNames(
+        string customOutputType) {
+
+        EventProviderDefinition definition =
+            CreateDefinition();
+        definition.Events[0].Fields[0]
+            .CustomOutputType =
+                customOutputType;
+
+        EventProviderValidationResult result =
+            EventProviderDefinitionValidator.Validate(
+                definition);
+
+        Assert.Contains(
+            result.Issues,
+            issue => issue.Code ==
+                         "FieldCustomOutputTypeInvalid" &&
+                     issue.Path ==
+                         "Events[0].Fields[0].CustomOutputType");
+    }
+
+    [Theory]
+    [InlineData("win:HexInt32")]
+    [InlineData("xs:string")]
+    public void AcceptsCustomOutputTypesFromDeclaredNamespaces(
+        string customOutputType) {
+
+        EventProviderDefinition definition =
+            CreateDefinition();
+        definition.Events[0].Fields[0]
+            .CustomOutputType =
+                customOutputType;
+
+        EventProviderValidationResult result =
+            EventProviderDefinitionValidator.Validate(
+                definition);
+
+        Assert.DoesNotContain(
+            result.Issues,
+            issue => issue.Code ==
+                     "FieldCustomOutputTypeInvalid");
+    }
+
     [Fact]
     public void RejectsInvalidCulturesAcrossLocalizedProviderValues() {
         const string invalidCulture = "not_a_real_culture";

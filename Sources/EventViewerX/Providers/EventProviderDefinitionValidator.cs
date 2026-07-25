@@ -654,6 +654,17 @@ public static partial class EventProviderDefinitionValidator {
                     $"Field output type '{field.OutputType}' is not supported.",
                     issues);
             }
+            if (!string.IsNullOrWhiteSpace(
+                    field.CustomOutputType) &&
+                !EventProviderManifestNames
+                    .IsDeclaredQualifiedName(
+                        field.CustomOutputType)) {
+                Error(
+                    "FieldCustomOutputTypeInvalid",
+                    fieldPath + ".CustomOutputType",
+                    "Custom output types must be qualified XML names using the declared win or xs namespace prefix.",
+                    issues);
+            }
             if (!string.IsNullOrWhiteSpace(field.Map) &&
                 !maps.Contains(field.Map)) {
                 Error(

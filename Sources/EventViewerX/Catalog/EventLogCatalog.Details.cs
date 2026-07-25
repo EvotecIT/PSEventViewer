@@ -453,11 +453,12 @@ public static partial class EventLogCatalog {
             string[] logNames;
             EventLogDetailsResult? enumerationFailure = null;
             try {
-                logNames = EventLogNativeOperation.Execute(
-                    () => activeSession.GetLogNames().ToArray(),
+                logNames = EnumerateNamesBounded(
+                    () => activeSession.GetLogNames(),
                     timeoutMs,
-                    $"Timed out enumerating event logs on '{hostName}' after {timeoutMs} ms.");
-                cancellationToken.ThrowIfCancellationRequested();
+                    $"Timed out enumerating event logs on '{hostName}' after {timeoutMs} ms.",
+                    cancellationToken,
+                    sessionLifetime.Retain());
             } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
                 throw;
             } catch (TimeoutException ex) {
@@ -485,7 +486,8 @@ public static partial class EventLogCatalog {
                         activeSession,
                         logName,
                         timeoutMs,
-                        cancellationToken)) {
+                        cancellationToken,
+                        sessionLifetime.Retain())) {
                     continue;
                 }
                 yield return SafeGetResult(

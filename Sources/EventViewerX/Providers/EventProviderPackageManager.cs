@@ -397,6 +397,16 @@ public static partial class EventProviderPackageManager {
                             archivePath);
                     EventProviderDefinition definition =
                         package.Definition;
+                    string packageHash =
+                        EventProviderHash.FileSha256(
+                            archivePath);
+                    if (active &&
+                        !ActiveArchiveMatchesState(
+                            definition,
+                            packageHash,
+                            state!)) {
+                        continue;
+                    }
                     bool registered = active &&
                                       EventProviderManifestRegistrar
                                           .IsRegistered(
@@ -408,10 +418,7 @@ public static partial class EventProviderPackageManager {
                             definition.PackageVersion,
                         InstallPath = versionDirectory,
                         PackagePath = archivePath,
-                        PackageSha256 = active
-                            ? state!.PackageSha256
-                            : EventProviderHash.FileSha256(
-                                archivePath),
+                        PackageSha256 = packageHash,
                         InstalledAtUtc = active
                             ? state!.InstalledAtUtc
                             : File.GetCreationTimeUtc(
@@ -443,6 +450,26 @@ public static partial class EventProviderPackageManager {
                 EventProviderPackageVersion.Parse(
                     item.PackageVersion))
             .ToArray();
+    }
+
+    private static bool ActiveArchiveMatchesState(
+        EventProviderDefinition definition,
+        string packageHash,
+        EventProviderInstallationState state) {
+
+        return string.Equals(
+                   definition.Name,
+                   state.ProviderName,
+                   StringComparison.Ordinal) &&
+               definition.Id == state.ProviderId &&
+               string.Equals(
+                   definition.PackageVersion,
+                   state.ActiveVersion,
+                   StringComparison.Ordinal) &&
+               string.Equals(
+                   packageHash,
+                   state.PackageSha256,
+                   StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool TryLoadInstallationState(
