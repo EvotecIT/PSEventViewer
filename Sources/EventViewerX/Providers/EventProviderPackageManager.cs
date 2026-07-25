@@ -526,7 +526,8 @@ public static partial class EventProviderPackageManager {
             EventProviderPackageReader.EnsureExtractedFilesMatch(
                 installed.PackagePath,
                 manifestDirectory);
-        } catch (InvalidDataException) {
+        } catch (Exception exception)
+            when (IsRecoverableActivePayloadFailure(exception)) {
             string recoveredDirectoryName =
                 CreateActivationDirectoryName(
                     installed.PackageVersion,
@@ -575,6 +576,14 @@ public static partial class EventProviderPackageManager {
             FilesRemoved = filesRemoved,
             FileRemovalPendingReboot = pendingReboot
         };
+    }
+
+    internal static bool IsRecoverableActivePayloadFailure(
+        Exception exception) {
+
+        return exception is InvalidDataException ||
+               exception is IOException ||
+               exception is UnauthorizedAccessException;
     }
 
     /// <summary>Returns the conventional machine-wide provider package root.</summary>

@@ -310,11 +310,14 @@ public static class EventProviderPackageBuilder {
                 "Provider compatibility baseline was not found.",
                 fullPath);
         }
-        return string.Equals(
+        if (string.Equals(
                 Path.GetExtension(fullPath),
                 ".evxprovider",
-                StringComparison.OrdinalIgnoreCase)
-            ? EventProviderPackageReader.Open(fullPath).Definition
-            : EventProviderDefinitionJson.Load(fullPath);
+                StringComparison.OrdinalIgnoreCase)) {
+            using EventProviderPackage package =
+                EventProviderPackageReader.Open(fullPath);
+            return package.Definition;
+        }
+        return EventProviderDefinitionJson.Load(fullPath);
     }
 }

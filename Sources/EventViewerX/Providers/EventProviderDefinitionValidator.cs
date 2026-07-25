@@ -378,8 +378,19 @@ public static partial class EventProviderDefinitionValidator {
                         $"Map value {entry.Value} is duplicated.",
                         issues);
                 }
+                bool valueInRange =
+                    entry.Value >= uint.MinValue &&
+                    entry.Value <= uint.MaxValue;
+                if (!valueInRange) {
+                    Error(
+                        "MapValueOutOfRange",
+                        $"Maps[{mapIndex}].Entries[{entryIndex}].Value",
+                        "Map values must be unsigned 32-bit integers between 0 and 4294967295.",
+                        issues);
+                }
                 if (map.Kind == EventProviderMapKind.Bit &&
-                    (entry.Value <= 0 ||
+                    valueInRange &&
+                    (entry.Value == 0 ||
                      (entry.Value & (entry.Value - 1)) != 0)) {
                     Error(
                         "BitMapValueInvalid",

@@ -25,8 +25,19 @@ public static class EventLogSessionManager {
     /// Creates an EventLogSession with a timeout and a quick reachability check to avoid long hangs.
     /// Returns null and logs a warning on timeout or failure.
     /// </summary>
-    internal static EventLogSession? CreateSession(string? machineName, string? purpose, string? logName, int? timeoutMs = null) {
-        return CreateSessionResult(machineName, purpose, logName, timeoutMs).Session;
+    internal static EventLogSession? CreateSession(
+        string? machineName,
+        string? purpose,
+        string? logName,
+        int? timeoutMs = null,
+        CancellationToken cancellationToken = default) {
+
+        return CreateSessionResult(
+            machineName,
+            purpose,
+            logName,
+            timeoutMs,
+            cancellationToken: cancellationToken).Session;
     }
 
     internal static EventLogSessionOpenResult CreateSessionResult(
@@ -40,7 +51,10 @@ public static class EventLogSessionManager {
         bool emitDiagnostics = true,
         NetworkCredential? credential = null,
         EventLogAuthentication authentication =
-            EventLogAuthentication.Default) {
+            EventLogAuthentication.Default,
+        CancellationToken cancellationToken = default) {
+
+        cancellationToken.ThrowIfCancellationRequested();
         int budget = timeoutMs ?? DefaultSessionTimeoutMs;
         if (budget <= 0) {
             throw new ArgumentOutOfRangeException(nameof(timeoutMs), "Session timeout must be positive.");
@@ -68,8 +82,12 @@ public static class EventLogSessionManager {
                     localSessionFactory ?? (static () => new EventLogSession()),
                     budget,
                     $"Timed out opening the local Event Log session for '{channel}' after {budget} ms.",
+                    cancellationToken,
                     static lateSession => lateSession.Dispose());
                 return SessionSuccess(machineName, EventLogTarget.LocalMachineName, operation, channel, budget, session);
+            } catch (OperationCanceledException)
+                when (cancellationToken.IsCancellationRequested) {
+                throw;
             } catch (TimeoutException ex) {
                 if (emitDiagnostics) {
                     Settings._logger.WriteWarning($"{operation}: {ex.Message}");
@@ -130,7 +148,45 @@ public static class EventLogSessionManager {
                 budget,
                 nameof(EventLogSessionOpenStatus.Timeout));
         }
-        if (!(rpcProbeOverride?.Invoke(normalizedHost, rpcBudget) ?? RpcProbe(normalizedHost, rpcBudget, emitDiagnostics))) {
+        bool rpcAvailable;
+        try {
+            rpcAvailable = rpcProbeOverride != null
+                ? BoundedNativeOperation.Execute(
+                    () => rpcProbeOverride(
+                        normalizedHost,
+                        rpcBudget),
+                    rpcBudget,
+                    $"Timed out probing RPC on '{targetHost}' after {rpcBudget} ms.",
+                    cancellationToken)
+                : RpcProbe(
+                    normalizedHost,
+                    rpcBudget,
+                    emitDiagnostics,
+                    cancellationToken);
+        } catch (OperationCanceledException)
+            when (cancellationToken.IsCancellationRequested) {
+            throw;
+        } catch (TimeoutException exception) {
+            if (emitDiagnostics) {
+                Settings._logger.WriteWarning(
+                    $"{operation}: {exception.Message}");
+            }
+            MarkHostUnreachable(normalizedHost);
+            TryGetHostNegativeCacheExpiry(
+                normalizedHost,
+                out DateTime probeCachedUntilUtc);
+            return SessionFailure(
+                machineName,
+                targetHost,
+                operation,
+                channel,
+                EventLogSessionOpenStatus.Timeout,
+                exception.Message,
+                budget,
+                exception.GetType().Name,
+                probeCachedUntilUtc);
+        }
+        if (!rpcAvailable) {
             if (emitDiagnostics) {
                 Settings._logger.WriteVerbose($"{operation}: RPC preflight failed for '{machineName}'");
             }
@@ -176,10 +232,14 @@ public static class EventLogSessionManager {
                 () => sessionFactory(normalizedHost),
                 sessionBudget,
                 $"Timed out opening Event Log session to '{targetHost}' for '{channel}' after {budget} ms.",
+                cancellationToken,
                 static lateSession => lateSession.Dispose());
             // Success: clear any stale negative entry
             ClearNegativeCache(normalizedHost);
             return SessionSuccess(machineName, targetHost, operation, channel, budget, session);
+        } catch (OperationCanceledException)
+            when (cancellationToken.IsCancellationRequested) {
+            throw;
         } catch (TimeoutException ex) {
             if (emitDiagnostics) {
                 Settings._logger.WriteWarning($"{operation}: {ex.Message}");
@@ -245,7 +305,8 @@ public static class EventLogSessionManager {
         int timeoutMilliseconds,
         NetworkCredential? credential = null,
         EventLogAuthentication authentication =
-            EventLogAuthentication.Default) {
+            EventLogAuthentication.Default,
+        CancellationToken cancellationToken = default) {
 
         using EventLogSessionOpenResult result =
             CreateSessionResult(
@@ -255,7 +316,8 @@ public static class EventLogSessionManager {
                 timeoutMilliseconds,
                 emitDiagnostics: false,
                 credential: credential,
-                authentication: authentication);
+                authentication: authentication,
+                cancellationToken: cancellationToken);
         if (!result.Success ||
             result.Session == null) {
             throw new EventLogSessionException(
@@ -290,15 +352,38 @@ public static class EventLogSessionManager {
     /// <summary>
     /// Public helper that exposes the fast session creation logic (shared reachability cache + RPC probe).
     /// </summary>
-    public static EventLogSession? OpenSession(string? machineName, int? timeoutMs = null, string? purpose = null, string? logName = null) {
-        return CreateSession(machineName, purpose, logName, timeoutMs);
+    public static EventLogSession? OpenSession(
+        string? machineName,
+        int? timeoutMs = null,
+        string? purpose = null,
+        string? logName = null,
+        CancellationToken cancellationToken = default) {
+
+        return CreateSession(
+            machineName,
+            purpose,
+            logName,
+            timeoutMs,
+            cancellationToken);
     }
 
     /// <summary>
     /// Opens an Event Log session and returns diagnostic details when the session cannot be created.
     /// </summary>
-    public static EventLogSessionOpenResult OpenSessionResult(string? machineName, int? timeoutMs = null, string? purpose = null, string? logName = null) {
-        return CreateSessionResult(machineName, purpose, logName, timeoutMs, emitDiagnostics: false);
+    public static EventLogSessionOpenResult OpenSessionResult(
+        string? machineName,
+        int? timeoutMs = null,
+        string? purpose = null,
+        string? logName = null,
+        CancellationToken cancellationToken = default) {
+
+        return CreateSessionResult(
+            machineName,
+            purpose,
+            logName,
+            timeoutMs,
+            emitDiagnostics: false,
+            cancellationToken: cancellationToken);
     }
 
     /// <summary>
@@ -315,11 +400,17 @@ public static class EventLogSessionManager {
         _unreachable.Clear();
     }
 
-    private static bool RpcProbe(string host, int timeoutMs, bool emitDiagnostics) {
+    private static bool RpcProbe(
+        string host,
+        int timeoutMs,
+        bool emitDiagnostics,
+        CancellationToken cancellationToken) {
+
         bool connected = RpcEndpointProbe.TryConnect(
             host,
             Settings.RpcProbePort,
-            timeoutMs);
+            timeoutMs,
+            cancellationToken);
         if (!connected && emitDiagnostics) {
             Settings._logger.WriteVerbose($"Session: RPC probe failed for '{host}'.");
         }

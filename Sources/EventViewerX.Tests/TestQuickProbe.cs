@@ -57,6 +57,75 @@ namespace EventViewerX.Tests {
         }
 
         [Fact]
+        public void SessionCreationHonorsCancellationDuringRpcProbe() {
+            if (!OperatingSystem.IsWindows()) return;
+
+            const string host =
+                "eventviewerx-canceled-rpc-probe.invalid";
+            EventLogSessionManager.ClearHostCache(host);
+            using var cancellation =
+                new CancellationTokenSource(
+                    TimeSpan.FromMilliseconds(100));
+            using var release = new ManualResetEventSlim();
+            var stopwatch = Stopwatch.StartNew();
+            try {
+                Assert.Throws<OperationCanceledException>(() =>
+                    EventLogSessionManager.CreateSessionResult(
+                        host,
+                        "QuickProbe",
+                        "Application",
+                        timeoutMs: 5000,
+                        rpcProbeOverride: (_, _) => {
+                            release.Wait();
+                            return true;
+                        },
+                        cancellationToken:
+                            cancellation.Token));
+
+                Assert.True(
+                    stopwatch.Elapsed <
+                    TimeSpan.FromSeconds(5),
+                    $"Cancellation took {stopwatch.Elapsed.TotalMilliseconds:F0} ms.");
+            } finally {
+                release.Set();
+                EventLogSessionManager.ClearHostCache(host);
+            }
+        }
+
+        [Fact]
+        public void SessionCreationHonorsCancellationDuringNativeOpen() {
+            if (!OperatingSystem.IsWindows()) return;
+
+            using var cancellation =
+                new CancellationTokenSource(
+                    TimeSpan.FromMilliseconds(100));
+            using var release = new ManualResetEventSlim();
+            var stopwatch = Stopwatch.StartNew();
+            try {
+                Assert.Throws<OperationCanceledException>(() =>
+                    EventLogSessionManager.CreateSessionResult(
+                        null,
+                        "QuickProbe",
+                        "Application",
+                        timeoutMs: 5000,
+                        localSessionFactory: () => {
+                            release.Wait();
+                            return new System.Diagnostics.Eventing.Reader
+                                .EventLogSession();
+                        },
+                        cancellationToken:
+                            cancellation.Token));
+
+                Assert.True(
+                    stopwatch.Elapsed <
+                    TimeSpan.FromSeconds(5),
+                    $"Cancellation took {stopwatch.Elapsed.TotalMilliseconds:F0} ms.");
+            } finally {
+                release.Set();
+            }
+        }
+
+        [Fact]
         public void BlankMachineNameReportsTheResolvedLocalMachine() {
             if (!OperatingSystem.IsWindows()) return;
 

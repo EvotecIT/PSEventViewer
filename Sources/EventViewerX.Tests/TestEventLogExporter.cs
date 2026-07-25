@@ -193,6 +193,53 @@ public sealed class TestEventLogExporter {
     }
 
     [Fact]
+    public void NativeExportCancellationDefersCleanupUntilTheWorkerStops() {
+        using var fixture = new ExportFixture();
+        string outputPath = fixture.GetPath("existing.evtx");
+        File.WriteAllText(outputPath, "preserve-me");
+        using var cancellation = new CancellationTokenSource();
+        using var started = new ManualResetEventSlim();
+        using var release = new ManualResetEventSlim();
+
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        Assert.Throws<OperationCanceledException>(() =>
+            EventLogExporter.ExportEvtxCore(
+                outputPath,
+                overwrite: true,
+                computeSha256: false,
+                cancellation.Token,
+                temporaryPath => {
+                    using var stream = new FileStream(
+                        temporaryPath,
+                        FileMode.CreateNew,
+                        FileAccess.Write,
+                        FileShare.None);
+                    stream.WriteByte(1);
+                    started.Set();
+                    cancellation.Cancel();
+                    release.Wait();
+                }));
+
+        Assert.True(started.IsSet);
+        Assert.True(
+            stopwatch.Elapsed < TimeSpan.FromSeconds(5),
+            $"Cancellation took {stopwatch.Elapsed.TotalMilliseconds:F0} ms.");
+        Assert.Equal("preserve-me", File.ReadAllText(outputPath));
+        Assert.Single(Directory.GetFiles(
+            fixture.DirectoryPath,
+            ".existing.evtx.*.tmp.evtx"));
+
+        release.Set();
+        Assert.True(
+            SpinWait.SpinUntil(
+                () => Directory.GetFiles(
+                    fixture.DirectoryPath,
+                    ".existing.evtx.*.tmp.evtx").Length == 0,
+                TimeSpan.FromSeconds(5)),
+            "The canceled native export did not remove its temporary file after the worker stopped.");
+    }
+
+    [Fact]
     public void FinalHashPassHonorsCancellation() {
         using var fixture = new ExportFixture();
         string path = fixture.GetPath("hash.bin");

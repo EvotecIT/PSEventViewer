@@ -278,7 +278,8 @@ namespace EventViewerX {
                                 failure => DetectFailure(
                                     subscriptionLifetime,
                                     subscriptionIndex,
-                                    failure)));
+                                    failure),
+                                cancellationToken));
                         }
                     } catch (Exception exception) {
                         startupFailedSubscriptions =

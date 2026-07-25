@@ -17,7 +17,9 @@ public static partial class EventLogCatalog {
         cancellationToken.ThrowIfCancellationRequested();
         EventLogCatalogQuery snapshot = SnapshotAndValidate(query);
         Regex[] patterns = CompilePatterns(providerPatterns);
-        using EventLogSession session = OpenSession(snapshot);
+        using EventLogSession session = OpenSession(
+            snapshot,
+            cancellationToken);
         var providers = new List<string>();
         foreach (string name in session.GetProviderNames()) {
             cancellationToken.ThrowIfCancellationRequested();
@@ -38,7 +40,9 @@ public static partial class EventLogCatalog {
         cancellationToken.ThrowIfCancellationRequested();
         EventLogCatalogQuery snapshot = SnapshotAndValidate(query);
         Regex[] patterns = CompilePatterns(providerPatterns);
-        using EventLogSession session = OpenSession(snapshot);
+        using EventLogSession session = OpenSession(
+            snapshot,
+            cancellationToken);
         foreach (string providerName in session.GetProviderNames()
                      .Where(name => MatchesAny(name, patterns))
                      .OrderBy(static name => name, StringComparer.OrdinalIgnoreCase)) {
@@ -99,7 +103,9 @@ public static partial class EventLogCatalog {
         cancellationToken.ThrowIfCancellationRequested();
         EventLogCatalogQuery snapshot = SnapshotAndValidate(query);
         Regex[] patterns = CompilePatterns(channelPatterns);
-        using EventLogSession session = OpenSession(snapshot);
+        using EventLogSession session = OpenSession(
+            snapshot,
+            cancellationToken);
         var channels = new List<string>();
         foreach (string name in session.GetLogNames()) {
             cancellationToken.ThrowIfCancellationRequested();
@@ -250,7 +256,8 @@ public static partial class EventLogCatalog {
     }
 
     private static EventLogSession OpenSession(
-        EventLogCatalogQuery query) {
+        EventLogCatalogQuery query,
+        CancellationToken cancellationToken) {
 
         return EventLogSessionManager.OpenRequiredSession(
             query.MachineName,
@@ -258,7 +265,8 @@ public static partial class EventLogCatalog {
             logName: null,
             query.ConnectionTimeoutMilliseconds,
             query.Credential,
-            query.Authentication);
+            query.Authentication,
+            cancellationToken);
     }
 
     private static EventLogCatalogQuery SnapshotAndValidate(

@@ -220,7 +220,7 @@ public static class EventLogExporter {
                 cancellationToken));
     }
 
-    private static EventExportResult ExportEvtxCore(
+    internal static EventExportResult ExportEvtxCore(
         string destination,
         bool overwrite,
         bool computeSha256,
@@ -240,9 +240,29 @@ public static class EventLogExporter {
         string temporaryPath = Path.Combine(
             directory,
             $".{Path.GetFileName(destination)}.{Guid.NewGuid():N}.tmp.evtx");
+        bool cleanupDeferred = false;
         try {
             cancellationToken.ThrowIfCancellationRequested();
-            export(temporaryPath);
+            try {
+                _ = BoundedNativeOperation.Execute(
+                    () => {
+                        try {
+                            export(temporaryPath);
+                            return true;
+                        } catch {
+                            DeleteTemporaryFile(temporaryPath);
+                            throw;
+                        }
+                    },
+                    int.MaxValue,
+                    $"Native EVTX export to '{destination}' did not complete.",
+                    cancellationToken,
+                    _ => DeleteTemporaryFile(temporaryPath));
+            } catch (OperationCanceledException)
+                when (cancellationToken.IsCancellationRequested) {
+                cleanupDeferred = true;
+                throw;
+            }
             cancellationToken.ThrowIfCancellationRequested();
             long count = WindowsEventArchive.GetFileRecordCount(temporaryPath);
             long bytes = new FileInfo(temporaryPath).Length;
@@ -258,9 +278,22 @@ public static class EventLogExporter {
                 bytes,
                 sha256);
         } finally {
+            if (!cleanupDeferred) {
+                DeleteTemporaryFile(temporaryPath);
+            }
+        }
+    }
+
+    private static void DeleteTemporaryFile(string temporaryPath) {
+        try {
             if (File.Exists(temporaryPath)) {
                 File.Delete(temporaryPath);
             }
+        } catch (IOException) {
+            // A canceled native export retains ownership until its worker
+            // completes and invokes this cleanup again.
+        } catch (UnauthorizedAccessException) {
+            // Preserve the caller's authoritative export failure.
         }
     }
 

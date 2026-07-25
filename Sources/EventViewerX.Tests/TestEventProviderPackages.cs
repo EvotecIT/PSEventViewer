@@ -72,6 +72,70 @@ public sealed class TestEventProviderPackages {
     }
 
     [Fact]
+    public void RejectsMapValuesOutsideTheWindowsUInt32Range() {
+        EventProviderDefinition definition = CreateDefinition();
+        definition.Maps.Add(
+            new EventProviderMapDefinition {
+                Name = "Values",
+                Entries = {
+                    new EventProviderMapEntryDefinition {
+                        Value = -1
+                    },
+                    new EventProviderMapEntryDefinition {
+                        Value = (long)uint.MaxValue + 1
+                    }
+                }
+            });
+        definition.Maps.Add(
+            new EventProviderMapDefinition {
+                Name = "Bits",
+                Kind = EventProviderMapKind.Bit,
+                Entries = {
+                    new EventProviderMapEntryDefinition {
+                        Value = 1L << 32
+                    }
+                }
+            });
+
+        EventProviderValidationResult result =
+            EventProviderDefinitionValidator.Validate(
+                definition);
+
+        Assert.False(result.IsValid);
+        Assert.Equal(
+            3,
+            result.Issues.Count(
+                issue => issue.Code ==
+                         "MapValueOutOfRange"));
+        Assert.DoesNotContain(
+            result.Issues,
+            issue => issue.Code ==
+                     "BitMapValueInvalid" &&
+                     issue.Path ==
+                     "Maps[1].Entries[0].Value");
+    }
+
+    [Fact]
+    public void UninstallRecoveryAcceptsUnreadableOrMismatchedPayloads() {
+        Assert.True(
+            EventProviderPackageManager
+                .IsRecoverableActivePayloadFailure(
+                    new InvalidDataException()));
+        Assert.True(
+            EventProviderPackageManager
+                .IsRecoverableActivePayloadFailure(
+                    new IOException()));
+        Assert.True(
+            EventProviderPackageManager
+                .IsRecoverableActivePayloadFailure(
+                    new UnauthorizedAccessException()));
+        Assert.False(
+            EventProviderPackageManager
+                .IsRecoverableActivePayloadFailure(
+                    new ArgumentException()));
+    }
+
+    [Fact]
     public void RejectsUndefinedChannelEnumsDuringValidation() {
         EventProviderDefinition definition = CreateDefinition();
         definition.Channels[0].Type =
