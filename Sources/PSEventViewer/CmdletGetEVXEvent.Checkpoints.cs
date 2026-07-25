@@ -377,47 +377,45 @@ public sealed partial class CmdletGetEVXEvent {
             return;
         }
 
-        IReadOnlyList<string> checkpointSources =
-            GetCheckpointSources(out bool usesFiles);
-        if (usesFiles) {
-            foreach (string path in checkpointSources) {
-                if (!TryGetCheckpoint(
-                        path,
-                        path,
-                        out string checkpointKey,
-                        out long checkpoint)) {
-                    continue;
-                }
-                EventObject? boundaryEvent = checkpoint > 0
-                    ? EventLogEngine.ReadFile(
-                        new EventLogFileQuery(path) {
-                            XPath = EventFilterCompiler.BuildXPath(
-                                new EventFilter {
-                                    RecordIds = new[] {
-                                        checkpoint
-                                    }
-                                }),
-                            MaxEvents = 1,
-                            ReadMode =
-                                EventReadMode.Metadata
-                        },
-                        cancellationToken).FirstOrDefault()
-                    : null;
-                EvaluateCheckpointBoundary(
-                    checkpointKey,
-                    checkpoint,
-                    boundaryEvent,
-                    path);
+        IReadOnlyList<CheckpointSource> checkpointSources =
+            GetCheckpointSources();
+        foreach (CheckpointSource source in checkpointSources
+                     .Where(static item => item.IsFile)) {
+            string path = source.Name;
+            if (!TryGetCheckpoint(
+                    path,
+                    path,
+                    out string checkpointKey,
+                    out long checkpoint)) {
+                continue;
             }
-            return;
+            EventObject? boundaryEvent = checkpoint > 0
+                ? EventLogEngine.ReadFile(
+                    new EventLogFileQuery(path) {
+                        XPath = EventFilterCompiler.BuildXPath(
+                            new EventFilter {
+                                RecordIds = new[] {
+                                    checkpoint
+                                }
+                            }),
+                        MaxEvents = 1,
+                        ReadMode =
+                            EventReadMode.Metadata
+                    },
+                    cancellationToken).FirstOrDefault()
+                : null;
+            EvaluateCheckpointBoundary(
+                checkpointKey,
+                checkpoint,
+                boundaryEvent,
+                path);
         }
 
-        IEnumerable<string> logs = ParameterSetName == "NamedEvents"
-            ? EventObjectSlim.GetEventInfoForNamedEvents(Type.ToList()).Keys
-            : checkpointSources;
         IReadOnlyList<string?> machines = GetEffectiveCheckpointMachines();
 
-        foreach (string log in logs) {
+        foreach (CheckpointSource source in checkpointSources
+                     .Where(static item => !item.IsFile)) {
+            string log = source.Name;
             foreach (string? machine in machines) {
                 cancellationToken.ThrowIfCancellationRequested();
                 if (!TryGetCheckpoint(machine, log, out string checkpointKey, out long checkpoint)) {

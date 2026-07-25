@@ -47,6 +47,7 @@ public static class EventLogExporter {
                 destination,
                 overwrite,
                 computeSha256,
+                cancellationToken,
                 temporaryPath => WindowsEventArchive.ExportFile(
                     query,
                     temporaryPath,
@@ -59,6 +60,7 @@ public static class EventLogExporter {
             format,
             overwrite,
             computeSha256,
+            cancellationToken,
             stream => WriteFile(query, format, stream, cancellationToken));
     }
 
@@ -93,6 +95,7 @@ public static class EventLogExporter {
                 destination,
                 overwrite,
                 computeSha256,
+                cancellationToken,
                 temporaryPath => WindowsEventArchive.ExportChannel(
                     query,
                     temporaryPath,
@@ -105,6 +108,7 @@ public static class EventLogExporter {
             format,
             overwrite,
             computeSha256,
+            cancellationToken,
             stream => WriteChannel(query, format, stream, cancellationToken));
     }
 
@@ -124,6 +128,9 @@ public static class EventLogExporter {
             throw new ArgumentNullException(nameof(query));
         }
         string destination = ResolveDestination(outputPath);
+        ValidateDestinationDoesNotOverwriteSources(
+            destination,
+            query.ResolveSources());
         if (format == EventExportFormat.Evtx) {
             ValidateLocalNativeExportTarget(query.MachineName);
             if (query.TolerateQueryErrors) {
@@ -143,6 +150,7 @@ public static class EventLogExporter {
                 destination,
                 overwrite,
                 computeSha256,
+                cancellationToken,
                 temporaryPath =>
                     WindowsEventArchive.ExportStructured(
                         query,
@@ -155,6 +163,7 @@ public static class EventLogExporter {
             format,
             overwrite,
             computeSha256,
+            cancellationToken,
             stream => WriteStructured(
                 query,
                 format,
@@ -187,11 +196,23 @@ public static class EventLogExporter {
                 "A merged batch cannot be represented as one native EVTX. Use a structured multi-channel export or export each source separately.");
         }
         string destination = ResolveDestination(outputPath);
+        ValidateDestinationDoesNotOverwriteSources(
+            destination,
+            query.FileQueries
+                .Select(static file =>
+                    new EventLogStructuredQuerySource(
+                        EventLogQuerySourceKind.File,
+                        Path.GetFullPath(
+                            file.Path.Trim().Trim('"', '\''))))
+                .Concat(query.StructuredQueries.SelectMany(
+                    static structured =>
+                        structured.ResolveSources())));
         return ExportCore(
             destination,
             format,
             overwrite,
             computeSha256,
+            cancellationToken,
             stream => WriteBatch(
                 query,
                 format,
@@ -203,6 +224,7 @@ public static class EventLogExporter {
         string destination,
         bool overwrite,
         bool computeSha256,
+        CancellationToken cancellationToken,
         Action<string> export) {
 
         string? directory = Path.GetDirectoryName(destination);
@@ -219,12 +241,15 @@ public static class EventLogExporter {
             directory,
             $".{Path.GetFileName(destination)}.{Guid.NewGuid():N}.tmp.evtx");
         try {
+            cancellationToken.ThrowIfCancellationRequested();
             export(temporaryPath);
+            cancellationToken.ThrowIfCancellationRequested();
             long count = WindowsEventArchive.GetFileRecordCount(temporaryPath);
             long bytes = new FileInfo(temporaryPath).Length;
             string? sha256 = computeSha256
-                ? ComputeSha256(temporaryPath)
+                ? ComputeSha256(temporaryPath, cancellationToken)
                 : null;
+            cancellationToken.ThrowIfCancellationRequested();
             PromoteTemporaryFile(temporaryPath, destination, overwrite);
             return new EventExportResult(
                 destination,
@@ -239,11 +264,12 @@ public static class EventLogExporter {
         }
     }
 
-    private static EventExportResult ExportCore(
+    internal static EventExportResult ExportCore(
         string destination,
         EventExportFormat format,
         bool overwrite,
         bool computeSha256,
+        CancellationToken cancellationToken,
         Func<Stream, long> write) {
 
         string? directory = Path.GetDirectoryName(destination);
@@ -259,6 +285,7 @@ public static class EventLogExporter {
             $".{Path.GetFileName(destination)}.{Guid.NewGuid():N}.tmp");
         long count;
         try {
+            cancellationToken.ThrowIfCancellationRequested();
             using (var stream = new FileStream(
                        temporaryPath,
                        FileMode.CreateNew,
@@ -270,11 +297,13 @@ public static class EventLogExporter {
                 stream.Flush(flushToDisk: true);
             }
 
+            cancellationToken.ThrowIfCancellationRequested();
             var temporaryInfo = new FileInfo(temporaryPath);
             long bytes = temporaryInfo.Length;
             string? sha256 = computeSha256
-                ? ComputeSha256(temporaryPath)
+                ? ComputeSha256(temporaryPath, cancellationToken)
                 : null;
+            cancellationToken.ThrowIfCancellationRequested();
             PromoteTemporaryFile(temporaryPath, destination, overwrite);
             return new EventExportResult(destination, format, count, bytes, sha256);
         } finally {
@@ -581,10 +610,57 @@ public static class EventLogExporter {
             "Windows creates native EVTX exports on the computer that owns the remote event-log session, so a local atomic destination cannot be guaranteed. Run the EVTX export on the source computer, or export the remote query to XML, JSON Lines, or CSV.");
     }
 
-    private static string ComputeSha256(string path) {
+    private static void ValidateDestinationDoesNotOverwriteSources(
+        string destination,
+        IEnumerable<EventLogStructuredQuerySource> sources) {
+
+        foreach (EventLogStructuredQuerySource source in sources) {
+            if (source.Kind != EventLogQuerySourceKind.File) {
+                continue;
+            }
+            string sourcePath = Path.GetFullPath(source.Source);
+            if (string.Equals(
+                    sourcePath,
+                    destination,
+                    StringComparison.OrdinalIgnoreCase)) {
+                throw new IOException(
+                    "The export destination cannot overwrite a source event log.");
+            }
+        }
+    }
+
+    internal static string ComputeSha256(
+        string path,
+        CancellationToken cancellationToken) {
+
         using SHA256 sha256 = SHA256.Create();
-        using FileStream stream = File.OpenRead(path);
-        return BitConverter.ToString(sha256.ComputeHash(stream))
+        using var stream = new FileStream(
+            path,
+            FileMode.Open,
+            FileAccess.Read,
+            FileShare.Read,
+            1024 * 1024,
+            FileOptions.SequentialScan);
+        var buffer = new byte[1024 * 1024];
+        while (true) {
+            cancellationToken.ThrowIfCancellationRequested();
+            int read = stream.Read(buffer, 0, buffer.Length);
+            if (read == 0) {
+                break;
+            }
+            sha256.TransformBlock(
+                buffer,
+                0,
+                read,
+                null,
+                0);
+        }
+        cancellationToken.ThrowIfCancellationRequested();
+        sha256.TransformFinalBlock(
+            Array.Empty<byte>(),
+            0,
+            0);
+        return BitConverter.ToString(sha256.Hash!)
             .Replace("-", string.Empty);
     }
 }

@@ -574,7 +574,7 @@ public sealed class TestEventProviderPackages {
         }
     }
 
-    private static EventProviderDefinition CreateDefinition() {
+    internal static EventProviderDefinition CreateDefinition() {
         EventProviderDefinition definition =
             EventProviderDefinition.Create(
                 "Evotec-EventViewerX-PackageTest",

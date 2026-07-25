@@ -4,13 +4,18 @@ using System.Net;
 namespace PSEventViewer;
 
 public sealed partial class CmdletGetEVXEvent {
-    private IReadOnlyList<string> GetCheckpointSources(
-        out bool usesFiles) {
+    private IReadOnlyList<CheckpointSource> GetCheckpointSources() {
+        return _checkpointSources ??=
+            ResolveCheckpointSources();
+    }
 
+    private IReadOnlyList<CheckpointSource> ResolveCheckpointSources() {
         switch (ParameterSetName) {
             case "PathEvents":
-                usesFiles = true;
-                return ExpandFilePaths(Path, nameof(Path));
+                return ExpandFilePaths(Path, nameof(Path))
+                    .Select(static path =>
+                        new CheckpointSource(path, isFile: true))
+                    .ToArray();
             case "FilterHashtableEvents":
                 Hashtable[] hashtables =
                     GetFilterHashtables();
@@ -30,7 +35,6 @@ public sealed partial class CmdletGetEVXEvent {
                     throw new PSArgumentException(
                         "RecordIdFile requires one FilterHashtable targeting only channels or only files. Multiple or mixed sources can have unrelated monotonic record sequences.");
                 }
-                usesFiles = hasFiles && !hasChannels;
                 var filterSources = new HashSet<string>(
                     StringComparer.OrdinalIgnoreCase);
                 foreach (PowerShellEventFilterBinding binding in
@@ -56,43 +60,68 @@ public sealed partial class CmdletGetEVXEvent {
                         filterSources.Add(source);
                     }
                 }
+                bool filesOnly = hasFiles && !hasChannels;
                 return filterSources
                     .OrderBy(
                         static source => source,
                         StringComparer.OrdinalIgnoreCase)
+                    .Select(source =>
+                        new CheckpointSource(source, filesOnly))
+                    .ToArray();
+            case "FilterXmlEvents":
+                EventLogStructuredQuerySource[] structuredSources =
+                    new EventLogStructuredQuery(
+                            FilterXml!.OuterXml)
+                        .ResolveSources()
+                        .ToArray();
+                if (structuredSources.Length == 0) {
+                    throw new PSArgumentException(
+                        "RecordIdFile requires FilterXml to declare at least one channel or offline-file Path.");
+                }
+                return structuredSources
+                    .Select(static source =>
+                        new CheckpointSource(
+                            source.Source,
+                            source.Kind ==
+                            EventLogQuerySourceKind.File))
                     .ToArray();
             case "NamedEvents":
-                usesFiles = false;
                 IReadOnlyList<string> namedSources = EventObjectSlim
                     .GetEventInfoForNamedEvents(Type.ToList())
                     .Keys
                     .ToArray();
-                return LogName.Length == 0
+                return (LogName.Length == 0
                     ? namedSources
                     : namedSources
                         .Where(source => string.Equals(
                             source,
                             LogName[0],
                             StringComparison.OrdinalIgnoreCase))
-                        .ToArray();
+                        .ToArray())
+                    .Select(static source =>
+                        new CheckpointSource(source, isFile: false))
+                    .ToArray();
             case "GenericEvents":
-                usesFiles = false;
                 return ExpandCheckpointChannels(
-                    NormalizeRequiredValues(
-                        LogName,
-                        nameof(LogName)));
+                        NormalizeRequiredValues(
+                            LogName,
+                            nameof(LogName)))
+                    .Select(static source =>
+                        new CheckpointSource(source, isFile: false))
+                    .ToArray();
             case "ProviderEvents":
-                usesFiles = false;
                 return ResolveCheckpointProviderChannels(
-                    ProviderName ?? Array.Empty<string>());
+                        ProviderName ?? Array.Empty<string>())
+                    .Select(static source =>
+                        new CheckpointSource(source, isFile: false))
+                    .ToArray();
             default:
-                usesFiles = false;
-                return Array.Empty<string>();
+                return Array.Empty<CheckpointSource>();
         }
     }
 
     private int GetCheckpointSourceCount() {
-        return GetCheckpointSources(out _).Count;
+        return GetCheckpointSources().Count;
     }
 
     private IReadOnlyList<string> ResolveCheckpointProviderChannels(
@@ -137,6 +166,20 @@ public sealed partial class CmdletGetEVXEvent {
         return channels
             .OrderBy(static channel => channel, StringComparer.OrdinalIgnoreCase)
             .ToArray();
+    }
+
+    private readonly struct CheckpointSource {
+        internal CheckpointSource(
+            string name,
+            bool isFile) {
+
+            Name = name;
+            IsFile = isFile;
+        }
+
+        internal string Name { get; }
+
+        internal bool IsFile { get; }
     }
 
 }

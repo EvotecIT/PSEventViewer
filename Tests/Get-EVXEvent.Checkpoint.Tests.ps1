@@ -60,6 +60,47 @@ Describe 'Get-EVXEvent checkpoint compatibility' {
         }
     }
 
+    It 'uses each FilterXml channel as its checkpoint identity' {
+        $System = Get-EVXEvent -LogName System -MaxEvents 1 -ReadMode Metadata |
+            Select-Object -First 1
+        $Application = Get-EVXEvent -LogName Application -MaxEvents 1 -ReadMode Metadata |
+            Select-Object -First 1
+        if (-not $System -or -not $Application) {
+            Set-ItResult -Skipped -Because 'System and Application both require one checkpointable event.'
+            return
+        }
+
+        [xml] $Query = @"
+<QueryList>
+  <Query Id="0" Path="System">
+    <Select Path="System">*[System[EventRecordID=$($System.RecordId)]]</Select>
+  </Query>
+  <Query Id="1" Path="Application">
+    <Select Path="Application">*[System[EventRecordID=$($Application.RecordId)]]</Select>
+  </Query>
+</QueryList>
+"@
+        $CheckpointPath = Join-Path $TestDrive 'filterxml-channels.json'
+
+        $Events = @(
+            Get-EVXEvent `
+                -FilterXml $Query `
+                -RecordIdFile $CheckpointPath `
+                -RecordIdKey 'filterxml-channels' `
+                -MaxEvents 2 `
+                -ReadMode Metadata
+        )
+
+        $Events.Count | Should -Be 2
+        $Persisted = Get-Content -LiteralPath $CheckpointPath -Raw |
+            ConvertFrom-Json
+        $Keys = @($Persisted.PSObject.Properties.Name)
+        @($Keys | Where-Object { $_ -like 'filterxml-channels|*|System' }).Count |
+            Should -Be 1
+        @($Keys | Where-Object { $_ -like 'filterxml-channels|*|Application' }).Count |
+            Should -Be 1
+    }
+
     It 'honors legacy default keys instead of replaying records after upgrade' {
         $Latest = Get-EVXEvent -LogName System -MaxEvents 1 -ReadMode Metadata | Select-Object -First 1
         if (-not $Latest -or -not $Latest.RecordId) {

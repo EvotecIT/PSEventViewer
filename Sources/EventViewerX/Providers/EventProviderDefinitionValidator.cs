@@ -19,7 +19,6 @@ public static partial class EventProviderDefinitionValidator {
             EventProviderFieldType.HexInt32,
             EventProviderFieldType.HexInt64
         };
-
     /// <summary>Validates all schema, reference, and Windows limit rules.</summary>
     public static EventProviderValidationResult Validate(
         EventProviderDefinition definition) {
@@ -492,9 +491,8 @@ public static partial class EventProviderDefinitionValidator {
                                     eventDefinition.Opcode;
                 if (!opcodes.Contains(eventDefinition.Opcode) &&
                     !opcodes.Contains(taskOpcode) &&
-                    !eventDefinition.Opcode.StartsWith(
-                        "win:",
-                        StringComparison.OrdinalIgnoreCase)) {
+                    !StandardOpcodes.Contains(
+                        eventDefinition.Opcode)) {
                     Error(
                         "EventOpcodeUnknown",
                         path + ".Opcode",
@@ -504,9 +502,7 @@ public static partial class EventProviderDefinitionValidator {
             }
             foreach (string keyword in eventDefinition.Keywords) {
                 if (!keywords.Contains(keyword) &&
-                    !keyword.StartsWith(
-                        "win:",
-                        StringComparison.OrdinalIgnoreCase)) {
+                    !StandardKeywords.Contains(keyword)) {
                     Error(
                         "EventKeywordUnknown",
                         path + ".Keywords",
@@ -677,17 +673,6 @@ public static partial class EventProviderDefinitionValidator {
                 $"{name} reference '{expression}' must be an integer field.",
                 issues);
         }
-    }
-
-    private static bool IsStandardLevel(string level) {
-        return new[] {
-            "win:LogAlways",
-            "win:Critical",
-            "win:Error",
-            "win:Warning",
-            "win:Informational",
-            "win:Verbose"
-        }.Contains(level, StringComparer.OrdinalIgnoreCase);
     }
 
     private static void Unique<T>(

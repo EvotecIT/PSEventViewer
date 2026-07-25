@@ -86,6 +86,7 @@ internal static class WindowsEventRemoteReader {
             $"Timed out connecting to '{displayName}' on '{machineName}' after {connectionTimeoutMilliseconds} ms.";
         string readTimeoutMessage =
             $"Timed out reading '{displayName}' on '{machineName}' after {readTimeoutMilliseconds} ms without progress.";
+        var connectionBudget = Stopwatch.StartNew();
         if (EventLogSessionManager
             .TryGetHostNegativeCacheExpiry(
                 machineName,
@@ -97,7 +98,10 @@ internal static class WindowsEventRemoteReader {
         if (!RpcEndpointProbe.TryConnect(
                 machineName,
                 rpcEndpointPort,
-                connectionTimeoutMilliseconds)) {
+                GetRemainingConnectionTimeout(
+                    connectionBudget,
+                    connectionTimeoutMilliseconds,
+                    connectionTimeoutMessage))) {
             EventLogSessionManager.MarkHostUnreachable(
                 machineName);
             throw new System.ComponentModel.Win32Exception(
@@ -105,8 +109,22 @@ internal static class WindowsEventRemoteReader {
                 $"RPC preflight to '{machineName}' on port {rpcEndpointPort} failed within {connectionTimeoutMilliseconds} ms.");
         }
         IDisposable operationSlot = BoundedNativeOperation.Acquire(
-            connectionTimeoutMilliseconds,
+            GetRemainingConnectionTimeout(
+                connectionBudget,
+                connectionTimeoutMilliseconds,
+                connectionTimeoutMessage),
             connectionTimeoutMessage);
+        int sessionConnectionTimeout;
+        try {
+            sessionConnectionTimeout =
+                GetRemainingConnectionTimeout(
+                    connectionBudget,
+                    connectionTimeoutMilliseconds,
+                    connectionTimeoutMessage);
+        } catch {
+            operationSlot.Dispose();
+            throw;
+        }
         var results = new BlockingCollection<EventObject>(bufferCapacity);
         var failures = new ConcurrentQueue<Exception>();
         var queryFailures = new ConcurrentQueue<EventLogQueryFailure>();
@@ -139,7 +157,7 @@ internal static class WindowsEventRemoteReader {
                         operationSlot,
                         credential,
                         authentication,
-                        connectionTimeoutMilliseconds,
+                        sessionConnectionTimeout,
                         bookmarkXml,
                         bookmarkOffset,
                         strictBookmark,
@@ -186,11 +204,16 @@ internal static class WindowsEventRemoteReader {
                     observedOpenSession = true;
                     inactivity.Restart();
                 }
-                int activeTimeout = observedOpenSession
-                    ? readTimeoutMilliseconds
-                    : connectionTimeoutMilliseconds;
-                if (activeTimeout > 0 &&
-                    inactivity.ElapsedMilliseconds >= activeTimeout) {
+                bool connectionTimedOut =
+                    !observedOpenSession &&
+                    connectionBudget.ElapsedMilliseconds >=
+                    connectionTimeoutMilliseconds;
+                bool readTimedOut =
+                    observedOpenSession &&
+                    readTimeoutMilliseconds > 0 &&
+                    inactivity.ElapsedMilliseconds >=
+                    readTimeoutMilliseconds;
+                if (connectionTimedOut || readTimedOut) {
                     workerCancellation.Cancel();
                     throw new TimeoutException(observedOpenSession
                         ? readTimeoutMessage
@@ -305,5 +328,20 @@ internal static class WindowsEventRemoteReader {
                    out EventLogQueryFailure? failure)) {
             failureHandler(failure);
         }
+    }
+
+    internal static int GetRemainingConnectionTimeout(
+        Stopwatch budget,
+        int timeoutMilliseconds,
+        string timeoutMessage) {
+
+        int elapsed = (int)Math.Min(
+            budget.ElapsedMilliseconds,
+            timeoutMilliseconds);
+        int remaining = timeoutMilliseconds - elapsed;
+        if (remaining <= 0) {
+            throw new TimeoutException(timeoutMessage);
+        }
+        return remaining;
     }
 }

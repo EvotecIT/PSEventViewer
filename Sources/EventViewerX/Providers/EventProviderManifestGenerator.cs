@@ -471,17 +471,23 @@ public static class EventProviderManifestGenerator {
                                     entry.Value(culture))))))));
     }
 
-    private static string CreateFallbackEventMessage(
+    internal static string CreateFallbackEventMessage(
         EventProviderEventDefinition eventDefinition) {
 
         if (eventDefinition.Fields.Count == 0) {
             return eventDefinition.Name + ".";
         }
-        return eventDefinition.Name + ": " +
-               string.Join(
-                   "; ",
-                   eventDefinition.Fields.Select(field =>
-                       field.Name + "={" + field.Name + "}"));
+        string message =
+            eventDefinition.Name + ": " +
+            string.Join(
+                "; ",
+                eventDefinition.Fields
+                    .Take(100)
+                    .Select(field =>
+                        field.Name + "={" + field.Name + "}"));
+        return eventDefinition.Fields.Count > 100
+            ? message + "; additional fields omitted."
+            : message;
     }
 
     private static string TemplateId(

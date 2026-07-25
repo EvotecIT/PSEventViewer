@@ -46,7 +46,13 @@ internal static class EventProviderManifestNames {
     }
 
     internal static string TypeName(EventProviderFieldType type) {
-        return "win:" + type;
+        return type switch {
+            EventProviderFieldType.Guid => "win:GUID",
+            EventProviderFieldType.FileTime => "win:FILETIME",
+            EventProviderFieldType.SystemTime => "win:SYSTEMTIME",
+            EventProviderFieldType.Sid => "win:SID",
+            _ => "win:" + type
+        };
     }
 
     internal static string OutputTypeName(

@@ -19,8 +19,11 @@ public static class EventTimeRange {
                 nameof(timePeriod));
         }
 
-        (DateTime? periodStart, DateTime? periodEnd, TimeSpan? _) =
+        (DateTime? periodStart, DateTime? periodEnd, TimeSpan? rollingPeriod) =
             TimeHelper.GetTimePeriod(timePeriod.Value);
+        if (!periodStart.HasValue && rollingPeriod.HasValue) {
+            periodStart = DateTime.Now.Subtract(rollingPeriod.Value);
+        }
         return (periodStart, periodEnd);
     }
 }

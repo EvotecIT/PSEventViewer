@@ -59,6 +59,16 @@ public sealed class EventLogStructuredQuery {
     }
 
     /// <summary>
+    /// Resolves the distinct channel names and normalized offline-file paths
+    /// referenced by Query, Select, and Suppress Path attributes.
+    /// </summary>
+    public IReadOnlyList<EventLogStructuredQuerySource> ResolveSources() {
+        return EventLogStructuredQueryParser.ResolveSources(
+            QueryXml,
+            SourceKind);
+    }
+
+    /// <summary>
     /// Returns the number of independent native query handles required by the
     /// QueryList. Channel paths share one handle, while each distinct offline
     /// file requires its own handle.

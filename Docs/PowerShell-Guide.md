@@ -325,6 +325,28 @@ Reset-EVXEventCheckpoint `
     -Confirm:$false
 ```
 
+Structured queries can share one checkpoint file without mixing channel record
+sequences. Each `Path` in the QueryList receives its own checkpoint entry:
+
+```powershell
+[xml] $query = @'
+<QueryList>
+  <Query Id="0" Path="System">
+    <Select Path="System">*[System[Level &lt;= 2]]</Select>
+  </Query>
+  <Query Id="1" Path="Application">
+    <Select Path="Application">*[System[Level &lt;= 2]]</Select>
+  </Query>
+</QueryList>
+'@
+
+Get-EVXEvent `
+    -FilterXml $query `
+    -RecordIdFile C:\State\CriticalEvents.json `
+    -RecordIdKey CriticalEvents `
+    -ReadMode StructuredData
+```
+
 Use bookmarks when another component owns native bookmark XML. Use checkpoints
 for a file-backed polling workflow owned by PSEventViewer.
 

@@ -123,6 +123,90 @@ public sealed class TestEventLogExporter {
     }
 
     [Fact]
+    public void BatchExportNeverOverwritesAnySourceEventLog() {
+        using var fixture = new ExportFixture();
+        EventLogBatchQuery batch =
+            EventLogBatchQuery.ForFiles(new[] {
+                fixture.CreateQuery(EventReadMode.Metadata)
+            });
+
+        IOException exception = Assert.Throws<IOException>(() =>
+            EventLogExporter.ExportBatch(
+                batch,
+                fixture.SourcePath,
+                EventExportFormat.JsonLines,
+                overwrite: true));
+
+        Assert.Contains(
+            "cannot overwrite a source",
+            exception.Message,
+            StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void StructuredExportNeverOverwritesAnySourceEventLog() {
+        using var fixture = new ExportFixture();
+        string queryXml = EventFilterCompiler.BuildFileQueryXml(
+            new[] { fixture.SourcePath },
+            new EventFilter());
+        var query = new EventLogStructuredQuery(queryXml) {
+            SourceKind = EventLogQuerySourceKind.File
+        };
+
+        IOException exception = Assert.Throws<IOException>(() =>
+            EventLogExporter.ExportStructured(
+                query,
+                fixture.SourcePath,
+                EventExportFormat.Xml,
+                overwrite: true));
+
+        Assert.Contains(
+            "cannot overwrite a source",
+            exception.Message,
+            StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void CancellationAfterWritingDoesNotPromoteTemporaryOutput() {
+        using var fixture = new ExportFixture();
+        string outputPath = fixture.GetPath("existing.csv");
+        File.WriteAllText(outputPath, "preserve-me");
+        using var cancellation = new CancellationTokenSource();
+
+        Assert.Throws<OperationCanceledException>(() =>
+            EventLogExporter.ExportCore(
+                outputPath,
+                EventExportFormat.Csv,
+                overwrite: true,
+                computeSha256: true,
+                cancellation.Token,
+                stream => {
+                    stream.WriteByte(1);
+                    cancellation.Cancel();
+                    return 1;
+                }));
+
+        Assert.Equal("preserve-me", File.ReadAllText(outputPath));
+        Assert.Empty(Directory.GetFiles(
+            fixture.DirectoryPath,
+            ".existing.csv.*.tmp"));
+    }
+
+    [Fact]
+    public void FinalHashPassHonorsCancellation() {
+        using var fixture = new ExportFixture();
+        string path = fixture.GetPath("hash.bin");
+        File.WriteAllBytes(path, new byte[1024]);
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        Assert.Throws<OperationCanceledException>(() =>
+            EventLogExporter.ComputeSha256(
+                path,
+                cancellation.Token));
+    }
+
+    [Fact]
     public void PromotionWithoutOverwritePreservesAConcurrentDestination() {
         using var fixture = new ExportFixture();
         string temporaryPath = fixture.GetPath("events.tmp");

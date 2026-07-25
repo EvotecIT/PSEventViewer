@@ -60,6 +60,7 @@ public sealed partial class CmdletGetEVXEvent : AsyncPSCmdlet {
     private readonly Dictionary<string, Guid> _checkpointGenerations = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, string> _checkpointBoundaries = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, string> _checkpointBoundaryMigrations = new(StringComparer.OrdinalIgnoreCase);
+    private IReadOnlyList<CheckpointSource>? _checkpointSources;
     private readonly Dictionary<string, long> _highestRecordIds = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, EventObject> _highestCheckpointEvents = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _resetCheckpointKeys = new(StringComparer.OrdinalIgnoreCase);
@@ -114,6 +115,7 @@ public sealed partial class CmdletGetEVXEvent : AsyncPSCmdlet {
     [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "FilterHashtableEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "FilterXmlEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "ProviderEvents")]
     public string? RecordIdFile { get; set; }
 
@@ -124,6 +126,7 @@ public sealed partial class CmdletGetEVXEvent : AsyncPSCmdlet {
     [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "FilterHashtableEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "FilterXmlEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "ProviderEvents")]
     public string? RecordIdKey { get; set; }
 
@@ -406,6 +409,7 @@ public sealed partial class CmdletGetEVXEvent : AsyncPSCmdlet {
     /// </summary>
     protected override async Task ProcessRecordAsync() {
         _eventsOutput = 0;
+        _checkpointSources = null;
         _managedProviderPatterns =
             Array.Empty<WildcardPattern>();
         _offlineProvidersByPath.Clear();

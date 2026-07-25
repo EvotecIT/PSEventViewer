@@ -37,5 +37,27 @@ namespace EventViewerX.Tests {
             Assert.Equal(expectedStart, result.StartTime);
             Assert.Equal(expectedEnd, result.EndTime);
         }
+
+        [Theory]
+        [InlineData(TimePeriod.Last1Hour, 1)]
+        [InlineData(TimePeriod.Last2Hours, 2)]
+        [InlineData(TimePeriod.Last3Hours, 3)]
+        [InlineData(TimePeriod.Last6Hours, 6)]
+        [InlineData(TimePeriod.Last12Hours, 12)]
+        [InlineData(TimePeriod.Last16Hours, 16)]
+        [InlineData(TimePeriod.Last24Hours, 24)]
+        public void EventTimeRangePreservesRollingDurations(
+            TimePeriod period,
+            int hours) {
+
+            DateTime earliest = DateTime.Now.AddHours(-hours);
+            (DateTime? start, DateTime? end) =
+                EventTimeRange.Resolve(null, null, period);
+            DateTime latest = DateTime.Now.AddHours(-hours);
+
+            Assert.NotNull(start);
+            Assert.InRange(start!.Value, earliest, latest);
+            Assert.Null(end);
+        }
     }
 }

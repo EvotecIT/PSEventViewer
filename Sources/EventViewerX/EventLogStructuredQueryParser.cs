@@ -70,6 +70,41 @@ internal static class EventLogStructuredQueryParser {
             .ToArray();
     }
 
+    internal static EventLogStructuredQuerySource[] ResolveSources(
+        string queryXml,
+        EventLogQuerySourceKind declaredKind) {
+
+        var sources = new List<EventLogStructuredQuerySource>();
+        var identities = new HashSet<string>(
+            StringComparer.OrdinalIgnoreCase);
+        foreach (XElement query in ParseQueries(queryXml)) {
+            EventLogQuerySourceKind sourceKind =
+                ResolveSourceKind(query, declaredKind);
+            foreach (string path in GetPaths(query)) {
+                bool isFile = IsFileSource(path);
+                if (isFile !=
+                    (sourceKind == EventLogQuerySourceKind.File)) {
+                    continue;
+                }
+                string source = isFile
+                    ? GetFilePath(path)
+                    : path;
+                string identity =
+                    ((int)sourceKind).ToString(
+                        System.Globalization.CultureInfo.InvariantCulture) +
+                    ":" +
+                    source;
+                if (identities.Add(identity)) {
+                    sources.Add(
+                        new EventLogStructuredQuerySource(
+                            sourceKind,
+                            source));
+                }
+            }
+        }
+        return sources.ToArray();
+    }
+
     internal static int CountIndependentSources(
         string queryXml,
         EventLogQuerySourceKind declaredKind) {
