@@ -34,7 +34,8 @@ public static class EventCatalogQueryExecutor {
                 machineName: request.MachineName,
                 timeoutMs: request.SessionTimeoutMs,
                 purpose: "EventCatalogChannels",
-                logName: "*");
+                logName: "*",
+                cancellationToken: cancellationToken);
 
             if (!sessionResult.Success || sessionResult.Session is null) {
                 result = new EventChannelListResult();
@@ -106,7 +107,8 @@ public static class EventCatalogQueryExecutor {
                 machineName: request.MachineName,
                 timeoutMs: request.SessionTimeoutMs,
                 purpose: "EventCatalogProviders",
-                logName: "*");
+                logName: "*",
+                cancellationToken: cancellationToken);
 
             if (!sessionResult.Success || sessionResult.Session is null) {
                 result = new EventProviderListResult();

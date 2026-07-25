@@ -5,6 +5,30 @@ namespace EventViewerX.Tests;
 
 public class TestLiveEventQueryExecutor {
     [Fact]
+    public void FormatTimeCreatedUtc_ShouldOmitMissingTimestamp() {
+        Assert.Null(
+            LiveEventQueryExecutor.FormatTimeCreatedUtc(
+                DateTime.MinValue));
+    }
+
+    [Fact]
+    public void FormatTimeCreatedUtc_ShouldPreservePresentTimestamp() {
+        var timestamp = new DateTime(
+            2026,
+            7,
+            25,
+            21,
+            52,
+            0,
+            DateTimeKind.Utc);
+
+        Assert.Equal(
+            "2026-07-25T21:52:00.0000000Z",
+            LiveEventQueryExecutor.FormatTimeCreatedUtc(
+                timestamp));
+    }
+
+    [Fact]
     public void Request_DefaultsToBoundedMaterialization() {
         Assert.Equal(1000, new LiveEventQueryRequest().MaxEvents);
     }

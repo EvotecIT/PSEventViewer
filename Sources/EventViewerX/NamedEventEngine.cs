@@ -29,6 +29,10 @@ public static partial class NamedEventEngine {
             [EnumeratorCancellation]
             CancellationToken cancellationToken) {
 
+        NamedEventsQueryExecutionInfo info =
+            executionInfo ??
+            new NamedEventsQueryExecutionInfo();
+        info.Reset(query.MaxCandidates);
         Dictionary<string, HashSet<int>> eventInfo =
             RestrictSources(
                 EventObjectSlim.GetEventInfoForNamedEvents(
@@ -39,10 +43,6 @@ public static partial class NamedEventEngine {
             yield break;
         }
 
-        NamedEventsQueryExecutionInfo info =
-            executionInfo ??
-            new NamedEventsQueryExecutionInfo();
-        info.Reset(query.MaxCandidates);
         using var enricher = query.Enrichment == null
             ? null
             : new NamedEventEnricher(

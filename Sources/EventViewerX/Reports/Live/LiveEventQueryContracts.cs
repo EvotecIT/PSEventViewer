@@ -103,9 +103,9 @@ public sealed class LiveEventQueryFailure {
 /// </summary>
 public sealed class LiveEventRow {
     /// <summary>
-    /// Event creation time in UTC (ISO-8601).
+    /// Event creation time in UTC (ISO-8601), or <see langword="null"/> when the source record has no timestamp.
     /// </summary>
-    public string TimeCreatedUtc { get; set; } = string.Empty;
+    public string? TimeCreatedUtc { get; set; }
 
     /// <summary>
     /// Event ID.

@@ -103,7 +103,8 @@ public static class LiveEventQueryExecutor {
                 }
 
                 rows.Add(new LiveEventRow {
-                    TimeCreatedUtc = ev.TimeCreated.ToUniversalTime().ToString("O"),
+                    TimeCreatedUtc = FormatTimeCreatedUtc(
+                        ev.TimeCreated),
                     Id = ev.Id,
                     RecordId = ev.RecordId ?? 0,
                     LogName = ev.LogName ?? string.Empty,
@@ -191,4 +192,13 @@ public static class LiveEventQueryExecutor {
         }
     }
 
+    internal static string? FormatTimeCreatedUtc(
+        DateTime timeCreated) {
+
+        return timeCreated == DateTime.MinValue
+            ? null
+            : timeCreated
+                .ToUniversalTime()
+                .ToString("O");
+    }
 }
