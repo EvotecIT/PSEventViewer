@@ -344,9 +344,11 @@ public sealed class TestEventLogSubscription {
     public void FutureSubscriptionIsSignaledAndDeliversANewEvent() {
         if (!OperatingSystem.IsWindows()) return;
         if (!TestEnv.IsAdmin()) return;
+        using IDisposable isolation =
+            TestClassicEventLogIsolation.Acquire();
         string suffix = Guid.NewGuid().ToString("N");
-        string logName = $"EVXSubscription{suffix}";
-        string sourceName = $"EVXSubscriptionSource{suffix}";
+        string logName = $"EVX{suffix}Subscription";
+        string sourceName = $"EVXS{suffix}SubscriptionSource";
         try {
             ClassicEventLogManager.EnsureLog(
                 new ClassicEventLogConfiguration {

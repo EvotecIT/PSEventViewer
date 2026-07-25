@@ -8,7 +8,9 @@ public class TestLimitLog {
     public void LimitExistingLog() {
         if (!OperatingSystem.IsWindows()) return;
         if (!TestEnv.IsAdmin()) return;
-        string logName = "EVXLimitTestLog" + Guid.NewGuid().ToString("N");
+        using IDisposable isolation =
+            TestClassicEventLogIsolation.Acquire();
+        string logName = "EVX" + Guid.NewGuid().ToString("N") + "LimitLog";
         if (ClassicEventLogManager.LogExists(logName)) {
             ClassicEventLogManager.RemoveLog(logName);
         }
@@ -46,7 +48,9 @@ public class TestLimitLog {
     public void LimitLogOverwriteAsNeeded() {
         if (!OperatingSystem.IsWindows()) return;
         if (!TestEnv.IsAdmin()) return;
-        string logName = "EVXLimitTestLog" + Guid.NewGuid().ToString("N");
+        using IDisposable isolation =
+            TestClassicEventLogIsolation.Acquire();
+        string logName = "EVX" + Guid.NewGuid().ToString("N") + "LimitLog";
         if (ClassicEventLogManager.LogExists(logName)) {
             ClassicEventLogManager.RemoveLog(logName);
         }

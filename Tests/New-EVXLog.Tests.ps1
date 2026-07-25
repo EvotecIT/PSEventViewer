@@ -1,7 +1,8 @@
 Describe 'New-EVXLog cmdlet' {
     BeforeAll {
-        $script:log = 'EVXTestLog'
-        $script:provider = 'EVXTestSource'
+        $suffix = [Guid]::NewGuid().ToString('N')
+        $script:log = 'EVX' + $suffix + 'TestLog'
+        $script:provider = 'EVXTestSource' + $suffix
         $script:isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltinRole]::Administrator)
         $script:skip = -not $script:isAdmin
 

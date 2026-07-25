@@ -1,7 +1,7 @@
 Describe 'Clear-EVXLog cmdlet' {
     BeforeAll {
         $suffix = [Guid]::NewGuid().ToString('N')
-        $script:log = 'EVXClear' + $suffix
+        $script:log = 'EVX' + $suffix + 'Clear'
         $script:provider = 'EVXClearSource' + $suffix
         $script:isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltinRole]::Administrator)
         $script:skip = -not $script:isAdmin

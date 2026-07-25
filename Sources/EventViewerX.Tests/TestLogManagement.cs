@@ -27,7 +27,9 @@ public class TestLogManagement {
         if (!OperatingSystem.IsWindows()) return;
         if (!TestEnv.IsAdmin()) return;
 
-        string logName = "EVXTestCustomLog" + Guid.NewGuid().ToString("N");
+        using IDisposable isolation =
+            TestClassicEventLogIsolation.Acquire();
+        string logName = "EVX" + Guid.NewGuid().ToString("N") + "CustomLog";
         if (ClassicEventLogManager.LogExists(logName)) {
             ClassicEventLogManager.RemoveLog(logName);
         }

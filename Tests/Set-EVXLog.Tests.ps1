@@ -1,7 +1,7 @@
 Describe 'Set-EVXLog channel policy' {
     BeforeAll {
         $suffix = [Guid]::NewGuid().ToString('N')
-        $script:log = 'EVXLimit' + $suffix
+        $script:log = 'EVX' + $suffix + 'Limit'
         $script:provider = 'EVXLimitSource' + $suffix
         $script:isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltinRole]::Administrator)
         $script:skip = -not $script:isAdmin
