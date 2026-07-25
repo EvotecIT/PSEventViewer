@@ -448,6 +448,36 @@ Describe 'Get-EVXEvent - Get-WinEvent compatible native filters' {
         $events.ContainerLog | Should -Contain 'System'
     }
 
+    It 'keeps file sources local in a mixed machine-targeted hashtable batch' {
+        $FilePath = [System.IO.Path]::Combine(
+            $PSScriptRoot,
+            'Logs',
+            'NamedFilterExamples.evtx')
+        $SystemEvent = Get-EVXEvent `
+            -LogName System `
+            -MaxEvents 1 `
+            -ReadMode Metadata
+
+        $events = @(
+            Get-EVXEvent `
+                -FilterHashtable @(
+                    @{
+                        Path = $FilePath
+                        Id = 7040
+                    },
+                    @{
+                        LogName = 'System'
+                        Id = $SystemEvent.Id
+                    }
+                ) `
+                -MachineName $env:COMPUTERNAME `
+                -ReadMode Metadata
+        )
+
+        $events.GatheredFrom | Should -Contain $FilePath
+        $events.ContainerLog | Should -Contain 'System'
+    }
+
     It 'deduplicates overlapping FilterHashtable Select expressions natively' {
         $Latest = Get-EVXEvent `
             -LogName System `

@@ -123,6 +123,45 @@ Describe 'Export-EVXEvent direct streaming contract' {
             Should -Be 3
     }
 
+    It 'reports tolerated structured path failures from the pipeline thread' {
+        $OutputPath = [System.IO.Path]::Combine(
+            $OutputDirectory,
+            'tolerated.jsonl')
+        $MissingPath = [System.IO.Path]::Combine(
+            $OutputDirectory,
+            'missing.evtx')
+        $EscapedSource = [System.Security.SecurityElement]::Escape(
+            $SourcePath)
+        $EscapedMissing = [System.Security.SecurityElement]::Escape(
+            $MissingPath)
+        $QueryXml = @"
+<QueryList>
+  <Query Id="0" Path="file://$EscapedSource">
+    <Select Path="file://$EscapedSource">*</Select>
+  </Query>
+  <Query Id="1" Path="file://$EscapedMissing">
+    <Select Path="file://$EscapedMissing">*</Select>
+  </Query>
+</QueryList>
+"@
+        $Errors = @()
+
+        $Result = Export-EVXEvent `
+            -FilterXml $QueryXml `
+            -OutputPath $OutputPath `
+            -Format JsonLines `
+            -ReadMode Metadata `
+            -TolerateQueryErrors `
+            -ErrorAction SilentlyContinue `
+            -ErrorVariable Errors
+
+        $Result.EventCount | Should -BeGreaterThan 0
+        $Errors | Should -HaveCount 1
+        $Errors[0].FullyQualifiedErrorId |
+            Should -BeLike 'EVXStructuredExportPathFailed*'
+        [System.IO.File]::Exists($OutputPath) | Should -BeTrue
+    }
+
     It 'exports several files as one deterministic bounded stream' {
         $OutputPath = [System.IO.Path]::Combine(
             $OutputDirectory,

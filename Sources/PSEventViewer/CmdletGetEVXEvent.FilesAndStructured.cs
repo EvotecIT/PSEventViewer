@@ -13,11 +13,13 @@ public sealed partial class CmdletGetEVXEvent {
         EventFilter filter,
         EventFilter? suppress,
         string? rawXPath,
-        bool allowManagedProviderFilter = true) {
+        bool allowManagedProviderFilter = true,
+        bool allowRemoteBatchContext = false) {
 
-        if (Credential != null ||
+        if (!allowRemoteBatchContext &&
+            (Credential != null ||
             (MachineName != null && MachineName.Any(
-                static machine => !string.IsNullOrWhiteSpace(machine)))) {
+                static machine => !string.IsNullOrWhiteSpace(machine))))) {
             throw new PSArgumentException(
                 "Offline event log files are read locally and cannot be combined with MachineName or Credential.");
         }
@@ -294,11 +296,17 @@ public sealed partial class CmdletGetEVXEvent {
         EventLogQuerySourceKind sourceKind,
         string? machineName) {
 
+        bool fileSource =
+            sourceKind == EventLogQuerySourceKind.File;
         var query = new EventLogStructuredQuery(queryXml) {
             SourceKind = sourceKind,
             MachineName = machineName,
-            Credential = Credential?.GetNetworkCredential(),
-            Authentication = Authentication,
+            Credential = fileSource
+                ? null
+                : Credential?.GetNetworkCredential(),
+            Authentication = fileSource
+                ? EventLogAuthentication.Default
+                : Authentication,
             Oldest = EffectiveOldest,
             ReadMode = ReadMode,
             MessageCulture = MessageCulture,

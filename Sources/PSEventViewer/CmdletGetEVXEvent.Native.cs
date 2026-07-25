@@ -97,7 +97,9 @@ public sealed partial class CmdletGetEVXEvent {
                     binding.Suppress,
                     rawXPath: null,
                     allowManagedProviderFilter:
-                        bindings.Length == 1));
+                        bindings.Length == 1,
+                    allowRemoteBatchContext:
+                        usesRemoteCapableSource));
             }
         }
         EventLogBatchQuery batch = batches.Count == 1

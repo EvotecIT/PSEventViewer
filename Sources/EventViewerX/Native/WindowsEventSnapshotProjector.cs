@@ -5,7 +5,7 @@ internal sealed class WindowsEventSnapshotProjector : IDisposable {
     private readonly bool _includeBookmark;
     private readonly string _queriedMachine;
     private readonly string _containerLog;
-    private readonly WindowsEventSystemRenderer _systemRenderer = new();
+    private readonly WindowsEventSystemRenderer _systemRenderer;
     private readonly WindowsEventMessageRenderer? _messageRenderer;
     private readonly WindowsEventPayloadRenderer? _payloadRenderer;
     private readonly WindowsEventXmlRenderer? _xmlRenderer;
@@ -24,26 +24,47 @@ internal sealed class WindowsEventSnapshotProjector : IDisposable {
         _includeBookmark = includeBookmark;
         _queriedMachine = queriedMachine;
         _containerLog = containerLog;
-        if (readMode == EventReadMode.Message ||
-            readMode == EventReadMode.Full) {
-            _messageRenderer = new WindowsEventMessageRenderer(
-                session,
-                null,
-                messageLocale,
-                fallbackMessageLocale);
-        }
-        if (readMode == EventReadMode.StructuredData ||
-            readMode == EventReadMode.Full) {
-            _payloadRenderer = new WindowsEventPayloadRenderer();
-        }
-        if (includeBookmark &&
-            (readMode == EventReadMode.Metadata ||
-             readMode == EventReadMode.RawXml)) {
-            _bookmarkRenderer =
-                new WindowsEventBookmarkRenderer();
-        }
-        if (readMode == EventReadMode.RawXml) {
-            _xmlRenderer = new WindowsEventXmlRenderer();
+        WindowsEventSystemRenderer? systemRenderer = null;
+        WindowsEventMessageRenderer? messageRenderer = null;
+        WindowsEventPayloadRenderer? payloadRenderer = null;
+        WindowsEventXmlRenderer? xmlRenderer = null;
+        WindowsEventBookmarkRenderer? bookmarkRenderer = null;
+        try {
+            systemRenderer = new WindowsEventSystemRenderer();
+            if (readMode == EventReadMode.Message ||
+                readMode == EventReadMode.Full) {
+                messageRenderer = new WindowsEventMessageRenderer(
+                    session,
+                    null,
+                    messageLocale,
+                    fallbackMessageLocale);
+            }
+            if (readMode == EventReadMode.StructuredData ||
+                readMode == EventReadMode.Full) {
+                payloadRenderer = new WindowsEventPayloadRenderer();
+            }
+            if (includeBookmark &&
+                (readMode == EventReadMode.Metadata ||
+                 readMode == EventReadMode.RawXml)) {
+                bookmarkRenderer =
+                    new WindowsEventBookmarkRenderer();
+            }
+            if (readMode == EventReadMode.RawXml) {
+                xmlRenderer = new WindowsEventXmlRenderer();
+            }
+
+            _systemRenderer = systemRenderer;
+            _messageRenderer = messageRenderer;
+            _payloadRenderer = payloadRenderer;
+            _xmlRenderer = xmlRenderer;
+            _bookmarkRenderer = bookmarkRenderer;
+        } catch {
+            bookmarkRenderer?.Dispose();
+            xmlRenderer?.Dispose();
+            payloadRenderer?.Dispose();
+            messageRenderer?.Dispose();
+            systemRenderer?.Dispose();
+            throw;
         }
     }
 

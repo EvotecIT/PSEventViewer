@@ -162,6 +162,24 @@ public static partial class EventProviderDefinitionValidator {
                 "ChannelNameRequired",
                 path + ".Name",
                 issues);
+            if (!Enum.IsDefined(
+                    typeof(EventProviderChannelType),
+                    channel.Type)) {
+                Error(
+                    "ChannelTypeInvalid",
+                    path + ".Type",
+                    $"Channel type '{channel.Type}' is not supported.",
+                    issues);
+            }
+            if (!Enum.IsDefined(
+                    typeof(EventProviderChannelIsolation),
+                    channel.Isolation)) {
+                Error(
+                    "ChannelIsolationInvalid",
+                    path + ".Isolation",
+                    $"Channel isolation '{channel.Isolation}' is not supported.",
+                    issues);
+            }
             if (!string.IsNullOrWhiteSpace(definition.Name) &&
                 !string.IsNullOrWhiteSpace(channel.Name) &&
                 !channel.Name.StartsWith(
@@ -551,11 +569,28 @@ public static partial class EventProviderDefinitionValidator {
                 "FieldNameRequired",
                 fieldPath + ".Name",
                 issues);
-            if (field.Type == EventProviderFieldType.Auto) {
+            if (!Enum.IsDefined(
+                    typeof(EventProviderFieldType),
+                    field.Type)) {
+                Error(
+                    "FieldTypeInvalid",
+                    fieldPath + ".Type",
+                    $"Field type '{field.Type}' is not supported.",
+                    issues);
+            } else if (field.Type == EventProviderFieldType.Auto) {
                 Error(
                     "FieldTypeCannotBeAuto",
                     fieldPath + ".Type",
                     "Auto is only valid while inferring a typed payload. A provider definition requires a concrete Windows field type.",
+                    issues);
+            }
+            if (!Enum.IsDefined(
+                    typeof(EventProviderFieldOutputType),
+                    field.OutputType)) {
+                Error(
+                    "FieldOutputTypeInvalid",
+                    fieldPath + ".OutputType",
+                    $"Field output type '{field.OutputType}' is not supported.",
                     issues);
             }
             if (!string.IsNullOrWhiteSpace(field.Map) &&

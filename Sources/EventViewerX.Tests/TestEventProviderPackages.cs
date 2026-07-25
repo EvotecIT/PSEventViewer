@@ -72,6 +72,98 @@ public sealed class TestEventProviderPackages {
     }
 
     [Fact]
+    public void RejectsUndefinedChannelEnumsDuringValidation() {
+        EventProviderDefinition definition = CreateDefinition();
+        definition.Channels[0].Type =
+            (EventProviderChannelType)int.MaxValue;
+        definition.Channels[0].Isolation =
+            (EventProviderChannelIsolation)int.MaxValue;
+
+        EventProviderValidationResult result =
+            EventProviderDefinitionValidator.Validate(
+                definition);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(
+            result.Issues,
+            issue => issue.Code == "ChannelTypeInvalid" &&
+                     issue.Path == "Channels[0].Type");
+        Assert.Contains(
+            result.Issues,
+            issue => issue.Code == "ChannelIsolationInvalid" &&
+                     issue.Path == "Channels[0].Isolation");
+    }
+
+    [Fact]
+    public void RejectsUndefinedFieldEnumsDuringValidation() {
+        EventProviderDefinition definition = CreateDefinition();
+        definition.Events[0].Fields[0].Type =
+            (EventProviderFieldType)int.MaxValue;
+        definition.Events[0].Fields[0].OutputType =
+            (EventProviderFieldOutputType)int.MaxValue;
+
+        EventProviderValidationResult result =
+            EventProviderDefinitionValidator.Validate(
+                definition);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(
+            result.Issues,
+            issue => issue.Code == "FieldTypeInvalid" &&
+                     issue.Path == "Events[0].Fields[0].Type");
+        Assert.Contains(
+            result.Issues,
+            issue => issue.Code == "FieldOutputTypeInvalid" &&
+                     issue.Path ==
+                     "Events[0].Fields[0].OutputType");
+    }
+
+    [Fact]
+    public void RejectsInvalidCulturesAcrossLocalizedProviderValues() {
+        const string invalidCulture = "not_a_real_culture";
+        EventProviderDefinition definition = CreateDefinition();
+        definition.DisplayNames[invalidCulture] = "Provider";
+        definition.Channels[0].DisplayNames[invalidCulture] =
+            "Operational";
+        definition.Maps.Add(
+            new EventProviderMapDefinition {
+                Name = "Results",
+                Entries = {
+                    new EventProviderMapEntryDefinition {
+                        Value = 1,
+                        Messages = {
+                            [invalidCulture] = "Success"
+                        }
+                    }
+                }
+            });
+
+        EventProviderValidationResult result =
+            EventProviderDefinitionValidator.Validate(
+                definition);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(
+            result.Issues,
+            issue => issue.Code ==
+                         "LocalizationCultureInvalid" &&
+                     issue.Path ==
+                         $"DisplayNames[{invalidCulture}]");
+        Assert.Contains(
+            result.Issues,
+            issue => issue.Code ==
+                         "LocalizationCultureInvalid" &&
+                     issue.Path ==
+                         $"Channels[0].DisplayNames[{invalidCulture}]");
+        Assert.Contains(
+            result.Issues,
+            issue => issue.Code ==
+                         "LocalizationCultureInvalid" &&
+                     issue.Path ==
+                         $"Maps[0].Entries[0].Messages[{invalidCulture}]");
+    }
+
+    [Fact]
     public void RejectsSchemaChangesWithoutAnEventVersionBump() {
         EventProviderDefinition baseline = CreateDefinition();
         EventProviderDefinition candidate = CreateDefinition();

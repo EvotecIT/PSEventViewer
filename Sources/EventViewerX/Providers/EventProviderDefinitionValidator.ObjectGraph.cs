@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace EventViewerX.Providers;
 
 public static partial class EventProviderDefinitionValidator {
@@ -235,6 +237,15 @@ public static partial class EventProviderDefinitionValidator {
                 value.Value,
                 $"{path}[{value.Key}]",
                 issues);
+            try {
+                _ = CultureInfo.GetCultureInfo(value.Key);
+            } catch (CultureNotFoundException) {
+                Error(
+                    "LocalizationCultureInvalid",
+                    $"{path}[{value.Key}]",
+                    $"'{value.Key}' is not a recognized culture.",
+                    issues);
+            }
         }
         return valid;
     }

@@ -11,8 +11,8 @@ internal sealed class WindowsEventMessageRenderer : IDisposable {
     private readonly IntPtr _session;
     private readonly int _locale;
     private readonly int _fallbackLocale;
-    private readonly NativeEventBuffer _messageBuffer = new();
-    private readonly WindowsEventBookmarkRenderer _bookmarkRenderer = new();
+    private readonly NativeEventBuffer _messageBuffer;
+    private readonly WindowsEventBookmarkRenderer _bookmarkRenderer;
     private readonly Dictionary<string, ProviderContext> _providers =
         new(StringComparer.OrdinalIgnoreCase);
 
@@ -31,6 +31,18 @@ internal sealed class WindowsEventMessageRenderer : IDisposable {
         _fallbackLocale = fallbackLocale == 0
             ? 0
             : CultureInfo.GetCultureInfo(fallbackLocale).LCID;
+        NativeEventBuffer? messageBuffer = null;
+        WindowsEventBookmarkRenderer? bookmarkRenderer = null;
+        try {
+            messageBuffer = new NativeEventBuffer();
+            bookmarkRenderer = new WindowsEventBookmarkRenderer();
+            _messageBuffer = messageBuffer;
+            _bookmarkRenderer = bookmarkRenderer;
+        } catch {
+            bookmarkRenderer?.Dispose();
+            messageBuffer?.Dispose();
+            throw;
+        }
     }
 
     internal NativeEventMessage Render(

@@ -34,6 +34,8 @@ namespace PSEventViewer;
     SupportsShouldProcess = true)]
 public sealed class CmdletExportEVXEvent : PSCmdlet {
     private readonly CancellationTokenSource _cancellation = new();
+    private readonly ConcurrentQueue<ErrorRecord>
+        _structuredFailures = new();
 
     /// <summary>
     /// Path to an offline log accepted by the Windows Event Log API. EVTX is the validated format.
@@ -290,6 +292,7 @@ public sealed class CmdletExportEVXEvent : PSCmdlet {
                     computeSha256: !SkipHash.IsPresent);
             }
         }
+        WriteStructuredFailures();
         WriteObject(result);
     }
 
@@ -342,13 +345,20 @@ public sealed class CmdletExportEVXEvent : PSCmdlet {
         query.BufferCapacity = BufferCapacity;
         query.TolerateQueryErrors =
             TolerateQueryErrors.IsPresent;
-        query.FailureHandler = failure => WriteError(
-            new ErrorRecord(
+        query.FailureHandler = failure =>
+            _structuredFailures.Enqueue(new ErrorRecord(
                 failure.Exception,
                 "EVXStructuredExportPathFailed",
                 ErrorCategory.ReadError,
                 failure.Source));
         return query;
+    }
+
+    private void WriteStructuredFailures() {
+        while (_structuredFailures.TryDequeue(
+                   out ErrorRecord? failure)) {
+            WriteError(failure);
+        }
     }
 
     private string[] ResolveChannels() {
