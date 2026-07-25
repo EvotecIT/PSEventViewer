@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Diagnostics.Eventing.Reader;
 using System.Net;
 
 namespace EventViewerX;
@@ -105,7 +106,10 @@ public static class EventLogProbe {
                     credential,
                     authentication,
                     effectiveTimeout -
-                    stopwatch.Elapsed),
+                    stopwatch.Elapsed,
+                    probeCancellation.Token),
+                effectiveTimeout -
+                stopwatch.Elapsed,
                 probeCancellation.Token);
             if (eventTimeUtc.HasValue) {
                 return new EventLogProbeResult(
@@ -180,6 +184,7 @@ public static class EventLogProbe {
 
     internal static T RunCancelableProbeStage<T>(
         Func<T> stage,
+        TimeSpan remaining,
         CancellationToken cancellationToken) {
 
         if (stage == null) {
@@ -187,7 +192,38 @@ public static class EventLogProbe {
                 nameof(stage));
         }
         cancellationToken.ThrowIfCancellationRequested();
-        T result = stage();
+        if (remaining <= TimeSpan.Zero) {
+            throw new TimeoutException(
+                "The probe deadline was reached before the optional stage started.");
+        }
+        Task<T> operation = Task.Run(stage);
+        Task completed = Task.WhenAny(
+                operation,
+                Task.Delay(
+                    remaining,
+                    cancellationToken))
+            .GetAwaiter()
+            .GetResult();
+        if (!ReferenceEquals(
+                completed,
+                operation)) {
+            _ = operation.ContinueWith(
+                static failed => {
+                    _ = failed.Exception;
+                },
+                CancellationToken.None,
+                TaskContinuationOptions
+                    .OnlyOnFaulted |
+                TaskContinuationOptions
+                    .ExecuteSynchronously,
+                TaskScheduler.Default);
+            cancellationToken.ThrowIfCancellationRequested();
+            throw new TimeoutException(
+                "The probe deadline was reached during the optional stage.");
+        }
+        T result = operation
+            .GetAwaiter()
+            .GetResult();
         cancellationToken.ThrowIfCancellationRequested();
         return result;
     }
@@ -197,31 +233,70 @@ public static class EventLogProbe {
         string? machineName,
         NetworkCredential? credential,
         EventLogAuthentication authentication,
-        TimeSpan remaining) {
+        TimeSpan remaining,
+        CancellationToken cancellationToken) {
 
         if (remaining <= TimeSpan.Zero) {
             return null;
         }
-        int budget = checked((int)Math.Min(
+        var stopwatch = Stopwatch.StartNew();
+        try {
+            cancellationToken.ThrowIfCancellationRequested();
+            int sessionBudget =
+                RemainingMilliseconds(
+                    remaining,
+                    stopwatch.Elapsed);
+            using EventLogSessionOpenResult sessionResult =
+                EventLogSessionManager
+                    .CreateSessionResult(
+                        machineName,
+                        "ProbeRecordCount",
+                        logName,
+                        sessionBudget,
+                        emitDiagnostics: false,
+                        credential: credential,
+                        authentication:
+                            authentication);
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!sessionResult.Success ||
+                sessionResult.Session == null) {
+                return null;
+            }
+            int informationBudget =
+                RemainingMilliseconds(
+                    remaining,
+                    stopwatch.Elapsed);
+            EventLogInformation information =
+                EventLogNativeOperation.Execute(
+                    () => sessionResult.Session
+                        .GetLogInformation(
+                            logName,
+                            PathType.LogName),
+                    informationBudget,
+                    $"Timed out reading the record count for '{logName}' after {informationBudget} ms.");
+            cancellationToken.ThrowIfCancellationRequested();
+            return information.RecordCount;
+        } catch (OperationCanceledException) {
+            throw;
+        } catch {
+            return null;
+        }
+    }
+
+    private static int RemainingMilliseconds(
+        TimeSpan budget,
+        TimeSpan elapsed) {
+
+        TimeSpan remaining = budget - elapsed;
+        if (remaining <= TimeSpan.Zero) {
+            throw new TimeoutException(
+                "The probe deadline was reached.");
+        }
+        return checked((int)Math.Min(
             int.MaxValue,
             Math.Max(
                 1,
                 remaining.TotalMilliseconds)));
-        try {
-            EventLogDetailsResult? result =
-                EventLogCatalog
-                    .DisplayEventLogResults(
-                        new[] { logName },
-                        machineName,
-                        budget,
-                        includeEventTimes: false,
-                        credential,
-                        authentication)
-                    .SingleOrDefault();
-            return result?.Details?.RecordCount;
-        } catch {
-            return null;
-        }
     }
 
     private static EventLogProbeStatus ClassifyFailure(

@@ -45,16 +45,15 @@ public static class LiveStatsQueryExecutor {
                 : request.MaxEventsScanned;
 
         try {
-            var query = new EventLogChannelQuery(
-                request.LogName) {
-                XPath = xpath,
-                MachineName = request.MachineName,
-                MaxEvents = readLimit,
-                Oldest = request.OldestFirst,
-                RemoteConnectionTimeoutMilliseconds =
-                    request.SessionTimeoutMs ?? 5000,
-                ReadMode = EventReadMode.Metadata
-            };
+            EventLogChannelQuery query =
+                LiveEventChannelQueryFactory.Create(
+                    request.LogName,
+                    request.MachineName,
+                    xpath,
+                    readLimit,
+                    request.OldestFirst,
+                    EventReadMode.Metadata,
+                    request.SessionTimeoutMs);
             foreach (EventObject ev in
                      EventLogEngine.ReadChannel(
                          query,

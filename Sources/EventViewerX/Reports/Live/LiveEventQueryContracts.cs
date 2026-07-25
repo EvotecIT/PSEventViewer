@@ -43,7 +43,8 @@ public sealed class LiveEventQueryRequest {
     public int MaxMessageChars { get; set; } = 4000;
 
     /// <summary>
-    /// Optional session timeout override in milliseconds.
+    /// Optional remote session-establishment and per-read timeout override in
+    /// milliseconds.
     /// </summary>
     public int? SessionTimeoutMs { get; set; }
 }

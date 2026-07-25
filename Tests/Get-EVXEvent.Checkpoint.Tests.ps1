@@ -277,7 +277,7 @@ Describe 'Get-EVXEvent checkpoint compatibility' {
                 $SparseIds.Add($Value)
             }
         }
-        $Value = 1000001
+        $Value = 30000
         while ($SparseIds.Count -lt 463) {
             if ($SeenIds.Add($Value)) {
                 $SparseIds.Add($Value)

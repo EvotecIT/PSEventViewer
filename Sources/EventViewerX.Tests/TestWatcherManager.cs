@@ -335,6 +335,35 @@ namespace EventViewerX.Tests {
         }
 
         [Fact]
+        public void StopDoesNotHoldStateLockWhileCancellingSubscriptions() {
+            var info = new WatcherInfo(
+                "stop-lock",
+                Environment.MachineName,
+                "Application",
+                new List<int> { 1 },
+                new List<NamedEvents>(),
+                _ => { },
+                false,
+                false,
+                0,
+                null);
+            using CancellationTokenRegistration registration =
+                info.Cancellation.Token.Register(
+                    () => {
+                        _ = info.IsStopped;
+                        _ = info.EndTime;
+                    });
+
+            Task stop = Task.Run(info.Stop);
+
+            Assert.True(
+                stop.Wait(TimeSpan.FromSeconds(5)),
+                "Watcher stop deadlocked while a cancellation callback read logical state.");
+            Assert.True(info.IsStopped);
+            Assert.NotNull(info.EndTime);
+        }
+
+        [Fact]
         public void LastTerminalSubscriptionRetiresTheLogicalWatcher() {
             WatcherManager.StopAll();
             string watcherName =

@@ -88,6 +88,8 @@ public sealed class EventLogBatchQuery {
 
     /// <summary>
     /// Combines independently built channel, file, and structured batches into one bounded merge.
+    /// Batch-level limits, concurrency, error handling, and failure callbacks
+    /// must agree and are preserved on the combined query.
     /// </summary>
     public static EventLogBatchQuery Combine(
         IEnumerable<EventLogBatchQuery> batches) {
@@ -103,6 +105,18 @@ public sealed class EventLogBatchQuery {
                 "At least one batch is required.",
                 nameof(batches));
         }
+        EventLogBatchQuery controls = materialized[0];
+        if (materialized.Skip(1).Any(batch =>
+                batch.MaxEvents != controls.MaxEvents ||
+                batch.MaxConcurrency != controls.MaxConcurrency ||
+                batch.ContinueOnError != controls.ContinueOnError ||
+                !Equals(
+                    batch.FailureHandler,
+                    controls.FailureHandler))) {
+            throw new ArgumentException(
+                "All combined batches must use the same MaxEvents, MaxConcurrency, ContinueOnError, and FailureHandler controls.",
+                nameof(batches));
+        }
         return new EventLogBatchQuery(
             materialized
                 .SelectMany(static batch =>
@@ -115,7 +129,12 @@ public sealed class EventLogBatchQuery {
             materialized
                 .SelectMany(static batch =>
                     batch.StructuredQueries)
-                .ToArray());
+                .ToArray()) {
+            MaxEvents = controls.MaxEvents,
+            MaxConcurrency = controls.MaxConcurrency,
+            ContinueOnError = controls.ContinueOnError,
+            FailureHandler = controls.FailureHandler
+        };
     }
 
     /// <summary>Channel queries in this batch.</summary>

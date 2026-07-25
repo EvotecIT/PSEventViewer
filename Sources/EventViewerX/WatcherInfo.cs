@@ -111,8 +111,8 @@ namespace EventViewerX {
         private readonly bool _staging;
         private readonly object _stopSync = new();
         private bool _started;
+        private bool _stopRequested;
         private bool _stopped;
-        private bool _cancellationDisposed;
         private int _eventsAccepted;
         private int _stopScheduled;
         private DateTime? _endTime;
@@ -179,7 +179,8 @@ namespace EventViewerX {
         /// <summary>Begins monitoring and starts the optional timeout timer.</summary>
         public void Start() {
             lock (_stopSync) {
-                if (_stopped) {
+                if (_stopRequested ||
+                    _stopped) {
                     throw new ObjectDisposedException(nameof(WatcherInfo));
                 }
                 if (_started) {
@@ -278,34 +279,34 @@ namespace EventViewerX {
 
         /// <summary>Stops the watcher, disposes resources, and records end time.</summary>
         public void Stop() {
-            bool stoppedNow = false;
             lock (_stopSync) {
-                if (_stopped) {
+                if (_stopRequested ||
+                    _stopped) {
                     return;
                 }
-                _stopped = true;
-                Cancellation.Cancel();
+                _stopRequested = true;
+            }
+
+            try {
                 Watcher.Stopped -= OnWatcherStopped;
-                Watcher.Dispose();
-                Cancellation.Dispose();
-                _cancellationDisposed = true;
-                _endTime = DateTime.UtcNow;
-                stoppedNow = true;
+                Cancellation.Cancel();
+            } finally {
+                try {
+                    Watcher.Dispose();
+                } finally {
+                    Cancellation.Dispose();
+                    lock (_stopSync) {
+                        _endTime = DateTime.UtcNow;
+                        _stopped = true;
+                    }
+                }
             }
-            if (stoppedNow) {
-                Stopped?.Invoke(this, EventArgs.Empty);
-            }
+            Stopped?.Invoke(this, EventArgs.Empty);
         }
 
         /// <summary>Stops the watcher and disposes internal cancellation token.</summary>
         public void Dispose() {
             Stop();
-            lock (_stopSync) {
-                if (!_cancellationDisposed) {
-                    Cancellation.Dispose();
-                    _cancellationDisposed = true;
-                }
-            }
         }
 
         private static EventLogSubscriptionQuery CreateSubscriptionQuery(

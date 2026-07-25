@@ -41,6 +41,9 @@ internal static class EventProviderProcessRunner {
             try {
                 process.Kill();
             } catch (InvalidOperationException) {
+            } finally {
+                process.WaitForExit();
+                Task.WaitAll(output, error);
             }
             throw new TimeoutException(
                 $"Provider build tool '{fileName}' did not finish within {timeout}.");

@@ -64,7 +64,8 @@ public sealed class LiveStatsQueryRequest {
     public int TopComputers { get; set; } = 10;
 
     /// <summary>
-    /// Optional session timeout override in milliseconds.
+    /// Optional remote session-establishment and per-read timeout override in
+    /// milliseconds.
     /// </summary>
     public int? SessionTimeoutMs { get; set; }
 }

@@ -199,7 +199,7 @@ Describe 'Get-EVXEvent - MessageRegex' {
         $FilePath = [System.IO.Path]::Combine($PSScriptRoot, 'Logs', 'Active Directory Web Services.evtx')
         $RealIds = @(1200, 1202, 1004, 1006, 1008, 1400, 1000, 1100)
         $ChunkedIds = [Collections.Generic.List[int]]::new()
-        $SyntheticId = 200000
+        $SyntheticId = 30000
         foreach ($RealId in $RealIds) {
             $ChunkedIds.Add($RealId)
             foreach ($Offset in 1..21) {
@@ -813,7 +813,7 @@ Describe 'Get-EVXEvent - bookmark projection' {
 
         $EventIds = [Collections.Generic.List[int]]::new()
         $EventIds.Add([int] $Latest.Id)
-        $Candidate = 1000001
+        $Candidate = 30000
         while ($EventIds.Count -lt 23) {
             if ($Candidate -ne $Latest.Id) {
                 $EventIds.Add($Candidate)

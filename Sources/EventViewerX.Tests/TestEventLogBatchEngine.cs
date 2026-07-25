@@ -2,7 +2,71 @@ using Xunit;
 
 namespace EventViewerX.Tests;
 
-public sealed class TestEventLogBatchEngine {
+    public sealed class TestEventLogBatchEngine {
+    [Fact]
+    public void CombinePreservesCompatibleBatchControls() {
+        Action<EventLogQueryFailure> handler =
+            _ => { };
+        EventLogBatchQuery first =
+            EventLogBatchQuery.ForChannels(
+                new[] {
+                    new EventLogChannelQuery(
+                        "Application")
+                });
+        EventLogBatchQuery second =
+            EventLogBatchQuery.ForFiles(
+                new[] {
+                    new EventLogFileQuery(
+                        "missing.evtx")
+                });
+        foreach (EventLogBatchQuery batch in
+                 new[] { first, second }) {
+            batch.MaxEvents = 7;
+            batch.MaxConcurrency = 3;
+            batch.ContinueOnError = true;
+            batch.FailureHandler = handler;
+        }
+
+        EventLogBatchQuery combined =
+            EventLogBatchQuery.Combine(
+                new[] { first, second });
+
+        Assert.Equal(7, combined.MaxEvents);
+        Assert.Equal(3, combined.MaxConcurrency);
+        Assert.True(combined.ContinueOnError);
+        Assert.Equal(
+            handler,
+            combined.FailureHandler);
+    }
+
+    [Fact]
+    public void CombineRejectsConflictingBatchControls() {
+        EventLogBatchQuery first =
+            EventLogBatchQuery.ForChannels(
+                new[] {
+                    new EventLogChannelQuery(
+                        "Application")
+                });
+        EventLogBatchQuery second =
+            EventLogBatchQuery.ForFiles(
+                new[] {
+                    new EventLogFileQuery(
+                        "missing.evtx")
+                });
+        first.MaxEvents = 5;
+        second.MaxEvents = 0;
+
+        ArgumentException exception =
+            Assert.Throws<ArgumentException>(() =>
+                EventLogBatchQuery.Combine(
+                    new[] { first, second }));
+
+        Assert.Contains(
+            "same MaxEvents",
+            exception.Message,
+            StringComparison.Ordinal);
+    }
+
     [Fact]
     public void QueryFactoryPartitionsAndConsolidatesLargeFilters() {
         EventLogBatchQuery query =

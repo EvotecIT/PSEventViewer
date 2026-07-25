@@ -59,6 +59,26 @@ public class TestLiveStatsQueryExecutor {
     }
 
     [Fact]
+    public void EventQueryAppliesTheRemoteTimeoutToSessionAndReads() {
+        EventLogChannelQuery query =
+            LiveEventChannelQueryFactory.Create(
+                "Application",
+                "server.example.test",
+                "*",
+                10,
+                false,
+                EventReadMode.Metadata,
+                4321);
+
+        Assert.Equal(
+            4321,
+            query.RemoteConnectionTimeoutMilliseconds);
+        Assert.Equal(
+            4321,
+            query.RemoteReadTimeoutMilliseconds);
+    }
+
+    [Fact]
     public void TryBuild_ExecutesCustomSelectorWithManagedTimeRange() {
         if (!OperatingSystem.IsWindows()) return;
         if (!TestEnv.CanReadLog("System")) return;

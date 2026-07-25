@@ -93,7 +93,49 @@ namespace EventViewerX.Tests {
                         cancellation.Cancel();
                         return 1L;
                     },
+                    TimeSpan.FromSeconds(5),
                     cancellation.Token));
+        }
+
+        [Fact]
+        public void OptionalProbeStageHonorsItsAbsoluteDeadline() {
+            var stopwatch = Stopwatch.StartNew();
+
+            Assert.Throws<TimeoutException>(() =>
+                EventLogProbe.RunCancelableProbeStage(
+                    () => {
+                        Thread.Sleep(2000);
+                        return 1L;
+                    },
+                    TimeSpan.FromMilliseconds(100),
+                    CancellationToken.None));
+
+            Assert.True(
+                stopwatch.Elapsed <
+                TimeSpan.FromSeconds(5),
+                $"Elapsed {stopwatch.Elapsed.TotalMilliseconds:F0} ms.");
+        }
+
+        [Fact]
+        public void OptionalProbeStageHonorsCancellationWhileBlocked() {
+            using var cancellation =
+                new CancellationTokenSource(
+                    TimeSpan.FromMilliseconds(100));
+            var stopwatch = Stopwatch.StartNew();
+
+            Assert.Throws<OperationCanceledException>(() =>
+                EventLogProbe.RunCancelableProbeStage(
+                    () => {
+                        Thread.Sleep(2000);
+                        return 1L;
+                    },
+                    TimeSpan.FromSeconds(5),
+                    cancellation.Token));
+
+            Assert.True(
+                stopwatch.Elapsed <
+                TimeSpan.FromSeconds(5),
+                $"Elapsed {stopwatch.Elapsed.TotalMilliseconds:F0} ms.");
         }
 
         [Fact]

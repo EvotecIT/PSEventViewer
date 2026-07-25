@@ -164,6 +164,20 @@ namespace EventViewerX.Tests {
         }
 
         [Fact]
+        public void EventIdsAboveTheWindowsRangeAreRejected() {
+            Assert.Throws<ArgumentException>(() =>
+                WindowsEventFilterBuilder
+                    .BuildWinEventFilter(
+                        id: ["65536"],
+                        xpathOnly: true));
+            Assert.Throws<ArgumentException>(() =>
+                WindowsEventFilterBuilder
+                    .BuildWinEventFilter(
+                        excludeId: ["65536"],
+                        xpathOnly: true));
+        }
+
+        [Fact]
         public void ProviderNameEscapesSpecialCharactersWinFilter() {
             var result = WindowsEventFilterBuilder.BuildWinEventFilter(providerName: ["O'Reilly & Co"], logName: "x", xpathOnly: true);
             Assert.Equal("*[System[Provider[@Name=\"O'Reilly & Co\"]]]", result);

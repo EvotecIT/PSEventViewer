@@ -99,7 +99,7 @@ public static partial class WindowsEventFilterBuilder {
             string[] validIds = ValidateNumericValues(
                 id,
                 minimum: 0,
-                maximum: int.MaxValue,
+                maximum: ushort.MaxValue,
                 nameof(id));
             filter = JoinXPathFilter(InitializeXPathFilter(validIds, "EventID={0}", "*[System[{0}]]"), filter);
         }
@@ -121,7 +121,7 @@ public static partial class WindowsEventFilterBuilder {
             string[] validExcludedIds = ValidateNumericValues(
                 excludeId,
                 minimum: 0,
-                maximum: int.MaxValue,
+                maximum: ushort.MaxValue,
                 nameof(excludeId));
             filter = JoinXPathFilter(InitializeXPathFilter(validExcludedIds, "EventID!={0}", "*[System[{0}]]", logic: "and"), filter);
         }
