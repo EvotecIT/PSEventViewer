@@ -168,6 +168,7 @@ namespace EventViewerX {
                         completed != null &&
                         TryBuildRestoredPowerShellScript(completed, format, textFilters, out RestoredPowerShellScript restored)) {
                         if (boundedScripts != null) {
+                            queryInfo.TryRecordMatchingResult();
                             AddBoundedRestoredPowerShellScript(
                                 boundedScripts,
                                 completed.EncounterOrder,
@@ -183,11 +184,12 @@ namespace EventViewerX {
                         }
                     }
 
-                    if (boundedScripts != null && CanFinalizeBoundedPowerShellScriptSelection(
+                    if (boundedScripts != null &&
+                        queryInfo.OutputLimitReached &&
+                        CanFinalizeBoundedPowerShellScriptSelection(
                             boundedScripts,
                             maxScripts,
                             cache.NewestPendingEncounterOrder)) {
-                        queryInfo.OutputLimitReached = true;
                         break;
                     }
                 }
@@ -204,6 +206,7 @@ namespace EventViewerX {
                     }
 
                     if (boundedScripts != null) {
+                        queryInfo.TryRecordMatchingResult();
                         AddBoundedRestoredPowerShellScript(
                             boundedScripts,
                             pending.EncounterOrder,
@@ -221,7 +224,6 @@ namespace EventViewerX {
                 }
 
                 if (boundedScripts != null) {
-                    queryInfo.OutputLimitReached |= boundedScripts.Count >= maxScripts;
                     foreach (KeyValuePair<long, RestoredPowerShellScript> selected in boundedScripts.OrderBy(static item => item.Key)) {
                         cancellationToken.ThrowIfCancellationRequested();
                         if (!selected.Value.IsComplete) {

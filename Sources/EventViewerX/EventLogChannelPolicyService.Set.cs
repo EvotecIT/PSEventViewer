@@ -114,6 +114,9 @@ public static partial class EventLogChannelPolicyService {
                     policy,
                     result.After,
                     result);
+            } catch (OperationCanceledException)
+                when (cancellationToken.IsCancellationRequested) {
+                throw;
             } catch (Exception exception) {
                 result.Errors.Add(
                     $"Failed to verify the saved channel policy: {exception.Message}");

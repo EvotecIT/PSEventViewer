@@ -2,6 +2,8 @@ namespace EventViewerX;
 
 /// <summary>Describes how a bounded PowerShell script-log query completed.</summary>
 public sealed class PowerShellScriptQueryExecutionInfo {
+    private long _matchingResults;
+
     /// <summary>Computer queried, or an empty string for the local computer.</summary>
     public string MachineName { get; internal set; } = string.Empty;
 
@@ -97,15 +99,24 @@ public sealed class PowerShellScriptQueryExecutionInfo {
         IncompleteScriptsReturned = 0;
         FailureKind = EventLogRemoteQueryFailureKind.None;
         FailureMessage = string.Empty;
+        _matchingResults = 0;
     }
 
     internal bool TryRecordResult() {
-        if (MaxResults > 0 &&
-            ResultsReturned >= MaxResults) {
-            OutputLimitReached = true;
+        if (!TryRecordMatchingResult()) {
             return false;
         }
         ResultsReturned++;
+        return true;
+    }
+
+    internal bool TryRecordMatchingResult() {
+        if (MaxResults > 0 &&
+            _matchingResults >= MaxResults) {
+            OutputLimitReached = true;
+            return false;
+        }
+        _matchingResults++;
         return true;
     }
 }

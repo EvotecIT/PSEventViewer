@@ -7,20 +7,43 @@ namespace EventViewerX.Native;
 
 internal sealed class WindowsEventPayloadRenderer : IDisposable {
     private const uint VariantArrayFlag = 0x80;
-    private readonly NativeEventBuffer _valueBuffer = new();
-    private readonly WindowsEventXmlRenderer _xmlRenderer = new();
-    private readonly WindowsEventBookmarkRenderer _bookmarkRenderer = new();
+    private readonly NativeEventBuffer _valueBuffer;
+    private readonly WindowsEventXmlRenderer _xmlRenderer;
+    private readonly WindowsEventBookmarkRenderer _bookmarkRenderer;
     private readonly WindowsEventNativeMethods.EventHandle _userContext;
 
     internal WindowsEventPayloadRenderer() {
-        _userContext = WindowsEventNativeMethods.EvtCreateRenderContext(
+        WindowsEventNativeMethods.EventHandle userContext =
+            WindowsEventNativeMethods.EvtCreateRenderContext(
             0,
             null,
             WindowsEventNativeMethods.RenderContextFlags.User);
-        if (_userContext.IsInvalid) {
+        if (userContext.IsInvalid) {
+            int error = Marshal.GetLastWin32Error();
+            userContext.Dispose();
             throw new System.ComponentModel.Win32Exception(
-                Marshal.GetLastWin32Error(),
+                error,
                 "Failed to create the Windows event payload render context.");
+        }
+
+        NativeEventBuffer? valueBuffer = null;
+        WindowsEventXmlRenderer? xmlRenderer = null;
+        WindowsEventBookmarkRenderer? bookmarkRenderer = null;
+        try {
+            valueBuffer = new NativeEventBuffer();
+            xmlRenderer = new WindowsEventXmlRenderer();
+            bookmarkRenderer = new WindowsEventBookmarkRenderer();
+
+            _userContext = userContext;
+            _valueBuffer = valueBuffer;
+            _xmlRenderer = xmlRenderer;
+            _bookmarkRenderer = bookmarkRenderer;
+        } catch {
+            bookmarkRenderer?.Dispose();
+            xmlRenderer?.Dispose();
+            valueBuffer?.Dispose();
+            userContext.Dispose();
+            throw;
         }
     }
 
