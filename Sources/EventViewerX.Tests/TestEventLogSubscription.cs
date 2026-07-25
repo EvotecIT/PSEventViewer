@@ -341,6 +341,44 @@ public sealed class TestEventLogSubscription {
     }
 
     [Fact]
+    public void CancellationReportedDuringQueryDiagnosticsFailsStartup() {
+        if (!OperatingSystem.IsWindows()) return;
+        const string missingLog =
+            "EventViewerX-Missing-Subscription-Cancellation";
+        string queryXml =
+            "<QueryList>" +
+            "<Query Id=\"0\" Path=\"System\">" +
+            "<Select Path=\"System\">*</Select>" +
+            "</Query>" +
+            $"<Query Id=\"1\" Path=\"{missingLog}\">" +
+            $"<Select Path=\"{missingLog}\">*</Select>" +
+            "</Query>" +
+            "</QueryList>";
+        using var cancellation =
+            new CancellationTokenSource();
+        int failures = 0;
+
+        Assert.ThrowsAny<OperationCanceledException>(() =>
+            new EventLogSubscription(
+                new EventLogSubscriptionQuery("System") {
+                    XPath = queryXml,
+                    Start = EventLogSubscriptionStart.Future,
+                    ReadMode = EventReadMode.Metadata,
+                    TolerateQueryErrors = true
+                },
+                _ => { },
+                _ => {
+                    Interlocked.Increment(ref failures);
+                    cancellation.Cancel();
+                },
+                cancellation.Token));
+
+        Assert.Equal(
+            1,
+            Volatile.Read(ref failures));
+    }
+
+    [Fact]
     public void FutureSubscriptionIsSignaledAndDeliversANewEvent() {
         if (!OperatingSystem.IsWindows()) return;
         if (!TestEnv.IsAdmin()) return;

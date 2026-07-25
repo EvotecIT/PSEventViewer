@@ -23,6 +23,8 @@ namespace PSEventViewer;
 /// </remarks>
 public abstract class AsyncPSCmdlet : PSCmdlet, IDisposable
 {
+    private const int PipelineCapacity = 64;
+
     private sealed class AsyncHookSynchronizationContext : SynchronizationContext
     {
         public override void Post(SendOrPostCallback callback, object? state)
@@ -293,7 +295,9 @@ public abstract class AsyncPSCmdlet : PSCmdlet, IDisposable
 
     private void RunBlockInAsync(Func<Task> task)
     {
-        using var outPipe = new BlockingCollection<PipelineItem>();
+        using var outPipe =
+            new BlockingCollection<PipelineItem>(
+                PipelineCapacity);
         Task blockTask;
 
         void ClearPipes()

@@ -150,6 +150,13 @@ public sealed class EventLogSubscription : IDisposable {
                             ((EventLogSubscription)state!).Dispose(),
                         this)
                     : default;
+            try {
+                cancellationToken
+                    .ThrowIfCancellationRequested();
+            } catch {
+                _externalCancellation.Dispose();
+                throw;
+            }
         } catch {
             ReleaseSetupResources();
             throw;
