@@ -65,6 +65,29 @@ public sealed class TestEventReadModeValidation {
     }
 
     [Fact]
+    public async Task AsyncBatchRejectsUndefinedReadModesBeforeContinueOnError() {
+        int failures = 0;
+        EventLogBatchQuery batch =
+            EventLogBatchQuery.ForChannels(
+                new[] {
+                    new EventLogChannelQuery(
+                        "Application") {
+                        ReadMode = UndefinedReadMode
+                    }
+                });
+        batch.ContinueOnError = true;
+        batch.FailureHandler = _ =>
+            Interlocked.Increment(ref failures);
+        await using IAsyncEnumerator<EventObject> enumerator =
+            EventLogBatchEngine.ReadAsync(batch)
+                .GetAsyncEnumerator();
+
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
+            async () => await enumerator.MoveNextAsync());
+        Assert.Equal(0, failures);
+    }
+
+    [Fact]
     public void EvtxRequestRejectsUndefinedReadModesBeforeOpeningTheFile() {
         bool success = EvtxQueryExecutor.TryForEachEvent(
             new EvtxQueryRequest {

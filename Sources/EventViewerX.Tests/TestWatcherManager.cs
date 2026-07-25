@@ -430,5 +430,30 @@ namespace EventViewerX.Tests {
             }
             WatcherManager.StopAll();
         }
+
+        [Fact]
+        public void StartWatcherRejectsCancelledStartupBeforeRegistration() {
+            WatcherManager.StopAll();
+            using var cancellation =
+                new CancellationTokenSource();
+            cancellation.Cancel();
+            string watcherName =
+                "cancelled-start-" +
+                Guid.NewGuid().ToString("N");
+            var query =
+                new EventLogSubscriptionQuery(
+                    "Application");
+
+            Assert.Throws<OperationCanceledException>(() =>
+                WatcherManager.StartWatcher(
+                    watcherName,
+                    query,
+                    _ => { },
+                    cancellationToken:
+                        cancellation.Token));
+            Assert.Empty(
+                WatcherManager.GetWatchers(
+                    watcherName));
+        }
     }
 }

@@ -140,6 +140,36 @@ public static partial class EventLogCatalog {
         }
     }
 
+    private static bool IsAnalyticOrDebug(
+        EventLogSession session,
+        string logName,
+        int timeoutMilliseconds,
+        CancellationToken cancellationToken) {
+
+        try {
+            cancellationToken.ThrowIfCancellationRequested();
+            bool result = EventLogNativeOperation.Execute(
+                () => {
+                    using var configuration =
+                        new EventLogConfiguration(
+                            logName,
+                            session);
+                    return configuration.LogType ==
+                               EventLogType.Analytical ||
+                           configuration.LogType ==
+                               EventLogType.Debug;
+                },
+                timeoutMilliseconds,
+                $"Timed out reading the type of event log '{logName}' after {timeoutMilliseconds} ms.");
+            cancellationToken.ThrowIfCancellationRequested();
+            return result;
+        } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
+            throw;
+        } catch (EventLogException) {
+            return false;
+        }
+    }
+
     private static EventProviderMetadataSnapshot SnapshotProvider(
         ProviderMetadata metadata,
         bool includeEvents) {

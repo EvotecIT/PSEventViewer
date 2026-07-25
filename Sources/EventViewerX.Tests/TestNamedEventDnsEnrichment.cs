@@ -190,7 +190,7 @@ public class TestNamedEventDnsEnrichment {
     }
 
     [Fact]
-    public async Task TimedOutSystemLookupRetainsItsConcurrencyLeaseUntilCompletion() {
+    public async Task TimedOutSystemLookupRetainsItsLeaseButQueuedLookupKeepsItsOwnDeadline() {
         var firstLookup =
             new TaskCompletionSource<IPHostEntry>(
                 TaskCreationOptions.RunContinuationsAsynchronously);
@@ -224,23 +224,30 @@ public class TestNamedEventDnsEnrichment {
             enricher.EnrichAsync(
                 second,
                 CancellationToken.None);
-        await Task.Delay(75);
+        await secondEnrichment.WaitAsync(
+            TimeSpan.FromSeconds(5));
 
         Assert.Equal(
             ReverseDnsResolutionStatus.TimedOut,
             first.ClientDnsResolutionStatus);
+        Assert.Equal(
+            ReverseDnsResolutionStatus.TimedOut,
+            second.ClientDnsResolutionStatus);
         Assert.Equal(1, Volatile.Read(ref calls));
 
         firstLookup.SetResult(new IPHostEntry {
             HostName = "first.example.test"
         });
-        await secondEnrichment.WaitAsync(
-            TimeSpan.FromSeconds(2));
+        SMBServerAudit third =
+            CreateSmbEvent("10.0.0.33");
+        await enricher.EnrichAsync(
+            third,
+            CancellationToken.None);
 
         Assert.Equal(2, calls);
         Assert.Equal(
             ReverseDnsResolutionStatus.Resolved,
-            second.ClientDnsResolutionStatus);
+            third.ClientDnsResolutionStatus);
     }
 
     [Fact]

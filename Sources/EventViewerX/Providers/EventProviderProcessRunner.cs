@@ -11,7 +11,8 @@ internal static class EventProviderProcessRunner {
         string fileName,
         IEnumerable<string> arguments,
         string workingDirectory,
-        TimeSpan timeout) {
+        TimeSpan timeout,
+        Action<Process>? processStarted = null) {
 
         string argumentText = string.Join(
             " ",
@@ -32,8 +33,22 @@ internal static class EventProviderProcessRunner {
             throw new InvalidOperationException(
                 $"Failed to start '{fileName}'.");
         }
-        Task<string> output = process.StandardOutput.ReadToEndAsync();
-        Task<string> error = process.StandardError.ReadToEndAsync();
+        Task<string> output =
+            process.StandardOutput.ReadToEndAsync();
+        Task<string> error =
+            process.StandardError.ReadToEndAsync();
+        try {
+            processStarted?.Invoke(process);
+        } catch {
+            try {
+                process.Kill();
+            } catch (InvalidOperationException) {
+            } finally {
+                process.WaitForExit();
+                Task.WaitAll(output, error);
+            }
+            throw;
+        }
         if (!process.WaitForExit(
                 checked((int)Math.Min(
                     int.MaxValue,

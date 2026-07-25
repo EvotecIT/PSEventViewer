@@ -15,9 +15,6 @@ public sealed class TestEventProviderProcessRunner {
             "EventViewerX.ProcessRunner." +
             Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(directory);
-        string processIdPath = Path.Combine(
-            directory,
-            "process-id.txt");
         string executable = Path.Combine(
             Environment.GetFolderPath(
                 Environment.SpecialFolder.Windows),
@@ -25,6 +22,7 @@ public sealed class TestEventProviderProcessRunner {
             "WindowsPowerShell",
             "v1.0",
             "powershell.exe");
+        int processId = 0;
         try {
             Assert.Throws<TimeoutException>(() =>
                 EventProviderProcessRunner.Run(
@@ -33,16 +31,14 @@ public sealed class TestEventProviderProcessRunner {
                         "-NoLogo",
                         "-NoProfile",
                         "-Command",
-                        $"[IO.File]::WriteAllText('{processIdPath.Replace("'", "''")}', $PID.ToString()); Start-Sleep -Seconds 30"
+                        "Start-Sleep -Seconds 30"
                     },
                     directory,
-                    TimeSpan.FromSeconds(2)));
+                    TimeSpan.FromSeconds(2),
+                    process =>
+                        processId = process.Id));
 
-            Assert.True(
-                File.Exists(processIdPath));
-            int processId = int.Parse(
-                File.ReadAllText(
-                    processIdPath));
+            Assert.NotEqual(0, processId);
             Assert.Throws<ArgumentException>(() =>
                 Process.GetProcessById(processId));
         } finally {

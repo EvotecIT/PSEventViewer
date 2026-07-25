@@ -344,8 +344,18 @@ namespace PSEventViewer {
                     reuseScopeIdentity: watcherOwnerId.ToString("N"),
                     namedEvents: ParameterSetName == "NamedEvent"
                         ? NamedEvent?.ToList()
-                        : null);
+                        : null,
+                    cancellationToken: CancelToken);
                 createdPowerShellWatcher = watcher.Action.Equals(publish);
+                using CancellationTokenRegistration startupCancellation =
+                    createdPowerShellWatcher
+                        ? CancelToken.Register(
+                            static state =>
+                                WatcherManager.StopWatcher(
+                                    (Guid)state!),
+                            watcher.Id)
+                        : default;
+                CancelToken.ThrowIfCancellationRequested();
                 if (!createdPowerShellWatcher) {
                     RemovePowerShellSubscription();
                 } else {
@@ -362,6 +372,7 @@ namespace PSEventViewer {
                             synchronousWhenIdle: true);
                     }
                 }
+                CancelToken.ThrowIfCancellationRequested();
                 WriteObject(watcher);
             } catch {
                 RemovePowerShellSubscription();

@@ -343,4 +343,26 @@ public class TestEventLogDetailsResult {
             EventLogSessionManager.ClearHostCache(host);
         }
     }
+
+    [Fact]
+    public void DetailEnumeratorsHonorCancellationBeforeSessionSetup() {
+        if (!OperatingSystem.IsWindows()) return;
+
+        using var cancellation =
+            new CancellationTokenSource();
+        cancellation.Cancel();
+
+        Assert.Throws<OperationCanceledException>(() =>
+            EventLogCatalog.DisplayEventLogResults(
+                    new[] { "Application" },
+                    cancellationToken:
+                        cancellation.Token)
+                .ToList());
+        Assert.Throws<OperationCanceledException>(() =>
+            EventLogCatalog.DisplayEventLogResultsParallel(
+                    new[] { "Application" },
+                    cancellationToken:
+                        cancellation.Token)
+                .ToList());
+    }
 }

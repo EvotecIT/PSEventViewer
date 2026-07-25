@@ -22,6 +22,14 @@ internal static class BoundedNativeOperation {
     }
 
     internal static IDisposable Acquire(
+        CancellationToken cancellationToken) {
+
+        cancellationToken.ThrowIfCancellationRequested();
+        Slots.Wait(cancellationToken);
+        return new SlotLease();
+    }
+
+    internal static IDisposable Acquire(
         int timeoutMilliseconds,
         string timeoutMessage,
         CancellationToken cancellationToken) {

@@ -110,6 +110,7 @@ namespace EventViewerX {
 
         private readonly bool _staging;
         private readonly object _stopSync = new();
+        private bool _starting;
         private bool _started;
         private bool _stopRequested;
         private bool _stopped;
@@ -177,7 +178,10 @@ namespace EventViewerX {
         }
 
         /// <summary>Begins monitoring and starts the optional timeout timer.</summary>
-        public void Start() {
+        public void Start(
+            CancellationToken startupCancellationToken = default) {
+
+            startupCancellationToken.ThrowIfCancellationRequested();
             lock (_stopSync) {
                 if (_stopRequested ||
                     _stopped) {
@@ -186,15 +190,55 @@ namespace EventViewerX {
                 if (_started) {
                     return;
                 }
+                if (_starting) {
+                    throw new InvalidOperationException(
+                        "The watcher is already starting.");
+                }
+                _starting = true;
+            }
 
+            using CancellationTokenRegistration startupRegistration =
+                startupCancellationToken.Register(
+                    static state =>
+                        ((WatcherInfo)state!).CancelStartup(),
+                    this);
+            try {
                 Watcher.Watch(
                     SubscriptionQueries,
                     OnEvent,
                     Cancellation.Token);
+                startupCancellationToken.ThrowIfCancellationRequested();
+            } catch (Exception) when (
+                startupCancellationToken.IsCancellationRequested) {
+                lock (_stopSync) {
+                    _starting = false;
+                }
+                throw new OperationCanceledException(
+                    startupCancellationToken);
+            } catch {
+                lock (_stopSync) {
+                    _starting = false;
+                }
+                throw;
+            }
+
+            lock (_stopSync) {
+                _starting = false;
+                if (_stopRequested ||
+                    _stopped) {
+                    throw new ObjectDisposedException(nameof(WatcherInfo));
+                }
                 _started = true;
                 if (Timeout.HasValue) {
                     TimeoutTask = StopAfterTimeoutAsync(Timeout.Value, Cancellation.Token);
                 }
+            }
+        }
+
+        private void CancelStartup() {
+            try {
+                Cancellation.Cancel();
+            } catch (ObjectDisposedException) {
             }
         }
 

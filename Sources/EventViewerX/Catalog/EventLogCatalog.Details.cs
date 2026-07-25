@@ -62,10 +62,22 @@ public static partial class EventLogCatalog {
         }
     }
 
-    private static EventLogDetailsResult SafeGetResult(string logName, string? machineName, int timeoutMs, bool includeEventTimes) {
+    private static EventLogDetailsResult SafeGetResult(
+        string logName,
+        string? machineName,
+        int timeoutMs,
+        bool includeEventTimes,
+        CancellationToken cancellationToken = default) {
+
         EventLogSessionOpenResult? sessionResult = null;
         try {
-            sessionResult = EventLogSessionManager.CreateSessionResult(machineName, "LogDetails", logName, timeoutMs, emitDiagnostics: false);
+            sessionResult = EventLogSessionManager.CreateSessionResult(
+                machineName,
+                "LogDetails",
+                logName,
+                timeoutMs,
+                emitDiagnostics: false,
+                cancellationToken: cancellationToken);
             if (!sessionResult.Success || sessionResult.Session == null) {
                 return Failure(
                     logName,
@@ -80,14 +92,26 @@ public static partial class EventLogCatalog {
                         : sessionResult.ErrorType);
             }
 
-            return SafeGetResult(logName, sessionResult.Session, timeoutMs, machineName, includeEventTimes);
+            return SafeGetResult(
+                logName,
+                sessionResult.Session,
+                timeoutMs,
+                machineName,
+                includeEventTimes,
+                cancellationToken);
         }
         finally {
             sessionResult?.Dispose();
         }
     }
 
-    private static EventLogDetailsResult SafeGetResult(string logName, EventLogSession session, int timeoutMs, string? machineName, bool includeEventTimes)
+    private static EventLogDetailsResult SafeGetResult(
+        string logName,
+        EventLogSession session,
+        int timeoutMs,
+        string? machineName,
+        bool includeEventTimes,
+        CancellationToken cancellationToken = default)
     {
         EventLogConfiguration? logConfig = null;
         try
@@ -101,6 +125,9 @@ public static partial class EventLogCatalog {
                     timeoutMs,
                     $"Timed out reading configuration for '{logName}' on '{hostName}' after {timeoutMs} ms.",
                     static configuration => configuration.Dispose());
+                cancellationToken.ThrowIfCancellationRequested();
+            } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
+                throw;
             } catch (TimeoutException ex) {
                 return Failure(logName, machineName, EventLogDetailsStatus.Timeout, ex.Message, timeoutMs, ex.GetType().Name);
             } catch (UnauthorizedAccessException ex) {
@@ -117,6 +144,9 @@ public static partial class EventLogCatalog {
                     () => session.GetLogInformation(logName, PathType.LogName),
                     timeoutMs,
                     $"Timed out reading runtime information for '{logName}' on '{hostName}' after {timeoutMs} ms.");
+                cancellationToken.ThrowIfCancellationRequested();
+            } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
+                throw;
             } catch (TimeoutException ex) {
                 logInformationFailure = ex;
             } catch (UnauthorizedAccessException ex) {
@@ -127,7 +157,12 @@ public static partial class EventLogCatalog {
 
             var details = new EventLogDetails(Settings._logger, hostName, logConfig, logInfoObj);
             Exception? eventTimeFailure = includeEventTimes
-                ? ReadEventTimes(logName, session, timeoutMs, details)
+                ? ReadEventTimes(
+                    logName,
+                    session,
+                    timeoutMs,
+                    details,
+                    cancellationToken)
                 : null;
             var result = new EventLogDetailsResult {
                 LogName = logName,
@@ -151,6 +186,10 @@ public static partial class EventLogCatalog {
             }
             return result;
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             return Failure(logName, machineName, EventLogDetailsStatus.Error, ex.Message, timeoutMs, ex.GetType().Name);
@@ -161,23 +200,60 @@ public static partial class EventLogCatalog {
         }
     }
 
-    private static Exception? ReadEventTimes(string logName, EventLogSession session, int timeoutMs, EventLogDetails details) {
+    private static Exception? ReadEventTimes(
+        string logName,
+        EventLogSession session,
+        int timeoutMs,
+        EventLogDetails details,
+        CancellationToken cancellationToken) {
+
         try {
-            var oldestQuery = new EventLogQuery(logName, PathType.LogName) { Session = session };
-            using (EventLogReader oldestReader = EventLogNativeOperation.CreateReader(oldestQuery, details.MachineName, timeoutMs)) {
-                using EventRecord? oldest = EventLogNativeOperation.ReadEvent(oldestReader, timeoutMs, $"Reading the oldest event from '{logName}' on '{details.MachineName}'");
-                details.OldestEvent = oldest?.TimeCreated;
+            cancellationToken.ThrowIfCancellationRequested();
+            var oldestQuery = new EventLogQuery(
+                logName,
+                PathType.LogName) {
+                Session = session
+            };
+            using (EventLogReader oldestReader =
+                   EventLogNativeOperation.CreateReader(
+                       oldestQuery,
+                       details.MachineName,
+                       timeoutMs)) {
+                cancellationToken.ThrowIfCancellationRequested();
+                using EventRecord? oldest =
+                    EventLogNativeOperation.ReadEvent(
+                        oldestReader,
+                        timeoutMs,
+                        $"Reading the oldest event from '{logName}' on '{details.MachineName}'");
+                details.OldestEvent =
+                    oldest?.TimeCreated;
             }
 
-            var newestQuery = new EventLogQuery(logName, PathType.LogName) {
+            cancellationToken.ThrowIfCancellationRequested();
+            var newestQuery = new EventLogQuery(
+                logName,
+                PathType.LogName) {
                 Session = session,
                 ReverseDirection = true
             };
-            using (EventLogReader newestReader = EventLogNativeOperation.CreateReader(newestQuery, details.MachineName, timeoutMs)) {
-                using EventRecord? newest = EventLogNativeOperation.ReadEvent(newestReader, timeoutMs, $"Reading the newest event from '{logName}' on '{details.MachineName}'");
-                details.NewestEvent = newest?.TimeCreated;
+            using (EventLogReader newestReader =
+                   EventLogNativeOperation.CreateReader(
+                       newestQuery,
+                       details.MachineName,
+                       timeoutMs)) {
+                cancellationToken.ThrowIfCancellationRequested();
+                using EventRecord? newest =
+                    EventLogNativeOperation.ReadEvent(
+                        newestReader,
+                        timeoutMs,
+                        $"Reading the newest event from '{logName}' on '{details.MachineName}'");
+                details.NewestEvent =
+                    newest?.TimeCreated;
             }
+            cancellationToken.ThrowIfCancellationRequested();
             return null;
+        } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
+            throw;
         } catch (Exception ex) {
             return ex;
         }
@@ -296,6 +372,7 @@ public static partial class EventLogCatalog {
     /// <param name="credential">Optional credentials for a remote event-log session.</param>
     /// <param name="authentication">Authentication package used for a remote event-log session.</param>
     /// <param name="includeAnalyticDebug">Includes analytic and debug channels when wildcard patterns are expanded.</param>
+    /// <param name="cancellationToken">Token used to cancel session setup and stop between bounded native detail operations.</param>
     /// <returns>Diagnostic result for every requested or matched channel.</returns>
     public static IEnumerable<EventLogDetailsResult> DisplayEventLogResults(
         string[]? listLog = null,
@@ -305,7 +382,10 @@ public static partial class EventLogCatalog {
         NetworkCredential? credential = null,
         EventLogAuthentication authentication =
             EventLogAuthentication.Default,
-        bool includeAnalyticDebug = false) {
+        bool includeAnalyticDebug = false,
+        CancellationToken cancellationToken = default) {
+
+        cancellationToken.ThrowIfCancellationRequested();
         if (timeoutMs <= 0) {
             throw new ArgumentOutOfRangeException(nameof(timeoutMs), "Timeout must be positive.");
         }
@@ -322,7 +402,8 @@ public static partial class EventLogCatalog {
             timeoutMs,
             emitDiagnostics: false,
             credential: credential,
-            authentication: authentication);
+            authentication: authentication,
+            cancellationToken: cancellationToken);
         if (!sessionResult.Success || sessionResult.Session == null) {
             string[] failedLogNames = exactNames ?? new[] { "*" };
             foreach (string failedLogName in failedLogNames) {
@@ -336,7 +417,14 @@ public static partial class EventLogCatalog {
         try {
             if (exactNames != null) {
                 foreach (string exactName in exactNames) {
-                    yield return SafeGetResult(exactName, activeSession, timeoutMs, hostName, includeEventTimes);
+                    cancellationToken.ThrowIfCancellationRequested();
+                    yield return SafeGetResult(
+                        exactName,
+                        activeSession,
+                        timeoutMs,
+                        hostName,
+                        includeEventTimes,
+                        cancellationToken);
                 }
                 yield break;
             }
@@ -348,6 +436,9 @@ public static partial class EventLogCatalog {
                     () => activeSession.GetLogNames().ToArray(),
                     timeoutMs,
                     $"Timed out enumerating event logs on '{hostName}' after {timeoutMs} ms.");
+                cancellationToken.ThrowIfCancellationRequested();
+            } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
+                throw;
             } catch (TimeoutException ex) {
                 logNames = Array.Empty<string>();
                 enumerationFailure = Failure("*", hostName, EventLogDetailsStatus.Timeout, ex.Message, timeoutMs, ex.GetType().Name);
@@ -364,16 +455,25 @@ public static partial class EventLogCatalog {
                 "^" + Regex.Escape(pattern).Replace("\\*", ".*").Replace("\\?", ".") + "$",
                 RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)).ToArray();
             foreach (string logName in logNames) {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (filters != null && !filters.Any(filter => filter.IsMatch(logName))) {
                     continue;
                 }
                 if (!includeAnalyticDebug &&
                     IsAnalyticOrDebug(
                         activeSession,
-                        logName)) {
+                        logName,
+                        timeoutMs,
+                        cancellationToken)) {
                     continue;
                 }
-                yield return SafeGetResult(logName, activeSession, timeoutMs, hostName, includeEventTimes);
+                yield return SafeGetResult(
+                    logName,
+                    activeSession,
+                    timeoutMs,
+                    hostName,
+                    includeEventTimes,
+                    cancellationToken);
             }
         } finally {
             sessionResult.Dispose();
@@ -442,7 +542,10 @@ public static partial class EventLogCatalog {
             ? new List<string?> { null }
             : machineNames;
         using var pipelineCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        using var results = new BlockingCollection<EventLogDetailsResult>(Math.Max(16, maxDegreeOfParallelism * 4));
+        var results = new BlockingCollection<EventLogDetailsResult>(
+            Math.Max(
+                16,
+                maxDegreeOfParallelism * 4));
 
         Task worker = Task.Factory.StartNew(() => {
             try {
@@ -459,7 +562,9 @@ public static partial class EventLogCatalog {
                                      timeoutMs,
                                      includeEventTimes,
                                      includeAnalyticDebug:
-                                         includeAnalyticDebug)) {
+                                         includeAnalyticDebug,
+                                     cancellationToken:
+                                         pipelineCancellation.Token)) {
                             results.Add(result, pipelineCancellation.Token);
                         }
                     });
@@ -476,9 +581,22 @@ public static partial class EventLogCatalog {
             worker.GetAwaiter().GetResult();
         } finally {
             pipelineCancellation.Cancel();
-            try {
-                worker.GetAwaiter().GetResult();
-            } catch (OperationCanceledException) when (pipelineCancellation.IsCancellationRequested) {
+            if (!worker.IsCompleted) {
+                _ = worker.ContinueWith(
+                    static (completed, state) => {
+                        _ = completed.Exception;
+                        ((BlockingCollection<EventLogDetailsResult>)state!)
+                            .Dispose();
+                    },
+                    results,
+                    CancellationToken.None,
+                    TaskContinuationOptions.ExecuteSynchronously,
+                    TaskScheduler.Default);
+            } else {
+                if (worker.IsFaulted) {
+                    _ = worker.Exception;
+                }
+                results.Dispose();
             }
         }
     }

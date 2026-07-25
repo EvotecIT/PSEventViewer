@@ -271,7 +271,8 @@ internal static class WindowsEventRemoteReader {
         Action<EventLogQueryFailure>? failureHandler,
         CancellationToken cancellationToken) {
 
-        using (operationSlot) {
+        IDisposable? setupSlot = operationSlot;
+        try {
             try {
                 using WindowsEventNativeMethods.EventHandle session =
                     WindowsEventRemoteSession.Open(
@@ -297,24 +298,65 @@ internal static class WindowsEventRemoteReader {
                     strictBookmark: strictBookmark,
                     machineName: machineName,
                     failureHandler: failureHandler);
-                long returned = 0;
-                foreach (EventObject eventObject in WindowsEventReader.Read(
-                             nativeQuery,
-                             readMode,
-                             machineName,
-                             containerLog,
-                             cancellationToken)) {
-                    results.Add(eventObject, cancellationToken);
-                    returned++;
-                    if (maxEvents > 0 && returned >= maxEvents) {
-                        break;
-                    }
-                }
+                using IEnumerator<EventObject> enumerator =
+                    WindowsEventReader.Read(
+                            nativeQuery,
+                            readMode,
+                            machineName,
+                            containerLog,
+                            cancellationToken)
+                        .GetEnumerator();
+                setupSlot.Dispose();
+                setupSlot = null;
+                CopyToBuffer(
+                    enumerator,
+                    results,
+                    maxEvents,
+                    readTimeoutMilliseconds,
+                    $"Timed out waiting for an available native read slot for '{displayName}' on '{machineName}'.",
+                    cancellationToken);
             } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
             } catch (Exception ex) {
                 failures.Enqueue(ex);
             } finally {
                 results.CompleteAdding();
+            }
+        } finally {
+            setupSlot?.Dispose();
+        }
+    }
+
+    internal static void CopyToBuffer(
+        IEnumerator<EventObject> enumerator,
+        BlockingCollection<EventObject> results,
+        long maxEvents,
+        int readTimeoutMilliseconds,
+        string slotTimeoutMessage,
+        CancellationToken cancellationToken) {
+
+        long returned = 0;
+        while (true) {
+            cancellationToken.ThrowIfCancellationRequested();
+            bool hasNext;
+            using (readTimeoutMilliseconds > 0
+                       ? BoundedNativeOperation.Acquire(
+                           readTimeoutMilliseconds,
+                           slotTimeoutMessage,
+                           cancellationToken)
+                       : BoundedNativeOperation.Acquire(
+                           cancellationToken)) {
+                hasNext = enumerator.MoveNext();
+            }
+            if (!hasNext) {
+                break;
+            }
+
+            results.Add(
+                enumerator.Current,
+                cancellationToken);
+            returned++;
+            if (maxEvents > 0 && returned >= maxEvents) {
+                break;
             }
         }
     }

@@ -24,7 +24,8 @@ namespace EventViewerX {
             TimeSpan? timeout = null,
             string? actionIdentity = null,
             string? reuseScopeIdentity = null,
-            IReadOnlyList<NamedEvents>? namedEvents = null) {
+            IReadOnlyList<NamedEvents>? namedEvents = null,
+            CancellationToken cancellationToken = default) {
 
             if (query == null) {
                 throw new ArgumentNullException(nameof(query));
@@ -38,7 +39,8 @@ namespace EventViewerX {
                 timeout,
                 actionIdentity,
                 reuseScopeIdentity,
-                namedEvents);
+                namedEvents,
+                cancellationToken);
         }
 
         /// <summary>
@@ -53,8 +55,10 @@ namespace EventViewerX {
             TimeSpan? timeout = null,
             string? actionIdentity = null,
             string? reuseScopeIdentity = null,
-            IReadOnlyList<NamedEvents>? namedEvents = null) {
+            IReadOnlyList<NamedEvents>? namedEvents = null,
+            CancellationToken cancellationToken = default) {
 
+            cancellationToken.ThrowIfCancellationRequested();
             if (queries == null || queries.Count == 0) {
                 throw new ArgumentException(
                     "At least one subscription query is required.",
@@ -90,7 +94,8 @@ namespace EventViewerX {
                 actionIdentity,
                 reuseScopeIdentity,
                 subscriptionQuery: first,
-                subscriptionQueries: queries);
+                subscriptionQueries: queries,
+                cancellationToken: cancellationToken);
         }
 
         /// <summary>
@@ -112,6 +117,7 @@ namespace EventViewerX {
         /// <param name="reuseScopeIdentity">Optional host scope that isolates friendly-name and action reuse from other host instances.</param>
         /// <param name="subscriptionQuery">Optional complete native subscription contract. New integrations should use the dedicated overload.</param>
         /// <param name="subscriptionQueries">Optional partitioned native subscription contracts for one logical watcher.</param>
+        /// <param name="cancellationToken">Token used to cancel watcher startup before it is registered as running.</param>
         /// <returns>A <see cref="WatcherInfo"/> describing the running watcher.</returns>
         public static WatcherInfo StartWatcher(
             string? name,
@@ -128,7 +134,10 @@ namespace EventViewerX {
             string? reuseScopeIdentity = null,
             EventLogSubscriptionQuery? subscriptionQuery = null,
             IReadOnlyList<EventLogSubscriptionQuery>?
-                subscriptionQueries = null) {
+                subscriptionQueries = null,
+            CancellationToken cancellationToken = default) {
+
+            cancellationToken.ThrowIfCancellationRequested();
             if (string.IsNullOrWhiteSpace(machineName)) {
                 machineName = Environment.MachineName;
             } else {
@@ -208,7 +217,8 @@ namespace EventViewerX {
                     _watchersByName[GetWatcherKey(name!, reuseScopeIdentity)] = info;
                 }
                 try {
-                    info.Start();
+                    info.Start(cancellationToken);
+                    cancellationToken.ThrowIfCancellationRequested();
                     return info;
                 } catch {
                     _watchers.TryRemove(info.Id, out _);

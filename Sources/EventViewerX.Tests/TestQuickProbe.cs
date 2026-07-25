@@ -195,7 +195,8 @@ namespace EventViewerX.Tests {
             Assert.Throws<OperationCanceledException>(() =>
                 EventLogProbe.RunCancelableProbeStage(
                     () => {
-                        Thread.Sleep(2000);
+                        Thread.Sleep(
+                            TimeSpan.FromSeconds(30));
                         return 1L;
                     },
                     TimeSpan.FromSeconds(5),

@@ -19,6 +19,7 @@ public static partial class EventLogBatchEngine {
                 nameof(query),
                 "Maximum events must be greater than or equal to zero.");
         }
+        ValidateReadModes(query);
         ValidateConcurrency(query.MaxConcurrency);
 
         EventSourceSnapshot[] sources = SnapshotSources(query);

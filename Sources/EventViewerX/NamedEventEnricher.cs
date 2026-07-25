@@ -74,12 +74,16 @@ internal sealed class NamedEventEnricher : IDisposable {
     private async Task<DnsResponse> RunDnsQueryAsync(string address, CancellationToken cancellationToken) {
         bool entered = false;
         bool releaseDeferred = false;
-        CancellationTokenSource? lookupCancellation = null;
+        using var lookupCancellation =
+            CancellationTokenSource.CreateLinkedTokenSource(
+                cancellationToken);
+        lookupCancellation.CancelAfter(
+            _options.DnsTimeoutMilliseconds);
         try {
-            await _dnsConcurrency!.WaitAsync(cancellationToken).ConfigureAwait(false);
+            await _dnsConcurrency!
+                .WaitAsync(lookupCancellation.Token)
+                .ConfigureAwait(false);
             entered = true;
-            lookupCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            lookupCancellation.CancelAfter(_options.DnsTimeoutMilliseconds);
             DnsResponse response = _rawDnsResolver == null
                 ? await ResolveSystemDnsAsync(
                     address,
@@ -100,10 +104,9 @@ internal sealed class NamedEventEnricher : IDisposable {
             throw new TimeoutException($"The reverse-DNS lookup exceeded {_options.DnsTimeoutMilliseconds} ms.");
         } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
             throw new OperationCanceledException(cancellationToken);
-        } catch (OperationCanceledException) when (lookupCancellation?.IsCancellationRequested == true) {
+        } catch (OperationCanceledException) when (lookupCancellation.IsCancellationRequested) {
             throw new TimeoutException($"The reverse-DNS lookup exceeded {_options.DnsTimeoutMilliseconds} ms.");
         } finally {
-            lookupCancellation?.Dispose();
             if (entered && !releaseDeferred) {
                 _dnsConcurrency!.Release();
             }
