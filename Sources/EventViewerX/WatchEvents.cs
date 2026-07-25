@@ -22,6 +22,7 @@ namespace EventViewerX {
         private string? _machineName;
         private int _eventsFound;
         private long _lifecycleVersion;
+        private bool _stoppedRaised;
 
         /// <summary>Total number of matching events observed by all watchers in this process.</summary>
         public static int NumberOfEventsFound => Volatile.Read(ref _numberOfEventsFound);
@@ -264,6 +265,7 @@ namespace EventViewerX {
                             queries.Count);
                     _subscriptionLifetime =
                         subscriptionLifetime;
+                    _stoppedRaised = false;
 
                     try {
                         for (int index = 0;
@@ -355,6 +357,9 @@ namespace EventViewerX {
                     stopped =
                         subscriptionLifetime.MarkTerminal(
                             subscriptionIndex);
+                    if (stopped) {
+                        stopped = TryMarkStoppedCore();
+                    }
                 }
             }
             _instanceLogger.WriteWarning(
@@ -370,15 +375,7 @@ namespace EventViewerX {
             if (!stopped) {
                 return;
             }
-            try {
-                Stopped?.Invoke(
-                    this,
-                    EventArgs.Empty);
-            } catch (Exception exception) {
-                _instanceLogger.WriteWarning(
-                    "Event watcher stopped callback threw: {0}",
-                    exception.Message.Trim());
-            }
+            RaiseStopped();
         }
 
         private void DetectEvent(EventObject eventObject) {
@@ -407,24 +404,55 @@ namespace EventViewerX {
         private void CancelWatch() {
             CancellationTokenRegistration? registration;
             EventLogSubscription[] subscriptions;
+            bool stopped;
             lock (_lifecycleSync) {
+                stopped = TryMarkStoppedCore();
                 registration = DetachCancellationRegistration();
                 subscriptions = DetachSubscriptionsCore();
             }
             registration?.Dispose();
             DisposeSubscriptions(subscriptions);
+            if (stopped) {
+                RaiseStopped();
+            }
         }
 
         /// <summary>Stops watching and releases native watcher/session resources.</summary>
         public void Dispose() {
             CancellationTokenRegistration? registration;
             EventLogSubscription[] subscriptions;
+            bool stopped;
             lock (_lifecycleSync) {
+                stopped = TryMarkStoppedCore();
                 registration = DetachCancellationRegistration();
                 subscriptions = DetachSubscriptionsCore();
             }
             registration?.Dispose();
             DisposeSubscriptions(subscriptions);
+            if (stopped) {
+                RaiseStopped();
+            }
+        }
+
+        private bool TryMarkStoppedCore() {
+            if (_subscriptionLifetime == null ||
+                _stoppedRaised) {
+                return false;
+            }
+            _stoppedRaised = true;
+            return true;
+        }
+
+        private void RaiseStopped() {
+            try {
+                Stopped?.Invoke(
+                    this,
+                    EventArgs.Empty);
+            } catch (Exception exception) {
+                _instanceLogger.WriteWarning(
+                    "Event watcher stopped callback threw: {0}",
+                    exception.Message.Trim());
+            }
         }
 
         private static void DisposeSubscriptions(

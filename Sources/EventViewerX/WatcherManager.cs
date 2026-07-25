@@ -175,60 +175,168 @@ namespace EventViewerX {
             }
             namedEvents = namedEvents.Distinct().OrderBy(static value => value).ToList();
 
-            WatcherInfo info;
+            WatcherInfo? reusable;
+            WatcherInfo? info = null;
+            string? reservedWatcherKey = null;
             lock (_syncRoot) {
-                if (!string.IsNullOrEmpty(name)) {
-                    string watcherKey = GetWatcherKey(name!, reuseScopeIdentity);
-                    if (_watchersByName.TryGetValue(watcherKey, out var existingByName) && !existingByName.IsStopped) {
-                        if (HasEquivalentConfiguration(existingByName, machineName, logName, eventIds, namedEvents, action, staging, stopOnMatch, stopAfter, timeout, actionIdentity, subscriptionQuery, subscriptionQueries)) {
-                            return existingByName;
-                        }
-
-                        throw new InvalidOperationException($"A running watcher named '{name}' already exists with different configuration.");
+                reusable = FindReusableWatcher(
+                    name,
+                    reuseScopeIdentity,
+                    machineName,
+                    logName,
+                    eventIds,
+                    namedEvents,
+                    action,
+                    staging,
+                    stopOnMatch,
+                    stopAfter,
+                    timeout,
+                    actionIdentity,
+                    subscriptionQuery,
+                    subscriptionQueries);
+                if (reusable == null) {
+                    info = subscriptionQueries == null
+                        ? new WatcherInfo(name ?? string.Empty, machineName, logName, eventIds, namedEvents, action, staging, stopOnMatch, stopAfter, timeout, subscriptionQuery)
+                        : new WatcherInfo(name ?? string.Empty, machineName, logName, eventIds, namedEvents, action, staging, stopOnMatch, stopAfter, timeout, subscriptionQueries);
+                    info.ActionIdentity = actionIdentity;
+                    info.ReuseScopeIdentity = reuseScopeIdentity;
+                    info.Stopped += RemoveStoppedWatcher;
+                    info.ReserveStartup();
+                    _watchers.TryAdd(info.Id, info);
+                    if (!string.IsNullOrEmpty(name)) {
+                        reservedWatcherKey =
+                            GetWatcherKey(
+                                name!,
+                                reuseScopeIdentity);
+                        _watchersByName[reservedWatcherKey] = info;
                     }
-
-                    // Detect pre-existing duplicates injected outside the manager.
-                    var sameName = _watchers.Values.Where(w =>
-                        string.Equals(w.Name, name, StringComparison.OrdinalIgnoreCase) &&
-                        string.Equals(w.ReuseScopeIdentity, reuseScopeIdentity, StringComparison.OrdinalIgnoreCase)).ToList();
-                    if (sameName.Count > 1 && !_watchersByName.ContainsKey(watcherKey)) {
-                        throw new InvalidOperationException($"Multiple watchers with name '{name}' already exist.");
-                    }
-                    if (sameName.Count >= 1) {
-                        var active = sameName.FirstOrDefault(w => !w.IsStopped) ?? sameName[0];
-                        _watchersByName[watcherKey] = active;
-                        if (!active.IsStopped) {
-                            if (HasEquivalentConfiguration(active, machineName, logName, eventIds, namedEvents, action, staging, stopOnMatch, stopAfter, timeout, actionIdentity, subscriptionQuery, subscriptionQueries)) {
-                                return active;
-                            }
-                            throw new InvalidOperationException($"A running watcher named '{name}' already exists with different configuration.");
-                        }
-                    }
-                }
-
-                info = subscriptionQueries == null
-                    ? new WatcherInfo(name ?? string.Empty, machineName, logName, eventIds, namedEvents, action, staging, stopOnMatch, stopAfter, timeout, subscriptionQuery)
-                    : new WatcherInfo(name ?? string.Empty, machineName, logName, eventIds, namedEvents, action, staging, stopOnMatch, stopAfter, timeout, subscriptionQueries);
-                info.ActionIdentity = actionIdentity;
-                info.ReuseScopeIdentity = reuseScopeIdentity;
-                info.Stopped += RemoveStoppedWatcher;
-                _watchers.TryAdd(info.Id, info);
-                if (!string.IsNullOrEmpty(name)) {
-                    _watchersByName[GetWatcherKey(name!, reuseScopeIdentity)] = info;
-                }
-                try {
-                    info.Start(cancellationToken);
-                    cancellationToken.ThrowIfCancellationRequested();
-                    return info;
-                } catch {
-                    _watchers.TryRemove(info.Id, out _);
-                    if (!string.IsNullOrEmpty(info.Name)) {
-                        _watchersByName.TryRemove(GetWatcherKey(info.Name, info.ReuseScopeIdentity), out _);
-                    }
-                    info.Dispose();
-                    throw;
                 }
             }
+            if (reusable != null) {
+                if (reusable.StartupWasClaimed) {
+                    reusable.WaitForStartup(
+                        cancellationToken);
+                }
+                cancellationToken.ThrowIfCancellationRequested();
+                return reusable;
+            }
+            WatcherInfo created = info!;
+            try {
+                created.CompleteReservedStartup(
+                    cancellationToken);
+                cancellationToken.ThrowIfCancellationRequested();
+                return created;
+            } catch {
+                _watchers.TryRemove(created.Id, out _);
+                if (reservedWatcherKey != null &&
+                    _watchersByName.TryGetValue(
+                        reservedWatcherKey,
+                        out WatcherInfo? mapped) &&
+                    ReferenceEquals(mapped, created)) {
+                    _watchersByName.TryRemove(
+                        reservedWatcherKey,
+                        out _);
+                }
+                created.Dispose();
+                throw;
+            }
+        }
+
+        private static WatcherInfo? FindReusableWatcher(
+            string? name,
+            string? reuseScopeIdentity,
+            string machineName,
+            string logName,
+            IReadOnlyList<int> eventIds,
+            IReadOnlyList<NamedEvents> namedEvents,
+            Action<EventObject> action,
+            bool staging,
+            bool stopOnMatch,
+            int stopAfter,
+            TimeSpan? timeout,
+            string? actionIdentity,
+            EventLogSubscriptionQuery? subscriptionQuery,
+            IReadOnlyList<EventLogSubscriptionQuery>?
+                subscriptionQueries) {
+
+            if (string.IsNullOrEmpty(name)) {
+                return null;
+            }
+            string watcherKey =
+                GetWatcherKey(
+                    name!,
+                    reuseScopeIdentity);
+            if (_watchersByName.TryGetValue(
+                    watcherKey,
+                    out WatcherInfo? existingByName) &&
+                !existingByName.IsStopped) {
+                if (HasEquivalentConfiguration(
+                        existingByName,
+                        machineName,
+                        logName,
+                        eventIds,
+                        namedEvents,
+                        action,
+                        staging,
+                        stopOnMatch,
+                        stopAfter,
+                        timeout,
+                        actionIdentity,
+                        subscriptionQuery,
+                        subscriptionQueries)) {
+                    return existingByName;
+                }
+                throw new InvalidOperationException(
+                    $"A running watcher named '{name}' already exists with different configuration.");
+            }
+
+            WatcherInfo[] sameName = _watchers.Values
+                .Where(watcher =>
+                    string.Equals(
+                        watcher.Name,
+                        name,
+                        StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(
+                        watcher.ReuseScopeIdentity,
+                        reuseScopeIdentity,
+                        StringComparison.OrdinalIgnoreCase))
+                .ToArray();
+            if (sameName.Length > 1 &&
+                !_watchersByName.ContainsKey(
+                    watcherKey)) {
+                throw new InvalidOperationException(
+                    $"Multiple watchers with name '{name}' already exist.");
+            }
+            if (sameName.Length == 0) {
+                return null;
+            }
+            WatcherInfo active =
+                sameName.FirstOrDefault(
+                    static watcher =>
+                        !watcher.IsStopped) ??
+                sameName[0];
+            _watchersByName[watcherKey] = active;
+            if (active.IsStopped) {
+                return null;
+            }
+            if (HasEquivalentConfiguration(
+                    active,
+                    machineName,
+                    logName,
+                    eventIds,
+                    namedEvents,
+                    action,
+                    staging,
+                    stopOnMatch,
+                    stopAfter,
+                    timeout,
+                    actionIdentity,
+                    subscriptionQuery,
+                    subscriptionQueries)) {
+                return active;
+            }
+            throw new InvalidOperationException(
+                $"A running watcher named '{name}' already exists with different configuration.");
         }
 
         private static bool HasEquivalentConfiguration(

@@ -31,11 +31,15 @@ public static partial class EventLogBatchEngine {
                 "Every source in a batch must use the same ordering direction.",
                 nameof(query));
         }
+        Action<EventLogQueryFailure>? failureHandler =
+            CreateSerializedFailureHandler(
+                query.FailureHandler);
 
         return ReadSynchronously(
             query,
             sources,
             oldest,
+            failureHandler,
             cancellationToken);
     }
 
@@ -206,6 +210,7 @@ public static partial class EventLogBatchEngine {
         EventLogBatchQuery query,
         EventSourceSnapshot[] sources,
         bool oldest,
+        Action<EventLogQueryFailure>? failureHandler,
         CancellationToken cancellationToken) {
 
         EventSourceCursor?[] primed =
@@ -213,7 +218,7 @@ public static partial class EventLogBatchEngine {
                 sources,
                 query.MaxConcurrency,
                 query.ContinueOnError,
-                query.FailureHandler,
+                failureHandler,
                 cancellationToken);
         var cursors = primed
             .Where(static cursor => cursor != null)
@@ -241,7 +246,7 @@ public static partial class EventLogBatchEngine {
                 if (TryMoveNext(
                         cursor,
                         query.ContinueOnError,
-                        query.FailureHandler,
+                        failureHandler,
                         cancellationToken)) {
                     queue.Add(cursor);
                 }
@@ -362,6 +367,21 @@ public static partial class EventLogBatchEngine {
             cursor.Dispose();
             return false;
         }
+    }
+
+    private static Action<EventLogQueryFailure>?
+        CreateSerializedFailureHandler(
+            Action<EventLogQueryFailure>? failureHandler) {
+
+        if (failureHandler == null) {
+            return null;
+        }
+        var synchronization = new object();
+        return failure => {
+            lock (synchronization) {
+                failureHandler(failure);
+            }
+        };
     }
 
     private static int CompareEvents(

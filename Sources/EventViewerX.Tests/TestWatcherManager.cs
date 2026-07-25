@@ -455,5 +455,90 @@ namespace EventViewerX.Tests {
                 WatcherManager.GetWatchers(
                     watcherName));
         }
+
+        [Fact]
+        public async Task PendingNameReservationDoesNotBlockIndependentWatcherStartup() {
+            WatcherManager.StopAll();
+            string reservedName =
+                "reserved-" +
+                Guid.NewGuid().ToString("N");
+            string independentName =
+                "independent-" +
+                Guid.NewGuid().ToString("N");
+            Action<EventObject> action = _ => { };
+            var reserved = new WatcherInfo(
+                reservedName,
+                Environment.MachineName,
+                "Application",
+                new List<int> { 1 },
+                new List<NamedEvents>(),
+                action,
+                false,
+                false,
+                0,
+                null);
+            reserved.ReserveStartup();
+            FieldInfo? watchersField =
+                typeof(WatcherManager).GetField(
+                    "_watchers",
+                    BindingFlags.NonPublic |
+                    BindingFlags.Static);
+            FieldInfo? namesField =
+                typeof(WatcherManager).GetField(
+                    "_watchersByName",
+                    BindingFlags.NonPublic |
+                    BindingFlags.Static);
+            Assert.NotNull(watchersField);
+            Assert.NotNull(namesField);
+            var watchers =
+                Assert.IsType<ConcurrentDictionary<Guid, WatcherInfo>>(
+                    watchersField!.GetValue(null));
+            var names =
+                Assert.IsType<ConcurrentDictionary<string, WatcherInfo>>(
+                    namesField!.GetValue(null));
+            watchers[reserved.Id] = reserved;
+            names[$"U:{reservedName}"] = reserved;
+            using var cancellation =
+                new CancellationTokenSource();
+            Task<WatcherInfo> waiting = Task.Run(() =>
+                WatcherManager.StartWatcher(
+                    reservedName,
+                    Environment.MachineName,
+                    "Application",
+                    new List<int> { 1 },
+                    new List<NamedEvents>(),
+                    action,
+                    false,
+                    false,
+                    0,
+                    null,
+                    cancellationToken:
+                        cancellation.Token));
+            try {
+                await Task.Delay(100);
+                Assert.False(waiting.IsCompleted);
+
+                WatcherInfo independent =
+                    WatcherManager.StartWatcher(
+                        independentName,
+                        Environment.MachineName,
+                        "Application",
+                        new List<int> { 1 },
+                        new List<NamedEvents>(),
+                        action,
+                        false,
+                        false,
+                        0,
+                        null);
+
+                Assert.False(independent.IsStopped);
+            } finally {
+                cancellation.Cancel();
+                await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                    async () =>
+                        await waiting);
+                WatcherManager.StopAll();
+            }
+        }
     }
 }

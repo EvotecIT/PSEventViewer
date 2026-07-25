@@ -85,24 +85,72 @@ public static class EventLogMaintenance {
                 }
             }
             cancellationToken.ThrowIfCancellationRequested();
-            if (!WindowsEventNativeMethods.EvtClearLog(
+            string normalizedLogName = logName.Trim();
+            string targetMachine = remote
+                ? machine
+                : Environment.MachineName;
+            if (!remote &&
+                cancellationToken.CanBeCanceled) {
+                ExecuteLocalClear(
+                    () => {
+                        ClearChannelNative(
+                            sessionHandle,
+                            normalizedLogName,
+                            normalizedBackup,
+                            targetMachine);
+                    },
+                    cancellationToken);
+            } else {
+                ClearChannelNative(
                     sessionHandle,
-                    logName.Trim(),
+                    normalizedLogName,
                     normalizedBackup,
-                    0)) {
-                int error = Marshal.GetLastWin32Error();
-                throw new Win32Exception(
-                    error,
-                    $"Failed to clear Windows event channel '{logName}' on '{(remote ? machine : Environment.MachineName)}'.");
+                    targetMachine);
             }
             cancellationToken.ThrowIfCancellationRequested();
             return new EventLogClearResult(
-                logName.Trim(),
+                normalizedLogName,
                 remote ? machine : null,
                 normalizedBackup);
         } finally {
             cancellationRegistration.Dispose();
             session?.Dispose();
         }
+    }
+
+    internal static void ExecuteLocalClear(
+        Action clear,
+        CancellationToken cancellationToken) {
+
+        if (clear == null) {
+            throw new ArgumentNullException(nameof(clear));
+        }
+        _ = BoundedNativeOperation.Execute(
+            () => {
+                clear();
+                return true;
+            },
+            int.MaxValue,
+            "The local Windows event channel clear did not complete.",
+            cancellationToken);
+    }
+
+    private static void ClearChannelNative(
+        IntPtr sessionHandle,
+        string logName,
+        string? backupPath,
+        string machineName) {
+
+        if (WindowsEventNativeMethods.EvtClearLog(
+                sessionHandle,
+                logName,
+                backupPath,
+                0)) {
+            return;
+        }
+        int error = Marshal.GetLastWin32Error();
+        throw new Win32Exception(
+            error,
+            $"Failed to clear Windows event channel '{logName}' on '{machineName}'.");
     }
 }

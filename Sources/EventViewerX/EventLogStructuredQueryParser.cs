@@ -3,6 +3,23 @@ using System.Xml.Linq;
 namespace EventViewerX;
 
 internal static class EventLogStructuredQueryParser {
+    internal static bool IsQueryList(string? queryXml) {
+        if (string.IsNullOrWhiteSpace(queryXml)) {
+            return false;
+        }
+        try {
+            XDocument document = XDocument.Parse(
+                queryXml,
+                LoadOptions.PreserveWhitespace);
+            return string.Equals(
+                document.Root?.Name.LocalName,
+                "QueryList",
+                StringComparison.Ordinal);
+        } catch (System.Xml.XmlException) {
+            return false;
+        }
+    }
+
     internal static XElement[] ParseQueries(string queryXml) {
         XDocument document = XDocument.Parse(
             queryXml,

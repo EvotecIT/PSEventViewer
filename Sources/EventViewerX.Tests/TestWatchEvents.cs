@@ -90,5 +90,32 @@ namespace EventViewerX.Tests {
                 Assert.Empty(GetIds(watcher));
             }
         }
+
+        [Fact]
+        public void CancellationRaisesStoppedExactlyOnce() {
+            var watcher = new WatchEvents();
+            using var cancellation =
+                new System.Threading.CancellationTokenSource();
+            int stopped = 0;
+            watcher.Stopped += (_, _) =>
+                System.Threading.Interlocked.Increment(
+                    ref stopped);
+            watcher.Watch(
+                Environment.MachineName,
+                "Application",
+                new List<int> { 1 },
+                cancellationToken: cancellation.Token);
+
+            cancellation.Cancel();
+            Assert.True(
+                System.Threading.SpinWait.SpinUntil(
+                    () =>
+                        System.Threading.Volatile.Read(
+                            ref stopped) == 1,
+                    TimeSpan.FromSeconds(5)));
+            watcher.Dispose();
+
+            Assert.Equal(1, stopped);
+        }
     }
 }

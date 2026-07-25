@@ -29,6 +29,9 @@ public static partial class EventLogBatchEngine {
                 "Every source in a batch must use the same ordering direction.",
                 nameof(query));
         }
+        Action<EventLogQueryFailure>? failureHandler =
+            CreateSerializedFailureHandler(
+                query.FailureHandler);
 
         using var concurrencyGate =
             new SemaphoreSlim(
@@ -41,7 +44,7 @@ public static partial class EventLogBatchEngine {
                         index,
                         source,
                         query.ContinueOnError,
-                        query.FailureHandler,
+                        failureHandler,
                         concurrencyGate,
                         cancellationToken))
                 .ToArray();
@@ -84,7 +87,7 @@ public static partial class EventLogBatchEngine {
                         () => TryMoveNext(
                             cursor,
                             query.ContinueOnError,
-                            query.FailureHandler,
+                            failureHandler,
                             cancellationToken),
                         CancellationToken.None)
                     .ConfigureAwait(false);

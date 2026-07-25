@@ -442,6 +442,65 @@ namespace EventViewerX.Tests;
     }
 
     [Fact]
+    public void ParallelPrimingSerializesFailureHandlerCalls() {
+        int active = 0;
+        int maximumActive = 0;
+        int failures = 0;
+        EventLogBatchQuery query =
+            CreateMissingFileBatch();
+        query.FailureHandler = _ => {
+            int current =
+                Interlocked.Increment(
+                    ref active);
+            UpdateMaximum(
+                ref maximumActive,
+                current);
+            Thread.Sleep(25);
+            Interlocked.Increment(
+                ref failures);
+            Interlocked.Decrement(
+                ref active);
+        };
+
+        Assert.Empty(
+            EventLogBatchEngine.Read(
+                query));
+
+        Assert.Equal(8, failures);
+        Assert.Equal(1, maximumActive);
+    }
+
+    [Fact]
+    public async Task AsyncParallelPrimingSerializesFailureHandlerCalls() {
+        int active = 0;
+        int maximumActive = 0;
+        int failures = 0;
+        EventLogBatchQuery query =
+            CreateMissingFileBatch();
+        query.FailureHandler = _ => {
+            int current =
+                Interlocked.Increment(
+                    ref active);
+            UpdateMaximum(
+                ref maximumActive,
+                current);
+            Thread.Sleep(25);
+            Interlocked.Increment(
+                ref failures);
+            Interlocked.Decrement(
+                ref active);
+        };
+
+        await foreach (EventObject _ in
+                       EventLogBatchEngine.ReadAsync(
+                           query)) {
+        }
+
+        Assert.Equal(8, failures);
+        Assert.Equal(1, maximumActive);
+    }
+
+    [Fact]
     public void CancellationStopsTheMergedBatchEnumeration() {
         if (!OperatingSystem.IsWindows()) return;
         var query = EventLogBatchQuery.ForFiles(new[] {
@@ -477,5 +536,41 @@ namespace EventViewerX.Tests;
             "Tests",
             "Logs",
             "NamedFilterExamples.evtx"));
+    }
+
+    private static EventLogBatchQuery CreateMissingFileBatch() {
+        EventLogBatchQuery query =
+            EventLogBatchQuery.ForFiles(
+                Enumerable.Range(0, 8)
+                    .Select(_ =>
+                        new EventLogFileQuery(
+                            Path.Combine(
+                                Path.GetTempPath(),
+                                $"missing-{Guid.NewGuid():N}.evtx")) {
+                            ReadMode =
+                                EventReadMode.Metadata
+                        })
+                    .ToArray());
+        query.MaxConcurrency = 8;
+        query.ContinueOnError = true;
+        return query;
+    }
+
+    private static void UpdateMaximum(
+        ref int maximum,
+        int candidate) {
+
+        while (true) {
+            int observed =
+                Volatile.Read(
+                    ref maximum);
+            if (candidate <= observed ||
+                Interlocked.CompareExchange(
+                    ref maximum,
+                    candidate,
+                    observed) == observed) {
+                return;
+            }
+        }
     }
 }

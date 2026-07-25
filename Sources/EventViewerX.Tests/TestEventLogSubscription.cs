@@ -5,6 +5,33 @@ namespace EventViewerX.Tests;
 
 public sealed class TestEventLogSubscription {
     [Fact]
+    public void QueryListClassificationAcceptsXmlDeclarationsAndComments() {
+        const string queryXml = """
+            <?xml version="1.0" encoding="utf-8"?>
+            <!-- generated query -->
+            <QueryList>
+              <Query Id="0" Path="System">
+                <Select Path="System">*</Select>
+              </Query>
+            </QueryList>
+            """;
+
+        Assert.True(
+            EventLogStructuredQueryParser.IsQueryList(
+                queryXml));
+        if (!OperatingSystem.IsWindows()) return;
+
+        using var subscription = new EventLogSubscription(
+            new EventLogSubscriptionQuery(
+                "IgnoredByQueryList") {
+                XPath = queryXml,
+                Start = EventLogSubscriptionStart.Future,
+                ReadMode = EventReadMode.Metadata
+            },
+            _ => { });
+    }
+
+    [Fact]
     public void LogicalSubscriptionStopsOnlyAfterEveryPartitionTerminates() {
         var lifetime =
             new EventLogSubscriptionLifetime(

@@ -162,6 +162,9 @@ public sealed class EventLogBatchQuery {
     /// </summary>
     public bool ContinueOnError { get; set; }
 
-    /// <summary>Receives failures isolated to individual query sources.</summary>
+    /// <summary>
+    /// Receives failures isolated to individual query sources. Calls are
+    /// serialized even when several sources fail during parallel priming.
+    /// </summary>
     public Action<EventLogQueryFailure>? FailureHandler { get; set; }
 }

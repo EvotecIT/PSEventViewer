@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -116,7 +117,11 @@ namespace EventViewerX {
         private bool _stopped;
         private int _eventsAccepted;
         private int _stopScheduled;
+        private int _startupOwnerClaimed;
         private DateTime? _endTime;
+        private readonly TaskCompletionSource<ExceptionDispatchInfo?>
+            _startupCompletion = new(
+                TaskCreationOptions.RunContinuationsAsynchronously);
         /// <summary>Unique identifier assigned to the watcher instance.</summary>
         public Guid Id { get; } = Guid.NewGuid();
         /// <summary>User-friendly name used to find and deduplicate watchers.</summary>
@@ -181,6 +186,50 @@ namespace EventViewerX {
         public void Start(
             CancellationToken startupCancellationToken = default) {
 
+            if (Interlocked.CompareExchange(
+                    ref _startupOwnerClaimed,
+                    1,
+                    0) != 0) {
+                WaitForStartup(
+                    startupCancellationToken);
+                return;
+            }
+            CompleteReservedStartup(
+                startupCancellationToken);
+        }
+
+        internal bool StartupWasClaimed =>
+            Volatile.Read(
+                ref _startupOwnerClaimed) != 0;
+
+        internal void ReserveStartup() {
+            if (Interlocked.CompareExchange(
+                    ref _startupOwnerClaimed,
+                    1,
+                    0) != 0) {
+                throw new InvalidOperationException(
+                    "The watcher startup is already reserved.");
+            }
+        }
+
+        internal void CompleteReservedStartup(
+            CancellationToken startupCancellationToken) {
+
+            try {
+                StartCore(
+                    startupCancellationToken);
+                _startupCompletion.TrySetResult(null);
+            } catch (Exception exception) {
+                _startupCompletion.TrySetResult(
+                    ExceptionDispatchInfo.Capture(
+                        exception));
+                throw;
+            }
+        }
+
+        private void StartCore(
+            CancellationToken startupCancellationToken) {
+
             startupCancellationToken.ThrowIfCancellationRequested();
             lock (_stopSync) {
                 if (_stopRequested ||
@@ -233,6 +282,18 @@ namespace EventViewerX {
                     TimeoutTask = StopAfterTimeoutAsync(Timeout.Value, Cancellation.Token);
                 }
             }
+        }
+
+        internal void WaitForStartup(
+            CancellationToken cancellationToken) {
+
+            _startupCompletion.Task.Wait(
+                cancellationToken);
+            ExceptionDispatchInfo? failure =
+                _startupCompletion.Task
+                    .GetAwaiter()
+                    .GetResult();
+            failure?.Throw();
         }
 
         private void CancelStartup() {

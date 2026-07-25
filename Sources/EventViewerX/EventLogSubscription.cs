@@ -24,6 +24,7 @@ public sealed class EventLogSubscription : IDisposable {
     private readonly WindowsEventNativeMethods.EventHandle? _bookmark;
     private readonly WindowsEventSnapshotProjector? _projector;
     private readonly WindowsEventNativeMethods.EventHandle? _subscription;
+    private readonly bool _structuredQuery;
     private CancellationTokenRegistration _externalCancellation;
     private Task _producer = Task.CompletedTask;
     private Task _consumer = Task.CompletedTask;
@@ -77,15 +78,16 @@ public sealed class EventLogSubscription : IDisposable {
                 }
             }
 
-            bool structuredQuery =
-                IsStructuredQuery(_query.XPath);
+            _structuredQuery =
+                EventLogStructuredQueryParser.IsQueryList(
+                    _query.XPath);
             _projector = new WindowsEventSnapshotProjector(
                 _query.ReadMode,
                 _session?.DangerousGetHandle() ?? IntPtr.Zero,
                 string.IsNullOrWhiteSpace(machineName)
                     ? Environment.MachineName
                     : machineName,
-                structuredQuery
+                _structuredQuery
                     ? string.Empty
                     : _query.LogName,
                 _query.MessageCulture?.LCID ?? 0,
@@ -93,7 +95,7 @@ public sealed class EventLogSubscription : IDisposable {
             _subscription = WindowsEventNativeMethods.EvtSubscribe(
                 _session?.DangerousGetHandle() ?? IntPtr.Zero,
                 _signal.SafeWaitHandle.DangerousGetHandle(),
-                structuredQuery
+                _structuredQuery
                     ? null
                     : _query.LogName,
                 string.IsNullOrWhiteSpace(_query.XPath)
@@ -265,11 +267,11 @@ public sealed class EventLogSubscription : IDisposable {
         }
         var nativeQuery = new NativeEventQuery(
             _session?.DangerousGetHandle() ?? IntPtr.Zero,
-            IsStructuredQuery(_query.XPath)
+            _structuredQuery
                 ? null
                 : _query.LogName,
             _query.XPath,
-            (IsStructuredQuery(_query.XPath)
+            (_structuredQuery
                 ? 0
                 : WindowsEventNativeMethods.QueryFlags.ChannelPath) |
             WindowsEventNativeMethods.QueryFlags
@@ -285,16 +287,6 @@ public sealed class EventLogSubscription : IDisposable {
         WindowsEventQueryDiagnostics.ReportFailures(
             _subscription!,
             nativeQuery);
-    }
-
-    private static bool IsStructuredQuery(
-        string? query) {
-
-        return query?.TrimStart()
-            .StartsWith(
-                "<QueryList",
-                StringComparison.OrdinalIgnoreCase) ==
-            true;
     }
 
     private void ReportFailure(

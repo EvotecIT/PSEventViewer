@@ -101,9 +101,11 @@ public static partial class EventLogEngine {
                        cancellationToken).ConfigureAwait(false)) {
                 while (channel.Reader.TryRead(
                            out EventObject? eventObject)) {
+                    cancellationToken.ThrowIfCancellationRequested();
                     yield return eventObject;
                 }
             }
+            cancellationToken.ThrowIfCancellationRequested();
         } finally {
             stop.Cancel();
             await producer.ConfigureAwait(false);

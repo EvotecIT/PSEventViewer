@@ -8,6 +8,40 @@ namespace EventViewerX.Tests;
 
 public sealed class TestNativeEventEngineContracts {
     [Fact]
+    public async Task LocalClearReturnsOnCancellationWhileNativeWorkRetainsOwnership() {
+        using var started =
+            new ManualResetEventSlim();
+        using var release =
+            new ManualResetEventSlim();
+        using var cancellation =
+            new CancellationTokenSource();
+        Task clear = Task.Run(() =>
+            EventLogMaintenance.ExecuteLocalClear(
+                () => {
+                    started.Set();
+                    release.Wait();
+                },
+                cancellation.Token));
+        Assert.True(
+            started.Wait(
+                TimeSpan.FromSeconds(5)));
+
+        cancellation.Cancel();
+        Task completed = await Task.WhenAny(
+            clear,
+            Task.Delay(
+                TimeSpan.FromSeconds(5)));
+        try {
+            Assert.Same(clear, completed);
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                async () =>
+                    await clear);
+        } finally {
+            release.Set();
+        }
+    }
+
+    [Fact]
     public void RemoteSessionUsesTheRequiredReservedNativeTimeout() {
         Assert.Equal(
             0,
@@ -515,6 +549,33 @@ public sealed class TestNativeEventEngineContracts {
         Assert.Equal(
             records.OrderBy(static value => value),
             records);
+    }
+
+    [Fact]
+    public async Task AsyncFileStreamStopsBeforeDrainingBufferedEventsAfterCancellation() {
+        if (!OperatingSystem.IsWindows()) return;
+        var query = new EventLogFileQuery(GetFixturePath()) {
+            Oldest = true,
+            ReadMode = EventReadMode.Metadata
+        };
+        using var cancellation =
+            new CancellationTokenSource();
+        await using IAsyncEnumerator<EventObject> events =
+            EventLogEngine.ReadFileAsync(
+                    query,
+                    bufferCapacity: 64,
+                    cancellationToken: cancellation.Token)
+                .GetAsyncEnumerator();
+
+        Assert.True(
+            await events.MoveNextAsync());
+        await Task.Delay(100);
+        cancellation.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            async () =>
+                await events.MoveNextAsync()
+                    .AsTask());
     }
 
     [Fact]
