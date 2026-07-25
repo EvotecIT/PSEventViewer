@@ -113,9 +113,9 @@ public sealed class LiveEventRow {
     public int Id { get; set; }
 
     /// <summary>
-    /// Event record ID.
+    /// Event record ID, or <see langword="null"/> when the source record does not expose one.
     /// </summary>
-    public long RecordId { get; set; }
+    public long? RecordId { get; set; }
 
     /// <summary>
     /// Source log name.

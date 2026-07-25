@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics.Eventing.Reader;
 using System.Linq;
 using System.Threading;
+using EventViewerX.Native;
 
 namespace EventViewerX.Reports.Inventory;
 
@@ -43,8 +44,13 @@ public static class EventCatalogQueryExecutor {
                 return false;
             }
 
+            string[] names = EnumerateNamesBounded(
+                sessionResult,
+                static session => session.GetLogNames(),
+                "event logs",
+                cancellationToken);
             var rows = BuildNameRows(
-                source: sessionResult.Session.GetLogNames(),
+                source: names,
                 request: request,
                 cancellationToken: cancellationToken,
                 rowFactory: static name => new EventChannelRow { Name = name },
@@ -59,6 +65,13 @@ public static class EventCatalogQueryExecutor {
             return true;
         } catch (OperationCanceledException) {
             throw;
+        } catch (TimeoutException ex) {
+            result = new EventChannelListResult();
+            failure = new EventCatalogFailure {
+                Kind = EventCatalogFailureKind.Timeout,
+                Message = ex.Message
+            };
+            return false;
         } catch (UnauthorizedAccessException ex) {
             result = new EventChannelListResult();
             failure = new EventCatalogFailure {
@@ -116,8 +129,14 @@ public static class EventCatalogQueryExecutor {
                 return false;
             }
 
+            string[] names = EnumerateNamesBounded(
+                sessionResult,
+                static session =>
+                    session.GetProviderNames(),
+                "event providers",
+                cancellationToken);
             var rows = BuildNameRows(
-                source: sessionResult.Session.GetProviderNames(),
+                source: names,
                 request: request,
                 cancellationToken: cancellationToken,
                 rowFactory: static name => new EventProviderRow { Name = name },
@@ -132,6 +151,13 @@ public static class EventCatalogQueryExecutor {
             return true;
         } catch (OperationCanceledException) {
             throw;
+        } catch (TimeoutException ex) {
+            result = new EventProviderListResult();
+            failure = new EventCatalogFailure {
+                Kind = EventCatalogFailureKind.Timeout,
+                Message = ex.Message
+            };
+            return false;
         } catch (UnauthorizedAccessException ex) {
             result = new EventProviderListResult();
             failure = new EventCatalogFailure {
@@ -171,6 +197,31 @@ public static class EventCatalogQueryExecutor {
                 ? $"Failed to open Event Log session to '{sessionResult.TargetHost}'."
                 : sessionResult.ErrorMessage
         };
+    }
+
+    private static string[] EnumerateNamesBounded(
+        EventLogSessionOpenResult sessionResult,
+        Func<EventLogSession, IEnumerable<string>> enumerate,
+        string description,
+        CancellationToken cancellationToken) {
+
+        EventLogSession session =
+            sessionResult.Session ??
+            throw new InvalidOperationException(
+                "A successful catalog session is required.");
+        sessionResult.Session = null;
+        using var sessionLifetime =
+            new RetainedDisposable<EventLogSession>(
+                session);
+        int timeoutMilliseconds =
+            sessionResult.TimeoutMs;
+        return EventLogCatalog.EnumerateNamesBounded(
+            () => enumerate(
+                sessionLifetime.Value),
+            timeoutMilliseconds,
+            $"Timed out enumerating {description} after {timeoutMilliseconds} ms.",
+            cancellationToken,
+            sessionLifetime.Retain());
     }
 
     private static bool TryValidateRequest<T>(

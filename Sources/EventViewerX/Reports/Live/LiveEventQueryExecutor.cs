@@ -102,24 +102,11 @@ public static class LiveEventQueryExecutor {
                     break;
                 }
 
-                rows.Add(new LiveEventRow {
-                    TimeCreatedUtc = FormatTimeCreatedUtc(
-                        ev.TimeCreated),
-                    Id = ev.Id,
-                    RecordId = ev.RecordId ?? 0,
-                    LogName = ev.LogName ?? string.Empty,
-                    ProviderName = ev.ProviderName ?? string.Empty,
-                    Level = (long)(ev.Level ?? 0),
-                    LevelDisplayName = ev.LevelDisplayName ?? string.Empty,
-                    Task = (long)(ev.Task ?? 0),
-                    Opcode = (long)(ev.Opcode ?? 0),
-                    Keywords = (long)(ev.Keywords ?? 0),
-                    MachineName = ev.MachineName ?? string.Empty,
-                    UserSid = EventProjectionHelpers.SafeGetUserSid(ev),
-                    Message = request.IncludeMessage
-                        ? EventProjectionHelpers.TruncateSafe(EventProjectionHelpers.SafeGetMessage(ev), request.MaxMessageChars)
-                        : null
-                });
+                rows.Add(
+                    ProjectRow(
+                        ev,
+                        request.IncludeMessage,
+                        request.MaxMessageChars));
             }
 
             result = new LiveEventQueryResult {
@@ -200,5 +187,41 @@ public static class LiveEventQueryExecutor {
             : timeCreated
                 .ToUniversalTime()
                 .ToString("O");
+    }
+
+    internal static LiveEventRow ProjectRow(
+        EventObject eventObject,
+        bool includeMessage,
+        int maxMessageChars) {
+
+        return new LiveEventRow {
+            TimeCreatedUtc = FormatTimeCreatedUtc(
+                eventObject.TimeCreated),
+            Id = eventObject.Id,
+            RecordId = eventObject.RecordId,
+            LogName = eventObject.LogName ??
+                      string.Empty,
+            ProviderName = eventObject.ProviderName ??
+                           string.Empty,
+            Level = (long)(eventObject.Level ?? 0),
+            LevelDisplayName =
+                eventObject.LevelDisplayName ??
+                string.Empty,
+            Task = (long)(eventObject.Task ?? 0),
+            Opcode = (long)(eventObject.Opcode ?? 0),
+            Keywords =
+                (long)(eventObject.Keywords ?? 0),
+            MachineName = eventObject.MachineName ??
+                          string.Empty,
+            UserSid =
+                EventProjectionHelpers.SafeGetUserSid(
+                    eventObject),
+            Message = includeMessage
+                ? EventProjectionHelpers.TruncateSafe(
+                    EventProjectionHelpers.SafeGetMessage(
+                        eventObject),
+                    maxMessageChars)
+                : null
+        };
     }
 }

@@ -225,6 +225,53 @@ public sealed class TestNativeEventEngineContracts {
         }
     }
 
+    [Fact]
+    public async Task RemoteClearReturnsOnCancellationWhileNativeWorkRetainsOwnership() {
+        using var started =
+            new ManualResetEventSlim();
+        using var release =
+            new ManualResetEventSlim();
+        using var leaseReleased =
+            new ManualResetEventSlim();
+        using var cancellation =
+            new CancellationTokenSource();
+        var lease =
+            new CallbackDisposable(
+                leaseReleased.Set);
+        Task clear = Task.Run(() =>
+            EventLogMaintenance.ExecuteRemoteClear(
+                () => {
+                    started.Set();
+                    release.Wait();
+                },
+                5000,
+                cancellation.Token,
+                lease));
+        Assert.True(
+            started.Wait(
+                TimeSpan.FromSeconds(5)));
+
+        cancellation.Cancel();
+        Task completed = await Task.WhenAny(
+            clear,
+            Task.Delay(
+                TimeSpan.FromSeconds(5)));
+        try {
+            Assert.Same(clear, completed);
+            await Assert.ThrowsAnyAsync<
+                OperationCanceledException>(
+                async () =>
+                    await clear);
+            Assert.False(
+                leaseReleased.IsSet);
+        } finally {
+            release.Set();
+        }
+        Assert.True(
+            leaseReleased.Wait(
+                TimeSpan.FromSeconds(5)));
+    }
+
     private sealed class CallbackDisposable :
         IDisposable {
         private readonly Action _dispose;

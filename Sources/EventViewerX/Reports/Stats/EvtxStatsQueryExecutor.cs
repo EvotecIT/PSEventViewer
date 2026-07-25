@@ -117,11 +117,15 @@ public static class EvtxStatsQueryExecutor {
             return false;
         }
 
-        if (request.EventIds is not null && request.EventIds.Any(static id => id <= 0)) {
+        if (request.EventIds is not null &&
+            request.EventIds.Any(static id =>
+                id < EventIdValidation.Minimum ||
+                id > EventIdValidation.Maximum)) {
             result = new EvtxStatsQueryResult();
             failure = new EvtxQueryFailure {
                 Kind = EvtxQueryFailureKind.InvalidArgument,
-                Message = "eventIds must contain only positive values."
+                Message =
+                    $"eventIds must contain only values from {EventIdValidation.Minimum} through {EventIdValidation.Maximum}."
             };
             return false;
         }

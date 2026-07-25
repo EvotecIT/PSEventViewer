@@ -61,36 +61,43 @@ public static class EventLogMaintenance {
             }
         }
 
-        WindowsEventNativeMethods.EventHandle? session = null;
-        CancellationTokenRegistration cancellationRegistration =
-            default;
+        RetainedDisposable<
+            WindowsEventNativeMethods.EventHandle>?
+            sessionLifetime = null;
         try {
             IntPtr sessionHandle = IntPtr.Zero;
             if (remote) {
-                session = WindowsEventRemoteSession.OpenBounded(
-                    machine,
-                    credential,
-                    authentication,
-                    remoteConnectionTimeoutMilliseconds,
-                    cancellationToken);
-                sessionHandle = session.DangerousGetHandle();
-                if (cancellationToken.CanBeCanceled) {
-                    cancellationRegistration =
-                        cancellationToken.Register(
-                            static state =>
-                                WindowsEventNativeMethods.EvtCancel(
-                                    (WindowsEventNativeMethods
-                                        .EventHandle)state!),
-                            session);
-                }
+                sessionLifetime =
+                    new RetainedDisposable<
+                        WindowsEventNativeMethods.EventHandle>(
+                        WindowsEventRemoteSession.OpenBounded(
+                            machine,
+                            credential,
+                            authentication,
+                            remoteConnectionTimeoutMilliseconds,
+                            cancellationToken));
+                sessionHandle =
+                    sessionLifetime.Value
+                        .DangerousGetHandle();
             }
             cancellationToken.ThrowIfCancellationRequested();
             string normalizedLogName = logName.Trim();
             string targetMachine = remote
                 ? machine
                 : Environment.MachineName;
-            if (!remote &&
-                cancellationToken.CanBeCanceled) {
+            if (remote) {
+                ExecuteRemoteClear(
+                    () => {
+                        ClearChannelNative(
+                            sessionHandle,
+                            normalizedLogName,
+                            normalizedBackup,
+                            targetMachine);
+                    },
+                    remoteConnectionTimeoutMilliseconds,
+                    cancellationToken,
+                    sessionLifetime!.Retain());
+            } else if (cancellationToken.CanBeCanceled) {
                 ExecuteLocalClear(
                     () => {
                         ClearChannelNative(
@@ -113,8 +120,7 @@ public static class EventLogMaintenance {
                 remote ? machine : null,
                 normalizedBackup);
         } finally {
-            cancellationRegistration.Dispose();
-            session?.Dispose();
+            sessionLifetime?.Dispose();
         }
     }
 
@@ -133,6 +139,29 @@ public static class EventLogMaintenance {
             int.MaxValue,
             "The local Windows event channel clear did not complete.",
             cancellationToken);
+    }
+
+    internal static void ExecuteRemoteClear(
+        Action clear,
+        int timeoutMilliseconds,
+        CancellationToken cancellationToken,
+        IDisposable operationLease) {
+
+        if (clear == null) {
+            operationLease?.Dispose();
+            throw new ArgumentNullException(
+                nameof(clear));
+        }
+        _ = EventLogNativeOperation.Execute(
+            () => {
+                clear();
+                return true;
+            },
+            timeoutMilliseconds,
+            $"The remote Windows event channel clear did not complete within {timeoutMilliseconds} ms.",
+            cancellationToken,
+            operationLease:
+                operationLease);
     }
 
     private static void ClearChannelNative(

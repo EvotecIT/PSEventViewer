@@ -95,4 +95,63 @@ public class TestEventCatalogQueryExecutor {
         Assert.Equal(new[] { "A" }, cappedRows);
         Assert.True(cappedTruncated);
     }
+
+    [Fact]
+    public void CatalogEnumerationIsBoundedAndRetainsOperationOwnership() {
+        using var started =
+            new ManualResetEventSlim();
+        using var release =
+            new ManualResetEventSlim();
+        using var leaseReleased =
+            new ManualResetEventSlim();
+        using var cancellation =
+            new CancellationTokenSource();
+        var lease =
+            new CallbackDisposable(
+                leaseReleased.Set);
+        var cancelThread =
+            new Thread(() => {
+                started.Wait();
+                cancellation.Cancel();
+            });
+        cancelThread.Start();
+
+        try {
+            Assert.Throws<
+                OperationCanceledException>(() =>
+                EventLogCatalog.EnumerateNamesBounded(
+                    () => {
+                        started.Set();
+                        release.Wait();
+                        return new[] { "Application" };
+                    },
+                    5000,
+                    "Catalog enumeration timed out.",
+                    cancellation.Token,
+                    lease));
+            Assert.False(
+                leaseReleased.IsSet);
+        } finally {
+            release.Set();
+            cancelThread.Join();
+        }
+        Assert.True(
+            leaseReleased.Wait(
+                TimeSpan.FromSeconds(5)));
+    }
+
+    private sealed class CallbackDisposable :
+        IDisposable {
+        private readonly Action _dispose;
+
+        internal CallbackDisposable(
+            Action dispose) {
+
+            _dispose = dispose;
+        }
+
+        public void Dispose() {
+            _dispose();
+        }
+    }
 }

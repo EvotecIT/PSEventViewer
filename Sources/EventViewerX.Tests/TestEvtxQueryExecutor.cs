@@ -96,6 +96,28 @@ public class TestEvtxQueryExecutor {
     }
 
     [Fact]
+    public void StatsQuery_ShouldAcceptEventIdZero() {
+        var request =
+            new EvtxStatsQueryRequest {
+                FilePath =
+                    "C:/this/file/does/not/exist.evtx",
+                EventIds = new[] { 0 }
+            };
+
+        bool success =
+            EvtxStatsQueryExecutor.TryBuild(
+                request,
+                out _,
+                out EvtxQueryFailure? failure);
+
+        Assert.False(success);
+        Assert.NotNull(failure);
+        Assert.Equal(
+            EvtxQueryFailureKind.NotFound,
+            failure!.Kind);
+    }
+
+    [Fact]
     public void TryRead_ShouldRejectEventIdsAboveWindowsRange() {
         var request = new EvtxQueryRequest {
             FilePath = "dummy.evtx",

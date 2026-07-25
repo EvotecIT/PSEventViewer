@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics.Eventing.Reader;
 using System.Runtime.Serialization;
 using System.Security.Principal;
+using EventViewerX.Reports.Live;
 using EventViewerX.Reports.Stats;
 using Xunit;
 
@@ -38,6 +39,24 @@ public class TestEventObjectTimeCreated
         Assert.Null(builder.MaxUtc);
     }
 
+    [Fact]
+    public void LiveProjectionPreservesMissingTimeAndRecordId() {
+        var eventObject =
+            new EventObject(
+                new NullTimeEventRecord(),
+                "local",
+                EventReadMode.Metadata);
+
+        LiveEventRow row =
+            LiveEventQueryExecutor.ProjectRow(
+                eventObject,
+                includeMessage: false,
+                maxMessageChars: 0);
+
+        Assert.Null(row.TimeCreatedUtc);
+        Assert.Null(row.RecordId);
+    }
+
     private sealed class NullTimeEventRecord : EventRecord
     {
         public override string ProviderName => "TestProvider";
@@ -62,7 +81,7 @@ public class TestEventObjectTimeCreated
         public override IList<EventProperty> Properties => Array.Empty<EventProperty>();
         public override DateTime? TimeCreated => null;
         public override int? Qualifiers => null;
-        public override long? RecordId => 0;
+        public override long? RecordId => null;
         public override byte? Version => 0;
         public override SecurityIdentifier UserId => null!;
         public override EventBookmark Bookmark => null!;
