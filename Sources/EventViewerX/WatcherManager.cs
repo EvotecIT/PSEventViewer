@@ -166,12 +166,16 @@ namespace EventViewerX {
             name = string.IsNullOrWhiteSpace(name) ? null : name!.Trim();
             actionIdentity = string.IsNullOrWhiteSpace(actionIdentity) ? null : actionIdentity!.Trim();
             reuseScopeIdentity = string.IsNullOrWhiteSpace(reuseScopeIdentity) ? null : reuseScopeIdentity!.Trim();
-            eventIds = eventIds.Where(static id => id > 0).Distinct().OrderBy(static id => id).ToList();
+            eventIds = EventIdValidation.Normalize(
+                eventIds,
+                nameof(eventIds));
             if (eventIds.Count == 0 &&
                 subscriptionQuery == null &&
                 (subscriptionQueries == null ||
                  subscriptionQueries.Count == 0)) {
-                throw new ArgumentException("At least one positive event ID is required.", nameof(eventIds));
+                throw new ArgumentException(
+                    "At least one event ID is required.",
+                    nameof(eventIds));
             }
             namedEvents = namedEvents.Distinct().OrderBy(static value => value).ToList();
 

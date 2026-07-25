@@ -421,7 +421,9 @@ namespace EventViewerX {
             bool staging) {
 
             var ids = new HashSet<int>(
-                eventIds.Where(static id => id > 0));
+                EventIdValidation.Normalize(
+                    eventIds,
+                    nameof(eventIds)));
             if (staging) {
                 ids.Add(350);
             }

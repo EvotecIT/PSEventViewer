@@ -1,3 +1,6 @@
+using System.Security.Cryptography;
+using System.Text;
+
 namespace EventViewerX.Providers;
 
 internal sealed class EventProviderLifecycleLock : IDisposable {
@@ -21,6 +24,43 @@ internal sealed class EventProviderLifecycleLock : IDisposable {
                 "A provider GUID is required for lifecycle serialization.",
                 nameof(providerId));
         }
+        return Acquire(
+            "Global\\EventViewerX.Provider." +
+            providerId.ToString("N"),
+            timeout,
+            $"provider {providerId:D}");
+    }
+
+    internal static EventProviderLifecycleLock AcquireProviderName(
+        string providerName,
+        TimeSpan timeout) {
+
+        if (string.IsNullOrWhiteSpace(providerName)) {
+            throw new ArgumentException(
+                "A provider name is required for lifecycle serialization.",
+                nameof(providerName));
+        }
+        string normalized =
+            providerName.Trim().ToUpperInvariant();
+        byte[] hash;
+        using (SHA256 sha256 = SHA256.Create()) {
+            hash = sha256.ComputeHash(
+                Encoding.UTF8.GetBytes(normalized));
+        }
+        string key =
+            BitConverter.ToString(hash)
+                .Replace("-", string.Empty);
+        return Acquire(
+            "Global\\EventViewerX.ProviderName." + key,
+            timeout,
+            $"provider name '{providerName.Trim()}'");
+    }
+
+    private static EventProviderLifecycleLock Acquire(
+        string mutexName,
+        TimeSpan timeout,
+        string description) {
+
         if (timeout <= TimeSpan.Zero) {
             throw new ArgumentOutOfRangeException(
                 nameof(timeout),
@@ -29,8 +69,7 @@ internal sealed class EventProviderLifecycleLock : IDisposable {
 
         var mutex = new Mutex(
             initiallyOwned: false,
-            "Global\\EventViewerX.Provider." +
-            providerId.ToString("N"));
+            mutexName);
         bool acquired;
         try {
             acquired = mutex.WaitOne(timeout);
@@ -40,7 +79,7 @@ internal sealed class EventProviderLifecycleLock : IDisposable {
         if (!acquired) {
             mutex.Dispose();
             throw new TimeoutException(
-                $"Timed out waiting for another lifecycle operation on provider {providerId:D}.");
+                $"Timed out waiting for another lifecycle operation on {description}.");
         }
         return new EventProviderLifecycleLock(
             mutex,

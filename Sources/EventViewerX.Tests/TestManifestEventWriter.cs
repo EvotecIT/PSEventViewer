@@ -243,6 +243,42 @@ public sealed class TestManifestEventWriter {
     }
 
     [Fact]
+    public void EncodesShortFixedLengthStringsWithNullPadding() {
+        if (!OperatingSystem.IsWindows()) return;
+        ManifestEventDefinition definition = CreateDefinition(
+            Field(
+                "UnicodeText",
+                "win:UnicodeString",
+                length: "5"),
+            Field(
+                "AnsiText",
+                "win:AnsiString",
+                length: "5"));
+
+        using var buffer =
+            new ManifestEventPayloadBuffer(
+                definition,
+                new object?[] {
+                    "A",
+                    "B"
+                });
+
+        Assert.Equal(
+            Encoding.Unicode.GetBytes(
+                "A\0\0\0\0"),
+            Read(buffer.Descriptors[0]));
+        Assert.Equal(
+            new byte[] {
+                (byte)'B',
+                0,
+                0,
+                0,
+                0
+            },
+            Read(buffer.Descriptors[1]));
+    }
+
+    [Fact]
     public void EncodesZeroLengthAndCountedBinaryPayloadsWithoutPadding() {
         ManifestEventDefinition definition = CreateDefinition(
             Field("EmptyText", "win:UnicodeString", length: "0"),

@@ -105,7 +105,7 @@ namespace EventViewerX {
         /// </summary>
         /// <param name="machineName">Target machine name; null targets the local computer.</param>
         /// <param name="logName">Event log channel name.</param>
-        /// <param name="eventId">Positive event identifiers to monitor.</param>
+        /// <param name="eventId">Event identifiers from 0 through 65535 to monitor.</param>
         /// <param name="eventAction">Callback invoked for each matching event.</param>
         /// <param name="cancellationToken">Cancellation token used to stop watching.</param>
         /// <param name="staging">Whether event ID 350 is also monitored.</param>
@@ -127,12 +127,17 @@ namespace EventViewerX {
             }
             cancellationToken.ThrowIfCancellationRequested();
 
-            var ids = new HashSet<int>(eventId.Where(static id => id > 0));
+            var ids = new HashSet<int>(
+                EventIdValidation.Normalize(
+                    eventId,
+                    nameof(eventId)));
             if (staging) {
                 ids.Add(350);
             }
             if (ids.Count == 0) {
-                throw new ArgumentException("At least one positive event ID is required.", nameof(eventId));
+                throw new ArgumentException(
+                    "At least one event ID is required.",
+                    nameof(eventId));
             }
 
             string xpath = EventFilterCompiler.BuildXPath(new EventFilter {

@@ -23,6 +23,10 @@ public static partial class EventProviderPackageManager {
         EventProviderPackageTrust.EnsureAllowed(
             preflightPackage,
             options);
+        using EventProviderLifecycleLock providerNameLock =
+            EventProviderLifecycleLock.AcquireProviderName(
+                preflightPackage.Definition.Name,
+                options.ToolTimeout);
         using EventProviderLifecycleLock lifecycleLock =
             EventProviderLifecycleLock.Acquire(
                 preflightPackage.Definition.Id,
@@ -522,6 +526,13 @@ public static partial class EventProviderPackageManager {
                 "Provider name cannot be empty.",
                 nameof(providerName));
         }
+        TimeSpan timeout =
+            toolTimeout ?? TimeSpan.FromMinutes(1);
+        providerName = providerName.Trim();
+        using EventProviderLifecycleLock providerNameLock =
+            EventProviderLifecycleLock.AcquireProviderName(
+                providerName,
+                timeout);
         InstalledEventProviderPackage initial =
             GetInstalled(rootPath).SingleOrDefault(item =>
                 string.Equals(
@@ -531,8 +542,6 @@ public static partial class EventProviderPackageManager {
                 item.IsActive) ??
             throw new InvalidOperationException(
                 $"Provider '{providerName}' is not managed by EventViewerX.");
-        TimeSpan timeout =
-            toolTimeout ?? TimeSpan.FromMinutes(1);
         using EventProviderLifecycleLock lifecycleLock =
             EventProviderLifecycleLock.Acquire(
                 initial.ProviderId,
@@ -543,6 +552,7 @@ public static partial class EventProviderPackageManager {
                     item.ProviderName,
                     providerName,
                     StringComparison.OrdinalIgnoreCase) &&
+                item.ProviderId == initial.ProviderId &&
                 item.IsActive) ??
             throw new InvalidOperationException(
                 $"Provider '{providerName}' changed while waiting for its lifecycle lock.");

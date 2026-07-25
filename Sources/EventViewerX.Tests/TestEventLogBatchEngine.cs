@@ -127,6 +127,32 @@ namespace EventViewerX.Tests;
     }
 
     [Fact]
+    public void StructuredBatchExpansionExposesEveryIndependentFileSource() {
+        EventLogStructuredQuery source =
+            EventLogStructuredQuery.ForFiles(
+                new[] {
+                    Path.Combine(
+                        Path.GetTempPath(),
+                        "first.evtx"),
+                    Path.Combine(
+                        Path.GetTempPath(),
+                        "second.evtx")
+                });
+
+        IReadOnlyList<EventLogStructuredQuery> expanded =
+            EventLogBatchEngine.ExpandStructuredSources(
+                source);
+
+        Assert.Equal(2, expanded.Count);
+        Assert.All(
+            expanded,
+            static query =>
+                Assert.Equal(
+                    1,
+                    query.GetIndependentSourceCount()));
+    }
+
+    [Fact]
     public async Task AsyncBatchMatchesSynchronousNativeSelection() {
         if (!OperatingSystem.IsWindows()) return;
         string path = GetFixturePath();

@@ -54,7 +54,7 @@ namespace PSEventViewer {
         /// Array of event identifiers to monitor.
         /// </summary>
         [Parameter(Mandatory = true, Position = 1, ParameterSetName = "EventId")]
-        [ValidateRange(1, int.MaxValue)]
+        [ValidateRange(0, ushort.MaxValue)]
         public int[] EventId { get; set; } = Array.Empty<int>();
 
         /// <summary>

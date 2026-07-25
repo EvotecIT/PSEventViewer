@@ -675,6 +675,34 @@ public sealed class TestEventProviderPackages {
     }
 
     [Fact]
+    public void SerializesLifecycleOperationsByProviderNameIgnoringCase() {
+        string providerName =
+            "EventViewerX.Tests." +
+            Guid.NewGuid().ToString("N");
+        using EventProviderLifecycleLock first =
+            EventProviderLifecycleLock.AcquireProviderName(
+                providerName,
+                TimeSpan.FromSeconds(1));
+
+        Exception? failure = null;
+        var contender = new Thread(() => {
+            try {
+                using EventProviderLifecycleLock second =
+                    EventProviderLifecycleLock.AcquireProviderName(
+                        providerName.ToUpperInvariant(),
+                        TimeSpan.FromMilliseconds(100));
+            } catch (Exception exception) {
+                failure = exception;
+            }
+        });
+        contender.Start();
+        Assert.True(
+            contender.Join(
+                TimeSpan.FromSeconds(2)));
+        Assert.IsType<TimeoutException>(failure);
+    }
+
+    [Fact]
     public void ProducesIdenticalSignedPackagesForIdenticalInputs() {
         string root = Path.Combine(
             Path.GetTempPath(),

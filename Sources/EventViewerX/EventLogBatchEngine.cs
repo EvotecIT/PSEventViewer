@@ -95,8 +95,14 @@ public static partial class EventLogBatchEngine {
                                 sourceLimit),
                             cancellationToken)))
                 .ToArray();
-        EventSourceSnapshot[] structured =
+        EventLogStructuredQuery[] structuredSources =
             query.StructuredQueries
+                .SelectMany(static structured =>
+                    ExpandStructuredSources(
+                        structured))
+                .ToArray();
+        EventSourceSnapshot[] structured =
+            structuredSources
                 .Select((structured, index) => new EventSourceSnapshot(
                     $"StructuredQuery[{index}]",
                     structured.MachineName,
@@ -118,6 +124,26 @@ public static partial class EventLogBatchEngine {
         throw new ArgumentException(
             "The batch does not contain any query sources.",
             nameof(query));
+    }
+
+    internal static IReadOnlyList<EventLogStructuredQuery>
+        ExpandStructuredSources(
+            EventLogStructuredQuery source) {
+
+        if (source == null) {
+            throw new ArgumentNullException(nameof(source));
+        }
+        if (source.GetIndependentSourceCount() <= 1) {
+            return new[] { source };
+        }
+
+        EventLogBatchQuery split =
+            EventLogBatchQuery.ForStructured(
+                new[] { source });
+        return EventLogBatchConsolidator
+            .Consolidate(split)
+            .StructuredQueries
+            .ToArray();
     }
 
     private static EventLogChannelQuery CopyChannelQuery(

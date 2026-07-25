@@ -19,6 +19,24 @@ Describe 'Start-EVXWatcher - Parameter validation' {
         { Start-EVXWatcher -MachineName $env:COMPUTERNAME -LogName 'Application' -EventId 1 -Action {} -NumberOfThreads 2000 } | Should -Throw
     }
 
+    It 'accepts event ID zero in an explicit watcher filter' {
+        $Watcher = $null
+        try {
+            $Watcher = Start-EVXWatcher `
+                -Name ('PSEventViewer.EventZero.' + [Guid]::NewGuid().ToString('N')) `
+                -MachineName $env:COMPUTERNAME `
+                -LogName Application `
+                -EventId 0 `
+                -Action {}
+
+            $Watcher | Should -Not -BeNullOrEmpty
+        } finally {
+            if ($Watcher) {
+                Stop-EVXWatcher -Id $Watcher.Id -ErrorAction SilentlyContinue
+            }
+        }
+    }
+
     It 'exposes native XPath and hashtable subscription sets' {
         $sets = (Get-Command Start-EVXWatcher).ParameterSets.Name
         $sets | Should -Contain 'FilterXPath'

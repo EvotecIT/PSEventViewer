@@ -329,6 +329,29 @@ namespace EventViewerX.Tests {
         }
 
         [Fact]
+        public void ExplicitWatcherFiltersAcceptEventIdZero() {
+            EventLogSubscriptionQuery query =
+                WatcherInfo.CreateSubscriptionQuery(
+                    Environment.MachineName,
+                    "Application",
+                    new[] { 0 },
+                    staging: false);
+
+            Assert.Contains(
+                "EventID=0",
+                query.XPath,
+                StringComparison.Ordinal);
+            Assert.Throws<ArgumentOutOfRangeException>(() =>
+                EventIdValidation.Normalize(
+                    new[] { -1 },
+                    "eventIds"));
+            Assert.Throws<ArgumentOutOfRangeException>(() =>
+                EventIdValidation.Normalize(
+                    new[] { 65536 },
+                    "eventIds"));
+        }
+
+        [Fact]
         public void StartWatcherThrowsWhenDuplicatesExist() {
             var field = typeof(WatcherManager).GetField("_watchers", BindingFlags.NonPublic | BindingFlags.Static);
             Assert.NotNull(field);

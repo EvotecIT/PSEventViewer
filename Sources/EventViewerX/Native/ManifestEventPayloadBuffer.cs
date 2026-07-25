@@ -476,7 +476,7 @@ internal sealed class ManifestEventPayloadBuffer : IDisposable {
                 $"Manifest payload field '{field.Name}' allows at most {contentLength} character(s) before its null terminator, but {value.Length} were supplied.",
                 field.Name);
         }
-        return value.PadRight(contentLength) + '\0';
+        return value.PadRight(contentLength, '\0') + '\0';
     }
 
     private static void ValidateEncodedLength(
