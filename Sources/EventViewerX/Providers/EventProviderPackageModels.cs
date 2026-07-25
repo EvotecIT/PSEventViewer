@@ -89,11 +89,13 @@ public sealed class EventProviderPackageManifest {
 public sealed class EventProviderPackage : IDisposable {
     internal EventProviderPackage(
         string path,
+        string packageSha256,
         EventProviderPackageManifest manifest,
         EventProviderDefinition definition,
         X509Certificate2? signerCertificate) {
 
         Path = path;
+        PackageSha256 = packageSha256;
         Manifest = manifest;
         Definition = definition;
         SignerCertificate = signerCertificate;
@@ -101,6 +103,10 @@ public sealed class EventProviderPackage : IDisposable {
 
     /// <summary>Complete source package path.</summary>
     public string Path { get; }
+    /// <summary>
+    /// SHA-256 of the exact package bytes used for verification.
+    /// </summary>
+    public string PackageSha256 { get; }
     /// <summary>Verified package metadata and hashes.</summary>
     public EventProviderPackageManifest Manifest { get; }
     /// <summary>Validated provider definition.</summary>

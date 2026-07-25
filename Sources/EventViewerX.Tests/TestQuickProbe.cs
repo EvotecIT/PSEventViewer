@@ -30,6 +30,35 @@ namespace EventViewerX.Tests {
         }
 
         [Fact]
+        public void ManagedRemoteSessionRejectsExplicitAuthenticationWithoutCredential() {
+            if (!OperatingSystem.IsWindows()) return;
+
+            ArgumentException exception =
+                Assert.Throws<ArgumentException>(() =>
+                    EventLogSessionManager
+                        .CreateSessionResult(
+                            "eventviewerx-auth.invalid",
+                            "QuickProbe",
+                            "Application",
+                            timeoutMs: 1000,
+                            rpcProbeOverride:
+                                static (_, _) => true,
+                            remoteSessionFactory:
+                                static _ => new System.Diagnostics
+                                    .Eventing.Reader.EventLogSession(),
+                            authentication:
+                                EventLogAuthentication.Kerberos));
+
+            Assert.Equal(
+                "authentication",
+                exception.ParamName);
+            Assert.Contains(
+                "requires a credential",
+                exception.Message,
+                StringComparison.OrdinalIgnoreCase);
+        }
+
+        [Fact]
         public void RemoteSessionCreationClassifiesAStalledOpenAsTimeout() {
             if (!OperatingSystem.IsWindows()) return;
 

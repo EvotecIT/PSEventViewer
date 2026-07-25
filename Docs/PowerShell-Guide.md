@@ -178,6 +178,9 @@ Use `-Credential`, `-Authentication`, `-RemoteConnectionTimeoutMs`, and
 `-RemoteReadTimeoutMs` when the default Windows Event Log session is not
 appropriate. Results retain both the queried source and the computer recorded
 inside the event.
+When selecting an explicit authentication package for catalog or administration
+commands, also provide `-Credential`; the managed Windows catalog API cannot
+enforce Kerberos, NTLM, or Negotiate while using its current-identity overload.
 
 ### Named event scenarios
 

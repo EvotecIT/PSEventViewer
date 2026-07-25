@@ -32,24 +32,17 @@ public static partial class EventProviderPackageManager {
                 preflightPackage.Definition.Id,
                 options.ToolTimeout);
 
-        string hashBeforeOpen =
-            EventProviderHash.FileSha256(
-                preflightPackage.Path);
+        string preflightHash =
+            preflightPackage.PackageSha256;
         using EventProviderPackage package =
             EventProviderPackageReader.Open(
                 preflightPackage.Path);
         string packageHash =
-            EventProviderHash.FileSha256(
-                package.Path);
-        if (!string.Equals(
-                hashBeforeOpen,
-                packageHash,
-                StringComparison.OrdinalIgnoreCase) ||
-            preflightPackage.Definition.Id !=
-            package.Definition.Id) {
-            throw new InvalidDataException(
-                "The provider package changed while installation was starting.");
-        }
+            package.PackageSha256;
+        EnsureMatchesPreflight(
+            preflightPackage,
+            preflightHash,
+            package);
         EventProviderPackageTrust.EnsureAllowed(
             package,
             options);
@@ -87,6 +80,22 @@ public static partial class EventProviderPackageManager {
                 ref activePackage);
         } finally {
             activePackage?.Dispose();
+        }
+    }
+
+    internal static void EnsureMatchesPreflight(
+        EventProviderPackage preflightPackage,
+        string preflightHash,
+        EventProviderPackage package) {
+
+        if (!string.Equals(
+                preflightHash,
+                package.PackageSha256,
+                StringComparison.OrdinalIgnoreCase) ||
+            preflightPackage.Definition.Id !=
+            package.Definition.Id) {
+            throw new InvalidDataException(
+                "The provider package changed while installation was starting.");
         }
     }
 

@@ -11,6 +11,12 @@ public static class EventProviderPackageReader {
     /// <summary>Opens a package and verifies every declared file hash.</summary>
     public static EventProviderPackage Open(string path) {
         PackageContents contents = Read(path);
+        return Open(contents);
+    }
+
+    private static EventProviderPackage Open(
+        PackageContents contents) {
+
         EventProviderDefinition definition =
             EventProviderDefinitionJson.Parse(
                 Encoding.UTF8.GetString(
@@ -36,7 +42,8 @@ public static class EventProviderPackageReader {
             signerCertificate =
                 EventProviderPackageSignature.Verify(contents.Manifest);
         return new EventProviderPackage(
-            Path.GetFullPath(path),
+            contents.Path,
+            contents.PackageSha256,
             contents.Manifest,
             definition,
             signerCertificate);
@@ -78,7 +85,7 @@ public static class EventProviderPackageReader {
                     contents.Manifest,
                     EventProviderDefinitionJson.SerializerOptions),
                 new UTF8Encoding(false));
-            return Open(packagePath);
+            return Open(contents);
         } catch {
             if (Directory.Exists(destination)) {
                 Directory.Delete(destination, recursive: true);
@@ -158,12 +165,34 @@ public static class EventProviderPackageReader {
                 "Provider package was not found.",
                 fullPath);
         }
-        if (new FileInfo(fullPath).Length > MaximumPackageBytes) {
+        using var packageStream = new FileStream(
+            fullPath,
+            FileMode.Open,
+            FileAccess.Read,
+            FileShare.Read);
+        if (packageStream.Length > MaximumPackageBytes) {
             throw new InvalidDataException(
                 $"Provider package exceeds {MaximumPackageBytes} bytes.");
         }
+        long packageBytesRead = 0;
+        byte[] packageBytes = ReadBounded(
+            packageStream,
+            Path.GetFileName(fullPath),
+            MaximumPackageBytes,
+            MaximumPackageBytes,
+            ref packageBytesRead);
+        string packageSha256 =
+            EventProviderHash.BytesSha256(
+                packageBytes);
+        using var verifiedPackageStream =
+            new MemoryStream(
+                packageBytes,
+                writable: false);
 
-        using ZipArchive archive = ZipFile.OpenRead(fullPath);
+        using var archive = new ZipArchive(
+            verifiedPackageStream,
+            ZipArchiveMode.Read,
+            leaveOpen: false);
         var entries = new Dictionary<string, ZipArchiveEntry>(
             StringComparer.Ordinal);
         long declaredExpandedBytes = 0;
@@ -272,7 +301,11 @@ public static class EventProviderPackageReader {
                     $"Provider package required file '{required}' is not declared.");
             }
         }
-        return new PackageContents(manifest, files);
+        return new PackageContents(
+            fullPath,
+            packageSha256,
+            manifest,
+            files);
     }
 
     private static string ReadText(
@@ -349,13 +382,19 @@ public static class EventProviderPackageReader {
 
     private sealed class PackageContents {
         internal PackageContents(
+            string path,
+            string packageSha256,
             EventProviderPackageManifest manifest,
             IReadOnlyDictionary<string, byte[]> files) {
 
+            Path = path;
+            PackageSha256 = packageSha256;
             Manifest = manifest;
             Files = files;
         }
 
+        internal string Path { get; }
+        internal string PackageSha256 { get; }
         internal EventProviderPackageManifest Manifest { get; }
         internal IReadOnlyDictionary<string, byte[]> Files { get; }
     }

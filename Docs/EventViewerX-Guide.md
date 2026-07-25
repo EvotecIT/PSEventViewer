@@ -299,6 +299,10 @@ EventLogChannelPolicyService.Apply(new ChannelPolicy {
 Use `ClassicEventLogManager` for classic logs/sources and
 `CollectorSubscriptionManager` for Windows Event Collector inventory and local
 updates. Administrative changes normally require elevation.
+Managed catalog and administration sessions require a `NetworkCredential` when
+`Kerberos`, `Ntlm`, or `Negotiate` is selected explicitly. The current-identity
+`EventLogSession` overload cannot enforce a specific authentication package;
+use `Default` when current-identity negotiation is acceptable.
 
 ## Write events
 

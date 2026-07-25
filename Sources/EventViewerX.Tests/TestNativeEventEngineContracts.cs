@@ -102,6 +102,62 @@ public sealed class TestNativeEventEngineContracts {
     }
 
     [Fact]
+    public async Task ProviderMetadataCancellationReturnsBeforeNativeWorkAndRetainsSession() {
+        using var started =
+            new ManualResetEventSlim();
+        using var release =
+            new ManualResetEventSlim();
+        using var disposed =
+            new ManualResetEventSlim();
+        using var cancellation =
+            new CancellationTokenSource();
+        var lifetime =
+            new Native.RetainedDisposable<
+                CallbackDisposable>(
+                new CallbackDisposable(
+                    disposed.Set));
+        Task<EventProviderMetadataSnapshot> snapshot =
+            Task.Run(() =>
+                EventLogCatalog.SnapshotProviderBounded(
+                    () => {
+                        started.Set();
+                        release.Wait();
+                        return null!;
+                    },
+                    "Stalled.Provider",
+                    5000,
+                    cancellation.Token,
+                    lifetime.Retain()));
+        Assert.True(
+            started.Wait(
+                TimeSpan.FromSeconds(5)));
+
+        cancellation.Cancel();
+        Task completed = await Task.WhenAny(
+            snapshot,
+            Task.Delay(
+                TimeSpan.FromSeconds(5)));
+        try {
+            Assert.Same(
+                snapshot,
+                completed);
+            await Assert.ThrowsAnyAsync<
+                OperationCanceledException>(
+                async () =>
+                    await snapshot);
+            lifetime.Dispose();
+            Assert.False(
+                disposed.IsSet);
+        } finally {
+            release.Set();
+            Assert.True(
+                disposed.Wait(
+                    TimeSpan.FromSeconds(5)));
+            lifetime.Dispose();
+        }
+    }
+
+    [Fact]
     public void ProviderCatalogValidatesBeforeReturningDeferredResults() {
         var query =
             new EventLogCatalogQuery {
@@ -111,7 +167,28 @@ public sealed class TestNativeEventEngineContracts {
         Assert.Throws<
             ArgumentOutOfRangeException>(() =>
                 EventLogCatalog.GetProviders(
+                 query));
+    }
+
+    [Fact]
+    public void ProviderCatalogRejectsExplicitAuthenticationWithoutCredentialAtCallTime() {
+        var query =
+            new EventLogCatalogQuery {
+                MachineName =
+                    "eventviewerx-auth.invalid",
+                Authentication =
+                    EventLogAuthentication.Kerberos
+            };
+
+        ArgumentException exception =
+            Assert.Throws<ArgumentException>(() =>
+                EventLogCatalog.GetProviders(
                     query));
+
+        Assert.Contains(
+            "requires a credential",
+            exception.Message,
+            StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

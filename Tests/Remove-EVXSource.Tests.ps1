@@ -1,6 +1,6 @@
 describe 'Remove-EVXSource cmdlet' {
     BeforeAll {
-        $script:source = 'TestEVXSource'
+        $script:source = 'TestEVXSource' + [Guid]::NewGuid().ToString('N')
         $script:isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltinRole]::Administrator)
         $script:skip = -not $script:isAdmin
     }

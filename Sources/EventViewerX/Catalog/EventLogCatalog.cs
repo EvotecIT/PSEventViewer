@@ -81,13 +81,24 @@ public static partial class EventLogCatalog {
             EventProviderMetadataSnapshot? provider = null;
             Exception? failure = null;
             try {
-                using var metadata = new ProviderMetadata(
+                provider = SnapshotProviderBounded(
+                    () => {
+                        using var metadata = new ProviderMetadata(
+                            providerName,
+                            session,
+                            snapshot.Culture ??
+                            CultureInfo.CurrentUICulture);
+                        return SnapshotProvider(
+                            metadata,
+                            snapshot.IncludeEvents);
+                    },
                     providerName,
-                    session,
-                    snapshot.Culture ?? CultureInfo.CurrentUICulture);
-                provider = SnapshotProvider(
-                    metadata,
-                    snapshot.IncludeEvents);
+                    snapshot.ConnectionTimeoutMilliseconds,
+                    cancellationToken,
+                    sessionLifetime.Retain());
+            } catch (OperationCanceledException)
+                when (cancellationToken.IsCancellationRequested) {
+                throw;
             } catch (Exception exception) {
                 failure = exception;
             }
@@ -96,6 +107,32 @@ public static partial class EventLogCatalog {
                 provider,
                 failure);
         }
+    }
+
+    internal static EventProviderMetadataSnapshot
+        SnapshotProviderBounded(
+            Func<EventProviderMetadataSnapshot> snapshot,
+            string providerName,
+            int timeoutMilliseconds,
+            CancellationToken cancellationToken,
+            IDisposable? operationLease = null) {
+
+        if (snapshot == null) {
+            operationLease?.Dispose();
+            throw new ArgumentNullException(
+                nameof(snapshot));
+        }
+        if (cancellationToken.IsCancellationRequested) {
+            operationLease?.Dispose();
+            cancellationToken.ThrowIfCancellationRequested();
+        }
+        return EventLogNativeOperation.Execute(
+            snapshot,
+            timeoutMilliseconds,
+            $"Timed out reading metadata for event provider '{providerName}' after {timeoutMilliseconds} ms.",
+            cancellationToken,
+            operationLease:
+                operationLease);
     }
 
     /// <summary>Resolves the channels linked by matching providers.</summary>
@@ -386,6 +423,14 @@ public static partial class EventLogCatalog {
             query.Credential != null) {
             throw new ArgumentException(
                 "Credentials can only be used with a remote catalog query.",
+                nameof(query));
+        }
+        if (!EventLogTarget.IsLocalMachine(machineName) &&
+            query.Credential == null &&
+            query.Authentication !=
+            EventLogAuthentication.Default) {
+            throw new ArgumentException(
+                "An explicit catalog authentication package requires a credential because the managed Windows catalog API cannot enforce an authentication package with its current-identity overload.",
                 nameof(query));
         }
         return new EventLogCatalogQuery {

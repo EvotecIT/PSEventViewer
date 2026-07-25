@@ -972,6 +972,63 @@ public sealed class TestEventProviderPackages {
     }
 
     [Fact]
+    public void PreflightIdentityIsBoundToTheExactVerifiedPackageBytes() {
+        string root = Path.Combine(
+            Path.GetTempPath(),
+            "EventViewerX.Tests",
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        string candidatePath = Path.Combine(
+            root,
+            "candidate.evxprovider");
+        string replacementPath = Path.Combine(
+            root,
+            "replacement.evxprovider");
+        try {
+            EventProviderPackageBuildResult candidate =
+                EventProviderPackageBuilder.Build(
+                    CreateDefinition(),
+                    candidatePath);
+            EventProviderDefinition replacementDefinition =
+                CreateDefinition();
+            replacementDefinition.PackageVersion =
+                "1.0.1";
+            EventProviderPackageBuilder.Build(
+                replacementDefinition,
+                replacementPath);
+
+            using EventProviderPackage preflight =
+                EventProviderPackageReader.Open(
+                    candidatePath);
+            Assert.Equal(
+                candidate.PackageSha256,
+                preflight.PackageSha256);
+
+            File.Copy(
+                replacementPath,
+                candidatePath,
+                overwrite: true);
+            using EventProviderPackage replacement =
+                EventProviderPackageReader.Open(
+                    candidatePath);
+
+            Assert.NotEqual(
+                preflight.PackageSha256,
+                replacement.PackageSha256);
+            Assert.Throws<InvalidDataException>(() =>
+                EventProviderPackageManager
+                    .EnsureMatchesPreflight(
+                        preflight,
+                        preflight.PackageSha256,
+                        replacement));
+        } finally {
+            Directory.Delete(
+                root,
+                recursive: true);
+        }
+    }
+
+    [Fact]
     public void RejectsAFileWhoseSignedHashWasTampered() {
         string root = Path.Combine(
             Path.GetTempPath(),

@@ -5,6 +5,10 @@ namespace EventViewerX.Providers;
 internal static class EventProviderHash {
     internal static string FileSha256(string path) {
         using FileStream stream = File.OpenRead(path);
+        return StreamSha256(stream);
+    }
+
+    internal static string StreamSha256(Stream stream) {
         using SHA256 sha256 = SHA256.Create();
         return ToHex(sha256.ComputeHash(stream));
     }

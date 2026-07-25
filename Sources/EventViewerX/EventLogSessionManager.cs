@@ -119,6 +119,12 @@ public static class EventLogSessionManager {
 
         var normalizedHost = machineName?.Trim() ?? string.Empty;
         var targetHost = string.IsNullOrWhiteSpace(normalizedHost) ? EventLogTarget.LocalMachineName : normalizedHost;
+        if (credential == null &&
+            authentication != EventLogAuthentication.Default) {
+            throw new ArgumentException(
+                "An explicit remote authentication package requires a credential because the managed EventLogSession current-identity overload cannot enforce an authentication package.",
+                nameof(authentication));
+        }
         if (TryGetHostNegativeCacheExpiry(normalizedHost, out DateTime cachedUntilUtc)) {
             if (emitDiagnostics) {
                 Settings._logger.WriteVerbose($"{operation}: skipping {normalizedHost} (cached unreachable)");
