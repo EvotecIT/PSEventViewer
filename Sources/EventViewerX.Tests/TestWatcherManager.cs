@@ -352,6 +352,49 @@ namespace EventViewerX.Tests {
         }
 
         [Fact]
+        public void WatcherExposesDefensiveSubscriptionContracts() {
+            var source =
+                new EventLogSubscriptionQuery(
+                    "Application") {
+                    XPath = "*[System[EventID=1]]",
+                    Credential =
+                        new System.Net.NetworkCredential(
+                            "original",
+                            "secret",
+                            "domain")
+                };
+            using var watcher = new WatcherInfo(
+                "immutable-contract",
+                Environment.MachineName,
+                "Application",
+                new List<int>(),
+                new List<NamedEvents>(),
+                _ => { },
+                staging: false,
+                stopOnMatch: false,
+                stopAfter: 0,
+                timeout: null,
+                subscriptionQuery: source);
+
+            source.XPath = "*[System[EventID=2]]";
+            EventLogSubscriptionQuery exposed =
+                watcher.SubscriptionQuery;
+            exposed.XPath = "*[System[EventID=3]]";
+            exposed.Credential!.UserName = "mutated";
+
+            Assert.Equal(
+                "*[System[EventID=1]]",
+                watcher.SubscriptionQuery.XPath);
+            Assert.Equal(
+                "original",
+                watcher.SubscriptionQuery
+                    .Credential!.UserName);
+            Assert.Equal(
+                "*[System[EventID=1]]",
+                watcher.SubscriptionContracts[0].XPath);
+        }
+
+        [Fact]
         public void StartWatcherThrowsWhenDuplicatesExist() {
             var field = typeof(WatcherManager).GetField("_watchers", BindingFlags.NonPublic | BindingFlags.Static);
             Assert.NotNull(field);

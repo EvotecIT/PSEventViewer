@@ -300,7 +300,7 @@ public static partial class EventLogCatalog {
             cancellationToken);
     }
 
-    private static EventLogCatalogQuery SnapshotAndValidate(
+    internal static EventLogCatalogQuery SnapshotAndValidate(
         EventLogCatalogQuery? query) {
 
         query ??= new EventLogCatalogQuery();
@@ -327,11 +327,19 @@ public static partial class EventLogCatalog {
             MachineName = string.IsNullOrWhiteSpace(machineName)
                 ? null
                 : machineName,
-            Credential = query.Credential,
+            Credential = query.Credential == null
+                ? null
+                : new NetworkCredential(
+                    query.Credential.UserName,
+                    query.Credential.Password,
+                    query.Credential.Domain),
             Authentication = query.Authentication,
             ConnectionTimeoutMilliseconds =
                 query.ConnectionTimeoutMilliseconds,
-            Culture = query.Culture,
+            Culture = query.Culture == null
+                ? null
+                : CultureInfo.GetCultureInfo(
+                    query.Culture.Name),
             IncludeEvents = query.IncludeEvents
         };
     }

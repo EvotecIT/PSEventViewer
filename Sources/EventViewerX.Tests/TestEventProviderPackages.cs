@@ -43,6 +43,50 @@ public sealed class TestEventProviderPackages {
     }
 
     [Fact]
+    public void RejectsExpandedEntryBytesBeyondTheDeclaredBudget() {
+        long expandedBytes = 0;
+        using var input = new MemoryStream(
+            Enumerable.Range(0, 11)
+                .Select(static value => (byte)value)
+                .ToArray());
+
+        InvalidDataException exception =
+            Assert.Throws<InvalidDataException>(() =>
+                EventProviderPackageReader.ReadBounded(
+                    input,
+                    "payload.bin",
+                    maximumEntryBytes: 10,
+                    maximumPackageBytes: 100,
+                    ref expandedBytes));
+
+        Assert.Contains(
+            "expanded bytes",
+            exception.Message,
+            StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void RejectsExpandedPackageBytesAcrossEntries() {
+        long expandedBytes = 9;
+        using var input = new MemoryStream(
+            new byte[] { 1, 2 });
+
+        InvalidDataException exception =
+            Assert.Throws<InvalidDataException>(() =>
+                EventProviderPackageReader.ReadBounded(
+                    input,
+                    "payload.bin",
+                    maximumEntryBytes: 10,
+                    maximumPackageBytes: 10,
+                    ref expandedBytes));
+
+        Assert.Contains(
+            "expanded contents",
+            exception.Message,
+            StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void GeneratesNamedMessagesAndStableFields() {
         EventProviderDefinition definition = CreateDefinition();
 
@@ -119,6 +163,63 @@ public sealed class TestEventProviderPackages {
             result.Issues,
             issue => issue.Code == "MapNameInvalid" &&
                      issue.Path == "Maps[0].Name");
+    }
+
+    [Fact]
+    public void RejectsCustomMetadataNamesThatAreNotManifestIdentifiers() {
+        EventProviderDefinition definition = CreateDefinition();
+        definition.Levels.Add(
+            new EventProviderLevelDefinition {
+                Name = "Custom Level",
+                Value = 16
+            });
+        definition.Tasks.Add(
+            new EventProviderTaskDefinition {
+                Name = "Custom Task",
+                Value = 1,
+                Opcodes = {
+                    new EventProviderOpcodeDefinition {
+                        Name = "Task Opcode",
+                        Value = 10
+                    }
+                }
+            });
+        definition.Opcodes.Add(
+            new EventProviderOpcodeDefinition {
+                Name = "Global Opcode",
+                Value = 11
+            });
+        definition.Keywords.Add(
+            new EventProviderKeywordDefinition {
+                Name = "Custom Keyword",
+                Mask = 1
+            });
+
+        EventProviderValidationResult result =
+            EventProviderDefinitionValidator.Validate(
+                definition);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(
+            result.Issues,
+            issue => issue.Code == "LevelNameInvalid" &&
+                     issue.Path == "Levels[0].Name");
+        Assert.Contains(
+            result.Issues,
+            issue => issue.Code == "TaskNameInvalid" &&
+                     issue.Path == "Tasks[0].Name");
+        Assert.Contains(
+            result.Issues,
+            issue => issue.Code == "OpcodeNameInvalid" &&
+                     issue.Path == "Tasks[0].Opcodes[0].Name");
+        Assert.Contains(
+            result.Issues,
+            issue => issue.Code == "OpcodeNameInvalid" &&
+                     issue.Path == "Opcodes[0].Name");
+        Assert.Contains(
+            result.Issues,
+            issue => issue.Code == "KeywordNameInvalid" &&
+                     issue.Path == "Keywords[0].Name");
     }
 
     [Fact]

@@ -18,6 +18,14 @@ public static class EventTimeRange {
                 "TimePeriod cannot be combined with StartTime or EndTime.",
                 nameof(timePeriod));
         }
+        if (!Enum.IsDefined(
+                typeof(TimePeriod),
+                timePeriod.Value)) {
+            throw new ArgumentOutOfRangeException(
+                nameof(timePeriod),
+                timePeriod.Value,
+                "TimePeriod must be a defined relative period.");
+        }
 
         (DateTime? periodStart, DateTime? periodEnd, TimeSpan? rollingPeriod) =
             TimeHelper.GetTimePeriod(timePeriod.Value);

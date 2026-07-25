@@ -127,7 +127,7 @@ namespace EventViewerX.Tests;
     }
 
     [Fact]
-    public void QueryFactoryPartitionsLargeNamedDataSuppressions() {
+    public void QueryFactoryRejectsUnrepresentableNamedDataSuppressions() {
         var excluded =
             Enumerable.Range(1, 12)
                 .ToDictionary(
@@ -137,30 +137,18 @@ namespace EventViewerX.Tests;
                             "Value" + index
                         });
 
-        EventLogBatchQuery fileQuery =
+        Assert.Throws<ArgumentException>(() =>
             EventLogQueryFactory.ForFiles(
                 new[] { GetFixturePath() },
                 new EventFilter {
                     ExcludedNamedData = excluded
-                });
-        EventLogBatchQuery channelQuery =
+                }));
+        Assert.Throws<ArgumentException>(() =>
             EventLogQueryFactory.ForChannels(
                 new[] { "Application" },
                 filter: new EventFilter {
                     ExcludedNamedData = excluded
-                });
-
-        foreach (EventLogStructuredQuery structured in
-                 fileQuery.StructuredQueries.Concat(
-                     channelQuery.StructuredQueries)) {
-            Assert.Equal(
-                2,
-                structured.QueryXml
-                    .Split(
-                        "<Suppress",
-                        StringSplitOptions.None)
-                    .Length - 1);
-        }
+                }));
     }
 
     [Fact]

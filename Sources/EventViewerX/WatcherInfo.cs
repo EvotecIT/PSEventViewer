@@ -62,7 +62,7 @@ namespace EventViewerX {
             _staging = staging;
             Watcher = new WatchEvents(new InternalLogger(false));
             Watcher.Stopped += OnWatcherStopped;
-            SubscriptionQueries = new[] {
+            _subscriptionQueries = new[] {
                 subscriptionQuery == null
                     ? CreateSubscriptionQuery(
                         machineName,
@@ -104,12 +104,14 @@ namespace EventViewerX {
                     "At least one subscription query is required.",
                     nameof(subscriptionQueries));
             }
-            SubscriptionQueries = subscriptionQueries
+            _subscriptionQueries = subscriptionQueries
                 .Select(CloneSubscriptionQuery)
                 .ToArray();
         }
 
         private readonly bool _staging;
+        private readonly IReadOnlyList<EventLogSubscriptionQuery>
+            _subscriptionQueries;
         private readonly object _stopSync = new();
         private bool _starting;
         private bool _started;
@@ -152,14 +154,21 @@ namespace EventViewerX {
         public WatchEvents Watcher { get; }
         /// <summary>Complete native subscription contract owned by this watcher.</summary>
         public IReadOnlyList<EventLogSubscriptionQuery>
-            SubscriptionQueries { get; }
+            SubscriptionQueries =>
+                _subscriptionQueries
+                    .Select(CloneSubscriptionQuery)
+                    .ToArray();
+        internal IReadOnlyList<EventLogSubscriptionQuery>
+            SubscriptionContracts =>
+                _subscriptionQueries;
 
         /// <summary>
         /// First native subscription contract. Use <see cref="SubscriptionQueries"/>
         /// when the watcher was partitioned across native XPath limits.
         /// </summary>
         public EventLogSubscriptionQuery SubscriptionQuery =>
-            SubscriptionQueries[0];
+            CloneSubscriptionQuery(
+                _subscriptionQueries[0]);
 
         /// <summary>Total number of matching events accepted for delivery by this watcher.</summary>
         public int EventsFound => Volatile.Read(ref _eventsAccepted);
@@ -253,7 +262,7 @@ namespace EventViewerX {
                     this);
             try {
                 Watcher.Watch(
-                    SubscriptionQueries,
+                    _subscriptionQueries,
                     OnEvent,
                     Cancellation.Token);
                 startupCancellationToken.ThrowIfCancellationRequested();
@@ -448,7 +457,12 @@ namespace EventViewerX {
 
             return new EventLogSubscriptionQuery(source.LogName) {
                 MachineName = source.MachineName,
-                Credential = source.Credential,
+                Credential = source.Credential == null
+                    ? null
+                    : new System.Net.NetworkCredential(
+                        source.Credential.UserName,
+                        source.Credential.Password,
+                        source.Credential.Domain),
                 Authentication = source.Authentication,
                 XPath = source.XPath,
                 Start = source.Start,
@@ -456,8 +470,15 @@ namespace EventViewerX {
                 StrictBookmark = source.StrictBookmark,
                 TolerateQueryErrors = source.TolerateQueryErrors,
                 ReadMode = source.ReadMode,
-                MessageCulture = source.MessageCulture,
-                FallbackMessageCulture = source.FallbackMessageCulture,
+                MessageCulture = source.MessageCulture == null
+                    ? null
+                    : System.Globalization.CultureInfo.GetCultureInfo(
+                        source.MessageCulture.Name),
+                FallbackMessageCulture =
+                    source.FallbackMessageCulture == null
+                        ? null
+                        : System.Globalization.CultureInfo.GetCultureInfo(
+                            source.FallbackMessageCulture.Name),
                 BufferCapacity = source.BufferCapacity,
                 RemoteConnectionTimeoutMilliseconds =
                     source.RemoteConnectionTimeoutMilliseconds

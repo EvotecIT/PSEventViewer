@@ -31,6 +31,19 @@ public class TestChannelPolicyDetailed
     }
 
     [Fact]
+    public void GetChannelPolicyRejectsAnUnboundedCatalogTimeout()
+    {
+        var query = new EventLogCatalogQuery {
+            ConnectionTimeoutMilliseconds = 0
+        };
+
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            EventLogChannelPolicyService.Get(
+                "Application",
+                query));
+    }
+
+    [Fact]
     public void GetChannelPolicies_ParallelEnumerates()
     {
         if (!OperatingSystem.IsWindows())

@@ -8,12 +8,27 @@ namespace EventViewerX;
 /// </summary>
 public static partial class NamedEventEngine {
     /// <summary>Streams named-event projections with bounded memory and ordered checkpoint observation.</summary>
-    public static async IAsyncEnumerable<EventObjectSlim> ReadAsync(
+    public static IAsyncEnumerable<EventObjectSlim> ReadAsync(
         NamedEventQuery query,
         NamedEventsQueryExecutionInfo? executionInfo = null,
-        [EnumeratorCancellation] CancellationToken cancellationToken = default) {
+        CancellationToken cancellationToken = default) {
 
-        Validate(query);
+        NamedEventQuery snapshot =
+            NamedEventQuerySnapshot.Copy(query);
+        Validate(snapshot);
+        return ReadSnapshotAsync(
+            snapshot,
+            executionInfo,
+            cancellationToken);
+    }
+
+    private static async IAsyncEnumerable<EventObjectSlim>
+        ReadSnapshotAsync(
+            NamedEventQuery query,
+            NamedEventsQueryExecutionInfo? executionInfo,
+            [EnumeratorCancellation]
+            CancellationToken cancellationToken) {
+
         Dictionary<string, HashSet<int>> eventInfo =
             RestrictSources(
                 EventObjectSlim.GetEventInfoForNamedEvents(

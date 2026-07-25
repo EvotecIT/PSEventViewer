@@ -59,5 +59,14 @@ namespace EventViewerX.Tests {
             Assert.InRange(start!.Value, earliest, latest);
             Assert.Null(end);
         }
+
+        [Fact]
+        public void EventTimeRangeRejectsUndefinedPeriods() {
+            Assert.Throws<ArgumentOutOfRangeException>(() =>
+                EventTimeRange.Resolve(
+                    null,
+                    null,
+                    (TimePeriod)int.MaxValue));
+        }
     }
 }

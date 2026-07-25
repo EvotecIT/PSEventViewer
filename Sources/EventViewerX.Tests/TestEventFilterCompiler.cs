@@ -248,4 +248,67 @@ public sealed class TestEventFilterCompiler {
                 .ToHashSet();
         Assert.Equal(30 * 12, combinations.Count);
     }
+
+    [Fact]
+    public void PartitionerPreservesAndAcrossNamedDataKeys() {
+        var filter = new EventFilter {
+            NamedData =
+                new Dictionary<string, IReadOnlyList<string>> {
+                    ["First"] = Enumerable.Range(1, 12)
+                        .Select(static value => $"A-{value}")
+                        .ToArray(),
+                    ["Second"] = Enumerable.Range(1, 12)
+                        .Select(static value => $"B-{value}")
+                        .ToArray()
+                }
+        };
+
+        IReadOnlyList<EventFilter> partitions =
+            EventFilterPartitioner.Partition(filter);
+
+        Assert.True(partitions.Count > 1);
+        Assert.All(partitions, static partition => {
+            Assert.Equal(
+                new[] { "First", "Second" },
+                partition.NamedData!.Keys
+                    .OrderBy(static key => key)
+                    .ToArray());
+            Assert.InRange(
+                EventFilterCompiler.CountExpressions(partition),
+                1,
+                EventFilterCompiler.MaximumXPathExpressions);
+        });
+        HashSet<(string First, string Second)> combinations =
+            partitions
+                .SelectMany(partition =>
+                    partition.NamedData!["First"]
+                        .SelectMany(first =>
+                            partition.NamedData["Second"]
+                                .Select(second =>
+                                    (first, second))))
+                .ToHashSet();
+        Assert.Equal(12 * 12, combinations.Count);
+    }
+
+    [Fact]
+    public void PartitionerRejectsNamedDataWhoseRequiredKeysCannotFit() {
+        var filter = new EventFilter {
+            NamedData = Enumerable.Range(1, 12)
+                .ToDictionary(
+                    index => "Field" + index,
+                    index =>
+                        (IReadOnlyList<string>)new[] {
+                            "Value" + index
+                        })
+        };
+
+        ArgumentException exception =
+            Assert.Throws<ArgumentException>(() =>
+                EventFilterPartitioner.Partition(filter));
+
+        Assert.Contains(
+            "require at least 24",
+            exception.Message,
+            StringComparison.Ordinal);
+    }
 }

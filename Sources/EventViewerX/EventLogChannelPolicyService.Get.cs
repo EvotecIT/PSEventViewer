@@ -1,4 +1,5 @@
 using System.Diagnostics.Eventing.Reader;
+using EventViewerX.Native;
 
 namespace EventViewerX;
 
@@ -30,29 +31,41 @@ public static partial class EventLogChannelPolicyService {
         if (query == null) {
             throw new ArgumentNullException(nameof(query));
         }
+        query = EventLogCatalog.SnapshotAndValidate(
+            query);
 
-        EventLogSession? session = null;
-        try {
-            session = EventLogSessionManager.OpenRequiredSession(
+        EventLogSession session =
+            EventLogSessionManager.OpenRequiredSession(
                 query.MachineName,
                 "ChannelPolicy.Get",
                 logName,
                 query.ConnectionTimeoutMilliseconds,
                 query.Credential,
                 query.Authentication);
-
-            using var cfg = new EventLogConfiguration(
-                logName,
+        using var sessionLifetime =
+            new RetainedDisposable<EventLogSession>(
                 session);
-            return CreateSnapshot(
-                cfg,
-                query.MachineName,
-                query.Credential,
-                query.Authentication,
-                query.ConnectionTimeoutMilliseconds);
-        } finally {
-            session?.Dispose();
-        }
+        string target = EventLogTarget.IsLocalMachine(
+                query.MachineName)
+            ? EventLogTarget.LocalMachineName
+            : query.MachineName!;
+        return EventLogNativeOperation.Execute(
+            () => {
+                using var configuration =
+                    new EventLogConfiguration(
+                        logName,
+                        sessionLifetime.Value);
+                return CreateSnapshot(
+                    configuration,
+                    query.MachineName,
+                    query.Credential,
+                    query.Authentication,
+                    query.ConnectionTimeoutMilliseconds);
+            },
+            query.ConnectionTimeoutMilliseconds,
+            $"Timed out reading channel policy for '{logName}' on '{target}' after {query.ConnectionTimeoutMilliseconds} ms.",
+            operationLease:
+                sessionLifetime.Retain());
     }
 
     /// <summary>

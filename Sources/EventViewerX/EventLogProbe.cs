@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Diagnostics.Eventing.Reader;
 using System.Net;
+using EventViewerX.Native;
 
 namespace EventViewerX;
 
@@ -246,7 +247,7 @@ public static class EventLogProbe {
                 RemainingMilliseconds(
                     remaining,
                     stopwatch.Elapsed);
-            using EventLogSessionOpenResult sessionResult =
+            EventLogSessionOpenResult? sessionResult =
                 EventLogSessionManager
                     .CreateSessionResult(
                         machineName,
@@ -257,25 +258,35 @@ public static class EventLogProbe {
                         credential: credential,
                         authentication:
                             authentication);
-            cancellationToken.ThrowIfCancellationRequested();
-            if (!sessionResult.Success ||
-                sessionResult.Session == null) {
-                return null;
+            try {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!sessionResult.Success ||
+                    sessionResult.Session == null) {
+                    return null;
+                }
+                using var sessionLifetime =
+                    new RetainedDisposable<EventLogSessionOpenResult>(
+                        sessionResult);
+                sessionResult = null;
+                int informationBudget =
+                    RemainingMilliseconds(
+                        remaining,
+                        stopwatch.Elapsed);
+                EventLogInformation information =
+                    EventLogNativeOperation.Execute(
+                        () => sessionLifetime.Value.Session!
+                            .GetLogInformation(
+                                logName,
+                                PathType.LogName),
+                        informationBudget,
+                        $"Timed out reading the record count for '{logName}' after {informationBudget} ms.",
+                        operationLease:
+                            sessionLifetime.Retain());
+                cancellationToken.ThrowIfCancellationRequested();
+                return information.RecordCount;
+            } finally {
+                sessionResult?.Dispose();
             }
-            int informationBudget =
-                RemainingMilliseconds(
-                    remaining,
-                    stopwatch.Elapsed);
-            EventLogInformation information =
-                EventLogNativeOperation.Execute(
-                    () => sessionResult.Session
-                        .GetLogInformation(
-                            logName,
-                            PathType.LogName),
-                    informationBudget,
-                    $"Timed out reading the record count for '{logName}' after {informationBudget} ms.");
-            cancellationToken.ThrowIfCancellationRequested();
-            return information.RecordCount;
         } catch (OperationCanceledException) {
             throw;
         } catch {

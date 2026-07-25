@@ -382,9 +382,9 @@ namespace EventViewerX {
                    existing.StopOnMatch == stopOnMatch &&
                    existing.StopAfter == stopAfter &&
                    existing.Timeout == timeout &&
-                   SubscriptionQuerySetsEqual(
-                       existing.SubscriptionQueries,
-                       requestedSubscriptionQueries);
+                    SubscriptionQuerySetsEqual(
+                        existing.SubscriptionContracts,
+                        requestedSubscriptionQueries);
         }
 
         private static bool SubscriptionQuerySetsEqual(

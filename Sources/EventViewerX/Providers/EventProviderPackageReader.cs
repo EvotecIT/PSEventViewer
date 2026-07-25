@@ -166,7 +166,7 @@ public static class EventProviderPackageReader {
         using ZipArchive archive = ZipFile.OpenRead(fullPath);
         var entries = new Dictionary<string, ZipArchiveEntry>(
             StringComparer.Ordinal);
-        long expandedBytes = 0;
+        long declaredExpandedBytes = 0;
         foreach (ZipArchiveEntry entry in archive.Entries) {
             if (entry.FullName.Length == 0 ||
                 entry.FullName != Path.GetFileName(entry.FullName) ||
@@ -181,11 +181,13 @@ public static class EventProviderPackageReader {
                 throw new InvalidDataException(
                     $"Provider package entry '{entry.FullName}' exceeds {MaximumEntryBytes} bytes.");
             }
-            expandedBytes = checked(expandedBytes + entry.Length);
-            if (expandedBytes > MaximumPackageBytes) {
+            if (entry.Length >
+                MaximumPackageBytes -
+                declaredExpandedBytes) {
                 throw new InvalidDataException(
                     $"Provider package expanded contents exceed {MaximumPackageBytes} bytes.");
             }
+            declaredExpandedBytes += entry.Length;
             if (entries.ContainsKey(entry.FullName)) {
                 throw new InvalidDataException(
                     $"Provider package entry '{entry.FullName}' is duplicated.");
@@ -198,9 +200,12 @@ public static class EventProviderPackageReader {
             throw new InvalidDataException(
                 "Provider package does not contain package.json.");
         }
+        long expandedBytes = 0;
         EventProviderPackageManifest manifest =
             JsonSerializer.Deserialize<EventProviderPackageManifest>(
-                ReadText(packageEntry),
+                ReadText(
+                    packageEntry,
+                    ref expandedBytes),
                 EventProviderDefinitionJson.SerializerOptions) ??
             throw new InvalidDataException(
                 "Provider package manifest is invalid.");
@@ -248,7 +253,9 @@ public static class EventProviderPackageReader {
                 throw new InvalidDataException(
                     $"Provider package file '{expected.Key}' is missing.");
             }
-            byte[] bytes = ReadBytes(entry);
+            byte[] bytes = ReadBytes(
+                entry,
+                ref expandedBytes);
             string actual = EventProviderHash.BytesSha256(bytes);
             if (!string.Equals(
                     actual,
@@ -268,15 +275,75 @@ public static class EventProviderPackageReader {
         return new PackageContents(manifest, files);
     }
 
-    private static string ReadText(ZipArchiveEntry entry) {
-        return Encoding.UTF8.GetString(ReadBytes(entry));
+    private static string ReadText(
+        ZipArchiveEntry entry,
+        ref long expandedBytes) {
+
+        return Encoding.UTF8.GetString(
+            ReadBytes(
+                entry,
+                ref expandedBytes));
     }
 
-    private static byte[] ReadBytes(ZipArchiveEntry entry) {
+    private static byte[] ReadBytes(
+        ZipArchiveEntry entry,
+        ref long expandedBytes) {
+
         using Stream input = entry.Open();
-        using var output = new MemoryStream(
-            checked((int)entry.Length));
-        input.CopyTo(output);
+        return ReadBounded(
+            input,
+            entry.FullName,
+            MaximumEntryBytes,
+            MaximumPackageBytes,
+            ref expandedBytes);
+    }
+
+    internal static byte[] ReadBounded(
+        Stream input,
+        string entryName,
+        long maximumEntryBytes,
+        long maximumPackageBytes,
+        ref long expandedBytes) {
+
+        if (input == null) {
+            throw new ArgumentNullException(nameof(input));
+        }
+        if (maximumEntryBytes <= 0 ||
+            maximumPackageBytes <= 0) {
+            throw new ArgumentOutOfRangeException(
+                nameof(maximumEntryBytes),
+                "Expanded package limits must be greater than zero.");
+        }
+        using var output = new MemoryStream();
+        var buffer = new byte[81920];
+        long entryBytes = 0;
+        while (true) {
+            int read = input.Read(
+                buffer,
+                0,
+                buffer.Length);
+            if (read == 0) {
+                break;
+            }
+            if (read >
+                maximumEntryBytes -
+                entryBytes) {
+                throw new InvalidDataException(
+                    $"Provider package entry '{entryName}' exceeds {maximumEntryBytes} expanded bytes.");
+            }
+            if (read >
+                maximumPackageBytes -
+                expandedBytes) {
+                throw new InvalidDataException(
+                    $"Provider package expanded contents exceed {maximumPackageBytes} bytes.");
+            }
+            entryBytes += read;
+            expandedBytes += read;
+            output.Write(
+                buffer,
+                0,
+                read);
+        }
         return output.ToArray();
     }
 

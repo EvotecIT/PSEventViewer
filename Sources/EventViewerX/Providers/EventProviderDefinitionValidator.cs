@@ -234,6 +234,11 @@ public static partial class EventProviderDefinitionValidator {
                 "LevelNameRequired",
                 $"Levels[{index}].Name",
                 issues);
+            ValidateMetadataIdentifier(
+                level.Name,
+                "LevelNameInvalid",
+                $"Levels[{index}].Name",
+                issues);
             if (level.Value < 16) {
                 Error(
                     "CustomLevelReserved",
@@ -279,6 +284,11 @@ public static partial class EventProviderDefinitionValidator {
                 "TaskNameRequired",
                 $"Tasks[{taskIndex}].Name",
                 issues);
+            ValidateMetadataIdentifier(
+                task.Name,
+                "TaskNameInvalid",
+                $"Tasks[{taskIndex}].Name",
+                issues);
             Unique(
                 task.Opcodes,
                 static opcode => opcode.Name,
@@ -300,6 +310,11 @@ public static partial class EventProviderDefinitionValidator {
                     "OpcodeNameRequired",
                     $"Tasks[{taskIndex}].Opcodes[{opcodeIndex}].Name",
                     issues);
+                ValidateMetadataIdentifier(
+                    task.Opcodes[opcodeIndex].Name,
+                    "OpcodeNameInvalid",
+                    $"Tasks[{taskIndex}].Opcodes[{opcodeIndex}].Name",
+                    issues);
             }
         }
         for (int opcodeIndex = 0;
@@ -308,6 +323,11 @@ public static partial class EventProviderDefinitionValidator {
             Required(
                 definition.Opcodes[opcodeIndex].Name,
                 "OpcodeNameRequired",
+                $"Opcodes[{opcodeIndex}].Name",
+                issues);
+            ValidateMetadataIdentifier(
+                definition.Opcodes[opcodeIndex].Name,
+                "OpcodeNameInvalid",
                 $"Opcodes[{opcodeIndex}].Name",
                 issues);
         }
@@ -337,6 +357,11 @@ public static partial class EventProviderDefinitionValidator {
             Required(
                 keyword.Name,
                 "KeywordNameRequired",
+                $"Keywords[{index}].Name",
+                issues);
+            ValidateMetadataIdentifier(
+                keyword.Name,
+                "KeywordNameInvalid",
                 $"Keywords[{index}].Name",
                 issues);
             if (keyword.Mask == 0 ||
@@ -744,6 +769,23 @@ public static partial class EventProviderDefinitionValidator {
 
         if (string.IsNullOrWhiteSpace(value)) {
             Error(code, path, "A value is required.", issues);
+        }
+    }
+
+    private static void ValidateMetadataIdentifier(
+        string value,
+        string code,
+        string path,
+        List<EventProviderValidationIssue> issues) {
+
+        if (!string.IsNullOrWhiteSpace(value) &&
+            !EventProviderManifestNames
+                .IsUnqualifiedIdentifier(value)) {
+            Error(
+                code,
+                path,
+                $"Metadata name '{value}' must be an unqualified manifest identifier.",
+                issues);
         }
     }
 
