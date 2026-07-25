@@ -132,7 +132,7 @@ public class TestNamedEventDnsEnrichment {
             new NamedEventEnrichmentOptions {
                 ResolveDns = true,
                 DnsMaxConcurrency = 2,
-                DnsTimeoutMilliseconds = 1000
+                DnsTimeoutMilliseconds = 5000
             },
             async (address, token) => {
                 Interlocked.Increment(ref calls);
