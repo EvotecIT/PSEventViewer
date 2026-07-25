@@ -139,6 +139,7 @@ public abstract partial class AsyncPSCmdlet : PSCmdlet, IDisposable
     private static readonly SynchronizationContext HookSynchronizationContext = new AsyncHookSynchronizationContext();
     private static readonly TaskScheduler HookTaskScheduler = new AsyncHookTaskScheduler();
     private BlockingCollection<PipelineItem>? _currentOutPipe;
+    private Func<PipelineItem, bool>? _pipelineThreadQueue;
     private bool _cancelSourceDisposed;
     private bool _disposeRequested;
     private int _activeBlocks;

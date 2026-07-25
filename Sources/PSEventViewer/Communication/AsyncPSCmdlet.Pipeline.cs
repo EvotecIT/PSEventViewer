@@ -94,6 +94,13 @@ public abstract partial class AsyncPSCmdlet
 
     private bool TryQueue(PipelineItem item)
     {
+        if (IsPipelineThread)
+        {
+            var pipelineThreadQueue = Volatile.Read(ref _pipelineThreadQueue);
+            if (pipelineThreadQueue is not null)
+                return pipelineThreadQueue(item);
+        }
+
         var outPipe = Volatile.Read(ref _currentOutPipe);
         if (outPipe is null)
             return false;
@@ -139,7 +146,8 @@ public abstract partial class AsyncPSCmdlet
 
         void ClearPipes()
         {
-            _ = Interlocked.CompareExchange(ref _currentOutPipe, null, outPipe);
+            if (ReferenceEquals(Interlocked.CompareExchange(ref _currentOutPipe, null, outPipe), outPipe))
+                Volatile.Write(ref _pipelineThreadQueue, null);
             CompleteAddingIfNeeded(outPipe);
         }
 
@@ -279,6 +287,30 @@ public abstract partial class AsyncPSCmdlet
 
         Volatile.Write(ref _asyncLifecycleStarted, 1);
         _pipelineThreadId = Environment.CurrentManagedThreadId;
+        Volatile.Write(
+            ref _pipelineThreadQueue,
+            item =>
+            {
+                try
+                {
+                    while (!outPipe.TryAdd(item))
+                    {
+                        PumpQueuedItems();
+                        ThrowIfStopped();
+                    }
+
+                    PumpQueuedItems();
+                    return true;
+                }
+                catch (ObjectDisposedException)
+                {
+                    return false;
+                }
+                catch (InvalidOperationException)
+                {
+                    return false;
+                }
+            });
         Volatile.Write(ref _currentOutPipe, outPipe);
 
         var synchronizationContext = SynchronizationContext.Current;
