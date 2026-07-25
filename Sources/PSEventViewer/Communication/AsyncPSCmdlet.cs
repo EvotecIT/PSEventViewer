@@ -77,12 +77,15 @@ public abstract class AsyncPSCmdlet : PSCmdlet, IDisposable
     }
 
     private readonly CancellationTokenSource _cancelSource = new();
+    private readonly object _lifecycleLock = new();
     private InternalLogger? _eventViewerLogger;
     private Guid _powerShellResourceOwnerId;
     private static readonly SynchronizationContext HookSynchronizationContext = new AsyncHookSynchronizationContext();
     private BlockingCollection<PipelineItem>? _currentOutPipe;
+    private bool _cancelSourceDisposed;
+    private bool _disposeRequested;
+    private int _activeBlocks;
     private int _pipelineThreadId;
-    private int _disposed;
 
     /// <summary>Cancellation token triggered when PowerShell stops the cmdlet.</summary>
     protected internal CancellationToken CancelToken => _cancelSource.Token;
@@ -134,12 +137,13 @@ public abstract class AsyncPSCmdlet : PSCmdlet, IDisposable
 
     /// <inheritdoc />
     protected override void StopProcessing()
-        => _cancelSource.Cancel();
+        => CancelSource();
 
     /// <summary>Thread-safe ShouldProcess bridge for asynchronous cmdlet code.</summary>
     public new bool ShouldProcess(string? target)
     {
-        if (IsPipelineThread)
+        ThrowIfStopped();
+        if (IsPipelineThread || Volatile.Read(ref _currentOutPipe) is null)
             return base.ShouldProcess(target ?? string.Empty);
 
         return (bool)RequestPipelineReply(target ?? string.Empty, PipelineType.ShouldProcessTarget)!;
@@ -148,7 +152,8 @@ public abstract class AsyncPSCmdlet : PSCmdlet, IDisposable
     /// <summary>Thread-safe ShouldProcess bridge for asynchronous cmdlet code.</summary>
     public new bool ShouldProcess(string? target, string action)
     {
-        if (IsPipelineThread)
+        ThrowIfStopped();
+        if (IsPipelineThread || Volatile.Read(ref _currentOutPipe) is null)
             return base.ShouldProcess(target ?? string.Empty, action);
 
         return (bool)RequestPipelineReply((target ?? string.Empty, action), PipelineType.ShouldProcess)!;
@@ -157,7 +162,8 @@ public abstract class AsyncPSCmdlet : PSCmdlet, IDisposable
     /// <summary>Thread-safe ShouldProcess bridge for asynchronous cmdlet code.</summary>
     public new bool ShouldProcess(string verboseDescription, string verboseWarning, string caption)
     {
-        if (IsPipelineThread)
+        ThrowIfStopped();
+        if (IsPipelineThread || Volatile.Read(ref _currentOutPipe) is null)
             return base.ShouldProcess(verboseDescription, verboseWarning, caption);
 
         return (bool)RequestPipelineReply(
@@ -172,7 +178,8 @@ public abstract class AsyncPSCmdlet : PSCmdlet, IDisposable
         string caption,
         out ShouldProcessReason shouldProcessReason)
     {
-        if (IsPipelineThread)
+        ThrowIfStopped();
+        if (IsPipelineThread || Volatile.Read(ref _currentOutPipe) is null)
             return base.ShouldProcess(verboseDescription, verboseWarning, caption, out shouldProcessReason);
 
         var reply = ((bool Result, ShouldProcessReason Reason))RequestPipelineReply(
@@ -185,7 +192,8 @@ public abstract class AsyncPSCmdlet : PSCmdlet, IDisposable
     /// <summary>Thread-safe ShouldContinue bridge for asynchronous cmdlet code.</summary>
     public new bool ShouldContinue(string query, string caption)
     {
-        if (IsPipelineThread)
+        ThrowIfStopped();
+        if (IsPipelineThread || Volatile.Read(ref _currentOutPipe) is null)
             return base.ShouldContinue(query, caption);
 
         return (bool)RequestPipelineReply((query, caption), PipelineType.ShouldContinue)!;
@@ -194,7 +202,8 @@ public abstract class AsyncPSCmdlet : PSCmdlet, IDisposable
     /// <summary>Thread-safe ShouldContinue bridge for asynchronous cmdlet code.</summary>
     public new bool ShouldContinue(string query, string caption, ref bool yesToAll, ref bool noToAll)
     {
-        if (IsPipelineThread)
+        ThrowIfStopped();
+        if (IsPipelineThread || Volatile.Read(ref _currentOutPipe) is null)
             return base.ShouldContinue(query, caption, ref yesToAll, ref noToAll);
 
         var reply = ((bool Result, bool YesToAll, bool NoToAll))RequestPipelineReply(
@@ -213,7 +222,8 @@ public abstract class AsyncPSCmdlet : PSCmdlet, IDisposable
         ref bool yesToAll,
         ref bool noToAll)
     {
-        if (IsPipelineThread)
+        ThrowIfStopped();
+        if (IsPipelineThread || Volatile.Read(ref _currentOutPipe) is null)
             return base.ShouldContinue(query, caption, hasSecurityImpact, ref yesToAll, ref noToAll);
 
         var reply = ((bool Result, bool YesToAll, bool NoToAll))RequestPipelineReply(
@@ -227,7 +237,8 @@ public abstract class AsyncPSCmdlet : PSCmdlet, IDisposable
     /// <summary>Thread-safe credential prompt bridge for asynchronous cmdlet code.</summary>
     public PSCredential? PromptForCredential(string caption, string message, string userName, string targetName)
     {
-        if (IsPipelineThread)
+        ThrowIfStopped();
+        if (IsPipelineThread || Volatile.Read(ref _currentOutPipe) is null)
             return Host.UI.PromptForCredential(caption, message, userName, targetName);
 
         return (PSCredential?)RequestPipelineReply(
@@ -377,11 +388,20 @@ public abstract class AsyncPSCmdlet : PSCmdlet, IDisposable
     /// <inheritdoc />
     public virtual void Dispose()
     {
-        if (Interlocked.Exchange(ref _disposed, 1) != 0)
-            return;
+        lock (_lifecycleLock)
+        {
+            if (_disposeRequested)
+                return;
 
-        _cancelSource.Cancel();
-        _cancelSource.Dispose();
+            _disposeRequested = true;
+        }
+
+        CancelSource();
+
+        lock (_lifecycleLock)
+        {
+            DisposeCancelSourceIfInactive();
+        }
     }
 
     private bool IsPipelineThread
@@ -402,12 +422,14 @@ public abstract class AsyncPSCmdlet : PSCmdlet, IDisposable
     private object? RequestPipelineReply(object? value, PipelineType type)
     {
         ThrowIfStopped();
-        var replyPipe = new BlockingCollection<PipelineReply>(boundedCapacity: 1);
+        using var replyPipe = new BlockingCollection<PipelineReply>(boundedCapacity: 1);
         if (!TryQueue(new PipelineItem(value, type, replyPipe)))
+        {
+            ThrowIfStopped();
             throw new InvalidOperationException("No active PowerShell pipeline is available for the asynchronous request.");
+        }
 
         var reply = replyPipe.Take(CancelToken);
-        replyPipe.Dispose();
         return reply.Value;
     }
 
@@ -426,9 +448,26 @@ public abstract class AsyncPSCmdlet : PSCmdlet, IDisposable
         {
             return false;
         }
+        catch (OperationCanceledException) when (_cancelSource.IsCancellationRequested)
+        {
+            return false;
+        }
     }
 
     private void RunBlockInAsync(Func<Task> task)
+    {
+        EnterAsyncBlock();
+        try
+        {
+            RunBlockInAsyncCore(task);
+        }
+        finally
+        {
+            ExitAsyncBlock();
+        }
+    }
+
+    private void RunBlockInAsyncCore(Func<Task> task)
     {
         var outPipe = new BlockingCollection<PipelineItem>(PipelineCapacity);
         Task blockTask;
@@ -568,9 +607,14 @@ public abstract class AsyncPSCmdlet : PSCmdlet, IDisposable
                 Settings.Logger = _eventViewerLogger;
             blockTask = task();
         }
-        catch
+        catch (Exception exception)
         {
             ClearPipes();
+            DisposePipeOnce();
+
+            if (exception is OperationCanceledException && _cancelSource.IsCancellationRequested)
+                throw new PipelineStoppedException();
+
             throw;
         }
         finally
@@ -595,16 +639,35 @@ public abstract class AsyncPSCmdlet : PSCmdlet, IDisposable
             return;
         }
 
-        _ = blockTask.ContinueWith(
-            completed =>
-            {
-                ClearPipes();
-                if (Volatile.Read(ref deferPipeDisposal) != 0)
-                    DisposePipeOnce();
-            },
-            CancellationToken.None,
-            TaskContinuationOptions.ExecuteSynchronously,
-            TaskScheduler.Default);
+        RetainAsyncBlock();
+        try
+        {
+            _ = blockTask.ContinueWith(
+                completed =>
+                {
+                    try
+                    {
+                        if (completed.IsFaulted)
+                            _ = completed.Exception;
+
+                        ClearPipes();
+                        if (Volatile.Read(ref deferPipeDisposal) != 0)
+                            DisposePipeOnce();
+                    }
+                    finally
+                    {
+                        ExitAsyncBlock();
+                    }
+                },
+                CancellationToken.None,
+                TaskContinuationOptions.ExecuteSynchronously,
+                TaskScheduler.Default);
+        }
+        catch
+        {
+            ExitAsyncBlock();
+            throw;
+        }
 
         try
         {
@@ -617,7 +680,7 @@ public abstract class AsyncPSCmdlet : PSCmdlet, IDisposable
         {
             var stopRequested = _cancelSource.IsCancellationRequested;
             Volatile.Write(ref deferPipeDisposal, 1);
-            _cancelSource.Cancel();
+            CancelSource();
             CompleteAddingIfNeeded(outPipe);
             if (blockTask.IsCompleted)
                 DisposePipeOnce();
@@ -636,5 +699,54 @@ public abstract class AsyncPSCmdlet : PSCmdlet, IDisposable
         {
             DisposePipeOnce();
         }
+    }
+
+    private void EnterAsyncBlock()
+    {
+        lock (_lifecycleLock)
+        {
+            if (_disposeRequested)
+                throw new ObjectDisposedException(GetType().FullName);
+
+            _activeBlocks++;
+        }
+    }
+
+    private void ExitAsyncBlock()
+    {
+        lock (_lifecycleLock)
+        {
+            _activeBlocks--;
+            DisposeCancelSourceIfInactive();
+        }
+    }
+
+    private void RetainAsyncBlock()
+    {
+        lock (_lifecycleLock)
+        {
+            _activeBlocks++;
+        }
+    }
+
+    private void CancelSource()
+    {
+        try
+        {
+            _cancelSource.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+            // Disposal may race a late StopProcessing callback after all async hooks have exited.
+        }
+    }
+
+    private void DisposeCancelSourceIfInactive()
+    {
+        if (!_disposeRequested || _activeBlocks != 0 || _cancelSourceDisposed)
+            return;
+
+        _cancelSource.Dispose();
+        _cancelSourceDisposed = true;
     }
 }
