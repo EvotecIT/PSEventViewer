@@ -44,6 +44,18 @@ public class TestChannelPolicyDetailed
     }
 
     [Fact]
+    public void GetChannelPoliciesValidateTheQueryBeforeReturningTheStream()
+    {
+        var query = new EventLogCatalogQuery {
+            ConnectionTimeoutMilliseconds = 0
+        };
+
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            EventLogChannelPolicyService.GetMany(
+                query));
+    }
+
+    [Fact]
     public void GetChannelPolicies_ParallelEnumerates()
     {
         if (!OperatingSystem.IsWindows())

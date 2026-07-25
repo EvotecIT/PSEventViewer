@@ -402,28 +402,51 @@ public static partial class EventLogCatalog {
         CancellationToken cancellationToken = default) {
 
         cancellationToken.ThrowIfCancellationRequested();
-        if (timeoutMs <= 0) {
-            throw new ArgumentOutOfRangeException(nameof(timeoutMs), "Timeout must be positive.");
-        }
+        EventLogCatalogQuery query =
+            SnapshotAndValidate(
+                new EventLogCatalogQuery {
+                    MachineName = machineName,
+                    Credential = credential,
+                    Authentication = authentication,
+                    ConnectionTimeoutMilliseconds =
+                        timeoutMs
+                });
+        string[]? listLogSnapshot =
+            listLog?.ToArray();
+        return DisplayEventLogResultsIterator(
+            listLogSnapshot,
+            query,
+            includeEventTimes,
+            includeAnalyticDebug,
+            cancellationToken);
+    }
+
+    private static IEnumerable<EventLogDetailsResult>
+        DisplayEventLogResultsIterator(
+            string[]? listLog,
+            EventLogCatalogQuery query,
+            bool includeEventTimes,
+            bool includeAnalyticDebug,
+            CancellationToken cancellationToken) {
 
         string[]? exactNames = listLog != null && listLog.Length > 0 &&
                                listLog.All(name => name.IndexOf('*') < 0 && name.IndexOf('?') < 0)
             ? listLog.Distinct(StringComparer.OrdinalIgnoreCase).ToArray()
             : null;
-        string hostName = string.IsNullOrWhiteSpace(machineName) ? EventLogTarget.LocalMachineName : machineName!;
+        string hostName = string.IsNullOrWhiteSpace(query.MachineName) ? EventLogTarget.LocalMachineName : query.MachineName!;
         EventLogSessionOpenResult sessionResult = EventLogSessionManager.CreateSessionResult(
-            machineName,
+            query.MachineName,
             "DisplayEventLogResults",
             "*",
-            timeoutMs,
+            query.ConnectionTimeoutMilliseconds,
             emitDiagnostics: false,
-            credential: credential,
-            authentication: authentication,
+            credential: query.Credential,
+            authentication: query.Authentication,
             cancellationToken: cancellationToken);
         if (!sessionResult.Success || sessionResult.Session == null) {
             string[] failedLogNames = exactNames ?? new[] { "*" };
             foreach (string failedLogName in failedLogNames) {
-                yield return Failure(failedLogName, hostName, MapSessionFailureStatus(sessionResult.Status), sessionResult.ErrorMessage, timeoutMs, sessionResult.ErrorType);
+                yield return Failure(failedLogName, hostName, MapSessionFailureStatus(sessionResult.Status), sessionResult.ErrorMessage, query.ConnectionTimeoutMilliseconds, sessionResult.ErrorType);
             }
             sessionResult.Dispose();
             yield break;
@@ -441,7 +464,7 @@ public static partial class EventLogCatalog {
                     yield return SafeGetResult(
                         exactName,
                         activeSession,
-                        timeoutMs,
+                        query.ConnectionTimeoutMilliseconds,
                         hostName,
                         includeEventTimes,
                         cancellationToken,
@@ -455,18 +478,18 @@ public static partial class EventLogCatalog {
             try {
                 logNames = EnumerateNamesBounded(
                     () => activeSession.GetLogNames(),
-                    timeoutMs,
-                    $"Timed out enumerating event logs on '{hostName}' after {timeoutMs} ms.",
+                    query.ConnectionTimeoutMilliseconds,
+                    $"Timed out enumerating event logs on '{hostName}' after {query.ConnectionTimeoutMilliseconds} ms.",
                     cancellationToken,
                     sessionLifetime.Retain());
             } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
                 throw;
             } catch (TimeoutException ex) {
                 logNames = Array.Empty<string>();
-                enumerationFailure = Failure("*", hostName, EventLogDetailsStatus.Timeout, ex.Message, timeoutMs, ex.GetType().Name);
+                enumerationFailure = Failure("*", hostName, EventLogDetailsStatus.Timeout, ex.Message, query.ConnectionTimeoutMilliseconds, ex.GetType().Name);
             } catch (Exception ex) {
                 logNames = Array.Empty<string>();
-                enumerationFailure = Failure("*", hostName, EventLogDetailsStatus.Error, ex.Message, timeoutMs, ex.GetType().Name);
+                enumerationFailure = Failure("*", hostName, EventLogDetailsStatus.Error, ex.Message, query.ConnectionTimeoutMilliseconds, ex.GetType().Name);
             }
             if (enumerationFailure != null) {
                 yield return enumerationFailure;
@@ -485,7 +508,7 @@ public static partial class EventLogCatalog {
                     IsAnalyticOrDebug(
                         activeSession,
                         logName,
-                        timeoutMs,
+                        query.ConnectionTimeoutMilliseconds,
                         cancellationToken,
                         sessionLifetime.Retain())) {
                     continue;
@@ -493,7 +516,7 @@ public static partial class EventLogCatalog {
                 yield return SafeGetResult(
                     logName,
                     activeSession,
-                    timeoutMs,
+                    query.ConnectionTimeoutMilliseconds,
                     hostName,
                     includeEventTimes,
                     cancellationToken,
@@ -528,11 +551,22 @@ public static partial class EventLogCatalog {
         string? machineName = null,
         bool includeAnalyticDebug = false) {
 
-        foreach (EventLogDetailsResult result in DisplayEventLogResults(
-                     listLog,
-                     machineName,
-                     Settings.SessionTimeoutMs,
-                     includeAnalyticDebug: includeAnalyticDebug)) {
+        IEnumerable<EventLogDetailsResult> results =
+            DisplayEventLogResults(
+                listLog,
+                machineName,
+                Settings.SessionTimeoutMs,
+                includeAnalyticDebug:
+                    includeAnalyticDebug);
+        return DisplayEventLogsIterator(
+            results);
+    }
+
+    private static IEnumerable<EventLogDetails>
+        DisplayEventLogsIterator(
+            IEnumerable<EventLogDetailsResult> results) {
+
+        foreach (EventLogDetailsResult result in results) {
             WriteLogDetailsWarningIfNeeded(result);
             if (result.Details != null) {
                 yield return result.Details;
@@ -552,6 +586,7 @@ public static partial class EventLogCatalog {
         CancellationToken cancellationToken = default,
         bool includeAnalyticDebug = false) {
 
+        cancellationToken.ThrowIfCancellationRequested();
         if (maxDegreeOfParallelism <= 0) {
             throw new ArgumentOutOfRangeException(nameof(maxDegreeOfParallelism), "Maximum degree of parallelism must be positive.");
         }
@@ -562,9 +597,33 @@ public static partial class EventLogCatalog {
             throw new ArgumentOutOfRangeException(nameof(timeoutMs), "Timeout must be positive.");
         }
 
-        List<string?> targets = machineNames == null || machineNames.Count == 0
-            ? new List<string?> { null }
-            : machineNames;
+        string[]? listLogSnapshot =
+            listLog?.ToArray();
+        string?[] targets =
+            machineNames == null ||
+            machineNames.Count == 0
+                ? new string?[] { null }
+                : machineNames.ToArray();
+        return DisplayEventLogResultsParallelIterator(
+            listLogSnapshot,
+            targets,
+            maxDegreeOfParallelism,
+            timeoutMs,
+            includeEventTimes,
+            cancellationToken,
+            includeAnalyticDebug);
+    }
+
+    private static IEnumerable<EventLogDetailsResult>
+        DisplayEventLogResultsParallelIterator(
+            string[]? listLog,
+            string?[] targets,
+            int maxDegreeOfParallelism,
+            int timeoutMs,
+            bool includeEventTimes,
+            CancellationToken cancellationToken,
+            bool includeAnalyticDebug) {
+
         using var pipelineCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         var results = new BlockingCollection<EventLogDetailsResult>(
             Math.Max(
@@ -641,18 +700,16 @@ public static partial class EventLogCatalog {
         CancellationToken cancellationToken = default,
         bool includeAnalyticDebug = false) {
 
-        foreach (EventLogDetailsResult result in DisplayEventLogResultsParallel(
-                     listLog,
-                     machineNames,
-                     maxDegreeOfParallelism,
-                     Settings.SessionTimeoutMs,
-                     includeEventTimes: false,
-                     cancellationToken,
-                     includeAnalyticDebug)) {
-            WriteLogDetailsWarningIfNeeded(result);
-            if (result.Details != null) {
-                yield return result.Details;
-            }
-        }
+        IEnumerable<EventLogDetailsResult> results =
+            DisplayEventLogResultsParallel(
+                listLog,
+                machineNames,
+                maxDegreeOfParallelism,
+                Settings.SessionTimeoutMs,
+                includeEventTimes: false,
+                cancellationToken,
+                includeAnalyticDebug);
+        return DisplayEventLogsIterator(
+            results);
     }
 }

@@ -522,11 +522,41 @@ public sealed partial class CmdletGetEVXEvent : AsyncPSCmdlet {
                         break;
                     }
                 }
+                WriteNamedTargetFailures(
+                    namedQueryInfo.TargetFailures);
         } else {
             ProcessNativeEvents(token, results);
         }
 
         WriteArrayResult(results);
+    }
+
+    private void WriteNamedTargetFailures(
+        IReadOnlyList<EventLogQueryTargetFailure> failures) {
+
+        foreach (EventLogQueryTargetFailure failure in failures) {
+            ErrorCategory category = failure.Kind switch {
+                EventLogRemoteQueryFailureKind.AccessDenied =>
+                    ErrorCategory.PermissionDenied,
+                EventLogRemoteQueryFailureKind.Timeout =>
+                    ErrorCategory.OperationTimeout,
+                EventLogRemoteQueryFailureKind.HostUnavailable =>
+                    ErrorCategory.ResourceUnavailable,
+                _ => ErrorCategory.ReadError
+            };
+            string message =
+                string.IsNullOrWhiteSpace(
+                    failure.Message)
+                    ? $"Failed to read '{failure.LogName}' on '{failure.MachineName}'."
+                    : failure.Message;
+            WriteError(
+                new ErrorRecord(
+                    new InvalidOperationException(
+                        message),
+                    "EVXNamedEventTargetFailed",
+                    category,
+                    $"{failure.LogName} on {failure.MachineName}"));
+        }
     }
 
     private bool HasManagedPostReadFilter =>

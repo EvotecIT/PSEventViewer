@@ -100,14 +100,21 @@ public static partial class NamedEventsTimelineQueryExecutor {
         }
 
         if (value is string text && TryParseUtcValue(text, out var parsedUtc)) {
-            return parsedUtc.ToString("O");
+            return parsedUtc == DateTime.MinValue
+                ? null
+                : parsedUtc.ToString("O");
         }
 
         if (value is DateTimeOffset dateTimeOffset) {
-            return dateTimeOffset.UtcDateTime.ToString("O");
+            return dateTimeOffset == DateTimeOffset.MinValue
+                ? null
+                : dateTimeOffset.UtcDateTime.ToString("O");
         }
 
         if (value is DateTime dateTime) {
+            if (dateTime == DateTime.MinValue) {
+                return null;
+            }
             var parsed = dateTime.Kind switch {
                 DateTimeKind.Utc => dateTime,
                 DateTimeKind.Local => dateTime.ToUniversalTime(),

@@ -98,6 +98,35 @@ public static partial class EventLogChannelPolicyService {
         if (query == null) {
             throw new ArgumentNullException(nameof(query));
         }
+        EventLogCatalogQuery snapshot =
+            EventLogCatalog.SnapshotAndValidate(
+                query);
+        string[] patternSnapshot =
+            includePatterns?.ToArray() ??
+            Array.Empty<string>();
+        int dop = Math.Max(
+            1,
+            degreeOfParallelism ??
+            Environment.ProcessorCount);
+        if (parallel &&
+            dop > EventLogLimits.MaximumConcurrency) {
+            throw new ArgumentOutOfRangeException(
+                nameof(degreeOfParallelism),
+                $"Maximum degree of parallelism cannot exceed {EventLogLimits.MaximumConcurrency}.");
+        }
+        return GetManyIterator(
+            snapshot,
+            patternSnapshot,
+            parallel,
+            dop);
+    }
+
+    private static IEnumerable<ChannelPolicy> GetManyIterator(
+        EventLogCatalogQuery query,
+        string[] includePatterns,
+        bool parallel,
+        int degreeOfParallelism) {
+
         string[] names = EventLogCatalog.GetChannelNames(
                 query,
                 includePatterns)
@@ -105,15 +134,10 @@ public static partial class EventLogChannelPolicyService {
         IEnumerable<string> filtered = names;
 
         if (parallel) {
-            int dop = Math.Max(1, degreeOfParallelism ?? Environment.ProcessorCount);
-            if (dop > EventLogLimits.MaximumConcurrency) {
-                throw new ArgumentOutOfRangeException(
-                    nameof(degreeOfParallelism),
-                    $"Maximum degree of parallelism cannot exceed {EventLogLimits.MaximumConcurrency}.");
-            }
             var policies = filtered
                 .AsParallel()
-                .WithDegreeOfParallelism(dop)
+                .WithDegreeOfParallelism(
+                    degreeOfParallelism)
                 .Select(name => Get(name, query))
                 .Where(static policy => policy != null)
                 .Cast<ChannelPolicy>();

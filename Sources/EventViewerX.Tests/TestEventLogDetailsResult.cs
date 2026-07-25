@@ -345,6 +345,55 @@ public class TestEventLogDetailsResult {
     }
 
     [Fact]
+    public void DisplayEventLogResultsSnapshotsLogNamesAtCallTime() {
+        if (!OperatingSystem.IsWindows()) return;
+
+        const string missingLog =
+            "Definitely-Missing-EventViewerX-Snapshot-Log";
+        string[] requestedLogs = { missingLog };
+        IEnumerable<EventLogDetailsResult> stream =
+            EventLogCatalog.DisplayEventLogResults(
+                requestedLogs);
+
+        requestedLogs[0] = "*";
+        EventLogDetailsResult result =
+            Assert.Single(
+                stream);
+
+        Assert.Equal(
+            missingLog,
+            result.LogName);
+        Assert.False(
+            result.Success);
+    }
+
+    [Fact]
+    public void ParallelDisplayEventLogResultsSnapshotsTargetsAtCallTime() {
+        if (!OperatingSystem.IsWindows()) return;
+
+        var targets =
+            new List<string?> {
+                null
+            };
+        IEnumerable<EventLogDetailsResult> stream =
+            EventLogCatalog.DisplayEventLogResultsParallel(
+                new[] { "Application" },
+                targets,
+                maxDegreeOfParallelism: 1);
+
+        targets[0] = "[";
+        EventLogDetailsResult result =
+            Assert.Single(
+                stream);
+
+        Assert.Equal(
+            "Application",
+            result.LogName);
+        Assert.True(
+            result.Success);
+    }
+
+    [Fact]
     public void DetailEnumeratorsHonorCancellationBeforeSessionSetup() {
         if (!OperatingSystem.IsWindows()) return;
 

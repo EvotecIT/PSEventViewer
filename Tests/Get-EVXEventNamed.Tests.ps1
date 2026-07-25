@@ -104,4 +104,20 @@ Describe 'Get-EVXEvent - Named Event' {
         $ActualKeys = @($Response.Item1.Timeline | ForEach-Object { '{0}|{1}|{2}' -f $_.GatheredFrom, $_.GatheredLogName, $_.RecordId } | Sort-Object)
         ($ActualKeys -join "`n") | Should -Be ($ExpectedKeys -join "`n")
     }
+
+    It 'reports an isolated remote named-event failure instead of silently returning partial results' {
+        $Errors = @()
+        $null = @(
+            Get-EVXEvent `
+                -Type OSStartup `
+                -MachineName $env:COMPUTERNAME, '192.0.2.1' `
+                -SessionTimeoutMs 500 `
+                -MaxEvents 0 `
+                -ErrorAction SilentlyContinue `
+                -ErrorVariable +Errors
+        )
+
+        @($Errors.FullyQualifiedErrorId) |
+            Should -Contain 'EVXNamedEventTargetFailed,PSEventViewer.CmdletGetEVXEvent'
+    }
 }

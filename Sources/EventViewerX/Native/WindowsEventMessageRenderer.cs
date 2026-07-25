@@ -7,14 +7,18 @@ using System.Runtime.InteropServices;
 namespace EventViewerX.Native;
 
 internal sealed class WindowsEventMessageRenderer : IDisposable {
+    private const int MaximumProviderCacheEntries = 256;
     private readonly string? _filePath;
     private readonly IntPtr _session;
     private readonly int _locale;
     private readonly int _fallbackLocale;
     private readonly NativeEventBuffer _messageBuffer;
     private readonly WindowsEventBookmarkRenderer _bookmarkRenderer;
-    private readonly Dictionary<string, ProviderContext> _providers =
-        new(StringComparer.OrdinalIgnoreCase);
+    private readonly BoundedDisposableCache<string, ProviderContext>
+        _providers =
+            new(
+                MaximumProviderCacheEntries,
+                StringComparer.OrdinalIgnoreCase);
 
     internal WindowsEventMessageRenderer(
         IntPtr session,
@@ -96,9 +100,14 @@ internal sealed class WindowsEventMessageRenderer : IDisposable {
     }
 
     private ProviderContext GetProvider(string providerName) {
-        if (_providers.TryGetValue(providerName, out ProviderContext? provider)) {
-            return provider;
-        }
+        return _providers.GetOrAdd(
+            providerName,
+            () => CreateProviderContext(
+                providerName));
+    }
+
+    private ProviderContext CreateProviderContext(
+        string providerName) {
 
         WindowsEventNativeMethods.EventHandle primary =
             OpenProvider(providerName, _locale);
@@ -122,15 +131,13 @@ internal sealed class WindowsEventMessageRenderer : IDisposable {
                     _fallbackLocale).Name;
         }
 
-        provider = new ProviderContext(
+        return new ProviderContext(
             primary,
             primaryError,
             CultureInfo.GetCultureInfo(_locale).Name,
             fallback,
             fallbackError,
             fallbackCultureName);
-        _providers.Add(providerName, provider);
-        return provider;
     }
 
     private WindowsEventNativeMethods.EventHandle OpenProvider(
@@ -297,10 +304,7 @@ internal sealed class WindowsEventMessageRenderer : IDisposable {
     }
 
     public void Dispose() {
-        foreach (ProviderContext provider in _providers.Values) {
-            provider.Dispose();
-        }
-        _providers.Clear();
+        _providers.Dispose();
         _messageBuffer.Dispose();
         _bookmarkRenderer.Dispose();
     }

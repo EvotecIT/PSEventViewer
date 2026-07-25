@@ -114,6 +114,28 @@ public class TestNamedEventsTimelineQueryExecutor {
     }
 
     [Fact]
+    public void ReadPayloadUtc_ShouldOmitTheMissingTimestampSentinel() {
+        MethodInfo method = typeof(NamedEventsTimelineQueryExecutor).GetMethod(
+            "ReadPayloadUtc",
+            BindingFlags.NonPublic | BindingFlags.Static)!;
+        IReadOnlyDictionary<string, object?> payload =
+            new Dictionary<string, object?>(
+                StringComparer.OrdinalIgnoreCase) {
+                ["when"] = DateTime.MinValue.ToString("O")
+            };
+
+        object? result = method.Invoke(
+            null,
+            new object[] {
+                payload,
+                "when"
+            });
+
+        Assert.Null(
+            result);
+    }
+
+    [Fact]
     public void ExtractPayload_ShouldExcludeBaseMetadataAndEventSnapshots() {
         MethodInfo method = typeof(NamedEventsTimelineQueryExecutor).GetMethod(
             "ExtractPayload",
