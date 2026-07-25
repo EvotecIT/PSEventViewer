@@ -11,6 +11,32 @@ internal static class WindowsEventArchive {
         int locale,
         CancellationToken cancellationToken) {
 
+        ArchiveFileResources(
+            path,
+            locale,
+            cancellationToken,
+            static (archivePath, archiveLocale) => {
+                if (!WindowsEventNativeMethods
+                        .EvtArchiveExportedLog(
+                            IntPtr.Zero,
+                            archivePath,
+                            archiveLocale,
+                            0)) {
+                    throw CreateWin32Exception(
+                        $"Provider resources could not be archived into '{archivePath}'.");
+                }
+            });
+    }
+
+    internal static void ArchiveFileResources(
+        string path,
+        int locale,
+        CancellationToken cancellationToken,
+        Action<string, int> archive) {
+
+        if (archive == null) {
+            throw new ArgumentNullException(nameof(archive));
+        }
         cancellationToken.ThrowIfCancellationRequested();
         string absolutePath = Path.GetFullPath(
             path.Trim().Trim('"', '\''));
@@ -19,15 +45,106 @@ internal static class WindowsEventArchive {
                 $"Event log file '{absolutePath}' does not exist.",
                 absolutePath);
         }
-        if (!WindowsEventNativeMethods.EvtArchiveExportedLog(
-                IntPtr.Zero,
+        string directory =
+            Path.GetDirectoryName(absolutePath)!;
+        string temporaryPath = Path.Combine(
+            directory,
+            $".{Path.GetFileName(absolutePath)}.{Guid.NewGuid():N}.archive.evtx");
+        bool cleanupDeferred = false;
+        try {
+            CopyFile(
                 absolutePath,
-                locale,
-                0)) {
-            throw CreateWin32Exception(
-                $"Provider resources could not be archived into '{absolutePath}'.");
+                temporaryPath,
+                cancellationToken);
+            try {
+                _ = BoundedNativeOperation.Execute(
+                    () => {
+                        try {
+                            archive(
+                                temporaryPath,
+                                locale);
+                            return true;
+                        } catch {
+                            DeleteTemporaryArchive(
+                                temporaryPath);
+                            throw;
+                        }
+                    },
+                    int.MaxValue,
+                    $"Provider resources could not be archived into '{absolutePath}'.",
+                    cancellationToken,
+                    _ => DeleteTemporaryArchive(
+                        temporaryPath));
+            } catch (OperationCanceledException)
+                when (cancellationToken.IsCancellationRequested) {
+                cleanupDeferred = true;
+                throw;
+            }
+            cancellationToken.ThrowIfCancellationRequested();
+            EventLogExporter.PromoteTemporaryFile(
+                temporaryPath,
+                absolutePath,
+                overwrite: true);
+        } finally {
+            if (!cleanupDeferred) {
+                DeleteTemporaryArchive(
+                    temporaryPath);
+            }
         }
-        cancellationToken.ThrowIfCancellationRequested();
+    }
+
+    private static void DeleteTemporaryArchive(
+        string temporaryPath) {
+
+        try {
+            if (File.Exists(temporaryPath)) {
+                File.Delete(temporaryPath);
+            }
+        } catch (IOException) {
+            // A canceled native archive retains ownership until its worker
+            // finishes and invokes this cleanup again.
+        } catch (UnauthorizedAccessException) {
+            // Preserve the authoritative native archive failure.
+        }
+    }
+
+    private static void CopyFile(
+        string sourcePath,
+        string destinationPath,
+        CancellationToken cancellationToken) {
+
+        const int bufferSize = 1024 * 1024;
+        using var source = new FileStream(
+            sourcePath,
+            FileMode.Open,
+            FileAccess.Read,
+            FileShare.Read,
+            bufferSize,
+            FileOptions.SequentialScan);
+        using var destination = new FileStream(
+            destinationPath,
+            FileMode.CreateNew,
+            FileAccess.Write,
+            FileShare.None,
+            bufferSize,
+            FileOptions.SequentialScan);
+        var buffer = new byte[bufferSize];
+        while (true) {
+            cancellationToken.ThrowIfCancellationRequested();
+            int read = source.Read(
+                buffer,
+                0,
+                buffer.Length);
+            if (read == 0) {
+                break;
+            }
+            destination.Write(
+                buffer,
+                0,
+                read);
+        }
+        destination.Flush(
+            flushToDisk: true);
     }
 
     internal static void ExportFile(

@@ -16,7 +16,7 @@ namespace PSEventViewer;
     "EVXLogArchive",
     SupportsShouldProcess = true)]
 [OutputType(typeof(FileInfo))]
-public sealed class CmdletUpdateEVXLogArchive : PSCmdlet {
+public sealed class CmdletUpdateEVXLogArchive : AsyncPSCmdlet {
     /// <summary>Exported EVTX files to update.</summary>
     [Parameter(
         Mandatory = true,
@@ -32,7 +32,7 @@ public sealed class CmdletUpdateEVXLogArchive : PSCmdlet {
     public CultureInfo? Culture { get; set; }
 
     /// <inheritdoc />
-    protected override void ProcessRecord() {
+    protected override Task ProcessRecordAsync() {
         foreach (string path in Path
                      .Select(static value =>
                          value?.Trim() ?? string.Empty)
@@ -50,8 +50,10 @@ public sealed class CmdletUpdateEVXLogArchive : PSCmdlet {
             }
             EventLogArchive.ArchiveResources(
                 absolutePath,
-                Culture);
+                Culture,
+                CancelToken);
             WriteObject(new FileInfo(absolutePath));
         }
+        return Task.CompletedTask;
     }
 }

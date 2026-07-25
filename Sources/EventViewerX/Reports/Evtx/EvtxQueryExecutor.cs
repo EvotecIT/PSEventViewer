@@ -215,10 +215,13 @@ public static class EvtxQueryExecutor {
             return false;
         }
 
-        if (QueryValidationHelpers.HasNonPositiveValues(request.EventIds)) {
+        if (request.EventIds != null &&
+            request.EventIds.Any(static eventId =>
+                eventId < EventIdValidation.Minimum ||
+                eventId > EventIdValidation.Maximum)) {
             failure = new EvtxQueryFailure {
                 Kind = EvtxQueryFailureKind.InvalidArgument,
-                Message = "eventIds must contain only positive values."
+                Message = $"eventIds must contain values from {EventIdValidation.Minimum} through {EventIdValidation.Maximum}."
             };
             return false;
         }

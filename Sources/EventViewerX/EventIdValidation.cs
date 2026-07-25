@@ -1,6 +1,9 @@
 namespace EventViewerX;
 
 internal static class EventIdValidation {
+    internal const int Minimum = 0;
+    internal const int Maximum = ushort.MaxValue;
+
     internal static List<int> Normalize(
         IEnumerable<int> eventIds,
         string parameterName) {
@@ -11,12 +14,12 @@ internal static class EventIdValidation {
 
         var normalized = new HashSet<int>();
         foreach (int eventId in eventIds) {
-            if (eventId < 0 ||
-                eventId > ushort.MaxValue) {
+            if (eventId < Minimum ||
+                eventId > Maximum) {
                 throw new ArgumentOutOfRangeException(
                     parameterName,
                     eventId,
-                    $"Event IDs must be between 0 and {ushort.MaxValue}.");
+                    $"Event IDs must be between {Minimum} and {Maximum}.");
             }
             normalized.Add(eventId);
         }

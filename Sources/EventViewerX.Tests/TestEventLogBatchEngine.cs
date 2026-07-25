@@ -187,6 +187,54 @@ namespace EventViewerX.Tests;
     }
 
     [Fact]
+    public void SynchronousBatchSnapshotsControlsAndSourcesAtReadCall() {
+        if (!OperatingSystem.IsWindows()) return;
+        string path = GetFixturePath();
+        var source = new EventLogFileQuery(path) {
+            ReadMode = EventReadMode.Metadata
+        };
+        EventLogBatchQuery query =
+            EventLogBatchQuery.ForFiles(
+                new[] { source });
+        query.MaxEvents = 1;
+        query.MaxConcurrency = 1;
+
+        IEnumerable<EventObject> stream =
+            EventLogBatchEngine.Read(query);
+        source.XPath = "*[";
+        query.MaxEvents = 0;
+        query.MaxConcurrency = 0;
+
+        Assert.Single(stream);
+    }
+
+    [Fact]
+    public async Task AsyncBatchSnapshotsControlsAndSourcesAtReadCall() {
+        if (!OperatingSystem.IsWindows()) return;
+        string path = GetFixturePath();
+        var source = new EventLogFileQuery(path) {
+            ReadMode = EventReadMode.Metadata
+        };
+        EventLogBatchQuery query =
+            EventLogBatchQuery.ForFiles(
+                new[] { source });
+        query.MaxEvents = 1;
+        query.MaxConcurrency = 1;
+
+        IAsyncEnumerable<EventObject> stream =
+            EventLogBatchEngine.ReadAsync(query);
+        source.XPath = "*[";
+        query.MaxEvents = 0;
+        query.MaxConcurrency = 0;
+        var events = new List<EventObject>();
+        await foreach (EventObject eventObject in stream) {
+            events.Add(eventObject);
+        }
+
+        Assert.Single(events);
+    }
+
+    [Fact]
     public async Task AsyncPrimingFailureReleasesSuccessfulSourceCursors() {
         if (!OperatingSystem.IsWindows()) return;
         string root = Path.Combine(

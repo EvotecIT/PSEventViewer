@@ -76,6 +76,44 @@ public class TestEvtxQueryExecutor {
     }
 
     [Fact]
+    public void TryRead_ShouldAcceptEventIdZero() {
+        var request = new EvtxQueryRequest {
+            FilePath = "C:/this/file/does/not/exist.evtx",
+            EventIds = new[] { 0 }
+        };
+
+        var ok = EvtxQueryExecutor.TryRead(
+            request,
+            out _,
+            out var failure);
+
+        Assert.False(ok);
+        Assert.NotNull(failure);
+        Assert.Equal(
+            EvtxQueryFailureKind.NotFound,
+            failure!.Kind);
+    }
+
+    [Fact]
+    public void TryRead_ShouldRejectEventIdsAboveWindowsRange() {
+        var request = new EvtxQueryRequest {
+            FilePath = "dummy.evtx",
+            EventIds = new[] { 65536 }
+        };
+
+        var ok = EvtxQueryExecutor.TryRead(
+            request,
+            out _,
+            out var failure);
+
+        Assert.False(ok);
+        Assert.NotNull(failure);
+        Assert.Equal(
+            EvtxQueryFailureKind.InvalidArgument,
+            failure!.Kind);
+    }
+
+    [Fact]
     public void TryRead_ShouldReturnNotFoundForMissingFile() {
         var request = new EvtxQueryRequest {
             FilePath = "C:/this/file/does/not/exist.evtx"

@@ -427,8 +427,7 @@ public static partial class EventProviderPackageManager {
                         IsRegistered = registered
                     });
                 } catch (Exception exception)
-                    when (!active &&
-                          IsUnreadableRetainedPackage(
+                    when (IsUnreadableRetainedPackage(
                               exception)) {
                 }
             }

@@ -152,6 +152,33 @@ Describe 'Get-EVXEvent checkpoint compatibility' {
         @($Events | Where-Object { $_.RecordId -le $Latest.RecordId }) | Should -BeNullOrEmpty
     }
 
+    It 'does not restore a legacy checkpoint over an authoritative default-key tombstone' {
+        $CheckpointPath = Join-Path $TestDrive 'legacy-tombstone.json'
+        @{ 'System|' = 0L } | ConvertTo-Json -Compress |
+            Set-Content -LiteralPath $CheckpointPath -Encoding UTF8
+
+        $Initial = @(Get-EVXEvent -LogName System -RecordIdFile $CheckpointPath -MaxEvents 1 -ReadMode Metadata)
+        if ($Initial.Count -eq 0) {
+            Set-ItResult -Skipped -Because 'The System event log contained no checkpointable events.'
+            return
+        }
+        $State = Get-Content -LiteralPath ($CheckpointPath + '.state.json') -Raw | ConvertFrom-Json
+        $DefaultKey = @($State.Checkpoints.PSObject.Properties.Name | Where-Object { $_ -ne 'System|' }) | Select-Object -First 1
+        if (-not $DefaultKey) {
+            Set-ItResult -Skipped -Because 'The default checkpoint key could not be identified.'
+            return
+        }
+
+        Reset-EVXEventCheckpoint -Path $CheckpointPath -Key $DefaultKey -Confirm:$false
+        @{ 'System|' = [long]::MaxValue } | ConvertTo-Json -Compress |
+            Set-Content -LiteralPath $CheckpointPath -Encoding UTF8
+
+        $AfterReset = @(Get-EVXEvent -LogName System -RecordIdFile $CheckpointPath -MaxEvents 1 -ReadMode Metadata -WarningAction SilentlyContinue)
+
+        $AfterReset.Count | Should -Be 1
+        [long] $AfterReset[0].RecordId | Should -BeLessThan ([long]::MaxValue)
+    }
+
     It 'does not fan out an aggregate legacy checkpoint across named-event sources' {
         $Baseline = @(Get-EVXEvent -Type OSStartup -MaxEvents 1)
         if ($Baseline.Count -eq 0) {

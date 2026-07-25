@@ -49,7 +49,8 @@ public sealed partial class CmdletGetEVXEvent {
             return;
         }
         string legacyKey = BuildLegacyCheckpointKey();
-        if (!_recordMap.ContainsKey(_recordIdKey) &&
+        if (!_checkpointGenerations.ContainsKey(_recordIdKey) &&
+            !_recordMap.ContainsKey(_recordIdKey) &&
             _recordMap.TryGetValue(
                 legacyKey,
                 out long legacyRecordId)) {

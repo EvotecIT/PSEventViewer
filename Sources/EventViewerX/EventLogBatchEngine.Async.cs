@@ -7,44 +7,33 @@ public static partial class EventLogBatchEngine {
     /// Asynchronously reads a bounded deterministic merge. Independent sources are primed concurrently,
     /// while consumer backpressure keeps only one detached head record per source in merge memory.
     /// </summary>
-    public static async IAsyncEnumerable<EventObject> ReadAsync(
+    public static IAsyncEnumerable<EventObject> ReadAsync(
         EventLogBatchQuery query,
-        [EnumeratorCancellation] CancellationToken cancellationToken = default) {
+        CancellationToken cancellationToken = default) {
 
-        if (query == null) {
-            throw new ArgumentNullException(nameof(query));
-        }
-        if (query.MaxEvents < 0) {
-            throw new ArgumentOutOfRangeException(
-                nameof(query),
-                "Maximum events must be greater than or equal to zero.");
-        }
-        ValidateReadModes(query);
-        ValidateConcurrency(query.MaxConcurrency);
+        return ReadAsynchronously(
+            CreateExecutionPlan(query),
+            cancellationToken);
+    }
 
-        EventSourceSnapshot[] sources = SnapshotSources(query);
-        bool oldest = sources[0].Oldest;
-        if (sources.Any(source => source.Oldest != oldest)) {
-            throw new ArgumentException(
-                "Every source in a batch must use the same ordering direction.",
-                nameof(query));
-        }
-        Action<EventLogQueryFailure>? failureHandler =
-            CreateSerializedFailureHandler(
-                query.FailureHandler);
+    private static async IAsyncEnumerable<EventObject>
+        ReadAsynchronously(
+            EventLogBatchExecutionPlan plan,
+            [EnumeratorCancellation]
+            CancellationToken cancellationToken) {
 
         using var concurrencyGate =
             new SemaphoreSlim(
-                query.MaxConcurrency,
-                query.MaxConcurrency);
+                plan.MaxConcurrency,
+                plan.MaxConcurrency);
         Task<EventSourceCursor?>[] primeTasks =
-            sources
+            plan.Sources
                 .Select((source, index) =>
                     PrimeSourceAsync(
                         index,
                         source,
-                        query.ContinueOnError,
-                        failureHandler,
+                        plan.ContinueOnError,
+                        plan.FailureHandler,
                         concurrencyGate,
                         cancellationToken))
                 .ToArray();
@@ -65,7 +54,7 @@ public static partial class EventLogBatchEngine {
             .Cast<EventSourceCursor>()
             .ToList();
         var queue = new SortedSet<EventSourceCursor>(
-            new EventSourceCursorComparer(oldest));
+            new EventSourceCursorComparer(plan.Oldest));
         foreach (EventSourceCursor cursor in cursors) {
             queue.Add(cursor);
         }
@@ -78,16 +67,16 @@ public static partial class EventLogBatchEngine {
                 queue.Remove(cursor);
                 yield return cursor.Current;
                 returned++;
-                if (query.MaxEvents > 0 &&
-                    returned >= query.MaxEvents) {
+                if (plan.MaxEvents > 0 &&
+                    returned >= plan.MaxEvents) {
                     yield break;
                 }
 
                 bool hasNext = await Task.Run(
                         () => TryMoveNext(
                             cursor,
-                            query.ContinueOnError,
-                            failureHandler,
+                            plan.ContinueOnError,
+                            plan.FailureHandler,
                             cancellationToken),
                         CancellationToken.None)
                     .ConfigureAwait(false);

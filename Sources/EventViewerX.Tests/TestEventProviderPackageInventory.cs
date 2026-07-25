@@ -145,4 +145,84 @@ public sealed class TestEventProviderPackageInventory {
             }
         }
     }
+
+    [Fact]
+    public void CorruptActivePackageDoesNotHideAnotherProvider() {
+        string root = Path.Combine(
+            Path.GetTempPath(),
+            "EventViewerX.Tests",
+            Guid.NewGuid().ToString("N"));
+        EventProviderDefinition healthyDefinition =
+            TestEventProviderPackages.CreateDefinition();
+        EventProviderDefinition corruptDefinition =
+            TestEventProviderPackages.CreateDefinition();
+        corruptDefinition.Name =
+            "EventViewerX.Tests.CorruptActive";
+        corruptDefinition.Id = Guid.NewGuid();
+        corruptDefinition.Channels[0].Name =
+            "EventViewerX.Tests.CorruptActive/Operational";
+        try {
+            CreateInstalledPackage(
+                root,
+                healthyDefinition,
+                corrupt: false);
+            CreateInstalledPackage(
+                root,
+                corruptDefinition,
+                corrupt: true);
+
+            InstalledEventProviderPackage installed =
+                Assert.Single(
+                    EventProviderPackageManager
+                        .GetInstalled(root));
+
+            Assert.Equal(
+                healthyDefinition.Id,
+                installed.ProviderId);
+            Assert.True(installed.IsActive);
+        } finally {
+            if (Directory.Exists(root)) {
+                Directory.Delete(
+                    root,
+                    recursive: true);
+            }
+        }
+    }
+
+    private static void CreateInstalledPackage(
+        string root,
+        EventProviderDefinition definition,
+        bool corrupt) {
+
+        string providerRoot = Path.Combine(
+            root,
+            definition.Id.ToString("N"));
+        string activeDirectory = Path.Combine(
+            providerRoot,
+            "active");
+        string packagePath = Path.Combine(
+            activeDirectory,
+            EventProviderInstallationStore
+                .ArchivedPackageFileName);
+        Directory.CreateDirectory(activeDirectory);
+        EventProviderPackageBuildResult build =
+            EventProviderPackageBuilder.Build(
+                definition,
+                packagePath);
+        EventProviderInstallationStore.Save(
+            providerRoot,
+            new EventProviderInstallationState {
+                ProviderName = definition.Name,
+                ProviderId = definition.Id,
+                ActiveVersion = definition.PackageVersion,
+                ActiveDirectoryName = "active",
+                PackageSha256 = build.PackageSha256,
+                InstalledAtUtc = DateTimeOffset.UtcNow
+            });
+        if (corrupt) {
+            File.WriteAllText(
+                packagePath,
+                "not a provider package");
+        }
+    }
 }

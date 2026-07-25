@@ -1,5 +1,6 @@
 using System.Diagnostics.Eventing.Reader;
 using System.Threading;
+using EventViewerX.Native;
 
 namespace EventViewerX;
 
@@ -44,7 +45,7 @@ public static partial class EventLogChannelPolicyService {
 
         EventLogSession? session = null;
         try {
-            EventLogSessionOpenResult sessionResult =
+            using EventLogSessionOpenResult sessionResult =
                 EventLogSessionManager.CreateSessionResult(
                     policy.MachineName,
                     "ChannelPolicy.Set",
@@ -53,7 +54,9 @@ public static partial class EventLogChannelPolicyService {
                     emitDiagnostics: false,
                     credential: policy.Credential,
                     authentication:
-                        policy.Authentication);
+                        policy.Authentication,
+                    cancellationToken:
+                        cancellationToken);
             session = sessionResult.Session;
             if (session == null) {
                 result.Errors.Add(
@@ -64,6 +67,48 @@ public static partial class EventLogChannelPolicyService {
                 return result;
             }
 
+            sessionResult.Session = null;
+            EventLogSession ownedSession = session;
+            session = null;
+            result = BoundedNativeOperation.Execute(
+                () => ApplyWithOwnedSession(
+                    policy,
+                    result,
+                    ownedSession,
+                    cancellationToken),
+                int.MaxValue,
+                $"Channel policy update for '{policy.LogName}' did not complete.",
+                cancellationToken);
+        } catch (OperationCanceledException)
+            when (cancellationToken.IsCancellationRequested) {
+            throw;
+        } catch (Exception exception) {
+            result.Errors.Add(exception.Message);
+        } finally {
+            session?.Dispose();
+        }
+
+        int completedCount =
+            result.AppliedProperties.Count +
+            result.UnchangedProperties.Count;
+        result.Success =
+            result.Errors.Count == 0 &&
+            result.SkippedOrUnsupported.Count == 0 &&
+            completedCount ==
+            result.RequestedProperties.Count;
+        result.PartialSuccess =
+            !result.Success &&
+            completedCount > 0;
+        return result;
+    }
+
+    private static ChannelPolicyApplyResult ApplyWithOwnedSession(
+        ChannelPolicy policy,
+        ChannelPolicyApplyResult result,
+        EventLogSession session,
+        CancellationToken cancellationToken) {
+
+        using (session) {
             cancellationToken.ThrowIfCancellationRequested();
             using var configuration =
                 new EventLogConfiguration(
@@ -121,26 +166,7 @@ public static partial class EventLogChannelPolicyService {
                 result.Errors.Add(
                     $"Failed to verify the saved channel policy: {exception.Message}");
             }
-        } catch (OperationCanceledException)
-            when (cancellationToken.IsCancellationRequested) {
-            throw;
-        } catch (Exception exception) {
-            result.Errors.Add(exception.Message);
-        } finally {
-            session?.Dispose();
         }
-
-        int completedCount =
-            result.AppliedProperties.Count +
-            result.UnchangedProperties.Count;
-        result.Success =
-            result.Errors.Count == 0 &&
-            result.SkippedOrUnsupported.Count == 0 &&
-            completedCount ==
-            result.RequestedProperties.Count;
-        result.PartialSuccess =
-            !result.Success &&
-            completedCount > 0;
         return result;
     }
 

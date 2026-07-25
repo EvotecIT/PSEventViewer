@@ -1,3 +1,6 @@
+using System.Globalization;
+using System.Net;
+
 namespace EventViewerX;
 
 /// <summary>
@@ -12,6 +15,16 @@ public static partial class EventLogBatchEngine {
     public static IEnumerable<EventObject> Read(
         EventLogBatchQuery query,
         CancellationToken cancellationToken = default) {
+
+        EventLogBatchExecutionPlan plan =
+            CreateExecutionPlan(query);
+        return ReadSynchronously(
+            plan,
+            cancellationToken);
+    }
+
+    private static EventLogBatchExecutionPlan CreateExecutionPlan(
+        EventLogBatchQuery query) {
 
         if (query == null) {
             throw new ArgumentNullException(nameof(query));
@@ -34,13 +47,13 @@ public static partial class EventLogBatchEngine {
         Action<EventLogQueryFailure>? failureHandler =
             CreateSerializedFailureHandler(
                 query.FailureHandler);
-
-        return ReadSynchronously(
-            query,
+        return new EventLogBatchExecutionPlan(
             sources,
             oldest,
-            failureHandler,
-            cancellationToken);
+            query.MaxEvents,
+            query.MaxConcurrency,
+            query.ContinueOnError,
+            failureHandler);
     }
 
     private static void ValidateConcurrency(int maxConcurrency) {
@@ -71,29 +84,37 @@ public static partial class EventLogBatchEngine {
         long sourceLimit = query.MaxEvents;
         EventSourceSnapshot[] channels =
             query.ChannelQueries
-                .Select(channel => new EventSourceSnapshot(
-                    channel.LogName,
-                    channel.MachineName,
-                    channel.Oldest,
-                    cancellationToken =>
-                        EventLogEngine.ReadChannel(
-                            CopyChannelQuery(
-                                channel,
-                                sourceLimit),
-                            cancellationToken)))
+                .Select(channel => {
+                    EventLogChannelQuery snapshot =
+                        CopyChannelQuery(
+                            channel,
+                            sourceLimit);
+                    return new EventSourceSnapshot(
+                        snapshot.LogName,
+                        snapshot.MachineName,
+                        snapshot.Oldest,
+                        cancellationToken =>
+                            EventLogEngine.ReadChannel(
+                                snapshot,
+                                cancellationToken));
+                })
                 .ToArray();
         EventSourceSnapshot[] files =
             query.FileQueries
-                .Select(file => new EventSourceSnapshot(
-                    file.Path,
-                    null,
-                    file.Oldest,
-                    cancellationToken =>
-                        EventLogEngine.ReadFile(
-                            CopyFileQuery(
-                                file,
-                                sourceLimit),
-                            cancellationToken)))
+                .Select(file => {
+                    EventLogFileQuery snapshot =
+                        CopyFileQuery(
+                            file,
+                            sourceLimit);
+                    return new EventSourceSnapshot(
+                        snapshot.Path,
+                        null,
+                        snapshot.Oldest,
+                        cancellationToken =>
+                            EventLogEngine.ReadFile(
+                                snapshot,
+                                cancellationToken));
+                })
                 .ToArray();
         EventLogStructuredQuery[] structuredSources =
             query.StructuredQueries
@@ -103,16 +124,20 @@ public static partial class EventLogBatchEngine {
                 .ToArray();
         EventSourceSnapshot[] structured =
             structuredSources
-                .Select((structured, index) => new EventSourceSnapshot(
-                    $"StructuredQuery[{index}]",
-                    structured.MachineName,
-                    structured.Oldest,
-                    cancellationToken =>
-                        EventLogEngine.ReadStructured(
-                            CopyStructuredQuery(
-                                structured,
-                                sourceLimit),
-                            cancellationToken)))
+                .Select((structured, index) => {
+                    EventLogStructuredQuery snapshot =
+                        CopyStructuredQuery(
+                            structured,
+                            sourceLimit);
+                    return new EventSourceSnapshot(
+                        $"StructuredQuery[{index}]",
+                        snapshot.MachineName,
+                        snapshot.Oldest,
+                        cancellationToken =>
+                            EventLogEngine.ReadStructured(
+                                snapshot,
+                                cancellationToken));
+                })
                 .ToArray();
         EventSourceSnapshot[] all = channels
             .Concat(files)
@@ -152,13 +177,16 @@ public static partial class EventLogBatchEngine {
 
         return new EventLogChannelQuery(source.LogName) {
             MachineName = source.MachineName,
-            Credential = source.Credential,
+            Credential = CopyCredential(
+                source.Credential),
             Authentication = source.Authentication,
             XPath = source.XPath,
             Oldest = source.Oldest,
             ReadMode = source.ReadMode,
-            MessageCulture = source.MessageCulture,
-            FallbackMessageCulture = source.FallbackMessageCulture,
+            MessageCulture = CopyCulture(
+                source.MessageCulture),
+            FallbackMessageCulture = CopyCulture(
+                source.FallbackMessageCulture),
             MaxEvents = ApplySourceLimit(source.MaxEvents, batchLimit),
             IncludeBookmark = source.IncludeBookmark,
             RemoteConnectionTimeoutMilliseconds =
@@ -181,8 +209,10 @@ public static partial class EventLogBatchEngine {
             XPath = source.XPath,
             Oldest = source.Oldest,
             ReadMode = source.ReadMode,
-            MessageCulture = source.MessageCulture,
-            FallbackMessageCulture = source.FallbackMessageCulture,
+            MessageCulture = CopyCulture(
+                source.MessageCulture),
+            FallbackMessageCulture = CopyCulture(
+                source.FallbackMessageCulture),
             MaxEvents = ApplySourceLimit(source.MaxEvents, batchLimit),
             IncludeBookmark = source.IncludeBookmark,
             BookmarkXml = source.BookmarkXml,
@@ -198,12 +228,15 @@ public static partial class EventLogBatchEngine {
         return new EventLogStructuredQuery(source.QueryXml) {
             SourceKind = source.SourceKind,
             MachineName = source.MachineName,
-            Credential = source.Credential,
+            Credential = CopyCredential(
+                source.Credential),
             Authentication = source.Authentication,
             Oldest = source.Oldest,
             ReadMode = source.ReadMode,
-            MessageCulture = source.MessageCulture,
-            FallbackMessageCulture = source.FallbackMessageCulture,
+            MessageCulture = CopyCulture(
+                source.MessageCulture),
+            FallbackMessageCulture = CopyCulture(
+                source.FallbackMessageCulture),
             MaxEvents = ApplySourceLimit(source.MaxEvents, batchLimit),
             IncludeBookmark = source.IncludeBookmark,
             RemoteConnectionTimeoutMilliseconds =
@@ -220,6 +253,26 @@ public static partial class EventLogBatchEngine {
         };
     }
 
+    private static NetworkCredential? CopyCredential(
+        NetworkCredential? credential) {
+
+        return credential == null
+            ? null
+            : new NetworkCredential(
+                credential.UserName,
+                credential.Password,
+                credential.Domain);
+    }
+
+    private static CultureInfo? CopyCulture(
+        CultureInfo? culture) {
+
+        return culture == null
+            ? null
+            : CultureInfo.GetCultureInfo(
+                culture.Name);
+    }
+
     private static long ApplySourceLimit(
         long sourceLimit,
         long batchLimit) {
@@ -233,25 +286,22 @@ public static partial class EventLogBatchEngine {
     }
 
     private static IEnumerable<EventObject> ReadSynchronously(
-        EventLogBatchQuery query,
-        EventSourceSnapshot[] sources,
-        bool oldest,
-        Action<EventLogQueryFailure>? failureHandler,
+        EventLogBatchExecutionPlan plan,
         CancellationToken cancellationToken) {
 
         EventSourceCursor?[] primed =
             PrimeSourcesSynchronously(
-                sources,
-                query.MaxConcurrency,
-                query.ContinueOnError,
-                failureHandler,
+                plan.Sources,
+                plan.MaxConcurrency,
+                plan.ContinueOnError,
+                plan.FailureHandler,
                 cancellationToken);
         var cursors = primed
             .Where(static cursor => cursor != null)
             .Cast<EventSourceCursor>()
             .ToList();
         var queue = new SortedSet<EventSourceCursor>(
-            new EventSourceCursorComparer(oldest));
+            new EventSourceCursorComparer(plan.Oldest));
         foreach (EventSourceCursor cursor in cursors) {
             queue.Add(cursor);
         }
@@ -264,15 +314,15 @@ public static partial class EventLogBatchEngine {
                 queue.Remove(cursor);
                 yield return cursor.Current;
                 returned++;
-                if (query.MaxEvents > 0 &&
-                    returned >= query.MaxEvents) {
+                if (plan.MaxEvents > 0 &&
+                    returned >= plan.MaxEvents) {
                     yield break;
                 }
 
                 if (TryMoveNext(
                         cursor,
-                        query.ContinueOnError,
-                        failureHandler,
+                        plan.ContinueOnError,
+                        plan.FailureHandler,
                         cancellationToken)) {
                     queue.Add(cursor);
                 }
@@ -468,6 +518,31 @@ public static partial class EventLogBatchEngine {
         internal Func<CancellationToken, IEnumerable<EventObject>> Open {
             get;
         }
+    }
+
+    private sealed class EventLogBatchExecutionPlan {
+        internal EventLogBatchExecutionPlan(
+            EventSourceSnapshot[] sources,
+            bool oldest,
+            long maxEvents,
+            int maxConcurrency,
+            bool continueOnError,
+            Action<EventLogQueryFailure>? failureHandler) {
+
+            Sources = sources;
+            Oldest = oldest;
+            MaxEvents = maxEvents;
+            MaxConcurrency = maxConcurrency;
+            ContinueOnError = continueOnError;
+            FailureHandler = failureHandler;
+        }
+
+        internal EventSourceSnapshot[] Sources { get; }
+        internal bool Oldest { get; }
+        internal long MaxEvents { get; }
+        internal int MaxConcurrency { get; }
+        internal bool ContinueOnError { get; }
+        internal Action<EventLogQueryFailure>? FailureHandler { get; }
     }
 
     private sealed class EventSourceCursor : IDisposable {
