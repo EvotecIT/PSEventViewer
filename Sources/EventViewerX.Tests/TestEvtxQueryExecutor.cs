@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using EventViewerX.Reports.Evtx;
 using EventViewerX.Reports.Security;
 using EventViewerX.Reports.Stats;
@@ -140,6 +141,33 @@ public class TestEvtxQueryExecutor {
     }
 
     [Fact]
+    public void CallbackMutationDoesNotChangeTheValidatedEventCap() {
+        var request = new EvtxQueryRequest {
+            FilePath = GetFixturePath(),
+            MaxEvents = 2,
+            ReadMode = EventReadMode.Metadata
+        };
+        int callbacks = 0;
+
+        bool success =
+            EvtxQueryExecutor.TryForEachEventWithInfo(
+                request,
+                _ => {
+                    callbacks++;
+                    request.MaxEvents = 0;
+                    return true;
+                },
+                out EvtxQueryExecutionInfo executionInfo,
+                out EvtxQueryFailure? failure);
+
+        Assert.True(success);
+        Assert.Null(failure);
+        Assert.Equal(2, callbacks);
+        Assert.Equal(2, executionInfo.EventsDelivered);
+        Assert.True(executionInfo.Truncated);
+    }
+
+    [Fact]
     public void SecurityBuilder_TryBuildFromFile_ShouldSurfaceQueryFailure() {
         var request = new EvtxQueryRequest {
             FilePath = "C:/this/file/does/not/exist.evtx",
@@ -182,5 +210,19 @@ public class TestEvtxQueryExecutor {
         Assert.False(success);
         Assert.NotNull(failure);
         Assert.Equal(EvtxQueryFailureKind.InvalidArgument, failure!.Kind);
+    }
+
+    private static string GetFixturePath() {
+        return Path.GetFullPath(
+            Path.Combine(
+                AppContext.BaseDirectory,
+                "..",
+                "..",
+                "..",
+                "..",
+                "..",
+                "Tests",
+                "Logs",
+                "NamedFilterExamples.evtx"));
     }
 }

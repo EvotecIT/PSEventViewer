@@ -68,29 +68,67 @@ public static class EventProviderPackageReader {
             throw new IOException(
                 $"Destination '{destination}' must be empty.");
         }
-        Directory.CreateDirectory(destination);
+        bool destinationExisted =
+            Directory.Exists(destination);
+        var writtenPaths = new List<string>(
+            contents.Files.Count + 1);
+        EventProviderPackage package = Open(contents);
         try {
+            Directory.CreateDirectory(destination);
             foreach (KeyValuePair<string, byte[]> file in
                      contents.Files) {
+                string filePath =
+                    Path.Combine(destination, file.Key);
+                writtenPaths.Add(filePath);
                 File.WriteAllBytes(
-                    Path.Combine(destination, file.Key),
+                    filePath,
                     file.Value);
             }
-            File.WriteAllText(
+            string manifestPath =
                 Path.Combine(
                     destination,
                     EventProviderPackageLayout
-                        .PackageManifestFileName),
+                        .PackageManifestFileName);
+            writtenPaths.Add(manifestPath);
+            File.WriteAllText(
+                manifestPath,
                 JsonSerializer.Serialize(
                     contents.Manifest,
                     EventProviderDefinitionJson.SerializerOptions),
                 new UTF8Encoding(false));
-            return Open(contents);
+            return package;
         } catch {
-            if (Directory.Exists(destination)) {
-                Directory.Delete(destination, recursive: true);
-            }
+            package.Dispose();
+            CleanupFailedExtraction(
+                destination,
+                destinationExisted,
+                writtenPaths);
             throw;
+        }
+    }
+
+    private static void CleanupFailedExtraction(
+        string destination,
+        bool destinationExisted,
+        IEnumerable<string> writtenPaths) {
+
+        foreach (string path in writtenPaths) {
+            try {
+                if (File.Exists(path)) {
+                    File.Delete(path);
+                }
+            } catch (IOException) {
+            } catch (UnauthorizedAccessException) {
+            }
+        }
+        if (destinationExisted ||
+            !Directory.Exists(destination)) {
+            return;
+        }
+        try {
+            Directory.Delete(destination, recursive: false);
+        } catch (IOException) {
+        } catch (UnauthorizedAccessException) {
         }
     }
 

@@ -62,13 +62,14 @@ public static class EvtxQueryExecutor {
             return false;
         }
         EvtxQueryRequest validatedRequest = request!;
+        int maxEvents = validatedRequest.MaxEvents;
 
         try {
             long readLimit =
-                validatedRequest.MaxEvents > 0 &&
-                validatedRequest.MaxEvents < int.MaxValue
-                    ? validatedRequest.MaxEvents + 1L
-                    : validatedRequest.MaxEvents;
+                maxEvents > 0 &&
+                maxEvents < int.MaxValue
+                    ? maxEvents + 1L
+                    : maxEvents;
             var query = new EventLogFileQuery(
                 validatedRequest.FilePath) {
                 XPath = EventFilterCompiler.BuildXPath(
@@ -98,7 +99,8 @@ public static class EvtxQueryExecutor {
                          cancellationToken)) {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                if (validatedRequest.MaxEvents > 0 && executionInfo.EventsDelivered >= validatedRequest.MaxEvents) {
+                if (maxEvents > 0 &&
+                    executionInfo.EventsDelivered >= maxEvents) {
                     executionInfo.Truncated = true;
                     break;
                 }

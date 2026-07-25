@@ -1086,6 +1086,95 @@ public sealed class TestEventProviderPackages {
         }
     }
 
+    [Fact]
+    public void FailedExtractionPreservesCallerOwnedEmptyDirectory() {
+        string root = Path.Combine(
+            Path.GetTempPath(),
+            "EventViewerX.Tests",
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        string packagePath = Path.Combine(
+            root,
+            "inconsistent.evxprovider");
+        string destinationPath = Path.Combine(
+            root,
+            "caller-owned");
+        Directory.CreateDirectory(destinationPath);
+        try {
+            EventProviderPackageBuilder.Build(
+                CreateDefinition(),
+                packagePath);
+            EventProviderDefinition changedDefinition =
+                CreateDefinition();
+            changedDefinition.PackageVersion = "1.0.1";
+            byte[] definitionBytes =
+                Encoding.UTF8.GetBytes(
+                    EventProviderDefinitionJson.Serialize(
+                        changedDefinition));
+
+            using (ZipArchive archive = ZipFile.Open(
+                       packagePath,
+                       ZipArchiveMode.Update)) {
+                ZipArchiveEntry definitionEntry =
+                    archive.GetEntry(
+                        EventProviderPackageLayout
+                            .DefinitionFileName)!;
+                ReplaceEntry(
+                    definitionEntry,
+                    definitionBytes);
+                ZipArchiveEntry manifestEntry =
+                    archive.GetEntry(
+                        EventProviderPackageLayout
+                            .PackageManifestFileName)!;
+                EventProviderPackageManifest manifest;
+                using (Stream stream = manifestEntry.Open()) {
+                    manifest =
+                        JsonSerializer.Deserialize<
+                            EventProviderPackageManifest>(
+                            stream,
+                            EventProviderDefinitionJson
+                                .SerializerOptions)!;
+                }
+                manifest.Files[
+                    EventProviderPackageLayout
+                        .DefinitionFileName] =
+                    EventProviderHash.BytesSha256(
+                        definitionBytes);
+                ReplaceEntry(
+                    manifestEntry,
+                    Encoding.UTF8.GetBytes(
+                        JsonSerializer.Serialize(
+                            manifest,
+                            EventProviderDefinitionJson
+                                .SerializerOptions)));
+            }
+
+            Assert.Throws<InvalidDataException>(() =>
+                EventProviderPackageReader.Extract(
+                    packagePath,
+                    destinationPath));
+            Assert.True(
+                Directory.Exists(destinationPath));
+            Assert.Empty(
+                Directory.EnumerateFileSystemEntries(
+                    destinationPath));
+        } finally {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    private static void ReplaceEntry(
+        ZipArchiveEntry entry,
+        byte[] contents) {
+
+        using Stream stream = entry.Open();
+        stream.SetLength(0);
+        stream.Write(
+            contents,
+            0,
+            contents.Length);
+    }
+
     internal static EventProviderDefinition CreateDefinition() {
         EventProviderDefinition definition =
             EventProviderDefinition.Create(

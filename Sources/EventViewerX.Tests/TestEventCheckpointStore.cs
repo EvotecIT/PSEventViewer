@@ -236,6 +236,41 @@ public class TestEventCheckpointStore {
         }
     }
 
+    [Fact]
+    public void LazyUpdatesAreMaterializedBeforeTheCheckpointLock() {
+        string root = CreateTemporaryDirectory();
+        try {
+            string path = Path.Combine(
+                root,
+                "checkpoint.json");
+
+            EventCheckpointSnapshot updated =
+                EventCheckpointStore.Update(
+                    path,
+                    CreateReentrantUpdates(),
+                    TimeSpan.FromSeconds(1));
+
+            Assert.Equal(
+                1,
+                updated.Records["System"]);
+
+            IEnumerable<EventCheckpointUpdate>
+                CreateReentrantUpdates() {
+
+                EventCheckpointStore.Update(
+                    path,
+                    Array.Empty<EventCheckpointUpdate>(),
+                    TimeSpan.Zero);
+                yield return new EventCheckpointUpdate(
+                    "System",
+                    1,
+                    Guid.Empty);
+            }
+        } finally {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
     private static string CreateTemporaryDirectory() {
         string path = Path.Combine(Path.GetTempPath(), "EventViewerX.Tests." + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(path);

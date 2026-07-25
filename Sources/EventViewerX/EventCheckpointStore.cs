@@ -158,12 +158,23 @@ public static class EventCheckpointStore {
 
         string checkpointPath = NormalizePath(path);
         EnsureParentDirectory(checkpointPath);
+        var preparedUpdates =
+            new List<EventCheckpointUpdate>();
+        foreach (EventCheckpointUpdate? update in updates) {
+            if (update == null) {
+                throw new ArgumentException(
+                    "Checkpoint updates cannot contain null entries.",
+                    nameof(updates));
+            }
+            preparedUpdates.Add(update);
+        }
 
         using (AcquireFileLock(checkpointPath, lockTimeout ?? DefaultLockTimeout)) {
             EventCheckpointSnapshot latest = LoadUnlocked(checkpointPath);
             Dictionary<string, EventCheckpointValue> values = latest.CopyValues();
 
-            foreach (EventCheckpointUpdate update in updates) {
+            foreach (EventCheckpointUpdate update in
+                     preparedUpdates) {
                 Guid currentGeneration = values.TryGetValue(update.Key, out EventCheckpointValue? current)
                     ? current.GenerationId
                     : Guid.Empty;
