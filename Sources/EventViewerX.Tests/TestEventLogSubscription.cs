@@ -54,7 +54,11 @@ public sealed class TestEventLogSubscription {
         Assert.Null(failure);
         Assert.NotNull(received);
         Assert.Equal(current.RecordId, received!.RecordId);
-        Assert.Equal(1, subscription.EventsDelivered);
+        Assert.True(
+            SpinWait.SpinUntil(
+                () => subscription.EventsDelivered == 1,
+                TimeSpan.FromSeconds(5)),
+            $"Expected one completed delivery, but observed {subscription.EventsDelivered}.");
     }
 
     [Fact]
