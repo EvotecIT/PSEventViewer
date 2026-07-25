@@ -250,6 +250,42 @@ namespace EventViewerX.Tests;
     }
 
     [Fact]
+    public void ConsolidationIgnoresOperationalQueryIdsWhenDeduplicating() {
+        const string firstQuery =
+            "<QueryList><Query Id=\"1\" Path=\"System\">" +
+            "<Select Path=\"System\">*</Select>" +
+            "</Query></QueryList>";
+        const string secondQuery =
+            "<QueryList><Query Id=\"99\" Path=\"System\">" +
+            "<Select Path=\"System\">*</Select>" +
+            "</Query></QueryList>";
+        EventLogBatchQuery query =
+            EventLogBatchQuery.ForStructured(
+                new[] {
+                    new EventLogStructuredQuery(firstQuery),
+                    new EventLogStructuredQuery(secondQuery)
+                });
+
+        EventLogBatchQuery consolidated =
+            EventLogBatchConsolidator.Consolidate(query);
+        EventLogStructuredQuery structured =
+            Assert.Single(
+                consolidated.StructuredQueries);
+        System.Xml.Linq.XDocument document =
+            System.Xml.Linq.XDocument.Parse(
+                structured.QueryXml);
+
+        System.Xml.Linq.XElement queryElement =
+            Assert.Single(
+                document.Descendants("Query"));
+        Assert.Equal(
+            "0",
+            (string?)queryElement.Attribute("Id"));
+        Assert.Single(
+            queryElement.Elements("Select"));
+    }
+
+    [Fact]
     public void ConsolidationKeepsChannelAndFileQueriesOnSeparateNativeHandles() {
         if (!OperatingSystem.IsWindows()) return;
         string path = GetFixturePath();

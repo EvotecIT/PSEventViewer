@@ -31,8 +31,7 @@ internal static class EventProviderManagedDirectorySecurity {
             string[] unrelated =
                 Directory.EnumerateFileSystemEntries(root)
                     .Where(path =>
-                        !IsManagedEntry(
-                            Path.GetFileName(path)))
+                        !IsManagedProviderDirectory(path))
                     .ToArray();
             if (unrelated.Length > 0) {
                 throw new InvalidOperationException(
@@ -214,23 +213,77 @@ internal static class EventProviderManagedDirectorySecurity {
         }
     }
 
-    private static bool IsManagedEntry(
-        string name) {
+    internal static bool IsManagedProviderDirectory(
+        string path) {
 
-        if (string.Equals(
-                name,
-                ManagedRootMarker,
-                StringComparison.Ordinal) ||
-            name.StartsWith(
-                ".removed-",
-                StringComparison.Ordinal) ||
-            name.StartsWith(
-                ".staging-",
-                StringComparison.Ordinal)) {
-            return true;
+        try {
+            if (!Directory.Exists(path) ||
+                (File.GetAttributes(path) &
+                 FileAttributes.ReparsePoint) != 0) {
+                return false;
+            }
+            string name = Path.GetFileName(path);
+            if (name.Length != 32 ||
+                !Guid.TryParseExact(
+                    name,
+                    "N",
+                    out Guid providerId)) {
+                return false;
+            }
+            EventProviderInstallationState? state =
+                EventProviderInstallationStore.Load(path);
+            if (state == null ||
+                state.ProviderId != providerId ||
+                string.IsNullOrWhiteSpace(
+                    state.ProviderName) ||
+                string.IsNullOrWhiteSpace(
+                    state.PackageSha256)) {
+                return false;
+            }
+            string activeDirectoryName =
+                string.IsNullOrWhiteSpace(
+                    state.ActiveDirectoryName)
+                    ? state.ActiveVersion
+                    : state.ActiveDirectoryName;
+            if (string.IsNullOrWhiteSpace(
+                    activeDirectoryName) ||
+                !string.Equals(
+                    Path.GetFileName(
+                        activeDirectoryName),
+                    activeDirectoryName,
+                    StringComparison.Ordinal) ||
+                activeDirectoryName.IndexOfAny(
+                    Path.GetInvalidFileNameChars()) >= 0) {
+                return false;
+            }
+            string archivePath = Path.Combine(
+                path,
+                activeDirectoryName,
+                EventProviderInstallationStore
+                    .ArchivedPackageFileName);
+            if (!File.Exists(archivePath) ||
+                !string.Equals(
+                    EventProviderHash.FileSha256(
+                        archivePath),
+                    state.PackageSha256,
+                    StringComparison.OrdinalIgnoreCase)) {
+                return false;
+            }
+            using EventProviderPackage package =
+                EventProviderPackageReader.Open(
+                    archivePath);
+            return package.Definition.Id ==
+                       state.ProviderId &&
+                   string.Equals(
+                       package.Definition.Name,
+                       state.ProviderName,
+                       StringComparison.Ordinal);
+        } catch (Exception exception)
+            when (EventProviderPackageManager
+                .IsUnreadableRetainedPackage(
+                    exception)) {
+            return false;
         }
-        return name.Length == 32 &&
-               name.All(Uri.IsHexDigit);
     }
 
     private static void RunIcacls(

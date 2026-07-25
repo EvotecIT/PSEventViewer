@@ -262,6 +262,13 @@ public static partial class EventProviderDefinitionValidator {
             "DuplicateOpcodeName",
             "Opcodes",
             issues);
+        Unique(
+            definition.Opcodes,
+            static opcode => opcode.Value.ToString(
+                CultureInfo.InvariantCulture),
+            "DuplicateOpcodeValue",
+            "Opcodes",
+            issues);
         for (int taskIndex = 0;
              taskIndex < definition.Tasks.Count;
              taskIndex++) {
@@ -271,6 +278,19 @@ public static partial class EventProviderDefinitionValidator {
                 task.Name,
                 "TaskNameRequired",
                 $"Tasks[{taskIndex}].Name",
+                issues);
+            Unique(
+                task.Opcodes,
+                static opcode => opcode.Name,
+                "DuplicateOpcodeName",
+                $"Tasks[{taskIndex}].Opcodes",
+                issues);
+            Unique(
+                task.Opcodes,
+                static opcode => opcode.Value.ToString(
+                    CultureInfo.InvariantCulture),
+                "DuplicateOpcodeValue",
+                $"Tasks[{taskIndex}].Opcodes",
                 issues);
             for (int opcodeIndex = 0;
                  opcodeIndex < task.Opcodes.Count;

@@ -363,8 +363,11 @@ public static partial class EventProviderPackageManager {
                     StringComparison.Ordinal)) {
                 continue;
             }
-            EventProviderInstallationState? state =
-                EventProviderInstallationStore.Load(providerRoot);
+            if (!TryLoadInstallationState(
+                    providerRoot,
+                    out EventProviderInstallationState? state)) {
+                continue;
+            }
             foreach (string versionDirectory in Directory
                          .EnumerateDirectories(providerRoot)
                          .Where(static path =>
@@ -439,7 +442,31 @@ public static partial class EventProviderPackageManager {
             .ToArray();
     }
 
-    private static bool IsUnreadableRetainedPackage(
+    private static bool TryLoadInstallationState(
+        string providerRoot,
+        out EventProviderInstallationState? state) {
+
+        try {
+            state = EventProviderInstallationStore.Load(
+                providerRoot);
+            return true;
+        } catch (Exception exception)
+            when (IsUnreadableInstallationState(exception)) {
+            state = null;
+            return false;
+        }
+    }
+
+    internal static bool IsUnreadableInstallationState(
+        Exception exception) {
+
+        return exception is System.Text.Json.JsonException ||
+               exception is InvalidDataException ||
+               exception is IOException ||
+               exception is UnauthorizedAccessException;
+    }
+
+    internal static bool IsUnreadableRetainedPackage(
         Exception exception) {
 
         return exception is IOException ||

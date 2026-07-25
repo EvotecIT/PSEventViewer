@@ -67,6 +67,7 @@ public static class EventLogBatchConsolidator {
         foreach (QueryInput input in inputs) {
             foreach (XElement sourceQuery in input.Queries) {
                 var query = new XElement(sourceQuery);
+                query.SetAttributeValue("Id", null);
                 string queryKey = query.ToString(
                     SaveOptions.DisableFormatting);
                 if (!queryKeys.Add(queryKey)) {

@@ -116,6 +116,53 @@ public sealed class TestEventProviderPackages {
     }
 
     [Fact]
+    public void RejectsDuplicateOpcodeValuesWithinEachManifestScope() {
+        EventProviderDefinition definition = CreateDefinition();
+        definition.Opcodes.Add(
+            new EventProviderOpcodeDefinition {
+                Name = "ProviderOne",
+                Value = 10
+            });
+        definition.Opcodes.Add(
+            new EventProviderOpcodeDefinition {
+                Name = "ProviderTwo",
+                Value = 10
+            });
+        definition.Tasks.Add(
+            new EventProviderTaskDefinition {
+                Name = "Task",
+                Value = 1,
+                Opcodes = {
+                    new EventProviderOpcodeDefinition {
+                        Name = "TaskOne",
+                        Value = 11
+                    },
+                    new EventProviderOpcodeDefinition {
+                        Name = "TaskTwo",
+                        Value = 11
+                    }
+                }
+            });
+
+        EventProviderValidationResult result =
+            EventProviderDefinitionValidator.Validate(
+                definition);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(
+            result.Issues,
+            issue => issue.Code ==
+                         "DuplicateOpcodeValue" &&
+                     issue.Path == "Opcodes");
+        Assert.Contains(
+            result.Issues,
+            issue => issue.Code ==
+                         "DuplicateOpcodeValue" &&
+                     issue.Path ==
+                         "Tasks[0].Opcodes");
+    }
+
+    [Fact]
     public void UninstallRecoveryAcceptsUnreadableOrMismatchedPayloads() {
         Assert.True(
             EventProviderPackageManager
@@ -532,6 +579,41 @@ public sealed class TestEventProviderPackages {
                 "unrelated content",
                 exception.Message,
                 StringComparison.OrdinalIgnoreCase);
+        } finally {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void RefusesToClaimAnUnverifiedGuidNamedDirectory() {
+        string root = Path.Combine(
+            Path.GetTempPath(),
+            "EventViewerX.Tests",
+            Guid.NewGuid().ToString("N"));
+        string unrelated = Path.Combine(
+            root,
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(unrelated);
+        File.WriteAllText(
+            Path.Combine(unrelated, "unrelated.txt"),
+            "do not modify");
+        try {
+            InvalidOperationException exception =
+                Assert.Throws<InvalidOperationException>(() =>
+                    EventProviderManagedDirectorySecurity
+                        .EnsureManagedRoot(
+                            root,
+                            TimeSpan.FromSeconds(10)));
+
+            Assert.Contains(
+                "unrelated content",
+                exception.Message,
+                StringComparison.OrdinalIgnoreCase);
+            Assert.False(
+                File.Exists(
+                    Path.Combine(
+                        root,
+                        ".eventviewerx-provider-root")));
         } finally {
             Directory.Delete(root, recursive: true);
         }
