@@ -9,25 +9,30 @@ internal static class EventLogNativeOperation {
         Func<T> operation,
         int timeoutMilliseconds,
         string timeoutMessage,
-        Action<T>? lateResultCleanup = null) {
+        Action<T>? lateResultCleanup = null,
+        IDisposable? operationLease = null) {
 
         return BoundedNativeOperation.Execute(
             operation,
             timeoutMilliseconds,
             timeoutMessage,
-            lateResultCleanup);
+            lateResultCleanup,
+            operationLease);
     }
 
     internal static EventLogReader CreateReader(
         EventLogQuery query,
         string? machineName,
-        int timeoutMilliseconds = 0) {
+        int timeoutMilliseconds = 0,
+        IDisposable? operationLease = null) {
 
         if (query == null) {
             throw new ArgumentNullException(nameof(query));
         }
         if (timeoutMilliseconds <= 0) {
-            return new EventLogReader(query);
+            using (operationLease) {
+                return new EventLogReader(query);
+            }
         }
 
         string target = string.IsNullOrWhiteSpace(machineName)
@@ -37,7 +42,8 @@ internal static class EventLogNativeOperation {
             () => new EventLogReader(query),
             timeoutMilliseconds,
             $"Timed out creating an Event Log reader for {target} after {timeoutMilliseconds} ms.",
-            static reader => reader.Dispose());
+            static reader => reader.Dispose(),
+            operationLease);
     }
 
     internal static EventRecord? ReadEvent(

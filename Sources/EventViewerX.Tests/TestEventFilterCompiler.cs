@@ -216,4 +216,36 @@ public sealed class TestEventFilterCompiler {
                 .ToHashSet();
         Assert.Equal(40 * 30, combinations.Count);
     }
+
+    [Fact]
+    public void PartitionerPreservesNamedDataAcrossOtherDimensions() {
+        var filter = new EventFilter {
+            EventIds = Enumerable.Range(1, 30).ToArray(),
+            NamedData =
+                new Dictionary<string, IReadOnlyList<string>> {
+                    ["Field"] = Enumerable.Range(1, 12)
+                        .Select(static value => $"Value-{value}")
+                        .ToArray()
+                }
+        };
+
+        IReadOnlyList<EventFilter> partitions =
+            EventFilterPartitioner.Partition(filter);
+
+        Assert.All(partitions, static partition =>
+            Assert.InRange(
+                EventFilterCompiler.CountExpressions(partition),
+                1,
+                EventFilterCompiler.MaximumXPathExpressions));
+        HashSet<(int EventId, string Value)> combinations =
+            partitions
+                .SelectMany(partition =>
+                    partition.EventIds!.SelectMany(
+                        eventId =>
+                            partition.NamedData!["Field"].Select(
+                                value =>
+                                    (eventId, value))))
+                .ToHashSet();
+        Assert.Equal(30 * 12, combinations.Count);
+    }
 }

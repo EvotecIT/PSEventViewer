@@ -307,27 +307,6 @@ public sealed partial class CmdletGetEVXEvent {
         foreach (string? machine in machines) {
             IReadOnlyList<string> machineLogNames =
                 ExpandChannelPatterns(logNames, machine);
-            if (!Force.IsPresent &&
-                ContainsWildcard(filter.ProviderNames)) {
-                var catalogQuery =
-                    new EventLogCatalogQuery {
-                        MachineName = machine,
-                        Credential =
-                            Credential?
-                                .GetNetworkCredential(),
-                        Authentication =
-                            Authentication,
-                        ConnectionTimeoutMilliseconds =
-                            EffectiveRemoteConnectionTimeoutMilliseconds,
-                        Culture = MessageCulture
-                    };
-                machineLogNames =
-                    EventLogCatalog.GetChannelNames(
-                        catalogQuery,
-                        machineLogNames,
-                        includeAnalyticDebug: false,
-                        cancellationToken: CancelToken);
-            }
             EventFilter machineFilter = ContainsWildcard(
                     filter.ProviderNames)
                 ? ExpandProviderPatterns(

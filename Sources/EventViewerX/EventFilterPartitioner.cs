@@ -14,6 +14,8 @@ public static class EventFilterPartitioner {
         if (filter == null) {
             throw new ArgumentNullException(nameof(filter));
         }
+        NamedDataAtom[] namedDataAtoms =
+            CreateNamedDataAtoms(filter.NamedData);
         var dimensions = new[] {
             new Dimension(
                 FilterDimension.EventIds,
@@ -32,20 +34,27 @@ public static class EventFilterPartitioner {
                 filter.UserIds?.Count ?? 0),
             new Dimension(
                 FilterDimension.Data,
-                filter.Data?.Count ?? 0)
+                filter.Data?.Count ?? 0),
+            new Dimension(
+                FilterDimension.NamedData,
+                namedDataAtoms)
         }.Where(static dimension => dimension.Count > 0)
             .ToArray();
         int splittableExpressions =
-            dimensions.Sum(static dimension => dimension.Count);
+            dimensions.Sum(static dimension =>
+                dimension.ExpressionCount);
         int fixedExpressions =
             EventFilterCompiler.CountExpressions(filter) -
             splittableExpressions;
         int available =
             EventFilterCompiler.MaximumXPathExpressions -
             fixedExpressions;
-        if (available < dimensions.Length) {
+        int minimumRequired =
+            dimensions.Sum(static dimension =>
+                dimension.MinimumCapacity);
+        if (available < minimumRequired) {
             throw new ArgumentException(
-                $"The fixed filter requires {fixedExpressions} native XPath expressions, leaving {available} for {dimensions.Length} non-empty OR dimensions. Windows Event Log permits {EventFilterCompiler.MaximumXPathExpressions} expressions.");
+                $"The fixed filter requires {fixedExpressions} native XPath expressions, leaving {available} for {dimensions.Length} non-empty OR dimensions that require at least {minimumRequired}. Windows Event Log permits {EventFilterCompiler.MaximumXPathExpressions} expressions.");
         }
 
         AllocateCapacities(dimensions, available);
@@ -78,81 +87,7 @@ public static class EventFilterPartitioner {
             suppression.NamedData.Count == 0) {
             return Array.Empty<EventFilter>();
         }
-        var atoms = new List<NamedDataAtom>();
-        foreach (KeyValuePair<string, IReadOnlyList<string>> entry in
-                 suppression.NamedData) {
-            if (entry.Value == null || entry.Value.Count == 0) {
-                atoms.Add(new NamedDataAtom(
-                    entry.Key,
-                    value: null,
-                    expressionCount: 1));
-                continue;
-            }
-            foreach (string value in entry.Value) {
-                atoms.Add(new NamedDataAtom(
-                    entry.Key,
-                    value,
-                    expressionCount: 2));
-            }
-        }
-
-        var partitions = new List<EventFilter>();
-        var values =
-            new Dictionary<string, List<string>>(
-                StringComparer.OrdinalIgnoreCase);
-        var existenceKeys = new List<string>();
-        int expressions = 0;
-        foreach (NamedDataAtom atom in atoms) {
-            if (expressions > 0 &&
-                expressions + atom.ExpressionCount >
-                EventFilterCompiler.MaximumXPathExpressions) {
-                partitions.Add(
-                    CreateNamedDataPartition(
-                        values,
-                        existenceKeys));
-                values = new Dictionary<string, List<string>>(
-                    StringComparer.OrdinalIgnoreCase);
-                existenceKeys = new List<string>();
-                expressions = 0;
-            }
-            if (atom.Value == null) {
-                existenceKeys.Add(atom.Key);
-            } else {
-                if (!values.TryGetValue(
-                        atom.Key,
-                        out List<string>? keyValues)) {
-                    keyValues = new List<string>();
-                    values.Add(atom.Key, keyValues);
-                }
-                keyValues.Add(atom.Value);
-            }
-            expressions += atom.ExpressionCount;
-        }
-        if (expressions > 0) {
-            partitions.Add(
-                CreateNamedDataPartition(
-                    values,
-                    existenceKeys));
-        }
-        return partitions;
-    }
-
-    private static EventFilter CreateNamedDataPartition(
-        IReadOnlyDictionary<string, List<string>> values,
-        IReadOnlyList<string> existenceKeys) {
-
-        var namedData =
-            new Dictionary<string, IReadOnlyList<string>>(
-                StringComparer.OrdinalIgnoreCase);
-        foreach (KeyValuePair<string, List<string>> entry in values) {
-            namedData[entry.Key] = entry.Value.ToArray();
-        }
-        foreach (string key in existenceKeys) {
-            namedData[key] = Array.Empty<string>();
-        }
-        return new EventFilter {
-            NamedData = namedData
-        };
+        return Partition(suppression);
     }
 
     private static void AllocateCapacities(
@@ -160,15 +95,19 @@ public static class EventFilterPartitioner {
         int available) {
 
         foreach (Dimension dimension in dimensions) {
-            dimension.Capacity = 1;
+            dimension.Capacity =
+                dimension.MinimumCapacity;
         }
-        int remaining = available - dimensions.Count;
+        int remaining = available -
+            dimensions.Sum(static dimension =>
+                dimension.MinimumCapacity);
         while (remaining > 0) {
             Dimension? selected = dimensions
                 .Where(static dimension =>
-                    dimension.Capacity < dimension.Count)
+                    dimension.Capacity <
+                    dimension.ExpressionCount)
                 .OrderByDescending(static dimension =>
-                    (double)dimension.Count /
+                    (double)dimension.ExpressionCount /
                     dimension.Capacity)
                 .ThenBy(static dimension => dimension.Kind)
                 .FirstOrDefault();
@@ -185,6 +124,12 @@ public static class EventFilterPartitioner {
         EventFilter source,
         Dimension dimension) {
 
+        if (dimension.Kind ==
+            FilterDimension.NamedData) {
+            return ApplyNamedDataDimension(
+                current,
+                dimension);
+        }
         int chunkCount =
             (dimension.Count + dimension.Capacity - 1) /
             dimension.Capacity;
@@ -206,6 +151,118 @@ public static class EventFilterPartitioner {
             }
         }
         return output;
+    }
+
+    private static List<EventFilter>
+        ApplyNamedDataDimension(
+            IReadOnlyList<EventFilter> current,
+            Dimension dimension) {
+
+        IReadOnlyList<IReadOnlyList<NamedDataAtom>>
+            chunks = ChunkNamedDataAtoms(
+                dimension.NamedDataAtoms!,
+                dimension.Capacity);
+        var output = new List<EventFilter>(
+            checked(current.Count * chunks.Count));
+        foreach (EventFilter partial in current) {
+            foreach (IReadOnlyList<NamedDataAtom> chunk in chunks) {
+                EventFilter result = Copy(partial);
+                result.NamedData =
+                    CreateNamedData(chunk);
+                output.Add(result);
+            }
+        }
+        return output;
+    }
+
+    private static IReadOnlyList<IReadOnlyList<NamedDataAtom>>
+        ChunkNamedDataAtoms(
+            IReadOnlyList<NamedDataAtom> atoms,
+            int capacity) {
+
+        var chunks =
+            new List<IReadOnlyList<NamedDataAtom>>();
+        var current = new List<NamedDataAtom>();
+        int expressions = 0;
+        foreach (NamedDataAtom atom in atoms) {
+            if (current.Count > 0 &&
+                expressions + atom.ExpressionCount >
+                capacity) {
+                chunks.Add(current.ToArray());
+                current = new List<NamedDataAtom>();
+                expressions = 0;
+            }
+            current.Add(atom);
+            expressions += atom.ExpressionCount;
+        }
+        if (current.Count > 0) {
+            chunks.Add(current.ToArray());
+        }
+        return chunks;
+    }
+
+    private static IReadOnlyDictionary<string, IReadOnlyList<string>>
+        CreateNamedData(
+            IEnumerable<NamedDataAtom> atoms) {
+
+        var values =
+            new Dictionary<string, List<string>>(
+                StringComparer.Ordinal);
+        var existenceKeys = new HashSet<string>(
+            StringComparer.Ordinal);
+        foreach (NamedDataAtom atom in atoms) {
+            if (atom.Value == null) {
+                existenceKeys.Add(atom.Key);
+                continue;
+            }
+            if (!values.TryGetValue(
+                    atom.Key,
+                    out List<string>? keyValues)) {
+                keyValues = new List<string>();
+                values.Add(atom.Key, keyValues);
+            }
+            keyValues.Add(atom.Value);
+        }
+        var namedData =
+            new Dictionary<string, IReadOnlyList<string>>(
+                StringComparer.Ordinal);
+        foreach (KeyValuePair<string, List<string>> entry in values) {
+            namedData[entry.Key] =
+                entry.Value.ToArray();
+        }
+        foreach (string key in existenceKeys) {
+            namedData[key] = Array.Empty<string>();
+        }
+        return namedData;
+    }
+
+    private static NamedDataAtom[] CreateNamedDataAtoms(
+        IReadOnlyDictionary<string, IReadOnlyList<string>>?
+            namedData) {
+
+        if (namedData == null ||
+            namedData.Count == 0) {
+            return Array.Empty<NamedDataAtom>();
+        }
+        var atoms = new List<NamedDataAtom>();
+        foreach (KeyValuePair<string, IReadOnlyList<string>> entry in
+                 namedData) {
+            if (entry.Value == null ||
+                entry.Value.Count == 0) {
+                atoms.Add(new NamedDataAtom(
+                    entry.Key,
+                    value: null,
+                    expressionCount: 1));
+                continue;
+            }
+            foreach (string value in entry.Value) {
+                atoms.Add(new NamedDataAtom(
+                    entry.Key,
+                    value,
+                    expressionCount: 2));
+            }
+        }
+        return atoms.ToArray();
     }
 
     private static EventFilter WithDimension(
@@ -270,6 +327,7 @@ public static class EventFilterPartitioner {
         copy.Levels = null;
         copy.UserIds = null;
         copy.Data = null;
+        copy.NamedData = null;
         return copy;
     }
 
@@ -300,7 +358,8 @@ public static class EventFilterPartitioner {
         ProviderNames,
         Levels,
         UserIds,
-        Data
+        Data,
+        NamedData
     }
 
     private sealed class Dimension {
@@ -310,11 +369,34 @@ public static class EventFilterPartitioner {
 
             Kind = kind;
             Count = count;
+            ExpressionCount = count;
+            MinimumCapacity = count > 0
+                ? 1
+                : 0;
+        }
+
+        internal Dimension(
+            FilterDimension kind,
+            NamedDataAtom[] atoms) {
+
+            Kind = kind;
+            NamedDataAtoms = atoms;
+            Count = atoms.Length;
+            ExpressionCount = atoms.Sum(
+                static atom =>
+                    atom.ExpressionCount);
+            MinimumCapacity = atoms.Length == 0
+                ? 0
+                : atoms.Max(static atom =>
+                    atom.ExpressionCount);
         }
 
         internal FilterDimension Kind { get; }
         internal int Count { get; }
+        internal int ExpressionCount { get; }
+        internal int MinimumCapacity { get; }
         internal int Capacity { get; set; }
+        internal NamedDataAtom[]? NamedDataAtoms { get; }
     }
 
     private sealed class NamedDataAtom {

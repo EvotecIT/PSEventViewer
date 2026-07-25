@@ -48,14 +48,16 @@ internal static class BoundedNativeOperation {
         Func<T> operation,
         int timeoutMilliseconds,
         string timeoutMessage,
-        Action<T>? lateResultCleanup = null) {
+        Action<T>? lateResultCleanup = null,
+        IDisposable? operationLease = null) {
 
         return Execute(
             operation,
             timeoutMilliseconds,
             timeoutMessage,
             CancellationToken.None,
-            lateResultCleanup);
+            lateResultCleanup,
+            operationLease);
     }
 
     internal static T Execute<T>(
@@ -63,25 +65,34 @@ internal static class BoundedNativeOperation {
         int timeoutMilliseconds,
         string timeoutMessage,
         CancellationToken cancellationToken,
-        Action<T>? lateResultCleanup = null) {
+        Action<T>? lateResultCleanup = null,
+        IDisposable? operationLease = null) {
 
         cancellationToken.ThrowIfCancellationRequested();
         if (timeoutMilliseconds <= 0) {
-            return operation();
+            using (operationLease) {
+                return operation();
+            }
         }
 
         var timeoutBudget = Stopwatch.StartNew();
-        if (!Slots.Wait(
-                timeoutMilliseconds,
-                cancellationToken)) {
-            throw new BoundedNativeOperationAdmissionTimeoutException(
-                timeoutMessage);
+        try {
+            if (!Slots.Wait(
+                    timeoutMilliseconds,
+                    cancellationToken)) {
+                throw new BoundedNativeOperationAdmissionTimeoutException(
+                    timeoutMessage);
+            }
+        } catch {
+            operationLease?.Dispose();
+            throw;
         }
 
         int remainingTimeout = timeoutMilliseconds -
             (int)Math.Min(timeoutBudget.ElapsedMilliseconds, timeoutMilliseconds);
         if (remainingTimeout <= 0) {
             Slots.Release();
+            operationLease?.Dispose();
             throw new BoundedNativeOperationAdmissionTimeoutException(
                 timeoutMessage);
         }
@@ -96,6 +107,7 @@ internal static class BoundedNativeOperation {
                 } catch (Exception ex) {
                     completion.TrySetException(ex);
                 } finally {
+                    operationLease?.Dispose();
                     Slots.Release();
                 }
             }) {
@@ -106,6 +118,7 @@ internal static class BoundedNativeOperation {
             task = completion.Task;
         } catch {
             Slots.Release();
+            operationLease?.Dispose();
             throw;
         }
 

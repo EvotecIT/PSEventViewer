@@ -732,6 +732,44 @@ Describe 'Get-EVXEvent - Force parity' {
             $set.Parameters.Name | Should -Contain 'Force'
         }
     }
+
+    It 'preserves an explicitly named analytic channel beside a wildcard' {
+        $AnalyticChannel = [EventViewerX.EventLogCatalog]::GetChannelNames(
+            $null,
+            [string[]] @('*'),
+            $true,
+            [System.Threading.CancellationToken]::None
+        ) | Where-Object {
+            try {
+                $Configuration = [System.Diagnostics.Eventing.Reader.EventLogConfiguration]::new($_)
+                try {
+                    $Configuration.LogType -in @(
+                        [System.Diagnostics.Eventing.Reader.EventLogType]::Analytical,
+                        [System.Diagnostics.Eventing.Reader.EventLogType]::Debug
+                    )
+                } finally {
+                    $Configuration.Dispose()
+                }
+            } catch {
+                $false
+            }
+        } | Select-Object -First 1
+        if (-not $AnalyticChannel) {
+            Set-ItResult -Skipped -Because 'No readable analytic or debug channel is available.'
+        }
+
+        $QueryErrors = @()
+        Get-EVXEvent `
+            -LogName $AnalyticChannel, 'EventViewerX-No-Such-Channel-*' `
+            -MaxEvents 1 `
+            -ReadMode Metadata `
+            -ContinueOnError `
+            -ErrorAction SilentlyContinue `
+            -ErrorVariable QueryErrors | Out-Null
+
+        ($QueryErrors -join [Environment]::NewLine) |
+            Should -Not -Match 'No event channels match'
+    }
 }
 
 Describe 'Get-EVXEvent - raw XPath wildcard expansion' {

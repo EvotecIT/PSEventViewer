@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Net;
 using System.Text.RegularExpressions;
 using System.Threading;
+using EventViewerX.Native;
 
 namespace EventViewerX;
 
@@ -102,16 +103,32 @@ public static partial class EventLogCatalog {
 
         cancellationToken.ThrowIfCancellationRequested();
         EventLogCatalogQuery snapshot = SnapshotAndValidate(query);
+        string[] normalizedPatterns =
+            NormalizePatterns(channelPatterns);
         Regex[] patterns = CompilePatterns(channelPatterns);
-        using EventLogSession session = OpenSession(
-            snapshot,
-            cancellationToken);
+        var explicitNames = new HashSet<string>(
+            normalizedPatterns.Where(static pattern =>
+                !ContainsWildcard(pattern)),
+            StringComparer.OrdinalIgnoreCase);
+        using var sessionLifetime =
+            new RetainedDisposable<EventLogSession>(
+                OpenSession(
+                    snapshot,
+                    cancellationToken));
+        EventLogSession session =
+            sessionLifetime.Value;
         var channels = new List<string>();
         foreach (string name in session.GetLogNames()) {
             cancellationToken.ThrowIfCancellationRequested();
             if (!MatchesAny(name, patterns) ||
                 (!includeAnalyticDebug &&
-                 IsAnalyticOrDebug(session, name))) {
+                 !explicitNames.Contains(name) &&
+                 IsAnalyticOrDebug(
+                     session,
+                     name,
+                     snapshot.ConnectionTimeoutMilliseconds,
+                     cancellationToken,
+                     sessionLifetime))) {
                 continue;
             }
             channels.Add(name);
@@ -122,29 +139,11 @@ public static partial class EventLogCatalog {
 
     private static bool IsAnalyticOrDebug(
         EventLogSession session,
-        string logName) {
-
-        try {
-            using var configuration =
-                new EventLogConfiguration(
-                    logName,
-                    session);
-            return configuration.LogType ==
-                       EventLogType.Analytical ||
-                   configuration.LogType ==
-                       EventLogType.Debug;
-        } catch (EventLogException) {
-            // Do not hide a source merely because its configuration cannot be read.
-            // The later query will report the authoritative access/source failure.
-            return false;
-        }
-    }
-
-    private static bool IsAnalyticOrDebug(
-        EventLogSession session,
         string logName,
         int timeoutMilliseconds,
-        CancellationToken cancellationToken) {
+        CancellationToken cancellationToken,
+        RetainedDisposable<EventLogSession>?
+            sessionLifetime = null) {
 
         try {
             cancellationToken.ThrowIfCancellationRequested();
@@ -160,7 +159,9 @@ public static partial class EventLogCatalog {
                                EventLogType.Debug;
                 },
                 timeoutMilliseconds,
-                $"Timed out reading the type of event log '{logName}' after {timeoutMilliseconds} ms.");
+                $"Timed out reading the type of event log '{logName}' after {timeoutMilliseconds} ms.",
+                operationLease:
+                    sessionLifetime?.Retain());
             cancellationToken.ThrowIfCancellationRequested();
             return result;
         } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
@@ -338,14 +339,8 @@ public static partial class EventLogCatalog {
     private static Regex[] CompilePatterns(
         IEnumerable<string>? patterns) {
 
-        string[] normalized = patterns?
-            .Select(static pattern => pattern?.Trim() ?? string.Empty)
-            .Where(static pattern => pattern.Length > 0)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToArray() ?? Array.Empty<string>();
-        if (normalized.Length == 0) {
-            normalized = new[] { "*" };
-        }
+        string[] normalized =
+            NormalizePatterns(patterns);
         return normalized
             .Select(static pattern =>
                 new Regex(
@@ -355,6 +350,27 @@ public static partial class EventLogCatalog {
                     RegexOptions.IgnoreCase |
                     RegexOptions.CultureInvariant))
             .ToArray();
+    }
+
+    private static string[] NormalizePatterns(
+        IEnumerable<string>? patterns) {
+
+        string[] normalized = patterns?
+            .Select(static pattern => pattern?.Trim() ?? string.Empty)
+            .Where(static pattern => pattern.Length > 0)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray() ?? Array.Empty<string>();
+        if (normalized.Length == 0) {
+            normalized = new[] { "*" };
+        }
+        return normalized;
+    }
+
+    private static bool ContainsWildcard(
+        string value) {
+
+        return value.IndexOf('*') >= 0 ||
+               value.IndexOf('?') >= 0;
     }
 
     private static bool MatchesAny(

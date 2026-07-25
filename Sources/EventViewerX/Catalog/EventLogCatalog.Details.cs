@@ -2,6 +2,7 @@
 using System.Diagnostics.Eventing.Reader;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using EventViewerX.Native;
 
 namespace EventViewerX;
 
@@ -92,13 +93,18 @@ public static partial class EventLogCatalog {
                         : sessionResult.ErrorType);
             }
 
+            using var sessionLifetime =
+                new RetainedDisposable<EventLogSessionOpenResult>(
+                    sessionResult);
+            sessionResult = null;
             return SafeGetResult(
                 logName,
-                sessionResult.Session,
+                sessionLifetime.Value.Session!,
                 timeoutMs,
                 machineName,
                 includeEventTimes,
-                cancellationToken);
+                cancellationToken,
+                sessionLifetime);
         }
         finally {
             sessionResult?.Dispose();
@@ -111,7 +117,9 @@ public static partial class EventLogCatalog {
         int timeoutMs,
         string? machineName,
         bool includeEventTimes,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        RetainedDisposable<EventLogSessionOpenResult>?
+            sessionLifetime = null)
     {
         EventLogConfiguration? logConfig = null;
         try
@@ -124,7 +132,8 @@ public static partial class EventLogCatalog {
                     () => new EventLogConfiguration(logName, session),
                     timeoutMs,
                     $"Timed out reading configuration for '{logName}' on '{hostName}' after {timeoutMs} ms.",
-                    static configuration => configuration.Dispose());
+                    static configuration => configuration.Dispose(),
+                    sessionLifetime?.Retain());
                 cancellationToken.ThrowIfCancellationRequested();
             } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
                 throw;
@@ -143,7 +152,9 @@ public static partial class EventLogCatalog {
                 logInfoObj = EventLogNativeOperation.Execute(
                     () => session.GetLogInformation(logName, PathType.LogName),
                     timeoutMs,
-                    $"Timed out reading runtime information for '{logName}' on '{hostName}' after {timeoutMs} ms.");
+                    $"Timed out reading runtime information for '{logName}' on '{hostName}' after {timeoutMs} ms.",
+                    operationLease:
+                        sessionLifetime?.Retain());
                 cancellationToken.ThrowIfCancellationRequested();
             } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
                 throw;
@@ -162,7 +173,8 @@ public static partial class EventLogCatalog {
                     session,
                     timeoutMs,
                     details,
-                    cancellationToken)
+                    cancellationToken,
+                    sessionLifetime)
                 : null;
             var result = new EventLogDetailsResult {
                 LogName = logName,
@@ -205,7 +217,9 @@ public static partial class EventLogCatalog {
         EventLogSession session,
         int timeoutMs,
         EventLogDetails details,
-        CancellationToken cancellationToken) {
+        CancellationToken cancellationToken,
+        RetainedDisposable<EventLogSessionOpenResult>?
+            sessionLifetime) {
 
         try {
             cancellationToken.ThrowIfCancellationRequested();
@@ -218,7 +232,8 @@ public static partial class EventLogCatalog {
                    EventLogNativeOperation.CreateReader(
                        oldestQuery,
                        details.MachineName,
-                       timeoutMs)) {
+                       timeoutMs,
+                       sessionLifetime?.Retain())) {
                 cancellationToken.ThrowIfCancellationRequested();
                 using EventRecord? oldest =
                     EventLogNativeOperation.ReadEvent(
@@ -240,7 +255,8 @@ public static partial class EventLogCatalog {
                    EventLogNativeOperation.CreateReader(
                        newestQuery,
                        details.MachineName,
-                       timeoutMs)) {
+                       timeoutMs,
+                       sessionLifetime?.Retain())) {
                 cancellationToken.ThrowIfCancellationRequested();
                 using EventRecord? newest =
                     EventLogNativeOperation.ReadEvent(
@@ -413,7 +429,11 @@ public static partial class EventLogCatalog {
             yield break;
         }
 
-        EventLogSession activeSession = sessionResult.Session;
+        var sessionLifetime =
+            new RetainedDisposable<EventLogSessionOpenResult>(
+                sessionResult);
+        EventLogSession activeSession =
+            sessionLifetime.Value.Session!;
         try {
             if (exactNames != null) {
                 foreach (string exactName in exactNames) {
@@ -424,7 +444,8 @@ public static partial class EventLogCatalog {
                         timeoutMs,
                         hostName,
                         includeEventTimes,
-                        cancellationToken);
+                        cancellationToken,
+                        sessionLifetime);
                 }
                 yield break;
             }
@@ -473,10 +494,11 @@ public static partial class EventLogCatalog {
                     timeoutMs,
                     hostName,
                     includeEventTimes,
-                    cancellationToken);
+                    cancellationToken,
+                    sessionLifetime);
             }
         } finally {
-            sessionResult.Dispose();
+            sessionLifetime.Dispose();
         }
     }
 

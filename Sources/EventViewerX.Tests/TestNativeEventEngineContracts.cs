@@ -150,6 +150,44 @@ public sealed class TestNativeEventEngineContracts {
     }
 
     [Fact]
+    public void ChannelCatalogPreservesAnExplicitAnalyticChannel() {
+        if (!OperatingSystem.IsWindows()) return;
+
+        string? analytic = EventLogCatalog
+            .GetChannelNames(
+                channelPatterns: new[] { "*" },
+                includeAnalyticDebug: true)
+            .FirstOrDefault(channel => {
+                try {
+                    using var configuration =
+                        new System.Diagnostics.Eventing.Reader
+                            .EventLogConfiguration(channel);
+                    return configuration.LogType is
+                        System.Diagnostics.Eventing.Reader
+                            .EventLogType.Analytical or
+                        System.Diagnostics.Eventing.Reader
+                            .EventLogType.Debug;
+                } catch {
+                    return false;
+                }
+            });
+
+        Assert.False(string.IsNullOrWhiteSpace(analytic));
+        IReadOnlyList<string> channels =
+            EventLogCatalog.GetChannelNames(
+                channelPatterns: new[] {
+                    analytic!,
+                    "EventViewerX-No-Such-Channel-*"
+                },
+                includeAnalyticDebug: false);
+
+        Assert.Contains(
+            analytic!,
+            channels,
+            StringComparer.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void RemoteChannelDefaultsToBoundedConnectionAndUnboundedRead() {
         var query = new EventLogChannelQuery("System");
 

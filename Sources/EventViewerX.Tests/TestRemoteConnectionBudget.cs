@@ -31,6 +31,38 @@ public sealed class TestRemoteConnectionBudget {
     }
 
     [Fact]
+    public void TimedOutNativeOperationRetainsItsOwnerUntilCompletion() {
+        using var release = new ManualResetEventSlim();
+        using var started = new ManualResetEventSlim();
+        var resource = new TestDisposable();
+        var lifetime =
+            new RetainedDisposable<TestDisposable>(
+                resource);
+
+        Assert.Throws<TimeoutException>(() =>
+            BoundedNativeOperation.Execute(
+                () => {
+                    started.Set();
+                    release.Wait(
+                        TimeSpan.FromSeconds(30));
+                    return 1;
+                },
+                500,
+                "The retained operation timed out.",
+                operationLease:
+                    lifetime.Retain()));
+        Assert.True(started.IsSet);
+
+        lifetime.Dispose();
+        Assert.False(resource.IsDisposed);
+        release.Set();
+        Assert.True(
+            SpinWait.SpinUntil(
+                () => resource.IsDisposed,
+                TimeSpan.FromSeconds(5)));
+    }
+
+    [Fact]
     public void SubtractsCompletedSetupStages() {
         var budget = System.Diagnostics.Stopwatch.StartNew();
         Thread.Sleep(25);
@@ -147,5 +179,13 @@ public sealed class TestRemoteConnectionBudget {
             metadata,
             Environment.MachineName,
             "Application");
+    }
+
+    private sealed class TestDisposable : IDisposable {
+        internal bool IsDisposed { get; private set; }
+
+        public void Dispose() {
+            IsDisposed = true;
+        }
     }
 }

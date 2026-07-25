@@ -164,6 +164,45 @@ namespace EventViewerX.Tests;
     }
 
     [Fact]
+    public void QueryFactoryPartitionsLargePositiveNamedDataFilters() {
+        var filter = new EventFilter {
+            NamedData =
+                new Dictionary<string, IReadOnlyList<string>> {
+                    ["Field"] = Enumerable.Range(1, 12)
+                        .Select(index => "Value" + index)
+                        .ToArray()
+                }
+        };
+
+        IReadOnlyList<EventFilter> partitions =
+            EventFilterPartitioner.Partition(filter);
+        EventLogBatchQuery fileQuery =
+            EventLogQueryFactory.ForFiles(
+                new[] { GetFixturePath() },
+                filter);
+        EventLogBatchQuery channelQuery =
+            EventLogQueryFactory.ForChannels(
+                new[] { "Application" },
+                filter: filter);
+
+        Assert.Equal(2, partitions.Count);
+        Assert.All(
+            partitions,
+            static partition =>
+                Assert.InRange(
+                    EventFilterCompiler.CountExpressions(
+                        partition),
+                    1,
+                    EventFilterCompiler.MaximumXPathExpressions));
+        Assert.True(
+            fileQuery.FileQueries.Count +
+            fileQuery.StructuredQueries.Count > 0);
+        Assert.True(
+            channelQuery.ChannelQueries.Count +
+            channelQuery.StructuredQueries.Count > 0);
+    }
+
+    [Fact]
     public void StructuredBatchExpansionExposesEveryIndependentFileSource() {
         EventLogStructuredQuery source =
             EventLogStructuredQuery.ForFiles(
