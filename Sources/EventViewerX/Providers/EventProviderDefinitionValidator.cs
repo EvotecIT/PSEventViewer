@@ -397,26 +397,26 @@ public static partial class EventProviderDefinitionValidator {
 
         var channelIds = new HashSet<string>(
             definition.Channels.Select(static channel => channel.Id),
-            StringComparer.OrdinalIgnoreCase);
+            StringComparer.Ordinal);
         var customLevels = new HashSet<string>(
             definition.Levels.Select(static level => level.Name),
-            StringComparer.OrdinalIgnoreCase);
+            StringComparer.Ordinal);
         var tasks = new HashSet<string>(
             definition.Tasks.Select(static task => task.Name),
-            StringComparer.OrdinalIgnoreCase);
+            StringComparer.Ordinal);
         var opcodes = new HashSet<string>(
             definition.Opcodes.Select(static opcode => opcode.Name)
                 .Concat(
                     definition.Tasks.SelectMany(static task =>
                         task.Opcodes.Select(opcode =>
                             task.Name + ":" + opcode.Name))),
-            StringComparer.OrdinalIgnoreCase);
+            StringComparer.Ordinal);
         var keywords = new HashSet<string>(
             definition.Keywords.Select(static keyword => keyword.Name),
-            StringComparer.OrdinalIgnoreCase);
+            StringComparer.Ordinal);
         var maps = new HashSet<string>(
             definition.Maps.Select(static map => map.Name),
-            StringComparer.OrdinalIgnoreCase);
+            StringComparer.Ordinal);
         var identities = new HashSet<string>(
             StringComparer.OrdinalIgnoreCase);
         var names = new HashSet<string>(

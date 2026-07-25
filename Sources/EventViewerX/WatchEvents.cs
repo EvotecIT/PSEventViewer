@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.ExceptionServices;
 using System.Threading;
 
 namespace EventViewerX {
@@ -20,6 +21,7 @@ namespace EventViewerX {
         private Action<EventObject>? _eventAction;
         private string? _machineName;
         private int _eventsFound;
+        private long _lifecycleVersion;
 
         /// <summary>Total number of matching events observed by all watchers in this process.</summary>
         public static int NumberOfEventsFound => Volatile.Read(ref _numberOfEventsFound);
@@ -226,51 +228,69 @@ namespace EventViewerX {
 
             cancellationToken.ThrowIfCancellationRequested();
             CancellationTokenRegistration? previousRegistration;
+            EventLogSubscription[] previousSubscriptions;
+            long lifecycleVersion;
             lock (_lifecycleSync) {
                 previousRegistration = DetachCancellationRegistration();
-                DisposeCore();
+                previousSubscriptions = DetachSubscriptionsCore();
+                lifecycleVersion = _lifecycleVersion;
             }
             previousRegistration?.Dispose();
+            DisposeSubscriptions(previousSubscriptions);
 
+            EventLogSubscription[] startupFailedSubscriptions =
+                Array.Empty<EventLogSubscription>();
+            ExceptionDispatchInfo? startFailure = null;
             lock (_lifecycleSync) {
-                _watchEventIds = ids;
-                _eventAction = eventAction;
-                _machineName = string.IsNullOrWhiteSpace(
-                    queries[0].MachineName)
-                    ? Environment.MachineName
-                    : queries[0].MachineName;
-                _eventsFound = 0;
-                LastEvent = null;
-                LastFailure = null;
-                StartTime = DateTime.UtcNow;
-                StagingEnabled = staging;
-                StagingEnabledBy = staging ? enabledBy ?? Environment.UserName : null;
-                var subscriptionLifetime =
-                    new EventLogSubscriptionLifetime(
-                        queries.Count);
-                _subscriptionLifetime =
-                    subscriptionLifetime;
+                if (_lifecycleVersion != lifecycleVersion) {
+                    startFailure = ExceptionDispatchInfo.Capture(
+                        new InvalidOperationException(
+                            "The watcher lifecycle changed while the previous subscription was stopping."));
+                } else {
+                    _watchEventIds = ids;
+                    _eventAction = eventAction;
+                    _machineName = string.IsNullOrWhiteSpace(
+                        queries[0].MachineName)
+                        ? Environment.MachineName
+                        : queries[0].MachineName;
+                    _eventsFound = 0;
+                    LastEvent = null;
+                    LastFailure = null;
+                    StartTime = DateTime.UtcNow;
+                    StagingEnabled = staging;
+                    StagingEnabledBy = staging ? enabledBy ?? Environment.UserName : null;
+                    var subscriptionLifetime =
+                        new EventLogSubscriptionLifetime(
+                            queries.Count);
+                    _subscriptionLifetime =
+                        subscriptionLifetime;
 
-                try {
-                    for (int index = 0;
-                         index < queries.Count;
-                         index++) {
-                        EventLogSubscriptionQuery query =
-                            queries[index];
-                        int subscriptionIndex = index;
-                        _subscriptions.Add(new EventLogSubscription(
-                            query,
-                            DetectEvent,
-                            failure => DetectFailure(
-                                subscriptionLifetime,
-                                subscriptionIndex,
-                                failure)));
+                    try {
+                        for (int index = 0;
+                             index < queries.Count;
+                             index++) {
+                            EventLogSubscriptionQuery query =
+                                queries[index];
+                            int subscriptionIndex = index;
+                            _subscriptions.Add(new EventLogSubscription(
+                                query,
+                                DetectEvent,
+                                failure => DetectFailure(
+                                    subscriptionLifetime,
+                                    subscriptionIndex,
+                                    failure)));
+                        }
+                    } catch (Exception exception) {
+                        startupFailedSubscriptions =
+                            DetachSubscriptionsCore();
+                        startFailure =
+                            ExceptionDispatchInfo.Capture(
+                                exception);
                     }
-                } catch {
-                    DisposeCore();
-                    throw;
                 }
             }
+            DisposeSubscriptions(startupFailedSubscriptions);
+            startFailure?.Throw();
 
             CancellationTokenRegistration? newRegistration = null;
             try {
@@ -278,7 +298,8 @@ namespace EventViewerX {
                     newRegistration = cancellationToken.Register(CancelWatch);
                     cancellationToken.ThrowIfCancellationRequested();
                     lock (_lifecycleSync) {
-                        if (_subscriptions.Count == 0) {
+                        if (_lifecycleVersion != lifecycleVersion ||
+                            _subscriptions.Count == 0) {
                             cancellationToken.ThrowIfCancellationRequested();
                             throw new InvalidOperationException("The event-log subscription stopped before cancellation registration completed.");
                         }
@@ -296,11 +317,22 @@ namespace EventViewerX {
             } catch {
                 newRegistration?.Dispose();
                 CancellationTokenRegistration? failedRegistration;
+                EventLogSubscription[] registrationFailedSubscriptions;
                 lock (_lifecycleSync) {
-                    failedRegistration = DetachCancellationRegistration();
-                    DisposeCore();
+                    if (_lifecycleVersion == lifecycleVersion) {
+                        failedRegistration =
+                            DetachCancellationRegistration();
+                        registrationFailedSubscriptions =
+                            DetachSubscriptionsCore();
+                    } else {
+                        failedRegistration = null;
+                        registrationFailedSubscriptions =
+                            Array.Empty<EventLogSubscription>();
+                    }
                 }
                 failedRegistration?.Dispose();
+                DisposeSubscriptions(
+                    registrationFailedSubscriptions);
                 throw;
             }
         }
@@ -373,33 +405,46 @@ namespace EventViewerX {
 
         private void CancelWatch() {
             CancellationTokenRegistration? registration;
+            EventLogSubscription[] subscriptions;
             lock (_lifecycleSync) {
                 registration = DetachCancellationRegistration();
-                DisposeCore();
+                subscriptions = DetachSubscriptionsCore();
             }
             registration?.Dispose();
+            DisposeSubscriptions(subscriptions);
         }
 
         /// <summary>Stops watching and releases native watcher/session resources.</summary>
         public void Dispose() {
             CancellationTokenRegistration? registration;
+            EventLogSubscription[] subscriptions;
             lock (_lifecycleSync) {
                 registration = DetachCancellationRegistration();
-                DisposeCore();
+                subscriptions = DetachSubscriptionsCore();
             }
             registration?.Dispose();
+            DisposeSubscriptions(subscriptions);
         }
 
-        private void DisposeCore() {
-            foreach (EventLogSubscription subscription in _subscriptions) {
+        private static void DisposeSubscriptions(
+            IEnumerable<EventLogSubscription> subscriptions) {
+
+            foreach (EventLogSubscription subscription in subscriptions) {
                 subscription.Dispose();
             }
+        }
+
+        private EventLogSubscription[] DetachSubscriptionsCore() {
+            EventLogSubscription[] subscriptions =
+                _subscriptions.ToArray();
             _subscriptions.Clear();
             _subscriptionLifetime = null;
             _watchEventIds = new HashSet<int>();
             _eventAction = null;
             StagingEnabled = false;
             StagingEnabledBy = null;
+            _lifecycleVersion++;
+            return subscriptions;
         }
 
         private CancellationTokenRegistration? DetachCancellationRegistration() {

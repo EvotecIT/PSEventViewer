@@ -230,8 +230,22 @@ public sealed partial class CmdletGetEVXEvent {
         ValidateRemoteCredentialTargets(machines);
         var structured = new List<EventLogStructuredQuery>(machines.Count);
         foreach (string? machine in machines) {
+            string effectiveQueryXml = queryXml;
+            if (UsesCheckpoint) {
+                effectiveQueryXml = sourceProbe
+                    .WithMinimumRecordIdExclusive(source =>
+                        GetCheckpointLowerBound(
+                            source.Kind ==
+                            EventLogQuerySourceKind.File
+                                ? null
+                                : machine,
+                            source.Source,
+                            source.Kind ==
+                            EventLogQuerySourceKind.File))
+                    .QueryXml;
+            }
             structured.Add(CreateStructuredQuery(
-                queryXml,
+                effectiveQueryXml,
                 sourceKind,
                 machine));
         }

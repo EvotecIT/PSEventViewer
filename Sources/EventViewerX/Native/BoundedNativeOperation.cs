@@ -15,7 +15,21 @@ internal static class BoundedNativeOperation {
         int timeoutMilliseconds,
         string timeoutMessage) {
 
-        if (!Slots.Wait(timeoutMilliseconds)) {
+        return Acquire(
+            timeoutMilliseconds,
+            timeoutMessage,
+            CancellationToken.None);
+    }
+
+    internal static IDisposable Acquire(
+        int timeoutMilliseconds,
+        string timeoutMessage,
+        CancellationToken cancellationToken) {
+
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!Slots.Wait(
+                timeoutMilliseconds,
+                cancellationToken)) {
             throw new TimeoutException(timeoutMessage);
         }
         return new SlotLease();

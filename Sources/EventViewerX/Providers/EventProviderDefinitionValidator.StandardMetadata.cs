@@ -38,7 +38,7 @@ public static partial class EventProviderDefinitionValidator {
             new[] {
                 "win:AnyKeyword",
                 "win:ResponseTime",
-                "win:ReservedKeyword49",
+                "win:WDIContext",
                 "win:WDIDiag",
                 "win:SQM",
                 "win:AuditFailure",

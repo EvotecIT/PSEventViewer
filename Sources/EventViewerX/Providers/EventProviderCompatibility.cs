@@ -180,6 +180,13 @@ public static class EventProviderCompatibility {
             if (current == null) {
                 continue;
             }
+            Equal(
+                task.EventGuid,
+                current.EventGuid,
+                "TaskEventGuidChanged",
+                $"Tasks[{task.Name}].EventGuid",
+                "Task event GUID",
+                issues);
             CompareNamedValues(
                 task.Opcodes,
                 current.Opcodes,

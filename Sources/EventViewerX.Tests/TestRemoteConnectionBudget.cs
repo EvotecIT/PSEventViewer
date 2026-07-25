@@ -4,6 +4,31 @@ namespace EventViewerX.Tests;
 
 public sealed class TestRemoteConnectionBudget {
     [Fact]
+    public void RpcProbeHonorsCallerCancellation() {
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        Assert.Throws<OperationCanceledException>(() =>
+            Native.RpcEndpointProbe.TryConnect(
+                "192.0.2.1",
+                135,
+                30000,
+                cancellation.Token));
+    }
+
+    [Fact]
+    public void NativeOperationAdmissionHonorsCallerCancellation() {
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        Assert.Throws<OperationCanceledException>(() =>
+            Native.BoundedNativeOperation.Acquire(
+                30000,
+                "timed out",
+                cancellation.Token));
+    }
+
+    [Fact]
     public void SubtractsCompletedSetupStages() {
         var budget = System.Diagnostics.Stopwatch.StartNew();
         Thread.Sleep(25);

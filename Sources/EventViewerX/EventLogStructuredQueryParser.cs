@@ -105,6 +105,58 @@ internal static class EventLogStructuredQueryParser {
         return sources.ToArray();
     }
 
+    internal static string AddMinimumRecordIdSuppressions(
+        string queryXml,
+        EventLogQuerySourceKind declaredKind,
+        Func<EventLogStructuredQuerySource, long?> resolver) {
+
+        XDocument document = XDocument.Parse(
+            queryXml,
+            LoadOptions.PreserveWhitespace);
+        XElement[] queries = document.Root?
+            .Elements()
+            .Where(static element =>
+                string.Equals(
+                    element.Name.LocalName,
+                    "Query",
+                    StringComparison.Ordinal))
+            .ToArray() ??
+            Array.Empty<XElement>();
+        if (queries.Length == 0) {
+            throw new ArgumentException(
+                "A structured query must contain at least one Query element.",
+                nameof(queryXml));
+        }
+        foreach (XElement query in queries) {
+            EventLogQuerySourceKind sourceKind =
+                ResolveSourceKind(query, declaredKind);
+            foreach (string path in GetPaths(query)
+                         .Distinct(StringComparer.OrdinalIgnoreCase)) {
+                bool isFile = IsFileSource(path);
+                if (isFile !=
+                    (sourceKind == EventLogQuerySourceKind.File)) {
+                    continue;
+                }
+                string source = isFile
+                    ? GetFilePath(path)
+                    : path;
+                long? minimum = resolver(
+                    new EventLogStructuredQuerySource(
+                        sourceKind,
+                        source));
+                if (!minimum.HasValue || minimum.Value <= 0) {
+                    continue;
+                }
+                query.Add(
+                    new XElement(
+                        query.Name.Namespace + "Suppress",
+                        new XAttribute("Path", path),
+                        $"*[System[EventRecordID <= {minimum.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)}]]"));
+            }
+        }
+        return document.ToString(SaveOptions.DisableFormatting);
+    }
+
     internal static int CountIndependentSources(
         string queryXml,
         EventLogQuerySourceKind declaredKind) {

@@ -101,7 +101,8 @@ internal static class WindowsEventRemoteReader {
                 GetRemainingConnectionTimeout(
                     connectionBudget,
                     connectionTimeoutMilliseconds,
-                    connectionTimeoutMessage))) {
+                    connectionTimeoutMessage),
+                cancellationToken)) {
             EventLogSessionManager.MarkHostUnreachable(
                 machineName);
             throw new System.ComponentModel.Win32Exception(
@@ -113,7 +114,8 @@ internal static class WindowsEventRemoteReader {
                 connectionBudget,
                 connectionTimeoutMilliseconds,
                 connectionTimeoutMessage),
-            connectionTimeoutMessage);
+            connectionTimeoutMessage,
+            cancellationToken);
         int sessionConnectionTimeout;
         try {
             sessionConnectionTimeout =

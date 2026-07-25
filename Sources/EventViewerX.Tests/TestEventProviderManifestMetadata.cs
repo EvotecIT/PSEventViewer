@@ -63,6 +63,86 @@ public sealed class TestEventProviderManifestMetadata {
     }
 
     [Theory]
+    [InlineData("win:WDIContext")]
+    [InlineData("win:WDIDiag")]
+    [InlineData("win:EventlogClassic")]
+    public void AcceptsCanonicalWindowsKeywordReferences(
+        string keyword) {
+
+        EventProviderDefinition definition =
+            TestEventProviderPackages.CreateDefinition();
+        definition.Events[0].Keywords.Add(keyword);
+
+        EventProviderValidationResult result =
+            EventProviderDefinitionValidator.Validate(
+                definition);
+
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public void RejectsCaseMismatchedCustomMetadataReferences() {
+        EventProviderDefinition definition =
+            TestEventProviderPackages.CreateDefinition();
+        definition.Levels.Add(
+            new EventProviderLevelDefinition {
+                Name = "Detailed",
+                Value = 16
+            });
+        definition.Tasks.Add(
+            new EventProviderTaskDefinition {
+                Name = "ScanTask",
+                Value = 1
+            });
+        definition.Opcodes.Add(
+            new EventProviderOpcodeDefinition {
+                Name = "ScanOpcode",
+                Value = 10
+            });
+        definition.Keywords.Add(
+            new EventProviderKeywordDefinition {
+                Name = "ScanKeyword",
+                Mask = 1
+            });
+        definition.Maps.Add(
+            new EventProviderMapDefinition {
+                Name = "ScanMap"
+            });
+        EventProviderEventDefinition eventDefinition =
+            definition.Events[0];
+        eventDefinition.Channel = "operational";
+        eventDefinition.Level = "detailed";
+        eventDefinition.Task = "scantask";
+        eventDefinition.Opcode = "scanopcode";
+        eventDefinition.Keywords.Add("scankeyword");
+        eventDefinition.Fields[1].Map = "scanmap";
+
+        EventProviderValidationResult result =
+            EventProviderDefinitionValidator.Validate(
+                definition);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(
+            result.Issues,
+            issue => issue.Code == "EventChannelUnknown");
+        Assert.Contains(
+            result.Issues,
+            issue => issue.Code == "EventLevelUnknown");
+        Assert.Contains(
+            result.Issues,
+            issue => issue.Code == "EventTaskUnknown");
+        Assert.Contains(
+            result.Issues,
+            issue => issue.Code == "EventOpcodeUnknown");
+        Assert.Contains(
+            result.Issues,
+            issue => issue.Code == "EventKeywordUnknown");
+        Assert.Contains(
+            result.Issues,
+            issue => issue.Code == "FieldMapUnknown");
+    }
+
+    [Theory]
     [InlineData(EventProviderFieldType.Guid, "win:GUID")]
     [InlineData(EventProviderFieldType.FileTime, "win:FILETIME")]
     [InlineData(EventProviderFieldType.SystemTime, "win:SYSTEMTIME")]

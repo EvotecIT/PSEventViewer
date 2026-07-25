@@ -69,6 +69,28 @@ public sealed class EventLogStructuredQuery {
     }
 
     /// <summary>
+    /// Creates an equivalent query that suppresses records at or below the
+    /// source-specific lower bounds returned by <paramref name="resolver"/>.
+    /// </summary>
+    /// <param name="resolver">
+    /// Resolves the exclusive minimum record ID for each channel or offline
+    /// file. A null or non-positive value leaves that source unchanged.
+    /// </param>
+    public EventLogStructuredQuery WithMinimumRecordIdExclusive(
+        Func<EventLogStructuredQuerySource, long?> resolver) {
+
+        if (resolver == null) {
+            throw new ArgumentNullException(nameof(resolver));
+        }
+        return CopyWithQueryXml(
+            EventLogStructuredQueryParser
+                .AddMinimumRecordIdSuppressions(
+                    QueryXml,
+                    SourceKind,
+                    resolver));
+    }
+
+    /// <summary>
     /// Returns the number of independent native query handles required by the
     /// QueryList. Channel paths share one handle, while each distinct offline
     /// file requires its own handle.
@@ -136,6 +158,34 @@ public sealed class EventLogStructuredQuery {
     /// for a complete result set.
     /// </summary>
     public Action<EventLogQueryFailure>? FailureHandler { get; set; }
+
+    private EventLogStructuredQuery CopyWithQueryXml(
+        string queryXml) {
+
+        return new EventLogStructuredQuery(queryXml) {
+            SourceKind = SourceKind,
+            MachineName = MachineName,
+            Credential = Credential,
+            Authentication = Authentication,
+            Oldest = Oldest,
+            ReadMode = ReadMode,
+            MessageCulture = MessageCulture,
+            FallbackMessageCulture = FallbackMessageCulture,
+            MaxEvents = MaxEvents,
+            IncludeBookmark = IncludeBookmark,
+            RemoteConnectionTimeoutMilliseconds =
+                RemoteConnectionTimeoutMilliseconds,
+            RemoteReadTimeoutMilliseconds =
+                RemoteReadTimeoutMilliseconds,
+            BufferCapacity = BufferCapacity,
+            RpcEndpointPort = RpcEndpointPort,
+            BookmarkXml = BookmarkXml,
+            BookmarkOffset = BookmarkOffset,
+            StrictBookmark = StrictBookmark,
+            TolerateQueryErrors = TolerateQueryErrors,
+            FailureHandler = FailureHandler
+        };
+    }
 
     private static string BuildQueryXml(
         IEnumerable<string> sources,

@@ -11,12 +11,32 @@ internal static class RpcEndpointProbe {
         int port,
         int timeoutMilliseconds) {
 
+        return TryConnect(
+            host,
+            port,
+            timeoutMilliseconds,
+            CancellationToken.None);
+    }
+
+    internal static bool TryConnect(
+        string host,
+        int port,
+        int timeoutMilliseconds,
+        CancellationToken cancellationToken) {
+
+        cancellationToken.ThrowIfCancellationRequested();
         try {
             using var client = new TcpClient();
             Task connect = client.ConnectAsync(host, port);
             bool completed;
             try {
-                completed = connect.Wait(timeoutMilliseconds);
+                completed = connect.Wait(
+                    timeoutMilliseconds,
+                    cancellationToken);
+            } catch (OperationCanceledException)
+                when (cancellationToken.IsCancellationRequested) {
+                ObserveLateFault(connect);
+                throw;
             } catch (AggregateException) {
                 connect.GetAwaiter().GetResult();
                 return false;
@@ -26,15 +46,22 @@ internal static class RpcEndpointProbe {
                 return true;
             }
 
-            _ = connect.ContinueWith(
-                task => _ = task.Exception,
-                CancellationToken.None,
-                TaskContinuationOptions.OnlyOnFaulted |
-                TaskContinuationOptions.ExecuteSynchronously,
-                TaskScheduler.Default);
+            ObserveLateFault(connect);
             return false;
+        } catch (OperationCanceledException)
+            when (cancellationToken.IsCancellationRequested) {
+            throw;
         } catch {
             return false;
         }
+    }
+
+    private static void ObserveLateFault(Task task) {
+        _ = task.ContinueWith(
+            completed => _ = completed.Exception,
+            CancellationToken.None,
+            TaskContinuationOptions.OnlyOnFaulted |
+            TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default);
     }
 }

@@ -101,6 +101,41 @@ Describe 'Get-EVXEvent checkpoint compatibility' {
             Should -Be 1
     }
 
+    It 'applies FilterXml checkpoints before the native scan limit' {
+        [xml] $Query = @'
+<QueryList>
+  <Query Id="0" Path="System">
+    <Select Path="System">*</Select>
+  </Query>
+</QueryList>
+'@
+        $CheckpointPath = Join-Path $TestDrive 'filterxml-scan-limit.json'
+
+        $First = @(
+            Get-EVXEvent `
+                -FilterXml $Query `
+                -RecordIdFile $CheckpointPath `
+                -RecordIdKey 'filterxml-scan-limit' `
+                -MaxEventsScanned 1 `
+                -ReadMode Metadata
+        )
+        $Second = @(
+            Get-EVXEvent `
+                -FilterXml $Query `
+                -RecordIdFile $CheckpointPath `
+                -RecordIdKey 'filterxml-scan-limit' `
+                -MaxEventsScanned 1 `
+                -ReadMode Metadata
+        )
+        if ($First.Count -eq 0 -or $Second.Count -eq 0) {
+            Set-ItResult -Skipped -Because 'The System event log did not contain two checkpointable events.'
+            return
+        }
+
+        [long] $Second[0].RecordId |
+            Should -BeGreaterThan ([long] $First[0].RecordId)
+    }
+
     It 'honors legacy default keys instead of replaying records after upgrade' {
         $Latest = Get-EVXEvent -LogName System -MaxEvents 1 -ReadMode Metadata | Select-Object -First 1
         if (-not $Latest -or -not $Latest.RecordId) {
