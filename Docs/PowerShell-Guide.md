@@ -90,6 +90,14 @@ Get-EVXEvent -FilterHashtable @{
 } -MaxEvents 500
 ```
 
+Offline provider wildcards that must be expanded before a structured
+Select/Suppress query are discovered with metadata-only reads. Discovery is
+cancellable and stops at `-MaxEventsScanned`, or at 65,536 records when no
+explicit scan bound is supplied. If the file is larger, the command fails
+instead of silently compiling an incomplete provider list. Use exact provider
+names for the fastest large-file path, or raise `-MaxEventsScanned`
+deliberately.
+
 ### Structured QueryList XML
 
 Use `-FilterXml` for several paths, explicit Select/Suppress combinations, or

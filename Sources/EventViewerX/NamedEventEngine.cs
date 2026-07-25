@@ -252,6 +252,9 @@ public static partial class NamedEventEngine {
             throw new ArgumentNullException(
                 nameof(query));
         }
+        EventReadModeValidation.EnsureDefined(
+            query.ReadMode,
+            nameof(query));
         if (query.MaxEvents < 0) {
             throw new ArgumentOutOfRangeException(
                 nameof(query),

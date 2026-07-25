@@ -300,6 +300,9 @@ public static class EventLogQueryFactory {
 
         options ??=
             new EventLogQueryOptions();
+        EventReadModeValidation.EnsureDefined(
+            options.ReadMode,
+            nameof(options));
         if (options.MaxEvents < 0) {
             throw new ArgumentOutOfRangeException(
                 nameof(options),

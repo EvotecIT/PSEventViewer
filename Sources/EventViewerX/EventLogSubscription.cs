@@ -383,6 +383,9 @@ public sealed class EventLogSubscription : IDisposable {
         if (query == null) {
             throw new ArgumentNullException(nameof(query));
         }
+        EventReadModeValidation.EnsureDefined(
+            query.ReadMode,
+            nameof(query));
         if (!Enum.IsDefined(
                 typeof(EventLogSubscriptionStart),
                 query.Start)) {

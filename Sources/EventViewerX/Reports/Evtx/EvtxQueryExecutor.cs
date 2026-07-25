@@ -51,6 +51,16 @@ public static class EvtxQueryExecutor {
         if (!TryValidateRequest(request, out failure)) {
             return false;
         }
+        if (readModeOverride.HasValue &&
+            !Enum.IsDefined(
+                typeof(EventReadMode),
+                readModeOverride.Value)) {
+            failure = new EvtxQueryFailure {
+                Kind = EvtxQueryFailureKind.InvalidArgument,
+                Message = "readModeOverride is not supported."
+            };
+            return false;
+        }
         EvtxQueryRequest validatedRequest = request!;
 
         try {
@@ -209,6 +219,15 @@ public static class EvtxQueryExecutor {
             failure = new EvtxQueryFailure {
                 Kind = EvtxQueryFailureKind.InvalidArgument,
                 Message = "eventIds must contain only positive values."
+            };
+            return false;
+        }
+        if (!Enum.IsDefined(
+                typeof(EventReadMode),
+                request.ReadMode)) {
+            failure = new EvtxQueryFailure {
+                Kind = EvtxQueryFailureKind.InvalidArgument,
+                Message = "readMode is not supported."
             };
             return false;
         }

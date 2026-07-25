@@ -159,7 +159,9 @@ namespace EventViewerX {
             reuseScopeIdentity = string.IsNullOrWhiteSpace(reuseScopeIdentity) ? null : reuseScopeIdentity!.Trim();
             eventIds = eventIds.Where(static id => id > 0).Distinct().OrderBy(static id => id).ToList();
             if (eventIds.Count == 0 &&
-                subscriptionQuery == null) {
+                subscriptionQuery == null &&
+                (subscriptionQueries == null ||
+                 subscriptionQueries.Count == 0)) {
                 throw new ArgumentException("At least one positive event ID is required.", nameof(eventIds));
             }
             namedEvents = namedEvents.Distinct().OrderBy(static value => value).ToList();

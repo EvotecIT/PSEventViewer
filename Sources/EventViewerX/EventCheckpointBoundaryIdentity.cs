@@ -22,8 +22,8 @@ public static class EventCheckpointBoundaryIdentity {
             eventObject.Id.ToString(CultureInfo.InvariantCulture),
             eventObject.ProviderName,
             eventObject.ProviderId?.ToString("D"),
-            eventObject.ContainerLog,
-            eventObject.MachineName,
+            NormalizeSource(eventObject.ContainerLog),
+            NormalizeSource(eventObject.MachineName),
             eventObject.ActivityId?.ToString("D"),
             eventObject.RelatedActivityId?.ToString("D"),
             eventObject.UserId?.Value,
@@ -40,5 +40,11 @@ public static class EventCheckpointBoundaryIdentity {
         using SHA256 sha256 = SHA256.Create();
         byte[] hash = sha256.ComputeHash(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(identity)));
         return BitConverter.ToString(hash).Replace("-", string.Empty);
+    }
+
+    private static string NormalizeSource(string? source) {
+        return (source ?? string.Empty)
+            .Trim()
+            .ToUpperInvariant();
     }
 }

@@ -215,6 +215,46 @@ namespace EventViewerX.Tests {
         }
 
         [Fact]
+        public void StartWatcherAcceptsPartitionedQueriesWithoutDummyEventIds() {
+            WatcherManager.StopAll();
+            string watcherName =
+                "unit-partitioned-" +
+                Guid.NewGuid().ToString("N");
+            WatcherInfo? watcher = null;
+            try {
+                var query = new EventLogSubscriptionQuery(
+                    "Application") {
+                    XPath =
+                        "*[System[EventID=2147483647]]"
+                };
+
+                watcher = WatcherManager.StartWatcher(
+                    watcherName,
+                    Environment.MachineName,
+                    "Application",
+                    new List<int>(),
+                    new List<NamedEvents>(),
+                    _ => { },
+                    staging: false,
+                    stopOnMatch: false,
+                    stopAfter: 0,
+                    timeout: null,
+                    subscriptionQuery: null,
+                    subscriptionQueries:
+                        new[] { query });
+
+                Assert.NotNull(watcher);
+            } finally {
+                if (watcher != null &&
+                    !watcher.IsStopped) {
+                    WatcherManager.StopWatcher(
+                        watcher.Id);
+                }
+                WatcherManager.StopAll();
+            }
+        }
+
+        [Fact]
         public void StartWatcherThrowsWhenDuplicatesExist() {
             var field = typeof(WatcherManager).GetField("_watchers", BindingFlags.NonPublic | BindingFlags.Static);
             Assert.NotNull(field);

@@ -221,18 +221,47 @@ internal static class EventLogStructuredQueryParser {
     }
 
     private static string[] GetPaths(XElement query) {
-        return query
-            .DescendantsAndSelf()
-            .Attributes()
-            .Where(static attribute =>
+        string fallbackPath =
+            GetPathAttribute(query);
+        XElement[] clauses = query
+            .Elements()
+            .Where(static element =>
                 string.Equals(
-                    attribute.Name.LocalName,
-                    "Path",
+                    element.Name.LocalName,
+                    "Select",
+                    StringComparison.Ordinal) ||
+                string.Equals(
+                    element.Name.LocalName,
+                    "Suppress",
                     StringComparison.Ordinal))
-            .Select(static attribute =>
-                attribute.Value.Trim())
+            .ToArray();
+        if (clauses.Length == 0) {
+            return fallbackPath.Length == 0
+                ? Array.Empty<string>()
+                : new[] { fallbackPath };
+        }
+        return clauses
+            .Select(element => {
+                string path = GetPathAttribute(element);
+                return path.Length == 0
+                    ? fallbackPath
+                    : path;
+            })
             .Where(static path => path.Length > 0)
             .ToArray();
+    }
+
+    private static string GetPathAttribute(XElement element) {
+        return element
+                   .Attributes()
+                   .FirstOrDefault(static attribute =>
+                       string.Equals(
+                           attribute.Name.LocalName,
+                           "Path",
+                           StringComparison.Ordinal))
+                   ?.Value
+                   .Trim() ??
+               string.Empty;
     }
 
     private static bool IsFileSource(string path) {

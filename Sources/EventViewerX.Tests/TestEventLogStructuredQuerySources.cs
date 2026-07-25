@@ -4,6 +4,32 @@ namespace EventViewerX.Tests;
 
 public sealed class TestEventLogStructuredQuerySources {
     [Fact]
+    public void ChildPathsOverrideUnusedQueryDefaultPath() {
+        const string xml =
+            "<QueryList>" +
+            "<Query Id=\"0\" Path=\"file://C:/unused.evtx\">" +
+            "<Select Path=\"file://C:/actual.evtx\">*</Select>" +
+            "<Suppress Path=\"file://C:/actual.evtx\">*[System[Level=0]]</Suppress>" +
+            "</Query>" +
+            "</QueryList>";
+        var query = new EventLogStructuredQuery(xml);
+
+        EventLogStructuredQuerySource source =
+            Assert.Single(query.ResolveSources());
+
+        Assert.Equal(
+            EventLogQuerySourceKind.File,
+            source.Kind);
+        Assert.Equal(
+            Path.GetFullPath("C:/actual.evtx"),
+            source.Source,
+            ignoreCase: true);
+        Assert.Equal(
+            1,
+            query.GetIndependentSourceCount());
+    }
+
+    [Fact]
     public void AddsSourceSpecificRecordIdSuppressions() {
         const string xml =
             "<QueryList>" +

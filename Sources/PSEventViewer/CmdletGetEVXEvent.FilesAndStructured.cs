@@ -173,16 +173,40 @@ public sealed partial class CmdletGetEVXEvent {
                 out string[]? providers)) {
             return providers;
         }
-        providers = EventLogEngine.ReadFile(
-                new EventLogFileQuery(fullPath) {
-                    Oldest = true,
-                    ReadMode = EventReadMode.Metadata
-                })
-            .Select(static eventObject =>
-                eventObject.ProviderName)
-            .Where(static provider =>
-                !string.IsNullOrWhiteSpace(provider))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
+        long discoveryLimit =
+            MaxEventsScanned > 0
+                ? MaxEventsScanned
+                : EventLogLimits
+                    .MaximumOfflineProviderDiscoveryEvents;
+        long nativeLimit =
+            discoveryLimit == long.MaxValue
+                ? long.MaxValue
+                : discoveryLimit + 1;
+        var discovered = new HashSet<string>(
+            StringComparer.OrdinalIgnoreCase);
+        long scanned = 0;
+        foreach (EventObject eventObject in
+                 EventLogEngine.ReadFile(
+                     new EventLogFileQuery(fullPath) {
+                         Oldest = true,
+                         ReadMode =
+                             EventReadMode.Metadata,
+                         MaxEvents = nativeLimit
+                     },
+                     CancelToken)) {
+            CancelToken.ThrowIfCancellationRequested();
+            scanned++;
+            if (scanned > discoveryLimit) {
+                throw new InvalidOperationException(
+                    $"Offline provider wildcard discovery for '{fullPath}' exceeded its {discoveryLimit} event safety limit. Use exact provider names or increase MaxEventsScanned.");
+            }
+            if (!string.IsNullOrWhiteSpace(
+                    eventObject.ProviderName)) {
+                discovered.Add(
+                    eventObject.ProviderName);
+            }
+        }
+        providers = discovered
             .OrderBy(
                 static provider => provider,
                 StringComparer.OrdinalIgnoreCase)

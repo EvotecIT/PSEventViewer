@@ -378,17 +378,18 @@ public static partial class EventProviderPackageManager {
                 if (!File.Exists(archivePath)) {
                     continue;
                 }
-                using (EventProviderPackage package =
-                       EventProviderPackageReader.Open(
-                           archivePath)) {
+                bool active = state != null &&
+                              string.Equals(
+                                  Path.GetFileName(
+                                      versionDirectory),
+                                  ActiveDirectoryName(state),
+                                  StringComparison.Ordinal);
+                try {
+                    using EventProviderPackage package =
+                        EventProviderPackageReader.Open(
+                            archivePath);
                     EventProviderDefinition definition =
                         package.Definition;
-                    bool active = state != null &&
-                                  string.Equals(
-                                      Path.GetFileName(
-                                          versionDirectory),
-                                      ActiveDirectoryName(state),
-                                      StringComparison.Ordinal);
                     bool registered = active &&
                                       EventProviderManifestRegistrar
                                           .IsRegistered(
@@ -418,6 +419,10 @@ public static partial class EventProviderPackageManager {
                         IsActive = active,
                         IsRegistered = registered
                     });
+                } catch (Exception exception)
+                    when (!active &&
+                          IsUnreadableRetainedPackage(
+                              exception)) {
                 }
             }
         }
@@ -432,6 +437,18 @@ public static partial class EventProviderPackageManager {
                 EventProviderPackageVersion.Parse(
                     item.PackageVersion))
             .ToArray();
+    }
+
+    private static bool IsUnreadableRetainedPackage(
+        Exception exception) {
+
+        return exception is IOException ||
+               exception is InvalidDataException ||
+               exception is UnauthorizedAccessException ||
+               exception is System.Security.Cryptography
+                   .CryptographicException ||
+               exception is System.Text.Json.JsonException ||
+               exception is EventProviderValidationException;
     }
 
     /// <summary>

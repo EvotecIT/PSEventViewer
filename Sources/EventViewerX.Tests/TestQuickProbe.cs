@@ -231,7 +231,7 @@ namespace EventViewerX.Tests {
                 Settings.RpcProbeTimeoutMs = 200;
                 EventLogSessionManager.ClearAllHostCache();
 
-                var result = EventLogProbe.ProbeLatestEvent("Application", machineName: "203.0.113.1", timeout: TimeSpan.FromMilliseconds(500), maxEventsToScan: 2);
+                var result = EventLogProbe.ProbeLatestEvent("Application", machineName: "[", timeout: TimeSpan.FromMilliseconds(500), maxEventsToScan: 2);
 
                 Assert.Equal(EventLogProbeStatus.HostUnavailable, result.Status);
                 Assert.Contains("RPC preflight", result.Message, StringComparison.OrdinalIgnoreCase);

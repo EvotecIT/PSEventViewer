@@ -354,6 +354,25 @@ Describe 'Get-EVXEvent - Get-WinEvent compatible native filters' {
         $events | Should -HaveCount 0
     }
 
+    It 'bounds offline provider wildcard discovery before the main query' {
+        $FilePath = [System.IO.Path]::Combine(
+            $PSScriptRoot,
+            'Logs',
+            'NamedFilterExamples.evtx')
+
+        {
+            Get-EVXEvent `
+                -FilterHashtable @{
+                    Path = $FilePath
+                    SuppressHashFilter = @{
+                        ProviderName = 'Service*'
+                    }
+                } `
+                -MaxEventsScanned 1 `
+                -ReadMode Metadata
+        } | Should -Throw '*provider wildcard discovery*safety limit*'
+    }
+
     It 'accepts several FilterHashtable queries as one ordered union' {
         $FilePath = [System.IO.Path]::Combine(
             $PSScriptRoot,

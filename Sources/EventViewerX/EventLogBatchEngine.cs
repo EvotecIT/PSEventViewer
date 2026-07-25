@@ -21,6 +21,7 @@ public static partial class EventLogBatchEngine {
                 nameof(query),
                 "Maximum events must be greater than or equal to zero.");
         }
+        ValidateReadModes(query);
         ValidateConcurrency(query.MaxConcurrency);
 
         EventSourceSnapshot[] sources = SnapshotSources(query);
@@ -44,6 +45,21 @@ public static partial class EventLogBatchEngine {
             throw new ArgumentOutOfRangeException(
                 nameof(maxConcurrency),
                 $"Maximum concurrency must be between 1 and {EventLogLimits.MaximumConcurrency}.");
+        }
+    }
+
+    private static void ValidateReadModes(
+        EventLogBatchQuery query) {
+
+        foreach (EventReadMode readMode in query.ChannelQueries
+                     .Select(static source => source.ReadMode)
+                     .Concat(query.FileQueries.Select(
+                         static source => source.ReadMode))
+                     .Concat(query.StructuredQueries.Select(
+                         static source => source.ReadMode))) {
+            EventReadModeValidation.EnsureDefined(
+                readMode,
+                nameof(query));
         }
     }
 

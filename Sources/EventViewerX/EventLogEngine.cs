@@ -25,6 +25,9 @@ public static partial class EventLogEngine {
         if (query == null) {
             throw new ArgumentNullException(nameof(query));
         }
+        EventReadModeValidation.EnsureDefined(
+            query.ReadMode,
+            nameof(query));
         if (query.MaxEvents < 0) {
             throw new ArgumentOutOfRangeException(nameof(query), "Maximum events must be greater than or equal to zero.");
         }
@@ -116,6 +119,9 @@ public static partial class EventLogEngine {
         if (query == null) {
             throw new ArgumentNullException(nameof(query));
         }
+        EventReadModeValidation.EnsureDefined(
+            query.ReadMode,
+            nameof(query));
         ValidateRemoteOptions(
             query.MaxEvents,
             query.RemoteConnectionTimeoutMilliseconds,
@@ -326,6 +332,9 @@ public static partial class EventLogEngine {
         if (query == null) {
             throw new ArgumentNullException(nameof(query));
         }
+        EventReadModeValidation.EnsureDefined(
+            query.ReadMode,
+            nameof(query));
         if (query.MaxEvents < 0) {
             throw new ArgumentOutOfRangeException(
                 nameof(query),
