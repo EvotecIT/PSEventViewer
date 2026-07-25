@@ -46,7 +46,9 @@ public static class EvtxEventReportBuilder {
                 request,
                 ev => {
                     rows.Add(new EvtxEventReportRow {
-                        TimeCreatedUtc = ev.TimeCreated.ToUniversalTime().ToString("O"),
+                        TimeCreatedUtc =
+                            FormatTimeCreatedUtc(
+                                ev.TimeCreated),
                         Id = ev.Id,
                         RecordId = ev.RecordId ?? 0,
                         LogName = ev.LogName ?? string.Empty,
@@ -82,4 +84,12 @@ public static class EvtxEventReportBuilder {
         failure = null;
         return true;
     }
+
+    internal static string? FormatTimeCreatedUtc(
+        DateTime timeCreated) =>
+        timeCreated == DateTime.MinValue
+            ? null
+            : timeCreated
+                .ToUniversalTime()
+                .ToString("O");
 }
