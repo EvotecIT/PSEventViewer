@@ -106,7 +106,7 @@ public static class EventLogProbe {
                     out scanned,
                     out scanLimitReached);
 
-            recordCount = RunCancelableProbeStage(
+            recordCount = TryRunOptionalRecordCountStage(
                 () => TryReadRecordCount(
                     logName,
                     machineName,
@@ -117,7 +117,8 @@ public static class EventLogProbe {
                     probeCancellation.Token),
                 effectiveTimeout -
                 stopwatch.Elapsed,
-                probeCancellation.Token);
+                probeCancellation.Token,
+                cancellationToken);
             if (eventTimeUtc.HasValue) {
                 return new EventLogProbeResult(
                     logName,
@@ -251,6 +252,28 @@ public static class EventLogProbe {
             .GetResult();
         cancellationToken.ThrowIfCancellationRequested();
         return result;
+    }
+
+    internal static long? TryRunOptionalRecordCountStage(
+        Func<long?> stage,
+        TimeSpan remaining,
+        CancellationToken probeCancellationToken,
+        CancellationToken callerCancellationToken) {
+
+        try {
+            return RunCancelableProbeStage(
+                stage,
+                remaining,
+                probeCancellationToken);
+        } catch (OperationCanceledException)
+            when (!callerCancellationToken
+                .IsCancellationRequested) {
+            return null;
+        } catch (TimeoutException) {
+            callerCancellationToken
+                .ThrowIfCancellationRequested();
+            return null;
+        }
     }
 
     private static long? TryReadRecordCount(

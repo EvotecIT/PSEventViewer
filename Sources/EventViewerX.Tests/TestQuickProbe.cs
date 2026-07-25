@@ -280,6 +280,44 @@ namespace EventViewerX.Tests {
         }
 
         [Fact]
+        public void OptionalRecordCountTimeoutDoesNotDiscardTheProbeResult() {
+            using var release =
+                new ManualResetEventSlim();
+            try {
+                long? recordCount =
+                    EventLogProbe.TryRunOptionalRecordCountStage(
+                        () => {
+                            release.Wait(
+                                TimeSpan.FromSeconds(30));
+                            return 42;
+                        },
+                        TimeSpan.FromMilliseconds(100),
+                        CancellationToken.None,
+                        CancellationToken.None);
+
+                Assert.Null(recordCount);
+            } finally {
+                release.Set();
+            }
+        }
+
+        [Fact]
+        public void OptionalRecordCountStillPropagatesCallerCancellation() {
+            using var cancellation =
+                new CancellationTokenSource();
+
+            Assert.Throws<OperationCanceledException>(() =>
+                EventLogProbe.TryRunOptionalRecordCountStage(
+                    () => {
+                        cancellation.Cancel();
+                        return 42;
+                    },
+                    TimeSpan.FromSeconds(5),
+                    cancellation.Token,
+                    cancellation.Token));
+        }
+
+        [Fact]
         public void ProbeLatestEventRejectsCredentialsForLocalSessions() {
             var credential = new NetworkCredential(
                 "eventviewerx-test",

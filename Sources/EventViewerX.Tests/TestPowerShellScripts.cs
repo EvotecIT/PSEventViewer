@@ -212,6 +212,11 @@ namespace EventViewerX.Tests {
             Assert.Throws<ArgumentOutOfRangeException>(() => PowerShellEventEngine.GetPowerShellScripts(
                 PowerShellEdition.WindowsPowerShell,
                 maxPendingScripts: 0).ToList());
+            Assert.Throws<ArgumentOutOfRangeException>(() =>
+                PowerShellEventEngine
+                    .GetPowerShellScriptExecution(
+                        PowerShellEdition.WindowsPowerShell,
+                        maxEvents: -1));
         }
 
         [Fact]
@@ -221,12 +226,42 @@ namespace EventViewerX.Tests {
 
             Assert.Throws<ArgumentOutOfRangeException>(() =>
                 PowerShellEventEngine.GetPowerShellScriptExecution(
-                        invalid)
-                    .ToList());
+                    invalid));
             Assert.Throws<ArgumentOutOfRangeException>(() =>
                 PowerShellEventEngine.RestorePowerShellScripts(
-                        invalid)
-                    .ToList());
+                    invalid));
+        }
+
+        [Fact]
+        public void ExecutionQueriesValidateAndResetAtCallTime() {
+            var queryInfo =
+                new PowerShellScriptQueryExecutionInfo();
+            queryInfo.Reset(
+                "stale",
+                "stale.evtx",
+                maxResults: 1,
+                maxEventsScanned: 1);
+            queryInfo.RecordFailure(
+                EventLogRemoteQueryFailureKind.Timeout,
+                "stale");
+
+            IEnumerable<PowerShellScriptExecutionInfo> events =
+                PowerShellEventEngine.GetPowerShellScriptExecution(
+                    PowerShellEdition.WindowsPowerShell,
+                    machineName: "server",
+                    eventLogPath: "not-opened.evtx",
+                    maxEvents: 2,
+                    maxEventsScanned: 3,
+                    executionInfo: queryInfo);
+
+            Assert.NotNull(events);
+            Assert.Equal("server", queryInfo.MachineName);
+            Assert.Equal(
+                "not-opened.evtx",
+                queryInfo.EventLogPath);
+            Assert.Equal(2, queryInfo.MaxResults);
+            Assert.Equal(3, queryInfo.MaxEventsScanned);
+            Assert.True(queryInfo.Succeeded);
         }
 
         [Fact]
@@ -274,7 +309,7 @@ namespace EventViewerX.Tests {
                 null,
                 0,
                 0,
-                cancellation.Token).ToList());
+                cancellation.Token));
         }
 
         [Fact]

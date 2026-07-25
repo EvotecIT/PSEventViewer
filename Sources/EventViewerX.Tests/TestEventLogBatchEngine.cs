@@ -463,6 +463,69 @@ namespace EventViewerX.Tests;
     }
 
     [Fact]
+    public void ConsolidationPreservesEachBoundedFilterOnTheSameChannel() {
+        EventLogChannelQuery[] sources = {
+            new("Application") {
+                XPath = "*[System[EventID=1000]]",
+                MaxEvents = 10,
+                ReadMode = EventReadMode.Metadata
+            },
+            new("Application") {
+                XPath = "*[System[EventID=1001]]",
+                MaxEvents = 10,
+                ReadMode = EventReadMode.Metadata
+            }
+        };
+
+        EventLogBatchQuery consolidated =
+            EventLogBatchConsolidator.Consolidate(
+                EventLogBatchQuery.ForChannels(
+                    sources));
+
+        Assert.Equal(
+            2,
+            consolidated.StructuredQueries.Count);
+        Assert.All(
+            consolidated.StructuredQueries,
+            static query =>
+                Assert.Equal(10, query.MaxEvents));
+    }
+
+    [Fact]
+    public void ConsolidationKeepsBookmarkPartitionsOnOneNativeSource() {
+        const string bookmark =
+            "<BookmarkList><Bookmark Channel=\"Application\" RecordId=\"1\" IsCurrent=\"true\" /></BookmarkList>";
+        EventLogChannelQuery[] sources = {
+            new("Application") {
+                XPath = "*[System[EventID=1000]]",
+                MaxEvents = 10,
+                BookmarkXml = bookmark,
+                ReadMode = EventReadMode.Metadata
+            },
+            new("Application") {
+                XPath = "*[System[EventID=1001]]",
+                MaxEvents = 10,
+                BookmarkXml = bookmark,
+                ReadMode = EventReadMode.Metadata
+            }
+        };
+
+        EventLogStructuredQuery consolidated =
+            Assert.Single(
+                EventLogBatchConsolidator
+                    .Consolidate(
+                        EventLogBatchQuery.ForChannels(
+                            sources))
+                    .StructuredQueries);
+        Assert.Equal(
+            2,
+            System.Xml.Linq.XDocument
+                .Parse(consolidated.QueryXml)
+                .Descendants("Select")
+                .Count());
+    }
+
+    [Fact]
     public void ConsolidationClonesRemoteCredentials() {
         var credential =
             new System.Net.NetworkCredential(

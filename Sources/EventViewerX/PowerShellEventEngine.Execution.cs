@@ -38,6 +38,28 @@ namespace EventViewerX {
             string logName =
                 GetPowerShellLogName(type);
 
+            return GetPowerShellScriptExecutionIterator(
+                logName,
+                machineName,
+                eventLogPath,
+                dateFrom,
+                dateTo,
+                maxEventsScanned,
+                cancellationToken,
+                queryInfo);
+        }
+
+        private static IEnumerable<PowerShellScriptExecutionInfo>
+            GetPowerShellScriptExecutionIterator(
+                string logName,
+                string? machineName,
+                string? eventLogPath,
+                DateTime? dateFrom,
+                DateTime? dateTo,
+                int maxEventsScanned,
+                CancellationToken cancellationToken,
+                PowerShellScriptQueryExecutionInfo queryInfo) {
+
             var scanLimit = new PowerShellScriptScanLimit(
                 maxEventsScanned);
             foreach (EventObject eventObject in QueryPowerShellScriptEvents(

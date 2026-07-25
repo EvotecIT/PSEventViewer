@@ -124,19 +124,19 @@ public static class EventLogBatchConsolidator {
                  query.ChannelQueries) {
             QueryProfile profile =
                 QueryProfile.From(channel);
+            XElement queryElement =
+                CreateQueryElement(
+                    channel.LogName,
+                    channel.XPath);
             inputs.Add(new QueryInput(
                 profile,
                 EventLogQuerySourceKind.Channel,
                 sourceIdentity: string.Empty,
-                new[] {
-                    CreateQueryElement(
-                        channel.LogName,
-                        channel.XPath)
-                },
+                new[] { queryElement },
                 consolidationScope:
                     GetConsolidationScope(
                         profile,
-                        channel.LogName)));
+                        new[] { queryElement })));
         }
         foreach (EventLogFileQuery file in
                  query.FileQueries) {
@@ -145,32 +145,31 @@ public static class EventLogBatchConsolidator {
                 Path.GetFullPath(file.Path);
             QueryProfile profile =
                 QueryProfile.From(file);
+            XElement queryElement =
+                CreateQueryElement(
+                    source,
+                    file.XPath);
             inputs.Add(new QueryInput(
                 profile,
                 EventLogQuerySourceKind.File,
                 "file://" + Path.GetFullPath(file.Path),
-                new[] {
-                    CreateQueryElement(
-                        source,
-                        file.XPath)
-                },
+                new[] { queryElement },
                 consolidationScope:
                     GetConsolidationScope(
                         profile,
-                        source)));
+                        new[] { queryElement })));
         }
         foreach (EventLogStructuredQuery structured in
                  query.StructuredQueries) {
             QueryProfile profile =
                 QueryProfile.From(structured);
-            string consolidationScope =
-                GetConsolidationScope(
-                    profile,
-                    GetStructuredSourceScope(
-                        structured));
             XElement[] queries =
                 EventLogStructuredQueryParser.ParseQueries(
                     structured.QueryXml);
+            string consolidationScope =
+                GetConsolidationScope(
+                    profile,
+                    queries);
             foreach (XElement queryElement in queries) {
                 EventLogQuerySourceKind sourceKind =
                     EventLogStructuredQueryParser.ResolveSourceKind(
@@ -192,33 +191,46 @@ public static class EventLogBatchConsolidator {
         return inputs.ToArray();
     }
 
-    private static string GetStructuredSourceScope(
-        EventLogStructuredQuery query) {
-
-        return string.Join(
-            "|",
-            EventLogStructuredQueryParser
-                .ResolveSources(
-                    query.QueryXml,
-                    query.SourceKind)
-                .Select(static source =>
-                    ((int)source.Kind).ToString(
-                        CultureInfo.InvariantCulture) +
-                    ":" +
-                    source.Source)
-                .OrderBy(
-                    static source =>
-                        source,
-                    StringComparer.OrdinalIgnoreCase));
-    }
-
     private static string GetConsolidationScope(
         QueryProfile profile,
-        string sourceIdentity) {
+        IReadOnlyList<XElement> queries) {
 
-        return profile.MaxEvents > 0
-            ? sourceIdentity
-            : string.Empty;
+        if (profile.MaxEvents <= 0) {
+            return string.Empty;
+        }
+        if (!string.IsNullOrWhiteSpace(
+                profile.BookmarkXml)) {
+            return "bookmark:" +
+                   string.Join(
+                       "|",
+                       queries
+                           .SelectMany(static query =>
+                               query
+                                   .DescendantsAndSelf()
+                                   .Attributes("Path"))
+                           .Select(static path =>
+                               path.Value)
+                           .Distinct(
+                               StringComparer.OrdinalIgnoreCase)
+                           .OrderBy(
+                               static path =>
+                                   path,
+                               StringComparer.OrdinalIgnoreCase));
+        }
+        return string.Join(
+            "\n",
+            queries
+                .Select(static sourceQuery => {
+                    var query =
+                        new XElement(sourceQuery);
+                    query.SetAttributeValue("Id", null);
+                    return query.ToString(
+                        SaveOptions.DisableFormatting);
+                })
+                .OrderBy(
+                    static query =>
+                        query,
+                    StringComparer.Ordinal));
     }
 
     private static XElement CreateQueryElement(
