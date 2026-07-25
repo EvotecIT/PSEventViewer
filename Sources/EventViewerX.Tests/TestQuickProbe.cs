@@ -187,7 +187,7 @@ namespace EventViewerX.Tests {
         public void NegativeCacheExpiresAndIsReevaluated() {
             if (!OperatingSystem.IsWindows()) return;
 
-            const string host = "203.0.113.77"; // Dedicated TEST-NET address avoids cross-class cache interference.
+            const string host = "["; // Invalid endpoint keeps this cache-lifetime test independent of network timing.
             var originalTtl = Settings.NegativeCacheTtlSeconds;
             var originalRpcTimeout = Settings.RpcProbeTimeoutMs;
             var originalSessionTimeout = Settings.SessionTimeoutMs;
