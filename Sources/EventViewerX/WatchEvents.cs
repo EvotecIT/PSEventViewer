@@ -415,11 +415,14 @@ namespace EventViewerX {
                 registration = DetachCancellationRegistration();
                 subscriptions = DetachSubscriptionsCore();
             }
-            registration?.Dispose();
-            DisposeSubscriptions(subscriptions);
-            if (stopped) {
-                RaiseStopped();
-            }
+            ThreadPool.QueueUserWorkItem(
+                _ => {
+                    registration?.Dispose();
+                    DisposeSubscriptions(subscriptions);
+                    if (stopped) {
+                        RaiseStopped();
+                    }
+                });
         }
 
         /// <summary>Stops watching and releases native watcher/session resources.</summary>

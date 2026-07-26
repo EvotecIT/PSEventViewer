@@ -95,13 +95,14 @@ public static partial class EventLogBatchEngine {
             throw new ArgumentNullException(nameof(prime));
         }
 
-        using var fatalCancellation =
+        var fatalCancellation =
             CancellationTokenSource.CreateLinkedTokenSource(
                 cancellationToken);
-        using var concurrencyGate =
+        var concurrencyGate =
             new SemaphoreSlim(
                 maxConcurrency,
                 maxConcurrency);
+        bool cleanupDetached = false;
         ExceptionDispatchInfo? firstFailure = null;
         Task<T?>[] tasks =
             Enumerable
@@ -110,13 +111,50 @@ public static partial class EventLogBatchEngine {
                 .ToArray();
 
         try {
-            return await Task.WhenAll(tasks)
-                .ConfigureAwait(false);
+            Task<T?[]> allTasks = Task.WhenAll(tasks);
+            if (fatalCancellation.Token.CanBeCanceled) {
+                var canceled = new TaskCompletionSource<bool>(
+                    TaskCreationOptions.RunContinuationsAsynchronously);
+                using CancellationTokenRegistration registration =
+                    fatalCancellation.Token.Register(
+                        static state =>
+                            ((TaskCompletionSource<bool>)state!)
+                                .TrySetResult(true),
+                        canceled);
+                Task completed = await Task.WhenAny(
+                        allTasks,
+                        canceled.Task)
+                    .ConfigureAwait(false);
+                if (!ReferenceEquals(completed, allTasks)) {
+                    cleanupDetached = true;
+                    _ = allTasks.ContinueWith(
+                        _ => {
+                            DisposeCompleted(tasks);
+                            concurrencyGate.Dispose();
+                            fatalCancellation.Dispose();
+                        },
+                        CancellationToken.None,
+                        TaskContinuationOptions.ExecuteSynchronously,
+                        TaskScheduler.Default);
+                    cancellationToken.ThrowIfCancellationRequested();
+                    firstFailure?.Throw();
+                    throw new OperationCanceledException(
+                        fatalCancellation.Token);
+                }
+            }
+            return await allTasks.ConfigureAwait(false);
         } catch {
-            DisposeCompleted(tasks);
+            if (!cleanupDetached) {
+                DisposeCompleted(tasks);
+            }
             cancellationToken.ThrowIfCancellationRequested();
             firstFailure?.Throw();
             throw;
+        } finally {
+            if (!cleanupDetached) {
+                concurrencyGate.Dispose();
+                fatalCancellation.Dispose();
+            }
         }
 
         async Task<T?> PrimeOneAsync(int index) {

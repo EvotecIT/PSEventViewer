@@ -17,6 +17,7 @@ public sealed partial class CmdletGetEVXEvent {
     /// Initializes logging and loads persisted checkpoint state.
     /// </summary>
     protected override Task BeginProcessingAsync() {
+        _eventsOutput = 0;
         // Initialize the logger to be able to see verbose, warning, debug, error, progress, and information messages.
         var internalLogger = new InternalLogger(false);
         var internalLoggerPowerShell = new InternalLoggerPowerShell(internalLogger, this.WriteVerbose, this.WriteWarning, this.WriteDebug, this.WriteError, this.WriteProgress, this.WriteInformation);

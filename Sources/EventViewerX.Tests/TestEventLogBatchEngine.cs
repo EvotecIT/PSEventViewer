@@ -949,6 +949,44 @@ namespace EventViewerX.Tests;
     }
 
     [Fact]
+    public async Task AsyncPrimerCancellationDetachesStalledProjectionCleanup() {
+        var primerEntered =
+            new TaskCompletionSource<bool>(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+        var releasePrimer =
+            new TaskCompletionSource<bool>(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+        var resource = new PrimerResource();
+        using var cancellation =
+            new CancellationTokenSource();
+
+        Task<PrimerResource?[]> priming =
+            EventLogBatchEngine
+                .PrimeConcurrentlyAsync<PrimerResource>(
+                    sourceCount: 1,
+                    maxConcurrency: 1,
+                    cancellation.Token,
+                    async (_, _) => {
+                        primerEntered.SetResult(true);
+                        await releasePrimer.Task;
+                        return resource;
+                    });
+        await primerEntered.Task;
+        cancellation.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            async () => await priming.WaitAsync(
+                TimeSpan.FromSeconds(5)));
+        Assert.False(resource.Disposed);
+
+        releasePrimer.SetResult(true);
+        Assert.True(
+            SpinWait.SpinUntil(
+                () => resource.Disposed,
+                TimeSpan.FromSeconds(5)));
+    }
+
+    [Fact]
     public void CancellationStopsTheMergedBatchEnumeration() {
         if (!OperatingSystem.IsWindows()) return;
         var query = EventLogBatchQuery.ForFiles(new[] {

@@ -327,9 +327,18 @@ public static class EventProviderPackageBuilder {
                 finalPath,
                 null);
         } else {
-            File.Move(
-                temporaryPath,
-                finalPath);
+            try {
+                File.Move(
+                    temporaryPath,
+                    finalPath);
+            } catch (IOException) when (
+                overwrite &&
+                File.Exists(finalPath)) {
+                File.Replace(
+                    temporaryPath,
+                    finalPath,
+                    null);
+            }
         }
     }
 

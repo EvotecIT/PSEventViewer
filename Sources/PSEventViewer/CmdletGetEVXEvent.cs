@@ -409,7 +409,9 @@ public sealed partial class CmdletGetEVXEvent : AsyncPSCmdlet {
     /// Initializes logging and helper classes before processing.
     /// </summary>
     protected override async Task ProcessRecordAsync() {
-        _eventsOutput = 0;
+        if (OutputLimitReached) {
+            return;
+        }
         _checkpointSources = null;
         _managedProviderPatterns =
             Array.Empty<WildcardPattern>();
