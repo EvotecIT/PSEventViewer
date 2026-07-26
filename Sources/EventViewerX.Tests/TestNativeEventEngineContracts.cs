@@ -374,6 +374,18 @@ public sealed class TestNativeEventEngineContracts {
     }
 
     [Fact]
+    public void FileReadabilityProbePreservesAccessDenied() {
+        UnauthorizedAccessException exception =
+            Assert.Throws<UnauthorizedAccessException>(() =>
+                EventLogEngine.EnsureFileReadable(
+                    "protected.evtx",
+                    static _ => throw new UnauthorizedAccessException(
+                        "Access denied.")));
+
+        Assert.Equal("Access denied.", exception.Message);
+    }
+
+    [Fact]
     public void ChannelCatalogCanExcludeAnalyticAndDebugChannels() {
         if (!OperatingSystem.IsWindows()) return;
 

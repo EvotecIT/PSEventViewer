@@ -344,11 +344,7 @@ public static partial class EventLogEngine {
         }
 
         path = Path.GetFullPath(query.Path.Trim().Trim('"', '\''));
-        if (!File.Exists(path)) {
-            throw new FileNotFoundException(
-                $"The event log file '{path}' does not exist.",
-                path);
-        }
+        EnsureFileReadable(path);
         string xpath = string.IsNullOrWhiteSpace(query.XPath) ? "*" : query.XPath;
         WindowsEventNativeMethods.QueryFlags flags =
             WindowsEventNativeMethods.QueryFlags.FilePath |
@@ -372,6 +368,37 @@ public static partial class EventLogEngine {
                 : query.BookmarkXml,
             bookmarkOffset: query.BookmarkOffset,
             strictBookmark: query.StrictBookmark);
+    }
+
+    /// <summary>
+    /// Verifies that an EVTX source can actually be opened for reading so
+    /// missing and access-denied paths retain their distinct exception types.
+    /// </summary>
+    internal static void EnsureFileReadable(string path) {
+        try {
+            EnsureFileReadable(
+                path,
+                static filePath => new FileStream(
+                    filePath,
+                    FileMode.Open,
+                    FileAccess.Read,
+                    FileShare.ReadWrite | FileShare.Delete));
+        } catch (DirectoryNotFoundException exception) {
+            throw new FileNotFoundException(
+                $"The event log file '{path}' does not exist.",
+                path,
+                exception);
+        }
+    }
+
+    /// <summary>
+    /// Verifies EVTX read access through an injectable filesystem boundary.
+    /// </summary>
+    internal static void EnsureFileReadable(
+        string path,
+        Func<string, Stream> openFile) {
+
+        using Stream stream = openFile(path);
     }
 
     private static IEnumerable<EventObject> ReadChannelIterator(

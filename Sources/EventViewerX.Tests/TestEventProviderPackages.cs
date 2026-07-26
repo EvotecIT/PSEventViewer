@@ -844,6 +844,34 @@ public sealed class TestEventProviderPackages {
     }
 
     [Fact]
+    public void DefinitionPromotionWithoutOverwritePreservesCompetingFile() {
+        string root = Path.Combine(
+            Path.GetTempPath(),
+            "EventViewerX.Tests",
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        string temporaryPath = Path.Combine(root, "definition.tmp");
+        string destinationPath = Path.Combine(root, "definition.json");
+        try {
+            File.WriteAllText(temporaryPath, "new-content");
+            File.WriteAllText(destinationPath, "competing-content");
+
+            Assert.Throws<IOException>(() =>
+                EventProviderDefinitionJson.PromoteTemporaryFile(
+                    temporaryPath,
+                    destinationPath,
+                    overwrite: false));
+
+            Assert.Equal(
+                "competing-content",
+                File.ReadAllText(destinationPath));
+            Assert.True(File.Exists(temporaryPath));
+        } finally {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public void RejectsNamesThatCollideAfterManifestNormalization() {
         EventProviderDefinition definition = CreateDefinition();
         definition.AddChannel(

@@ -70,14 +70,10 @@ public static class EventProviderDefinitionJson {
                 temporaryPath,
                 Serialize(definition),
                 new UTF8Encoding(false));
-            if (File.Exists(fullPath)) {
-                File.Replace(
-                    temporaryPath,
-                    fullPath,
-                    null);
-            } else {
-                File.Move(temporaryPath, fullPath);
-            }
+            PromoteTemporaryFile(
+                temporaryPath,
+                fullPath,
+                overwrite);
         } finally {
             if (File.Exists(temporaryPath)) {
                 File.Delete(temporaryPath);
@@ -86,6 +82,36 @@ public static class EventProviderDefinitionJson {
     }
 
     internal static JsonSerializerOptions SerializerOptions => Options;
+
+    /// <summary>
+    /// Promotes a fully written temporary definition while preserving the
+    /// caller's overwrite contract at the atomic filesystem boundary.
+    /// </summary>
+    internal static void PromoteTemporaryFile(
+        string temporaryPath,
+        string fullPath,
+        bool overwrite) {
+
+        if (!overwrite) {
+            File.Move(temporaryPath, fullPath);
+            return;
+        }
+        if (File.Exists(fullPath)) {
+            File.Replace(
+                temporaryPath,
+                fullPath,
+                null);
+            return;
+        }
+        try {
+            File.Move(temporaryPath, fullPath);
+        } catch (IOException) when (File.Exists(fullPath)) {
+            File.Replace(
+                temporaryPath,
+                fullPath,
+                null);
+        }
+    }
 
     private static JsonSerializerOptions CreateOptions() {
         var options = new JsonSerializerOptions {

@@ -171,9 +171,7 @@ public sealed partial class CmdletGetEVXEvent {
             var entries = dictionary
                 .Cast<DictionaryEntry>()
                 .Select(entry => new {
-                    Key = Convert.ToString(
-                        entry.Key,
-                        CultureInfo.InvariantCulture) ?? string.Empty,
+                    Key = ConvertNamedDataValue(entry.Key),
                     entry.Value
                 })
                 .OrderBy(
@@ -202,29 +200,19 @@ public sealed partial class CmdletGetEVXEvent {
             identity.Add("]");
             return;
         }
-        if (value is DateTime dateTime) {
+        if (value is DateTime) {
             identity.Add(
                 "datetime:" +
-                dateTime.ToUniversalTime().ToString(
-                    "O",
-                    CultureInfo.InvariantCulture));
+                EventFilterValueConverter.ToInvariantString(value));
             return;
         }
-        if (value is DateTimeOffset dateTimeOffset) {
+        if (value is DateTimeOffset) {
             identity.Add(
                 "datetimeoffset:" +
-                dateTimeOffset.ToUniversalTime().ToString(
-                    "O",
-                    CultureInfo.InvariantCulture));
+                EventFilterValueConverter.ToInvariantString(value));
             return;
         }
-        string text = value is IFormattable formattable
-            ? formattable.ToString(
-                null,
-                CultureInfo.InvariantCulture) ?? string.Empty
-            : Convert.ToString(
-                value,
-                CultureInfo.InvariantCulture) ?? string.Empty;
+        string text = EventFilterValueConverter.ToInvariantString(value);
         identity.Add(
             value.GetType().FullName + ":" + text);
     }

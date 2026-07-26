@@ -107,7 +107,7 @@ public sealed partial class CmdletGetEVXEvent {
         var converted = new Dictionary<string, IReadOnlyList<string>>(
             StringComparer.Ordinal);
         foreach (DictionaryEntry entry in table) {
-            string key = Convert.ToString(entry.Key) ?? string.Empty;
+            string key = ConvertNamedDataValue(entry.Key);
             if (key.Length == 0) {
                 throw new PSArgumentException(
                     "Named-data filter keys cannot be empty.");
@@ -118,10 +118,17 @@ public sealed partial class CmdletGetEVXEvent {
                     : enumerable;
             converted[key] = values
                 .Cast<object?>()
-                .Select(static value => Convert.ToString(value) ?? string.Empty)
+                .Select(static value => ConvertNamedDataValue(value))
                 .ToArray();
         }
         return converted;
+    }
+
+    private static string ConvertNamedDataValue(object? value) {
+        if (value is PSObject psObject) {
+            value = psObject.BaseObject;
+        }
+        return EventFilterValueConverter.ToInvariantString(value);
     }
 
     private static string[] NormalizeRequiredValues(
