@@ -5,6 +5,19 @@ namespace EventViewerX.Tests;
 
 public sealed class TestEventProviderPackageInventory {
     [Fact]
+    public void MissingProviderDirectoryIsIgnoredDuringInventory() {
+        string missing = Path.Combine(
+            Path.GetTempPath(),
+            "EventViewerX.Tests",
+            Guid.NewGuid().ToString("N"));
+
+        Assert.Empty(
+            EventProviderPackageManager
+                .EnumerateDirectoriesSafely(
+                    missing));
+    }
+
+    [Fact]
     public void CorruptInstallationStateDoesNotHideAnotherProvider() {
         string root = Path.Combine(
             Path.GetTempPath(),

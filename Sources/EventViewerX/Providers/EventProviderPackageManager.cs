@@ -370,7 +370,8 @@ public static partial class EventProviderPackageManager {
             return Array.Empty<InstalledEventProviderPackage>();
         }
         var results = new List<InstalledEventProviderPackage>();
-        foreach (string providerRoot in Directory.EnumerateDirectories(root)) {
+        foreach (string providerRoot in
+                 EnumerateDirectoriesSafely(root)) {
             if (Path.GetFileName(providerRoot).StartsWith(
                     ".",
                     StringComparison.Ordinal)) {
@@ -381,8 +382,8 @@ public static partial class EventProviderPackageManager {
                     out EventProviderInstallationState? state)) {
                 continue;
             }
-            foreach (string versionDirectory in Directory
-                         .EnumerateDirectories(providerRoot)
+            foreach (string versionDirectory in
+                     EnumerateDirectoriesSafely(providerRoot)
                          .Where(static path =>
                              !Path.GetFileName(path).StartsWith(
                                  ".",
@@ -459,6 +460,19 @@ public static partial class EventProviderPackageManager {
                 EventProviderPackageVersion.Parse(
                     item.PackageVersion))
             .ToArray();
+    }
+
+    internal static IReadOnlyList<string>
+        EnumerateDirectoriesSafely(
+            string path) {
+
+        try {
+            return Directory.GetDirectories(path);
+        } catch (IOException) {
+            return Array.Empty<string>();
+        } catch (UnauthorizedAccessException) {
+            return Array.Empty<string>();
+        }
     }
 
     private static bool ActiveArchiveMatchesState(

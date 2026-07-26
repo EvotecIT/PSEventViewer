@@ -156,6 +156,7 @@ namespace EventViewerX {
         public TimeSpan? Timeout { get; }
         internal CancellationTokenSource Cancellation { get; } = new();
         internal Task? TimeoutTask { get; private set; }
+        internal Action? BeforeStartupCommit { get; set; }
         /// <summary>Underlying watcher engine instance.</summary>
         public WatchEvents Watcher { get; }
         /// <summary>Complete native subscription contract owned by this watcher.</summary>
@@ -272,11 +273,30 @@ namespace EventViewerX {
                     OnEvent,
                     Cancellation.Token);
                 startupCancellationToken.ThrowIfCancellationRequested();
+                BeforeStartupCommit?.Invoke();
+                lock (_stopSync) {
+                    _starting = false;
+                    startupCancellationToken
+                        .ThrowIfCancellationRequested();
+                    if (_stopRequested ||
+                        _stopped) {
+                        throw new ObjectDisposedException(
+                            nameof(WatcherInfo));
+                    }
+                    _started = true;
+                    if (Timeout.HasValue) {
+                        TimeoutTask =
+                            StopAfterTimeoutAsync(
+                                Timeout.Value,
+                                Cancellation.Token);
+                    }
+                }
             } catch (Exception) when (
                 startupCancellationToken.IsCancellationRequested) {
                 lock (_stopSync) {
                     _starting = false;
                 }
+                Stop();
                 throw new OperationCanceledException(
                     startupCancellationToken);
             } catch {
@@ -284,18 +304,6 @@ namespace EventViewerX {
                     _starting = false;
                 }
                 throw;
-            }
-
-            lock (_stopSync) {
-                _starting = false;
-                if (_stopRequested ||
-                    _stopped) {
-                    throw new ObjectDisposedException(nameof(WatcherInfo));
-                }
-                _started = true;
-                if (Timeout.HasValue) {
-                    TimeoutTask = StopAfterTimeoutAsync(Timeout.Value, Cancellation.Token);
-                }
             }
         }
 

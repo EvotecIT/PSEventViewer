@@ -22,6 +22,7 @@ internal sealed class WindowsEventHandleEnumerator : IDisposable {
 
         _eventQuery = eventQuery;
         _cancellationToken = cancellationToken;
+        cancellationToken.ThrowIfCancellationRequested();
         _query = WindowsEventNativeMethods.EvtQuery(
             eventQuery.Session,
             eventQuery.Path,
@@ -34,13 +35,19 @@ internal sealed class WindowsEventHandleEnumerator : IDisposable {
                 error,
                 $"Failed to query Windows event source '{eventQuery.DisplayName}'.");
         }
+        _cancellationRegistration = cancellationToken.Register(
+            static state =>
+                ((WindowsEventHandleEnumerator)state!)
+                    .CancelPendingRead(),
+            this);
         try {
+            cancellationToken.ThrowIfCancellationRequested();
             WindowsEventQueryDiagnostics.ReportFailures(_query, eventQuery);
+            cancellationToken.ThrowIfCancellationRequested();
             SeekToBookmark();
-            _cancellationRegistration = cancellationToken.Register(
-                static state => ((WindowsEventHandleEnumerator)state!).CancelPendingRead(),
-                this);
+            cancellationToken.ThrowIfCancellationRequested();
         } catch {
+            _cancellationRegistration.Dispose();
             _query.Dispose();
             throw;
         }

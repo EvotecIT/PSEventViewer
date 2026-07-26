@@ -645,6 +645,33 @@ namespace EventViewerX.Tests {
         }
 
         [Fact]
+        public void WatcherStartupCancellationWinsBeforeCommit() {
+            using var cancellation =
+                new CancellationTokenSource();
+            var info = new WatcherInfo(
+                "cancel-before-commit",
+                Environment.MachineName,
+                "Application",
+                new List<int> { 1 },
+                new List<NamedEvents>(),
+                _ => { },
+                false,
+                false,
+                0,
+                null) {
+                BeforeStartupCommit =
+                    cancellation.Cancel
+            };
+
+            Assert.Throws<OperationCanceledException>(() =>
+                info.Start(
+                    cancellation.Token));
+
+            Assert.True(info.IsStopped);
+            info.Dispose();
+        }
+
+        [Fact]
         public async Task PendingNameReservationDoesNotBlockIndependentWatcherStartup() {
             WatcherManager.StopAll();
             string reservedName =
