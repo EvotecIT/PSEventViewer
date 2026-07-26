@@ -119,6 +119,7 @@ namespace EventViewerX {
         private readonly EventDeliveryDeduplicator?
             _eventDeduplicator;
         private readonly object _stopSync = new();
+        private bool _startupCancellationRequested;
         private bool _starting;
         private bool _started;
         private bool _stopRequested;
@@ -259,6 +260,7 @@ namespace EventViewerX {
                     throw new InvalidOperationException(
                         "The watcher is already starting.");
                 }
+                _startupCancellationRequested = false;
                 _starting = true;
             }
 
@@ -276,6 +278,10 @@ namespace EventViewerX {
                 BeforeStartupCommit?.Invoke();
                 lock (_stopSync) {
                     _starting = false;
+                    if (_startupCancellationRequested) {
+                        throw new OperationCanceledException(
+                            startupCancellationToken);
+                    }
                     startupCancellationToken
                         .ThrowIfCancellationRequested();
                     if (_stopRequested ||
@@ -320,6 +326,16 @@ namespace EventViewerX {
         }
 
         private void CancelStartup() {
+            bool cancel;
+            lock (_stopSync) {
+                cancel = _starting;
+                if (cancel) {
+                    _startupCancellationRequested = true;
+                }
+            }
+            if (!cancel) {
+                return;
+            }
             try {
                 Cancellation.Cancel();
             } catch (ObjectDisposedException) {
