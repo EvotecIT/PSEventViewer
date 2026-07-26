@@ -420,13 +420,25 @@ public sealed class EventLogSubscription : IDisposable {
         if (Interlocked.Exchange(ref _stopping, 1) != 0) {
             return;
         }
-        _stop.Cancel();
-        _signal.Set();
-        if (_subscription != null &&
-            !_subscription.IsInvalid &&
-            !_subscription.IsClosed) {
-            WindowsEventNativeMethods.EvtCancel(
-                _subscription);
+        try {
+            _stop.Cancel();
+        } catch (ObjectDisposedException) {
+            // A concurrent teardown already released the cancellation source.
+        }
+        try {
+            _signal.Set();
+        } catch (ObjectDisposedException) {
+            // A concurrent teardown already released the wake-up handle.
+        }
+        try {
+            if (_subscription != null &&
+                !_subscription.IsInvalid &&
+                !_subscription.IsClosed) {
+                WindowsEventNativeMethods.EvtCancel(
+                    _subscription);
+            }
+        } catch (ObjectDisposedException) {
+            // Teardown can close the safe handle between the state check and EvtCancel.
         }
     }
 
