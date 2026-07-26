@@ -131,6 +131,29 @@ public class TestEventCheckpointStore {
     }
 
     [Fact]
+    public void AuthoritativeStateAccessFailureDoesNotFallBackToLegacy() {
+        string root = CreateTemporaryDirectory();
+        try {
+            string path = Path.Combine(
+                root,
+                "checkpoint.json");
+            File.WriteAllText(
+                path,
+                "{\"System\":100}");
+            Directory.CreateDirectory(
+                path + ".state.json");
+
+            Assert.Throws<UnauthorizedAccessException>(
+                () => EventCheckpointStore.Load(
+                    path));
+        } finally {
+            Directory.Delete(
+                root,
+                recursive: true);
+        }
+    }
+
+    [Fact]
     public void NumericCompatibilityMirrorFailureDoesNotInvalidateAuthoritativeUpdate() {
         string root = CreateTemporaryDirectory();
         try {

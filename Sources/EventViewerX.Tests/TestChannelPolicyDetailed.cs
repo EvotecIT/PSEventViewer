@@ -113,4 +113,21 @@ public class TestChannelPolicyDetailed
         Assert.NotNull(result.Before);
         Assert.NotNull(result.After);
     }
+
+    [Fact]
+    public void SavedPolicyResultWinsOverPostSaveCancellation() {
+        using var cancellation =
+            new CancellationTokenSource();
+        var applied = new List<string>();
+
+        EventLogChannelPolicyService.PersistChanges(
+            () => cancellation.Cancel(),
+            new[] { "MaximumSizeInBytes" },
+            applied,
+            cancellation.Token);
+
+        Assert.Equal(
+            new[] { "MaximumSizeInBytes" },
+            applied);
+    }
 }

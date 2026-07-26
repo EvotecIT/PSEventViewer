@@ -21,7 +21,7 @@ public static class EventFilterCompiler {
             ToInvariantStrings(filter.RecordIds),
             filter.StartTime,
             filter.EndTime,
-            NormalizeStrings(filter.Data),
+            NormalizeLiterals(filter.Data),
             NormalizeStrings(filter.ProviderNames),
             filter.Keywords?.ToArray(),
             filter.Levels?
@@ -60,7 +60,7 @@ public static class EventFilterCompiler {
             eventRecordId: ToInvariantStrings(filter.RecordIds),
             startTime: filter.StartTime,
             endTime: filter.EndTime,
-            data: NormalizeStrings(filter.Data),
+            data: NormalizeLiterals(filter.Data),
             providerName: NormalizeStrings(filter.ProviderNames),
             keywords: filter.Keywords?.ToArray(),
             level: levels,
@@ -431,7 +431,7 @@ public static class EventFilterCompiler {
                 selectedValues
                     .Intersect(
                         entry.Value,
-                        StringComparer.OrdinalIgnoreCase)
+                        StringComparer.Ordinal)
                     .ToArray();
             if (intersection.Length == 0) {
                 return null;
@@ -489,6 +489,18 @@ public static class EventFilterCompiler {
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
         return normalized.Length == 0 ? null : normalized;
+    }
+
+    private static string[]? NormalizeLiterals(
+        IReadOnlyList<string>? values) {
+
+        if (values == null || values.Count == 0) {
+            return null;
+        }
+        return values
+            .Select(static value => value ?? string.Empty)
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
     }
 
     private static Hashtable[]? ToHashtables(

@@ -58,14 +58,26 @@ public static partial class EventLogBatchEngine {
                     yield break;
                 }
 
-                bool hasNext = await Task.Run(
-                        () => TryMoveNext(
+                Task<bool> moveNext = Task.Run(
+                    () => TryMoveNext(
+                        cursor,
+                        plan.ContinueOnError,
+                        plan.FailureHandler,
+                        cancellationToken),
+                    CancellationToken.None);
+                (bool completed, bool hasNext) =
+                    await AwaitMoveNextAsync(
+                            moveNext,
                             cursor,
-                            plan.ContinueOnError,
-                            plan.FailureHandler,
-                            cancellationToken),
-                        CancellationToken.None)
-                    .ConfigureAwait(false);
+                            cancellationToken)
+                        .ConfigureAwait(false);
+                if (!completed) {
+                    cursors.Remove(cursor);
+                    cancellationToken
+                        .ThrowIfCancellationRequested();
+                    throw new OperationCanceledException(
+                        cancellationToken);
+                }
                 if (hasNext) {
                     queue.Add(cursor);
                 }
@@ -109,5 +121,57 @@ public static partial class EventLogBatchEngine {
                 cursor?.Dispose();
             }
         }, CancellationToken.None).ConfigureAwait(false);
+    }
+
+    internal static async Task<(bool Completed, bool HasNext)>
+        AwaitMoveNextAsync(
+            Task<bool> moveNext,
+            IDisposable owner,
+            CancellationToken cancellationToken) {
+
+        if (moveNext == null) {
+            throw new ArgumentNullException(nameof(moveNext));
+        }
+        if (owner == null) {
+            throw new ArgumentNullException(nameof(owner));
+        }
+        if (!cancellationToken.CanBeCanceled ||
+            moveNext.IsCompleted) {
+            return (
+                true,
+                await moveNext.ConfigureAwait(false));
+        }
+
+        Task canceled =
+            Task.Delay(
+                Timeout.Infinite,
+                cancellationToken);
+        Task completed =
+            await Task.WhenAny(
+                    moveNext,
+                    canceled)
+                .ConfigureAwait(false);
+        if (completed == moveNext ||
+            moveNext.IsCompleted) {
+            return (
+                true,
+                await moveNext.ConfigureAwait(false));
+        }
+
+        _ = moveNext.ContinueWith(
+            task => {
+                if (task.IsFaulted) {
+                    _ = task.Exception;
+                }
+                try {
+                    owner.Dispose();
+                } catch {
+                    // Preserve the cancellation result after detached native work.
+                }
+            },
+            CancellationToken.None,
+            TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default);
+        return (false, false);
     }
 }

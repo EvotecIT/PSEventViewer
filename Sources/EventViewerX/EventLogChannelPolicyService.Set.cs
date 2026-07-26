@@ -132,11 +132,11 @@ public static partial class EventLogChannelPolicyService {
 
             if (pendingChanges.Count > 0) {
                 try {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    configuration.SaveChanges();
-                    cancellationToken.ThrowIfCancellationRequested();
-                    result.AppliedProperties.AddRange(
-                        pendingChanges);
+                    PersistChanges(
+                        configuration.SaveChanges,
+                        pendingChanges,
+                        result.AppliedProperties,
+                        cancellationToken);
                 } catch (OperationCanceledException)
                     when (cancellationToken.IsCancellationRequested) {
                     throw;
@@ -162,6 +162,11 @@ public static partial class EventLogChannelPolicyService {
                     result.After,
                     result);
             } catch (OperationCanceledException)
+                when (cancellationToken.IsCancellationRequested &&
+                      result.AppliedProperties.Count > 0) {
+                // A cancellation that arrives after SaveChanges cannot undo
+                // the durable mutation and must not replace its result.
+            } catch (OperationCanceledException)
                 when (cancellationToken.IsCancellationRequested) {
                 throw;
             } catch (Exception exception) {
@@ -170,6 +175,19 @@ public static partial class EventLogChannelPolicyService {
             }
         }
         return result;
+    }
+
+    internal static void PersistChanges(
+        Action saveChanges,
+        IReadOnlyList<string> pendingChanges,
+        ICollection<string> appliedProperties,
+        CancellationToken cancellationToken) {
+
+        cancellationToken.ThrowIfCancellationRequested();
+        saveChanges();
+        foreach (string property in pendingChanges) {
+            appliedProperties.Add(property);
+        }
     }
 
     private static ChannelPolicy ReadVerifiedSnapshot(

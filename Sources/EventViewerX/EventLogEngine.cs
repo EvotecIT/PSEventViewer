@@ -208,6 +208,7 @@ public static partial class EventLogEngine {
             remote,
             filePath ?? machineName,
             path: null,
+            publisherMetadataPath: filePath,
             query.QueryXml,
             displayName: filePath ??
                 "structured event query",
@@ -432,6 +433,7 @@ public static partial class EventLogEngine {
             remote,
             machineName,
             logName,
+            publisherMetadataPath: null,
             xpath,
             logName,
             logName,
@@ -458,6 +460,7 @@ public static partial class EventLogEngine {
         bool remote,
         string machineName,
         string? path,
+        string? publisherMetadataPath,
         string query,
         string displayName,
         string containerLog,
@@ -512,6 +515,8 @@ public static partial class EventLogEngine {
                 query,
                 flags,
                 displayName,
+                publisherMetadataPath:
+                    publisherMetadataPath,
                 messageLocale: messageLocale,
                 fallbackMessageLocale: fallbackMessageLocale,
                 includeBookmark: includeBookmark,

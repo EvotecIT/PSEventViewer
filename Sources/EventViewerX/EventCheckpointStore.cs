@@ -256,7 +256,17 @@ public static class EventCheckpointStore {
 
     private static EventCheckpointSnapshot LoadUnlocked(string checkpointPath) {
         string statePath = GetStateFilePath(checkpointPath);
-        if (!File.Exists(statePath)) {
+        string stateJson;
+        try {
+            stateJson = File.ReadAllText(statePath);
+        } catch (FileNotFoundException) {
+            Dictionary<string, EventCheckpointValue> legacyValues = ReadNumericFile(checkpointPath)
+                .ToDictionary(
+                    static entry => entry.Key,
+                    static entry => new EventCheckpointValue(entry.Value, Guid.Empty, boundaryIdentity: null),
+                    StringComparer.OrdinalIgnoreCase);
+            return new EventCheckpointSnapshot(checkpointPath, legacyValues);
+        } catch (DirectoryNotFoundException) {
             Dictionary<string, EventCheckpointValue> legacyValues = ReadNumericFile(checkpointPath)
                 .ToDictionary(
                     static entry => entry.Key,
@@ -268,7 +278,7 @@ public static class EventCheckpointStore {
         var values = new Dictionary<string, EventCheckpointValue>(StringComparer.OrdinalIgnoreCase);
         CheckpointStateDocument? state;
         try {
-            state = JsonSerializer.Deserialize<CheckpointStateDocument>(File.ReadAllText(statePath));
+            state = JsonSerializer.Deserialize<CheckpointStateDocument>(stateJson);
         } catch (JsonException ex) {
             throw new InvalidDataException($"Checkpoint generation state '{statePath}' is not valid JSON.", ex);
         }

@@ -985,6 +985,25 @@ public sealed class TestEventProviderPackages {
         }
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void DefinitionTemporaryCleanupIsBestEffort(
+        bool accessDenied) {
+
+        EventProviderDefinitionJson
+            .DeleteTemporaryBestEffort(
+                "definition.tmp",
+                _ => {
+                    if (accessDenied) {
+                        throw new UnauthorizedAccessException(
+                            "cleanup denied");
+                    }
+                    throw new IOException(
+                        "cleanup busy");
+                });
+    }
+
     [Fact]
     public void ActivationPromotionReplacesAnIncompleteExistingDirectory() {
         string root = Path.Combine(

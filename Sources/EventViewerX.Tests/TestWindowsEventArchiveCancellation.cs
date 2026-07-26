@@ -5,6 +5,31 @@ namespace EventViewerX.Tests;
 
 public sealed class TestWindowsEventArchiveCancellation {
     [Fact]
+    public void ArchiveResourcesPreservesSourceOpenAccessFailure() {
+        string root = Path.Combine(
+            Path.GetTempPath(),
+            "EventViewerX.Tests",
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try {
+            bool archiveCalled = false;
+
+            Assert.Throws<UnauthorizedAccessException>(() =>
+                WindowsEventArchive.ArchiveFileResources(
+                    root,
+                    0,
+                    CancellationToken.None,
+                    (_, _) => archiveCalled = true));
+
+            Assert.False(archiveCalled);
+        } finally {
+            Directory.Delete(
+                root,
+                recursive: true);
+        }
+    }
+
+    [Fact]
     public void CancellationBeforeNativeWorkerAdmissionRemovesTheTemporaryCopy() {
         string root = Path.Combine(
             Path.GetTempPath(),

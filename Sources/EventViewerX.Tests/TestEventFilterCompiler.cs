@@ -55,6 +55,43 @@ public sealed class TestEventFilterCompiler {
     }
 
     [Fact]
+    public void UnnamedDataPreservesEmptyWhitespaceAndCaseDistinctLiterals() {
+        var filter = new EventFilter {
+            Data = new[] {
+                string.Empty,
+                " Ready ",
+                "Ready",
+                "ready"
+            }
+        };
+
+        string xpath =
+            EventFilterCompiler.BuildXPath(
+                filter);
+
+        Assert.Contains(
+            "Data=''",
+            xpath,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "Data=' Ready '",
+            xpath,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "Data='Ready'",
+            xpath,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "Data='ready'",
+            xpath,
+            StringComparison.Ordinal);
+        Assert.Equal(
+            4,
+            EventFilterCompiler.CountExpressions(
+                filter));
+    }
+
+    [Fact]
     public void StructuredQuerySupportsSeveralChannelsAndSuppressions() {
         string queryXml = EventFilterCompiler.BuildChannelQueryXml(
             new[] { "System", "Application", "System" },
@@ -316,6 +353,38 @@ public sealed class TestEventFilterCompiler {
                                     IReadOnlyList<string>> {
                                     ["State"] =
                                         new[] { "Ignored" }
+                                }
+                        }
+                    });
+        XElement query = XDocument.Parse(xml)
+            .Root!
+            .Element("Query")!;
+
+        Assert.Empty(
+            query.Elements("Suppress"));
+    }
+
+    [Fact]
+    public void ChannelUnionUsesCaseSensitiveNamedDataIntersections() {
+        string xml =
+            EventFilterCompiler
+                .BuildChannelUnionQueryXml(
+                    new[] { "Application" },
+                    new[] {
+                        new EventFilter {
+                            NamedData =
+                                new Dictionary<
+                                    string,
+                                    IReadOnlyList<string>> {
+                                    ["State"] =
+                                        new[] { "Ready" }
+                                },
+                            ExcludedNamedData =
+                                new Dictionary<
+                                    string,
+                                    IReadOnlyList<string>> {
+                                    ["State"] =
+                                        new[] { "ready" }
                                 }
                         }
                     });

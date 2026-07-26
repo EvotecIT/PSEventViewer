@@ -75,9 +75,8 @@ public static class EventProviderDefinitionJson {
                 fullPath,
                 overwrite);
         } finally {
-            if (File.Exists(temporaryPath)) {
-                File.Delete(temporaryPath);
-            }
+            DeleteTemporaryBestEffort(
+                temporaryPath);
         }
     }
 
@@ -110,6 +109,20 @@ public static class EventProviderDefinitionJson {
                 temporaryPath,
                 fullPath,
                 null);
+        }
+    }
+
+    internal static void DeleteTemporaryBestEffort(
+        string temporaryPath,
+        Action<string>? deleteFile = null) {
+
+        try {
+            (deleteFile ?? File.Delete)(
+                temporaryPath);
+        } catch (IOException) {
+            // Preserve the authoritative serialization, write, or promotion failure.
+        } catch (UnauthorizedAccessException) {
+            // Preserve the authoritative serialization, write, or promotion failure.
         }
     }
 

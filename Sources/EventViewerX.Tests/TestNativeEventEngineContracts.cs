@@ -1144,6 +1144,47 @@ public sealed class TestNativeEventEngineContracts {
     }
 
     [Fact]
+    public void StructuredOfflineQueryUsesArchivedMessageResources() {
+        if (!OperatingSystem.IsWindows()) return;
+        string path = GetFixturePath();
+        var fileQuery =
+            new EventLogFileQuery(path) {
+                Oldest = true,
+                MaxEvents = 1,
+                ReadMode = EventReadMode.Full
+            };
+        EventLogStructuredQuery structuredQuery =
+            EventLogStructuredQuery.ForFiles(
+                new[] { path });
+        structuredQuery.Oldest = true;
+        structuredQuery.MaxEvents = 1;
+        structuredQuery.ReadMode =
+            EventReadMode.Full;
+
+        EventObject file =
+            Assert.Single(
+                EventLogEngine.ReadFile(
+                    fileQuery));
+        EventObject structured =
+            Assert.Single(
+                EventLogEngine.ReadStructured(
+                    structuredQuery));
+
+        Assert.Equal(
+            file.Message,
+            structured.Message);
+        Assert.False(
+            string.IsNullOrWhiteSpace(
+                structured.Message));
+        Assert.Equal(
+            file.MessageRenderStatus,
+            structured.MessageRenderStatus);
+        Assert.Equal(
+            EventMessageRenderStatus.Rendered,
+            structured.MessageRenderStatus);
+    }
+
+    [Fact]
     public void LocalChannelExportsJsonLinesWithoutAConsumerPipeline() {
         if (!OperatingSystem.IsWindows()) return;
         string directory = CreateTemporaryDirectory();

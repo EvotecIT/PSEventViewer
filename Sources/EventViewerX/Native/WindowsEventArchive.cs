@@ -41,11 +41,6 @@ internal static class WindowsEventArchive {
         cancellationToken.ThrowIfCancellationRequested();
         string absolutePath = Path.GetFullPath(
             path.Trim().Trim('"', '\''));
-        if (!File.Exists(absolutePath)) {
-            throw new FileNotFoundException(
-                $"Event log file '{absolutePath}' does not exist.",
-                absolutePath);
-        }
         string directory =
             Path.GetDirectoryName(absolutePath)!;
         string temporaryPath = Path.Combine(
