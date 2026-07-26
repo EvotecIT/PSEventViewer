@@ -286,6 +286,28 @@ Describe 'Get-EVXEvent - EVTX record filtering' {
 }
 
 Describe 'Get-EVXEvent - Get-WinEvent compatible native filters' {
+    It 'preserves case whitespace and empty FilterHashtable data literals' {
+        $Assembly = (Get-Command Get-EVXEvent).ImplementingType.Assembly
+        $Adapter = $Assembly.GetType(
+            'PSEventViewer.PowerShellEventFilterAdapter',
+            $true)
+        $BindFilter = $Adapter.GetMethod(
+            'BindFilter',
+            [System.Reflection.BindingFlags]'NonPublic, Static')
+        $Filter = $BindFilter.Invoke(
+            $null,
+            (, @{
+                Path = 'unused.evtx'
+                Data = @(' value ', 'VALUE', 'value', '')
+                CustomField = @(' Exact ', 'EXACT', 'exact', '')
+            }))
+
+        @($Filter.Data) |
+            Should -Be @(' value ', 'VALUE', 'value', '')
+        @($Filter.NamedData['CustomField']) |
+            Should -Be @(' Exact ', 'EXACT', 'exact', '')
+    }
+
     It 'expands provider wildcards and chunks past the native 22-expression limit' {
         $event = Get-EVXEvent `
             -FilterHashtable @{

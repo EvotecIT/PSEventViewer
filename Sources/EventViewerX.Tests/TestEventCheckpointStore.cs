@@ -333,6 +333,37 @@ public class TestEventCheckpointStore {
         }
     }
 
+    [Fact]
+    public void AtomicWriteCleanupCannotReplaceThePrimaryFailure() {
+        string root = CreateTemporaryDirectory();
+        string destination = Path.Combine(
+            root,
+            "existing-directory");
+        Directory.CreateDirectory(destination);
+        try {
+            IOException exception =
+                Assert.Throws<IOException>(() =>
+                    EventCheckpointStore.AtomicWrite(
+                        destination,
+                        "{}",
+                        _ => throw new IOException(
+                            "simulated cleanup failure")));
+
+            Assert.DoesNotContain(
+                "simulated cleanup failure",
+                exception.Message,
+                StringComparison.Ordinal);
+        } finally {
+            foreach (string temporary in
+                     Directory.EnumerateFiles(
+                         root,
+                         "existing-directory.*.tmp")) {
+                File.Delete(temporary);
+            }
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
     private static string CreateTemporaryDirectory() {
         string path = Path.Combine(Path.GetTempPath(), "EventViewerX.Tests." + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(path);

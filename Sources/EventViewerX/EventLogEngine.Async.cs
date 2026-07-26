@@ -66,7 +66,7 @@ public static partial class EventLogEngine {
             cancellationToken);
     }
 
-    private static async IAsyncEnumerable<EventObject> ReadAsync(
+    internal static async IAsyncEnumerable<EventObject> ReadAsync(
         Func<CancellationToken, IEnumerable<EventObject>> source,
         int bufferCapacity,
         [EnumeratorCancellation] CancellationToken cancellationToken) {
@@ -76,7 +76,7 @@ public static partial class EventLogEngine {
                 nameof(bufferCapacity),
                 "Buffer capacity must be between 1 and 4096.");
         }
-        using var stop = CancellationTokenSource
+        CancellationTokenSource stop = CancellationTokenSource
             .CreateLinkedTokenSource(cancellationToken);
         Channel<EventObject> channel =
             Channel.CreateBounded<EventObject>(
@@ -114,7 +114,22 @@ public static partial class EventLogEngine {
             cancellationToken.ThrowIfCancellationRequested();
         } finally {
             stop.Cancel();
-            await producer.ConfigureAwait(false);
+            if (producer.IsCompleted) {
+                try {
+                    await producer.ConfigureAwait(false);
+                } finally {
+                    stop.Dispose();
+                }
+            } else {
+                _ = producer.ContinueWith(
+                    completed => {
+                        _ = completed.Exception;
+                        stop.Dispose();
+                    },
+                    CancellationToken.None,
+                    TaskContinuationOptions.ExecuteSynchronously,
+                    TaskScheduler.Default);
+            }
         }
     }
 }

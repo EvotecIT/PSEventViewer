@@ -219,11 +219,6 @@ public static class EventProviderPackageReader {
                 nameof(path));
         }
         string fullPath = Path.GetFullPath(path);
-        if (!File.Exists(fullPath)) {
-            throw new FileNotFoundException(
-                "Provider package was not found.",
-                fullPath);
-        }
         using var packageStream = new FileStream(
             fullPath,
             FileMode.Open,

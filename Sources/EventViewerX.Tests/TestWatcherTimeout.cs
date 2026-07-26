@@ -28,5 +28,28 @@ namespace EventViewerX.Tests {
             );
             WatcherManager.StopAll();
         }
+
+        [Fact]
+        public void WatcherRejectsTimeoutBeyondTaskDelayLimitBeforeStartup() {
+            TimeSpan unsupported =
+                WatcherInfo.MaximumSupportedTimeout +
+                TimeSpan.FromMilliseconds(1);
+
+            ArgumentOutOfRangeException exception =
+                Assert.Throws<ArgumentOutOfRangeException>(() =>
+                    new WatcherInfo(
+                        "unsupported-timeout",
+                        Environment.MachineName,
+                        "Application",
+                        new List<int> { 1 },
+                        new List<NamedEvents>(),
+                        _ => { },
+                        false,
+                        false,
+                        0,
+                        unsupported));
+
+            Assert.Equal("timeout", exception.ParamName);
+        }
     }
 }

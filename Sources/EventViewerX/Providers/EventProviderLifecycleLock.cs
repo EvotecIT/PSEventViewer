@@ -56,6 +56,35 @@ internal sealed class EventProviderLifecycleLock : IDisposable {
             $"provider name '{providerName.Trim()}'");
     }
 
+    internal static EventProviderLifecycleLock AcquireProviderRoot(
+        string rootPath,
+        TimeSpan timeout) {
+
+        if (string.IsNullOrWhiteSpace(rootPath)) {
+            throw new ArgumentException(
+                "A provider root is required for lifecycle serialization.",
+                nameof(rootPath));
+        }
+        string normalized =
+            Path.GetFullPath(rootPath)
+                .TrimEnd(
+                    Path.DirectorySeparatorChar,
+                    Path.AltDirectorySeparatorChar)
+                .ToUpperInvariant();
+        byte[] hash;
+        using (SHA256 sha256 = SHA256.Create()) {
+            hash = sha256.ComputeHash(
+                Encoding.UTF8.GetBytes(normalized));
+        }
+        string key =
+            BitConverter.ToString(hash)
+                .Replace("-", string.Empty);
+        return Acquire(
+            "Global\\EventViewerX.ProviderRoot." + key,
+            timeout,
+            $"provider root '{rootPath}'");
+    }
+
     private static EventProviderLifecycleLock Acquire(
         string mutexName,
         TimeSpan timeout,

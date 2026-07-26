@@ -998,6 +998,43 @@ public sealed class TestNativeEventEngineContracts {
     }
 
     [Fact]
+    public async Task AsyncStreamCancellationDoesNotWaitForAStalledProducer() {
+        using var entered = new ManualResetEventSlim();
+        using var release = new ManualResetEventSlim();
+        using var cancellation =
+            new CancellationTokenSource();
+        await using IAsyncEnumerator<EventObject> events =
+            EventLogEngine.ReadAsync(
+                    Source,
+                    bufferCapacity: 1,
+                    cancellation.Token)
+                .GetAsyncEnumerator();
+        Task<bool> moveNext =
+            events.MoveNextAsync().AsTask();
+        Assert.True(
+            entered.Wait(TimeSpan.FromSeconds(2)));
+
+        cancellation.Cancel();
+        Task completed = await Task.WhenAny(
+            moveNext,
+            Task.Delay(TimeSpan.FromSeconds(2)));
+
+        Assert.Same(moveNext, completed);
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            async () => await moveNext);
+        release.Set();
+
+        IEnumerable<EventObject> Source(
+            CancellationToken cancellationToken) {
+
+            entered.Set();
+            release.Wait();
+            cancellationToken.ThrowIfCancellationRequested();
+            yield break;
+        }
+    }
+
+    [Fact]
     public void ProviderNameCatalogDoesNotRequireMetadataProjection() {
         if (!OperatingSystem.IsWindows()) return;
 

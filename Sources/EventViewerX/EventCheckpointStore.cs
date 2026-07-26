@@ -362,7 +362,11 @@ public static class EventCheckpointStore {
         }
     }
 
-    private static void AtomicWrite(string path, string contents) {
+    internal static void AtomicWrite(
+        string path,
+        string contents,
+        Action<string>? deleteTemporary = null) {
+
         string temporaryPath = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
         try {
             File.WriteAllText(temporaryPath, contents);
@@ -372,9 +376,23 @@ public static class EventCheckpointStore {
                 File.Move(temporaryPath, path);
             }
         } finally {
+            DeleteTemporaryBestEffort(
+                temporaryPath,
+                deleteTemporary);
+        }
+    }
+
+    private static void DeleteTemporaryBestEffort(
+        string temporaryPath,
+        Action<string>? deleteTemporary) {
+
+        try {
             if (File.Exists(temporaryPath)) {
-                File.Delete(temporaryPath);
+                (deleteTemporary ?? File.Delete)(
+                    temporaryPath);
             }
+        } catch (IOException) {
+        } catch (UnauthorizedAccessException) {
         }
     }
 

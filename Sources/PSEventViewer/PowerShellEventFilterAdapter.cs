@@ -28,9 +28,9 @@ internal static class PowerShellEventFilterAdapter {
             throw new ArgumentNullException(nameof(source));
         }
 
-        string[] logNames = ReadStrings(source, "LogName");
-        string[] paths = ReadStrings(source, "Path");
-        string[] providers = ReadStrings(source, "ProviderName");
+        string[] logNames = ReadNormalizedStrings(source, "LogName");
+        string[] paths = ReadNormalizedStrings(source, "Path");
+        string[] providers = ReadNormalizedStrings(source, "ProviderName");
         if (logNames.Length == 0 &&
             paths.Length == 0 &&
             providers.Length == 0) {
@@ -73,18 +73,18 @@ internal static class PowerShellEventFilterAdapter {
             if (key.Length == 0 || ReservedKeys.Contains(key)) {
                 continue;
             }
-            namedData[key] = ReadStrings(entry.Value, key);
+            namedData[key] = ReadLiteralStrings(entry.Value, key);
         }
 
         return new EventFilter {
             EventIds = ReadValues<int>(source, "Id"),
-            ProviderNames = ReadStrings(source, "ProviderName"),
+            ProviderNames = ReadNormalizedStrings(source, "ProviderName"),
             Keywords = ReadValues<long>(source, "Keywords"),
             Levels = ReadValues<byte>(source, "Level"),
             StartTime = ReadNullable<DateTime>(source, "StartTime"),
             EndTime = ReadNullable<DateTime>(source, "EndTime"),
-            UserIds = ReadStrings(source, "UserID"),
-            Data = ReadStrings(source, "Data"),
+            UserIds = ReadNormalizedStrings(source, "UserID"),
+            Data = ReadLiteralStrings(source, "Data"),
             NamedData = namedData.Count == 0 ? null : namedData
         };
     }
@@ -130,16 +130,16 @@ internal static class PowerShellEventFilterAdapter {
         return ConvertValue<T>(values[0], key);
     }
 
-    private static string[] ReadStrings(
+    private static string[] ReadNormalizedStrings(
         Hashtable source,
         string key) {
 
         return TryGetValue(source, key, out object? raw)
-            ? ReadStrings(raw, key)
+            ? ReadNormalizedStrings(raw, key)
             : Array.Empty<string>();
     }
 
-    private static string[] ReadStrings(
+    private static string[] ReadNormalizedStrings(
         object? raw,
         string key) {
 
@@ -150,6 +150,28 @@ internal static class PowerShellEventFilterAdapter {
             .Select(value => ConvertValue<string>(value, key).Trim())
             .Where(static value => value.Length > 0)
             .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
+
+    private static string[] ReadLiteralStrings(
+        Hashtable source,
+        string key) {
+
+        return TryGetValue(source, key, out object? raw)
+            ? ReadLiteralStrings(raw, key)
+            : Array.Empty<string>();
+    }
+
+    private static string[] ReadLiteralStrings(
+        object? raw,
+        string key) {
+
+        if (raw == null) {
+            return Array.Empty<string>();
+        }
+        return Enumerate(raw)
+            .Select(value => ConvertValue<string>(value, key))
+            .Distinct(StringComparer.Ordinal)
             .ToArray();
     }
 

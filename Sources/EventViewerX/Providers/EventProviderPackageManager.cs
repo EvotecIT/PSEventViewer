@@ -50,10 +50,15 @@ public static partial class EventProviderPackageManager {
         string providerRoot = Path.Combine(
             root,
             package.Definition.Id.ToString("N"));
-        EventProviderManagedDirectorySecurity
-            .EnsureManagedRoot(
-                root,
-                options.ToolTimeout);
+        using (EventProviderLifecycleLock rootLock =
+               EventProviderLifecycleLock.AcquireProviderRoot(
+                   root,
+                   options.ToolTimeout)) {
+            EventProviderManagedDirectorySecurity
+                .EnsureManagedRoot(
+                    root,
+                    options.ToolTimeout);
+        }
         if (Directory.Exists(providerRoot)) {
             EventProviderManifestRegistrar.EnsureReadable(
                 providerRoot,

@@ -86,9 +86,67 @@ public static partial class EventProviderPackageManager {
             EventProviderManifestRegistrar.EnsureReadable(
                 staging,
                 options.ToolTimeout);
-            Directory.Move(staging, activationDirectory);
+            PromoteActivationDirectory(
+                staging,
+                activationDirectory);
         } finally {
             CleanupStagingDirectory(staging);
+        }
+    }
+
+    internal static void PromoteActivationDirectory(
+        string staging,
+        string activationDirectory,
+        Action<string, string>? moveDirectory = null,
+        Action<string>? removeDirectory = null) {
+
+        moveDirectory ??= Directory.Move;
+        removeDirectory ??=
+            path => EventProviderFileRemoval
+                .DeleteOrSchedule(path);
+        if (!Directory.Exists(activationDirectory)) {
+            moveDirectory(
+                staging,
+                activationDirectory);
+            return;
+        }
+
+        string backup =
+            activationDirectory +
+            ".replaced-" +
+            Guid.NewGuid().ToString("N");
+        moveDirectory(
+            activationDirectory,
+            backup);
+        try {
+            moveDirectory(
+                staging,
+                activationDirectory);
+        } catch (Exception promotionError) {
+            Exception? restoreError = null;
+            try {
+                if (!Directory.Exists(activationDirectory) &&
+                    Directory.Exists(backup)) {
+                    moveDirectory(
+                        backup,
+                        activationDirectory);
+                }
+            } catch (Exception exception) {
+                restoreError = exception;
+            }
+            if (restoreError != null) {
+                throw new AggregateException(
+                    "Provider activation promotion failed and the previous activation directory could not be restored.",
+                    promotionError,
+                    restoreError);
+            }
+            throw;
+        }
+        try {
+            removeDirectory(backup);
+        } catch {
+            // The replacement is authoritative. Deferred cleanup must not
+            // replace a successful activation.
         }
     }
 

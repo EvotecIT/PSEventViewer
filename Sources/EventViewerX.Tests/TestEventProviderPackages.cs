@@ -54,6 +54,98 @@ public sealed class TestEventProviderPackages {
         }
     }
 
+    [Fact]
+    public void OpeningADirectoryPreservesTheNativeAccessFailure() {
+        string root = Path.Combine(
+            Path.GetTempPath(),
+            "EventViewerX.Tests",
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try {
+            Assert.Throws<UnauthorizedAccessException>(() =>
+                EventProviderPackageReader.Open(root));
+        } finally {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void ActivationPromotionReplacesAnExistingCorruptDirectory() {
+        string root = Path.Combine(
+            Path.GetTempPath(),
+            "EventViewerX.Tests",
+            Guid.NewGuid().ToString("N"));
+        string staging = Path.Combine(root, "staging");
+        string activation = Path.Combine(root, "active");
+        Directory.CreateDirectory(staging);
+        Directory.CreateDirectory(activation);
+        File.WriteAllText(
+            Path.Combine(staging, "new.txt"),
+            "new");
+        File.WriteAllText(
+            Path.Combine(activation, "old.txt"),
+            "old");
+        try {
+            EventProviderPackageManager
+                .PromoteActivationDirectory(
+                    staging,
+                    activation);
+
+            Assert.True(
+                File.Exists(
+                    Path.Combine(activation, "new.txt")));
+            Assert.False(
+                File.Exists(
+                    Path.Combine(activation, "old.txt")));
+            Assert.Empty(
+                Directory.EnumerateDirectories(
+                    root,
+                    "active.replaced-*"));
+        } finally {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void ActivationPromotionRestoresTheExistingDirectoryWhenPromotionFails() {
+        string root = Path.Combine(
+            Path.GetTempPath(),
+            "EventViewerX.Tests",
+            Guid.NewGuid().ToString("N"));
+        string staging = Path.Combine(root, "staging");
+        string activation = Path.Combine(root, "active");
+        Directory.CreateDirectory(staging);
+        Directory.CreateDirectory(activation);
+        File.WriteAllText(
+            Path.Combine(activation, "old.txt"),
+            "old");
+        int moves = 0;
+        try {
+            Assert.Throws<IOException>(() =>
+                EventProviderPackageManager
+                    .PromoteActivationDirectory(
+                        staging,
+                        activation,
+                        (source, destination) => {
+                            moves++;
+                            if (moves == 2) {
+                                throw new IOException(
+                                    "simulated promotion failure");
+                            }
+                            Directory.Move(
+                                source,
+                                destination);
+                        }));
+
+            Assert.True(
+                File.Exists(
+                    Path.Combine(activation, "old.txt")));
+            Assert.True(Directory.Exists(staging));
+        } finally {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
     [Theory]
     [InlineData(0)]
     [InlineData(-1)]
@@ -1053,6 +1145,35 @@ public sealed class TestEventProviderPackages {
                 using EventProviderLifecycleLock second =
                     EventProviderLifecycleLock.AcquireProviderName(
                         providerName.ToUpperInvariant(),
+                        TimeSpan.FromMilliseconds(100));
+            } catch (Exception exception) {
+                failure = exception;
+            }
+        });
+        contender.Start();
+        Assert.True(
+            contender.Join(
+                TimeSpan.FromSeconds(2)));
+        Assert.IsType<TimeoutException>(failure);
+    }
+
+    [Fact]
+    public void SerializesLifecycleOperationsByProviderRoot() {
+        string root = Path.Combine(
+            Path.GetTempPath(),
+            "EventViewerX.Tests",
+            Guid.NewGuid().ToString("N"));
+        using EventProviderLifecycleLock first =
+            EventProviderLifecycleLock.AcquireProviderRoot(
+                root,
+                TimeSpan.FromSeconds(1));
+
+        Exception? failure = null;
+        var contender = new Thread(() => {
+            try {
+                using EventProviderLifecycleLock second =
+                    EventProviderLifecycleLock.AcquireProviderRoot(
+                        root + Path.DirectorySeparatorChar,
                         TimeSpan.FromMilliseconds(100));
             } catch (Exception exception) {
                 failure = exception;

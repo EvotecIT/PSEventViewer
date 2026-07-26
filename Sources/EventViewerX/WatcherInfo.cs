@@ -11,6 +11,9 @@ namespace EventViewerX {
     /// Represents information about a running watcher instance.
     /// </summary>
     public class WatcherInfo : IDisposable {
+        internal static readonly TimeSpan MaximumSupportedTimeout =
+            TimeSpan.FromMilliseconds(uint.MaxValue - 1d);
+
         internal WatcherInfo(
             string name,
             string machineName,
@@ -49,6 +52,7 @@ namespace EventViewerX {
             TimeSpan? timeout,
             EventLogSubscriptionQuery? subscriptionQuery = null) {
 
+            ValidateTimeout(timeout);
             Name = name;
             MachineName = machineName;
             LogName = logName;
@@ -347,6 +351,17 @@ namespace EventViewerX {
                 await Task.Delay(timeout, cancellationToken).ConfigureAwait(false);
                 Stop();
             } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
+            }
+        }
+
+        internal static void ValidateTimeout(
+            TimeSpan? timeout) {
+
+            if (timeout.HasValue &&
+                timeout.Value > MaximumSupportedTimeout) {
+                throw new ArgumentOutOfRangeException(
+                    nameof(timeout),
+                    $"Watcher timeout cannot exceed {MaximumSupportedTimeout.TotalMilliseconds:0} milliseconds.");
             }
         }
 
