@@ -33,7 +33,8 @@ internal static class EventProviderInstallationStore {
 
     internal static void Save(
         string providerRoot,
-        EventProviderInstallationState state) {
+        EventProviderInstallationState state,
+        Action<string>? deleteTemporary = null) {
 
         Directory.CreateDirectory(providerRoot);
         string path = Path.Combine(providerRoot, StateFileName);
@@ -53,8 +54,12 @@ internal static class EventProviderInstallationStore {
                 File.Move(temporary, path);
             }
         } finally {
-            if (File.Exists(temporary)) {
-                File.Delete(temporary);
+            try {
+                if (File.Exists(temporary)) {
+                    (deleteTemporary ?? File.Delete)(
+                        temporary);
+                }
+            } catch {
             }
         }
     }

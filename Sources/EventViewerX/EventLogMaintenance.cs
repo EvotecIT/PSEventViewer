@@ -114,7 +114,6 @@ public static class EventLogMaintenance {
                     normalizedBackup,
                     targetMachine);
             }
-            cancellationToken.ThrowIfCancellationRequested();
             return new EventLogClearResult(
                 normalizedLogName,
                 remote ? machine : null,

@@ -5,6 +5,38 @@ namespace EventViewerX.Tests;
 
 public sealed class TestEventProviderPackageInventory {
     [Fact]
+    public void StateSaveCleanupDoesNotReplaceThePrimaryFailure() {
+        string root = Path.Combine(
+            Path.GetTempPath(),
+            "EventViewerX-State-" +
+            Guid.NewGuid().ToString("N"));
+        string statePath = Path.Combine(
+            root,
+            EventProviderInstallationStore
+                .StateFileName);
+        Directory.CreateDirectory(statePath);
+        try {
+            IOException exception =
+                Assert.Throws<IOException>(() =>
+                    EventProviderInstallationStore.Save(
+                        root,
+                        new EventProviderInstallationState(),
+                        static _ =>
+                            throw new InvalidOperationException(
+                                "Cleanup failed.")));
+
+            Assert.DoesNotContain(
+                "Cleanup failed.",
+                exception.Message,
+                StringComparison.Ordinal);
+        } finally {
+            Directory.Delete(
+                root,
+                recursive: true);
+        }
+    }
+
+    [Fact]
     public void MissingProviderDirectoryIsIgnoredDuringInventory() {
         string missing = Path.Combine(
             Path.GetTempPath(),

@@ -357,13 +357,29 @@ internal static class WindowsEventArchive {
     internal static EventLogFileInformation GetFileInformation(
         string path) {
 
+        return GetFileInformation(
+            path,
+            static absolutePath => {
+                using FileStream stream = new(
+                    absolutePath,
+                    FileMode.Open,
+                    FileAccess.Read,
+                    FileShare.ReadWrite |
+                    FileShare.Delete);
+            });
+    }
+
+    internal static EventLogFileInformation GetFileInformation(
+        string path,
+        Action<string> validateReadable) {
+
+        if (validateReadable == null) {
+            throw new ArgumentNullException(
+                nameof(validateReadable));
+        }
         string absolutePath = Path.GetFullPath(
             path.Trim().Trim('"', '\''));
-        if (!File.Exists(absolutePath)) {
-            throw new FileNotFoundException(
-                $"Event log file '{absolutePath}' does not exist.",
-                absolutePath);
-        }
+        validateReadable(absolutePath);
         using WindowsEventNativeMethods.EventHandle log =
             WindowsEventNativeMethods.EvtOpenLog(
                 IntPtr.Zero,

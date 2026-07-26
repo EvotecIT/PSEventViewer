@@ -190,6 +190,32 @@ public class TestEvtxQueryExecutor {
     }
 
     [Fact]
+    public void CallbackFileFailureIsNotClassifiedAsAQueryFailure() {
+        var request = new EvtxQueryRequest {
+            FilePath = GetFixturePath(),
+            MaxEvents = 1,
+            ReadMode = EventReadMode.Metadata
+        };
+
+        bool success =
+            EvtxQueryExecutor.TryForEachEvent(
+                request,
+                static _ =>
+                    throw new FileNotFoundException(
+                        "Callback output was unavailable."),
+                out EvtxQueryFailure? failure);
+
+        Assert.False(success);
+        Assert.NotNull(failure);
+        Assert.Equal(
+            EvtxQueryFailureKind.Exception,
+            failure!.Kind);
+        Assert.Equal(
+            "Callback output was unavailable.",
+            failure.Message);
+    }
+
+    [Fact]
     public void SecurityBuilder_TryBuildFromFile_ShouldSurfaceQueryFailure() {
         var request = new EvtxQueryRequest {
             FilePath = "C:/this/file/does/not/exist.evtx",

@@ -796,6 +796,26 @@ public sealed class TestNativeEventEngineContracts {
     }
 
     [Fact]
+    public void OfflineArchiveMetadataPreservesReadableValidationFailures() {
+        if (!OperatingSystem.IsWindows()) return;
+        string path = GetFixturePath();
+
+        UnauthorizedAccessException exception =
+            Assert.Throws<UnauthorizedAccessException>(
+                () =>
+                    Native.WindowsEventArchive
+                        .GetFileInformation(
+                            path,
+                            static _ =>
+                                throw new UnauthorizedAccessException(
+                                    "Access denied.")));
+
+        Assert.Equal(
+            "Access denied.",
+            exception.Message);
+    }
+
+    [Fact]
     public void ExportedArchiveCanReceiveProviderResourcesSeparately() {
         if (!OperatingSystem.IsWindows()) return;
         string directory = CreateTemporaryDirectory();

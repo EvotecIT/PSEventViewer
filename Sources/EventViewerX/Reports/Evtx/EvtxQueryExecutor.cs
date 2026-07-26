@@ -105,7 +105,21 @@ public static class EvtxQueryExecutor {
                     break;
                 }
 
-                if (!eventHandler(ev)) {
+                bool continueReading;
+                try {
+                    continueReading =
+                        eventHandler(ev);
+                } catch (OperationCanceledException) {
+                    throw;
+                } catch (Exception ex) {
+                    failure = new EvtxQueryFailure {
+                        Kind =
+                            EvtxQueryFailureKind.Exception,
+                        Message = ex.Message
+                    };
+                    return false;
+                }
+                if (!continueReading) {
                     executionInfo.EventsDelivered++;
                     executionInfo.StoppedByHandler = true;
                     break;
