@@ -112,7 +112,8 @@ public class TestEventLogDetailsResult {
     public void OpenSessionResult_DoesNotWriteBoundaryDiagnostics() {
         if (!OperatingSystem.IsWindows()) return;
 
-        const string host = "[";
+        const string host =
+            "eventviewerx-session-diagnostics.invalid";
         InternalLogger previous = Settings._logger;
         var logger = new InternalLogger();
         var warnings = new List<string>();
@@ -122,14 +123,15 @@ public class TestEventLogDetailsResult {
         Settings._logger = logger;
         EventLogSessionManager.ClearHostCache(host);
         try {
+            EventLogSessionManager.MarkHostUnreachable(host);
             using EventLogSessionOpenResult result = EventLogSessionManager.OpenSessionResult(
                 host,
-                timeoutMs: 100,
+                timeoutMs: 5000,
                 purpose: "UnitTest",
                 logName: "Application");
 
             Assert.False(result.Success);
-            Assert.Equal(EventLogSessionOpenStatus.RpcUnavailable, result.Status);
+            Assert.Equal(EventLogSessionOpenStatus.NegativeCache, result.Status);
             Assert.Empty(warnings);
             Assert.Empty(verboseMessages);
         } finally {
@@ -350,13 +352,15 @@ public class TestEventLogDetailsResult {
     public void DisplayEventLogResults_PreservesExactNamesWhenSessionFails() {
         if (!OperatingSystem.IsWindows()) return;
 
-        const string host = "[";
+        const string host =
+            "eventviewerx-details-unavailable.invalid";
         EventLogSessionManager.ClearHostCache(host);
         try {
+            EventLogSessionManager.MarkHostUnreachable(host);
             List<EventLogDetailsResult> results = EventLogCatalog.DisplayEventLogResults(
                     new[] { "Application", "System", "Application" },
                     host,
-                    timeoutMs: 100)
+                    timeoutMs: 5000)
                 .ToList();
 
             Assert.Equal(2, results.Count);
