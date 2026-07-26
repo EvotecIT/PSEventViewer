@@ -117,5 +117,41 @@ namespace EventViewerX.Tests {
 
             Assert.Equal(1, stopped);
         }
+
+        [Fact]
+        public async Task CancellationDoesNotWaitForStoppedCallbacks() {
+            using var watcher = new WatchEvents();
+            using var cancellation =
+                new System.Threading.CancellationTokenSource();
+            using var callbackStarted =
+                new System.Threading.ManualResetEventSlim();
+            using var releaseCallback =
+                new System.Threading.ManualResetEventSlim();
+            watcher.Stopped += (_, _) => {
+                callbackStarted.Set();
+                releaseCallback.Wait(
+                    TimeSpan.FromSeconds(30));
+            };
+            watcher.Watch(
+                Environment.MachineName,
+                "Application",
+                new List<int> { 1 },
+                cancellationToken: cancellation.Token);
+
+            Task cancel = Task.Run(cancellation.Cancel);
+            try {
+                Task completed = await Task.WhenAny(
+                    cancel,
+                    Task.Delay(TimeSpan.FromSeconds(5)));
+
+                Assert.Same(cancel, completed);
+                await cancel;
+                Assert.True(
+                    callbackStarted.Wait(
+                        TimeSpan.FromSeconds(5)));
+            } finally {
+                releaseCallback.Set();
+            }
+        }
     }
 }

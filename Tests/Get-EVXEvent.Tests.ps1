@@ -607,7 +607,7 @@ Describe 'Get-EVXEvent - wildcard source parity' {
 }
 
 Describe 'Get-EVXEvent - pipeline parity' {
-    It 'accepts channel names from the pipeline' {
+    It 'enforces MaxEvents across channel names from the pipeline' {
         $events = @(
             'System', 'Application' |
                 Get-EVXEvent `
@@ -615,9 +615,8 @@ Describe 'Get-EVXEvent - pipeline parity' {
                     -ReadMode Metadata
         )
 
-        $events | Should -HaveCount 2
+        $events | Should -HaveCount 1
         $events.ContainerLog | Should -Contain 'System'
-        $events.ContainerLog | Should -Contain 'Application'
     }
 
     It 'accepts PSPath by property name from the pipeline' {

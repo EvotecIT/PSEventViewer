@@ -112,11 +112,11 @@ public static partial class EventLogBatchEngine {
 
         try {
             Task<T?[]> allTasks = Task.WhenAll(tasks);
-            if (fatalCancellation.Token.CanBeCanceled) {
+            if (cancellationToken.CanBeCanceled) {
                 var canceled = new TaskCompletionSource<bool>(
                     TaskCreationOptions.RunContinuationsAsynchronously);
                 using CancellationTokenRegistration registration =
-                    fatalCancellation.Token.Register(
+                    cancellationToken.Register(
                         static state =>
                             ((TaskCompletionSource<bool>)state!)
                                 .TrySetResult(true),
@@ -137,9 +137,8 @@ public static partial class EventLogBatchEngine {
                         TaskContinuationOptions.ExecuteSynchronously,
                         TaskScheduler.Default);
                     cancellationToken.ThrowIfCancellationRequested();
-                    firstFailure?.Throw();
                     throw new OperationCanceledException(
-                        fatalCancellation.Token);
+                        cancellationToken);
                 }
             }
             return await allTasks.ConfigureAwait(false);

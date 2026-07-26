@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.ExceptionServices;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace EventViewerX {
     /// <summary>
@@ -303,7 +304,8 @@ namespace EventViewerX {
             CancellationTokenRegistration? newRegistration = null;
             try {
                 if (cancellationToken.CanBeCanceled) {
-                    newRegistration = cancellationToken.Register(CancelWatch);
+                    newRegistration = cancellationToken.Register(
+                        CancelWatch);
                     cancellationToken.ThrowIfCancellationRequested();
                     lock (_lifecycleSync) {
                         if (_lifecycleVersion != lifecycleVersion ||
@@ -415,14 +417,35 @@ namespace EventViewerX {
                 registration = DetachCancellationRegistration();
                 subscriptions = DetachSubscriptionsCore();
             }
-            ThreadPool.QueueUserWorkItem(
-                _ => {
-                    registration?.Dispose();
-                    DisposeSubscriptions(subscriptions);
-                    if (stopped) {
-                        RaiseStopped();
-                    }
-                });
+            if (registration == null &&
+                subscriptions.Length == 0 &&
+                !stopped) {
+                return;
+            }
+            _ = Task.Run(() =>
+                CompleteCancellation(
+                    registration,
+                    subscriptions,
+                    stopped));
+        }
+
+        private void CompleteCancellation(
+            CancellationTokenRegistration? registration,
+            EventLogSubscription[] subscriptions,
+            bool stopped) {
+
+            try {
+                registration?.Dispose();
+                DisposeSubscriptions(subscriptions);
+            } catch (Exception exception) {
+                _instanceLogger.WriteWarning(
+                    "Event watcher cancellation cleanup failed: {0}",
+                    exception.Message.Trim());
+            } finally {
+                if (stopped) {
+                    RaiseStopped();
+                }
+            }
         }
 
         /// <summary>Stops watching and releases native watcher/session resources.</summary>
