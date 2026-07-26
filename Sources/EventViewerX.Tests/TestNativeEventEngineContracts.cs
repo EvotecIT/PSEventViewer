@@ -1001,6 +1001,7 @@ public sealed class TestNativeEventEngineContracts {
     public async Task AsyncStreamCancellationDoesNotWaitForAStalledProducer() {
         using var entered = new ManualResetEventSlim();
         using var release = new ManualResetEventSlim();
+        using var exited = new ManualResetEventSlim();
         using var cancellation =
             new CancellationTokenSource();
         await using IAsyncEnumerator<EventObject> events =
@@ -1023,14 +1024,20 @@ public sealed class TestNativeEventEngineContracts {
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
             async () => await moveNext);
         release.Set();
+        Assert.True(
+            exited.Wait(TimeSpan.FromSeconds(5)));
 
         IEnumerable<EventObject> Source(
             CancellationToken cancellationToken) {
 
             entered.Set();
-            release.Wait();
-            cancellationToken.ThrowIfCancellationRequested();
-            yield break;
+            try {
+                release.Wait();
+                cancellationToken.ThrowIfCancellationRequested();
+                yield break;
+            } finally {
+                exited.Set();
+            }
         }
     }
 
