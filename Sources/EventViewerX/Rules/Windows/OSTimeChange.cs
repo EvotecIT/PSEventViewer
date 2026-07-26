@@ -34,17 +34,17 @@ public class OSTimeChange : EventRuleBase {
 
     /// <summary>Initialises a time-change wrapper from an event record.</summary>
     public OSTimeChange(EventObject eventObject) : base(eventObject) {
-        _eventObject = eventObject;
+        Event = eventObject;
 
         Type = "OSTimeChange";
-        Computer = _eventObject.ComputerName;
-        Action = _eventObject.MessageSubject;
-        ObjectAffected = _eventObject.MachineName;
-        PreviousTime = _eventObject.GetValueFromDataDictionary("PreviousTime");
-        NewTime = _eventObject.GetValueFromDataDictionary("NewTime");
+        Computer = Event.ComputerName;
+        Action = Event.MessageSubject;
+        ObjectAffected = Event.MachineName;
+        PreviousTime = Event.GetValueFromDataDictionary("PreviousTime");
+        NewTime = Event.GetValueFromDataDictionary("NewTime");
 
-        Who = _eventObject.GetSubjectAccountOrEmpty();
-        When = _eventObject.TimeCreated;
+        Who = Event.GetSubjectAccountOrEmpty();
+        When = Event.TimeCreated;
     }
 }
 

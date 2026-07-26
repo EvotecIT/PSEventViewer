@@ -27,10 +27,10 @@ public class NetworkPromiscuousMode : EventRuleBase {
 
     /// <summary>Initialises a promiscuous-mode event wrapper from an event record.</summary>
     public NetworkPromiscuousMode(EventObject eventObject) : base(eventObject) {
-        _eventObject = eventObject;
+        Event = eventObject;
         Type = "NetworkPromiscuousMode";
-        Computer = _eventObject.ComputerName;
-        Adapter = _eventObject.GetValueFromDataDictionary("AdapterName", "Name");
-        When = _eventObject.TimeCreated;
+        Computer = Event.ComputerName;
+        Adapter = Event.GetValueFromDataDictionary("AdapterName", "Name");
+        When = Event.TimeCreated;
     }
 }

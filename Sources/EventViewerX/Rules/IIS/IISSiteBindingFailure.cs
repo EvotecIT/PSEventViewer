@@ -32,15 +32,15 @@ public class IISSiteBindingFailure : EventRuleBase {
 
     /// <summary>Initialises an IIS binding failure wrapper from an event record.</summary>
     public IISSiteBindingFailure(EventObject eventObject) : base(eventObject) {
-        _eventObject = eventObject;
+        Event = eventObject;
         Type = "IISSiteBindingFailure";
-        Computer = _eventObject.ComputerName;
-        SiteName = _eventObject.GetValueFromDataDictionary("SiteName", "Site");
-        Binding = _eventObject.GetValueFromDataDictionary("BindingInfo", "BindingInformation");
-        When = _eventObject.TimeCreated;
+        Computer = Event.ComputerName;
+        SiteName = Event.GetValueFromDataDictionary("SiteName", "Site");
+        Binding = Event.GetValueFromDataDictionary("BindingInfo", "BindingInformation");
+        When = Event.TimeCreated;
 
         if (string.IsNullOrEmpty(SiteName) || string.IsNullOrEmpty(Binding)) {
-            ParseMessage(_eventObject.Message);
+            ParseMessage(Event.Message);
         }
     }
 

@@ -1,67 +1,157 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Reflection;
-using System.IO;
-using System.Linq;
+using System.Threading.Tasks;
 using Xunit;
 
 namespace EventViewerX.Tests {
     public class TestWatchEvents {
-        private static ConcurrentBag<int> GetIds(WatchEvents watcher) {
-            var field = typeof(WatchEvents).GetField("_watchEventId", BindingFlags.NonPublic | BindingFlags.Instance);
+        private static HashSet<int> GetIds(WatchEvents watcher) {
+            FieldInfo? field = typeof(WatchEvents).GetField("_watchEventIds", BindingFlags.NonPublic | BindingFlags.Instance);
             Assert.NotNull(field);
-            return (ConcurrentBag<int>)field!.GetValue(watcher)!;
+            return (HashSet<int>)field!.GetValue(watcher)!;
         }
 
         [Fact]
         public void DisposeClearsWatchEventIds() {
-            var watcher = new WatchEvents();
+            using var watcher = new WatchEvents();
             watcher.Watch(Environment.MachineName, "Application", new List<int> { 1 });
             watcher.Dispose();
-            var ids = GetIds(watcher);
-            Assert.Empty(ids);
+            Assert.Empty(GetIds(watcher));
         }
 
         [Fact]
         public void SubsequentWatchesUseNewIdsOnly() {
-            var watcher = new WatchEvents();
+            using var watcher = new WatchEvents();
             watcher.Watch(Environment.MachineName, "Application", new List<int> { 1 });
             watcher.Watch(Environment.MachineName, "Application", new List<int> { 2 });
-            var ids = GetIds(watcher);
+            HashSet<int> ids = GetIds(watcher);
             Assert.DoesNotContain(1, ids);
             Assert.Contains(2, ids);
         }
 
         [Fact]
-        public void StagingAddsEvent350AndRecordsUser() {
-            var watcher = new WatchEvents();
-            watcher.Watch(Environment.MachineName, "Application", new List<int> { 1 }, null, default, true, "tester");
-            var ids = GetIds(watcher);
-            Assert.Contains(350, ids);
+        public void StagingAddsEvent350WithoutMutatingCallerList() {
+            using var watcher = new WatchEvents();
+            var ids = new List<int> { 1 };
+            watcher.Watch(Environment.MachineName, "Application", ids, null, default, true, "tester");
+
+            Assert.DoesNotContain(350, ids);
+            Assert.Contains(350, GetIds(watcher));
             Assert.Equal("tester", watcher.StagingEnabledBy);
         }
 
         [Fact]
-        public void WatchResetsNumberOfEventsFound() {
-            WatchEvents.NumberOfEventsFound = 5;
-            var watcher = new WatchEvents();
-            watcher.Watch(Environment.MachineName, "Application", new List<int> { 1 });
+        public void ResetGlobalEventCountIsExplicit() {
+            WatchEvents.ResetGlobalEventCount();
             Assert.Equal(0, WatchEvents.NumberOfEventsFound);
         }
 
         [Fact]
-        public void WatchedEventsAreKeyedByRecordId() {
-            if (!OperatingSystem.IsWindows()) return;
-            var path = Path.Combine("..", "..", "..", "..", "..", "Tests", "Logs", "Active Directory Web Services.evtx");
-            var firstEvent = SearchEvents.QueryLogFile(path, maxEvents: 1).FirstOrDefault();
-            if (firstEvent == null) return; // graceful skip when sample log is unavailable
+        public void WatchRejectsEmptyEventFilter() {
+            using var watcher = new WatchEvents();
+            Assert.Throws<ArgumentException>(() => watcher.Watch(null, "Application", new List<int>()));
+        }
+
+        [Fact]
+        public void WatchRejectsAnAlreadyCancelledSubscription() {
+            using var watcher = new WatchEvents();
+            using var cancellation = new System.Threading.CancellationTokenSource();
+            cancellation.Cancel();
+
+            Assert.Throws<OperationCanceledException>(() => watcher.Watch(
+                null,
+                "Application",
+                new List<int> { 1 },
+                cancellationToken: cancellation.Token));
+            Assert.Empty(GetIds(watcher));
+        }
+
+        [Fact]
+        public async Task CancellationAndDisposeCompleteWithoutDeadlock() {
+            for (int index = 0; index < 25; index++) {
+                var watcher = new WatchEvents();
+                using var cancellation = new System.Threading.CancellationTokenSource();
+                watcher.Watch(
+                    Environment.MachineName,
+                    "Application",
+                    new List<int> { 1 },
+                    cancellationToken: cancellation.Token);
+
+                Task cancel = Task.Run(cancellation.Cancel);
+                Task dispose = Task.Run(watcher.Dispose);
+                Task operations = Task.WhenAll(cancel, dispose);
+                Task completed = await Task.WhenAny(
+                    operations,
+                    Task.Delay(TimeSpan.FromSeconds(30)));
+
+                Assert.Same(operations, completed);
+                await operations;
+                Assert.Empty(GetIds(watcher));
+            }
+        }
+
+        [Fact]
+        public void CancellationRaisesStoppedExactlyOnce() {
             var watcher = new WatchEvents();
-            var field = typeof(WatchEvents).GetField("WatchedEvents", BindingFlags.NonPublic | BindingFlags.Instance);
-            Assert.NotNull(field);
-            var dict = (ConcurrentDictionary<long, EventObject>)field!.GetValue(watcher)!;
-            Assert.True(dict.TryAdd(firstEvent.RecordId ?? -1L, firstEvent));
-            Assert.False(dict.TryAdd(firstEvent.RecordId ?? -1L, firstEvent));
+            using var cancellation =
+                new System.Threading.CancellationTokenSource();
+            int stopped = 0;
+            watcher.Stopped += (_, _) =>
+                System.Threading.Interlocked.Increment(
+                    ref stopped);
+            watcher.Watch(
+                Environment.MachineName,
+                "Application",
+                new List<int> { 1 },
+                cancellationToken: cancellation.Token);
+
+            cancellation.Cancel();
+            Assert.True(
+                System.Threading.SpinWait.SpinUntil(
+                    () =>
+                        System.Threading.Volatile.Read(
+                            ref stopped) == 1,
+                    TimeSpan.FromSeconds(5)));
+            watcher.Dispose();
+
+            Assert.Equal(1, stopped);
+        }
+
+        [Fact]
+        public async Task CancellationDoesNotWaitForStoppedCallbacks() {
+            using var watcher = new WatchEvents();
+            using var cancellation =
+                new System.Threading.CancellationTokenSource();
+            using var callbackStarted =
+                new System.Threading.ManualResetEventSlim();
+            using var releaseCallback =
+                new System.Threading.ManualResetEventSlim();
+            watcher.Stopped += (_, _) => {
+                callbackStarted.Set();
+                releaseCallback.Wait(
+                    TimeSpan.FromSeconds(30));
+            };
+            watcher.Watch(
+                Environment.MachineName,
+                "Application",
+                new List<int> { 1 },
+                cancellationToken: cancellation.Token);
+
+            Task cancel = Task.Run(cancellation.Cancel);
+            try {
+                Task completed = await Task.WhenAny(
+                    cancel,
+                    Task.Delay(TimeSpan.FromSeconds(5)));
+
+                Assert.Same(cancel, completed);
+                await cancel;
+                Assert.True(
+                    callbackStarted.Wait(
+                        TimeSpan.FromSeconds(5)));
+            } finally {
+                releaseCallback.Set();
+            }
         }
     }
 }

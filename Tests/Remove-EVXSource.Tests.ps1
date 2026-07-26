@@ -1,12 +1,16 @@
 describe 'Remove-EVXSource cmdlet' {
     BeforeAll {
-        $script:source = 'TestEVXSource'
+        $script:source = 'TestEVXSource' + [Guid]::NewGuid().ToString('N')
         $script:isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltinRole]::Administrator)
         $script:skip = -not $script:isAdmin
     }
 
     BeforeEach {
         if (-not $script:skip) {
+            New-EVXSource `
+                -LogName 'Application' `
+                -SourceName $script:source |
+                Out-Null
             Write-EVXEntry -LogName 'Application' -ProviderName $script:source -EventId 1 -Message 'test'
         }
     }
@@ -26,7 +30,11 @@ describe 'Remove-EVXSource cmdlet' {
         }
     }
 
-    It 'returns false when using -WhatIf' -Skip:$script:skip {
-        Remove-EVXSource -SourceName $script:source -LogName 'Application' -WhatIf | Should -Be $false
+    It 'emits no false success value when using -WhatIf' -Skip:$script:skip {
+        Remove-EVXSource -SourceName $script:source -LogName 'Application' -WhatIf |
+            Should -BeNullOrEmpty
+        [EventViewerX.ClassicEventLogManager]::SourceExists(
+            $script:source,
+            'Application') | Should -BeTrue
     }
 }

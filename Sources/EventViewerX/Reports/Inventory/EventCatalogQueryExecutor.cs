@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics.Eventing.Reader;
 using System.Linq;
 using System.Threading;
+using EventViewerX.Native;
 
 namespace EventViewerX.Reports.Inventory;
 
@@ -27,25 +28,29 @@ public static class EventCatalogQueryExecutor {
         if (!TryValidateRequest(request, out result, out failure)) {
             return false;
         }
+        cancellationToken.ThrowIfCancellationRequested();
 
         try {
-            using var session = SearchEvents.OpenSession(
+            using EventLogSessionOpenResult sessionResult = EventLogSessionManager.OpenSessionResult(
                 machineName: request.MachineName,
                 timeoutMs: request.SessionTimeoutMs,
                 purpose: "EventCatalogChannels",
-                logName: "*");
+                logName: "*",
+                cancellationToken: cancellationToken);
 
-            if (session is null) {
+            if (!sessionResult.Success || sessionResult.Session is null) {
                 result = new EventChannelListResult();
-                failure = new EventCatalogFailure {
-                    Kind = EventCatalogFailureKind.Exception,
-                    Message = "Failed to open event log session."
-                };
+                failure = MapSessionFailure(sessionResult);
                 return false;
             }
 
+            string[] names = EnumerateNamesBounded(
+                sessionResult,
+                static session => session.GetLogNames(),
+                "event logs",
+                cancellationToken);
             var rows = BuildNameRows(
-                source: session.GetLogNames(),
+                source: names,
                 request: request,
                 cancellationToken: cancellationToken,
                 rowFactory: static name => new EventChannelRow { Name = name },
@@ -58,6 +63,15 @@ public static class EventCatalogQueryExecutor {
             };
             failure = null;
             return true;
+        } catch (OperationCanceledException) {
+            throw;
+        } catch (TimeoutException ex) {
+            result = new EventChannelListResult();
+            failure = new EventCatalogFailure {
+                Kind = EventCatalogFailureKind.Timeout,
+                Message = ex.Message
+            };
+            return false;
         } catch (UnauthorizedAccessException ex) {
             result = new EventChannelListResult();
             failure = new EventCatalogFailure {
@@ -99,25 +113,30 @@ public static class EventCatalogQueryExecutor {
         if (!TryValidateRequest(request, out result, out failure)) {
             return false;
         }
+        cancellationToken.ThrowIfCancellationRequested();
 
         try {
-            using var session = SearchEvents.OpenSession(
+            using EventLogSessionOpenResult sessionResult = EventLogSessionManager.OpenSessionResult(
                 machineName: request.MachineName,
                 timeoutMs: request.SessionTimeoutMs,
                 purpose: "EventCatalogProviders",
-                logName: "*");
+                logName: "*",
+                cancellationToken: cancellationToken);
 
-            if (session is null) {
+            if (!sessionResult.Success || sessionResult.Session is null) {
                 result = new EventProviderListResult();
-                failure = new EventCatalogFailure {
-                    Kind = EventCatalogFailureKind.Exception,
-                    Message = "Failed to open event log session."
-                };
+                failure = MapSessionFailure(sessionResult);
                 return false;
             }
 
+            string[] names = EnumerateNamesBounded(
+                sessionResult,
+                static session =>
+                    session.GetProviderNames(),
+                "event providers",
+                cancellationToken);
             var rows = BuildNameRows(
-                source: session.GetProviderNames(),
+                source: names,
                 request: request,
                 cancellationToken: cancellationToken,
                 rowFactory: static name => new EventProviderRow { Name = name },
@@ -130,6 +149,15 @@ public static class EventCatalogQueryExecutor {
             };
             failure = null;
             return true;
+        } catch (OperationCanceledException) {
+            throw;
+        } catch (TimeoutException ex) {
+            result = new EventProviderListResult();
+            failure = new EventCatalogFailure {
+                Kind = EventCatalogFailureKind.Timeout,
+                Message = ex.Message
+            };
+            return false;
         } catch (UnauthorizedAccessException ex) {
             result = new EventProviderListResult();
             failure = new EventCatalogFailure {
@@ -152,6 +180,48 @@ public static class EventCatalogQueryExecutor {
             };
             return false;
         }
+    }
+
+    private static EventCatalogFailure MapSessionFailure(EventLogSessionOpenResult sessionResult) {
+        EventCatalogFailureKind kind = sessionResult.Status switch {
+            EventLogSessionOpenStatus.AccessDenied => EventCatalogFailureKind.AccessDenied,
+            EventLogSessionOpenStatus.Timeout => EventCatalogFailureKind.Timeout,
+            EventLogSessionOpenStatus.NegativeCache => EventCatalogFailureKind.HostUnavailable,
+            EventLogSessionOpenStatus.RpcUnavailable => EventCatalogFailureKind.HostUnavailable,
+            EventLogSessionOpenStatus.EventLogSessionUnavailable => EventCatalogFailureKind.HostUnavailable,
+            _ => EventCatalogFailureKind.Exception
+        };
+        return new EventCatalogFailure {
+            Kind = kind,
+            Message = string.IsNullOrWhiteSpace(sessionResult.ErrorMessage)
+                ? $"Failed to open Event Log session to '{sessionResult.TargetHost}'."
+                : sessionResult.ErrorMessage
+        };
+    }
+
+    private static string[] EnumerateNamesBounded(
+        EventLogSessionOpenResult sessionResult,
+        Func<EventLogSession, IEnumerable<string>> enumerate,
+        string description,
+        CancellationToken cancellationToken) {
+
+        EventLogSession session =
+            sessionResult.Session ??
+            throw new InvalidOperationException(
+                "A successful catalog session is required.");
+        sessionResult.Session = null;
+        using var sessionLifetime =
+            new RetainedDisposable<EventLogSession>(
+                session);
+        int timeoutMilliseconds =
+            sessionResult.TimeoutMs;
+        return EventLogCatalog.EnumerateNamesBounded(
+            () => enumerate(
+                sessionLifetime.Value),
+            timeoutMilliseconds,
+            $"Timed out enumerating {description} after {timeoutMilliseconds} ms.",
+            cancellationToken,
+            sessionLifetime.Retain());
     }
 
     private static bool TryValidateRequest<T>(
@@ -191,7 +261,7 @@ public static class EventCatalogQueryExecutor {
         return true;
     }
 
-    private static List<T> BuildNameRows<T>(
+    internal static List<T> BuildNameRows<T>(
         IEnumerable<string> source,
         EventCatalogQueryRequest request,
         CancellationToken cancellationToken,
@@ -213,15 +283,14 @@ public static class EventCatalogQueryExecutor {
 
         names.Sort(StringComparer.OrdinalIgnoreCase);
 
-        var rows = new List<T>();
-        truncated = false;
-        foreach (var name in names) {
+        int resultCount = request.MaxResults > 0
+            ? Math.Min(request.MaxResults, names.Count)
+            : names.Count;
+        truncated = request.MaxResults > 0 && names.Count > request.MaxResults;
+        var rows = new List<T>(Math.Min(resultCount, 256));
+        for (int index = 0; index < resultCount; index++) {
             cancellationToken.ThrowIfCancellationRequested();
-            rows.Add(rowFactory(name));
-            if (request.MaxResults > 0 && rows.Count >= request.MaxResults) {
-                truncated = true;
-                break;
-            }
+            rows.Add(rowFactory(names[index]));
         }
 
         return rows;

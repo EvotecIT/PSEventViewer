@@ -28,11 +28,11 @@ public class DfsReplicationError : EventRuleBase {
 
     /// <summary>Initialises a DFS replication error wrapper from an event record.</summary>
     public DfsReplicationError(EventObject eventObject) : base(eventObject) {
-        _eventObject = eventObject;
+        Event = eventObject;
         Type = "DfsReplicationError";
-        ReplicationGroup = _eventObject.GetValueFromDataDictionary("Replication Group");
-        ErrorCode = _eventObject.GetValueFromDataDictionary("Error Code", "Error");
-        Partner = _eventObject.GetValueFromDataDictionary("Partner Name");
-        When = _eventObject.TimeCreated;
+        ReplicationGroup = Event.GetValueFromDataDictionary("Replication Group");
+        ErrorCode = Event.GetValueFromDataDictionary("Error Code", "Error");
+        Partner = Event.GetValueFromDataDictionary("Partner Name");
+        When = Event.TimeCreated;
     }
 }

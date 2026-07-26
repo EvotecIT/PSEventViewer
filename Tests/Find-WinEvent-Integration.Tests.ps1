@@ -1,8 +1,10 @@
 Describe 'Find-WinEvent integration (local)' {
-    $localMachine = $env:COMPUTERNAME
+    BeforeAll {
+        $localMachine = $env:COMPUTERNAME
+    }
 
     It 'lists Application/System logs without error' {
-        $logs = Find-WinEvent -Verbose -ListLog 'Application','System' -MachineName $localMachine
+        $logs = Get-EVXLog -LogName 'Application','System' -MachineName $localMachine
         $logs | Should -Not -BeNullOrEmpty
         $logs.LogName | Should -Contain 'Application'
         $logs.LogName | Should -Contain 'System'

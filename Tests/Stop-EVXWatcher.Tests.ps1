@@ -19,9 +19,10 @@ Describe 'Start-EVXWatcher and Stop-EVXWatcher lifecycle' {
     }
 
     It 'stops the watcher and cleans up resources' {
+        $StartTime = $script:watcher.Watcher.StartTime
         Stop-EVXWatcher -Id $script:watcher.Id
         $script:watcher.EndTime | Should -Not -Be $null
-        $script:watcher.Watcher.StartTime | Should -Be ([datetime]::MinValue)
+        $script:watcher.Watcher.StartTime | Should -Be $StartTime
         Get-EVXWatcher -Id $script:watcher.Id | Should -BeNullOrEmpty
     }
 }

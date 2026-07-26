@@ -49,7 +49,7 @@ public static class ClassicLogOverflowActions {
     /// <summary>
     /// Tries to parse a normalized overflow action name into <see cref="OverflowAction"/>.
     /// </summary>
-    internal static bool TryParse(string? value, out OverflowAction overflowAction) {
+    public static bool TryParse(string? value, out OverflowAction overflowAction) {
         overflowAction = OverflowAction.OverwriteAsNeeded;
         if (!TryNormalize(value, out var normalized, out _)) {
             return false;

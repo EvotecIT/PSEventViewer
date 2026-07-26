@@ -82,7 +82,8 @@ public sealed class EventStructuredQueryFilter {
     public DateTime? EndTimeUtc { get; set; }
 
     /// <summary>
-    /// Optional normalized level.
+    /// Optional normalized standard or custom provider level in the Windows
+    /// Event Log range from 0 through 255.
     /// </summary>
     public Level? Level { get; set; }
 

@@ -8,9 +8,9 @@ namespace EventViewerX.Reports.Evtx;
 /// </summary>
 public sealed class EvtxEventReportRow {
     /// <summary>
-    /// Event creation time in UTC (ISO-8601).
+    /// Event creation time in UTC (ISO-8601), when present.
     /// </summary>
-    public string TimeCreatedUtc { get; set; } = string.Empty;
+    public string? TimeCreatedUtc { get; set; }
 
     /// <summary>
     /// Event ID.
@@ -18,9 +18,9 @@ public sealed class EvtxEventReportRow {
     public int Id { get; set; }
 
     /// <summary>
-    /// Event record ID.
+    /// Event record ID, when present.
     /// </summary>
-    public long RecordId { get; set; }
+    public long? RecordId { get; set; }
 
     /// <summary>
     /// Source log name.
@@ -33,9 +33,9 @@ public sealed class EvtxEventReportRow {
     public string ProviderName { get; set; } = string.Empty;
 
     /// <summary>
-    /// Numeric level.
+    /// Numeric level, when present.
     /// </summary>
-    public long Level { get; set; }
+    public long? Level { get; set; }
 
     /// <summary>
     /// Localized level name.

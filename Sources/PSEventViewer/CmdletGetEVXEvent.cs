@@ -1,9 +1,14 @@
-﻿using System.Collections;
+using System.Collections;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
+using System.Linq;
+using System.Net;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
-using System.Linq;
+using System.Threading;
 
 namespace PSEventViewer;
 
@@ -33,74 +38,107 @@ namespace PSEventViewer;
 /// </example>
 /// <example>
 ///   <summary>Parallel query across servers</summary>
-///   <code>Get-EVXEvent -LogName Security -MachineName DC1,DC2 -EventId 4740 -Parallel</code>
-///   <para>Retrieves account lockouts from multiple domain controllers concurrently.</para>
+///   <code>Get-EVXEvent -LogName Security -MachineName DC1,DC2 -EventId 4740 -MaxConcurrency 8</code>
+///   <para>Retrieves account lockouts from multiple domain controllers with bounded concurrent source setup.</para>
+/// </example>
+/// <example>
+///   <summary>Stream core metadata from a large EVTX file</summary>
+///   <code>Get-EVXEvent -Path C:\Logs\Security.evtx -Oldest -ReadMode Metadata | Select-Object TimeCreated, RecordId, Id, ProviderName, MachineName | Export-Csv C:\Logs\Security-metadata.csv -NoTypeInformation</code>
+///   <para>Skips provider message formatting, XML parsing, attachments, and bookmarks while streaming every record.</para>
 /// </example>
 [OutputType(typeof(EventObject), ParameterSetName = new string[] { "GenericEvents" })]
 [OutputType(typeof(EventObject), ParameterSetName = new string[] { "PathEvents" })]
+[OutputType(typeof(EventObject), ParameterSetName = new string[] { "FilterHashtableEvents" })]
+[OutputType(typeof(EventObject), ParameterSetName = new string[] { "FilterXmlEvents" })]
+[OutputType(typeof(EventObject), ParameterSetName = new string[] { "ProviderEvents" })]
 [OutputType(typeof(EventObjectSlim), ParameterSetName = new string[] { "NamedEvents" })]
-[OutputType(typeof(EventLogDetails), ParameterSetName = new string[] { "ListLog" })]
-[Cmdlet(VerbsCommon.Get, "EVXEvent", DefaultParameterSetName = "GenericEvents")]
-[Alias("Get-EventViewerXEvent", "Find-WinEvent", "Get-Events")]
-public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
-    private long? _resumeRecordId;
-    private long? _highestRecordId;
+[Cmdlet(VerbsCommon.Get, "EVXEvent", DefaultParameterSetName = "ProviderEvents")]
+[Alias("Find-WinEvent")]
+public sealed partial class CmdletGetEVXEvent : AsyncPSCmdlet {
     private string _recordIdKey = string.Empty;
     private Dictionary<string, long> _recordMap = new();
+    private readonly Dictionary<string, Guid> _checkpointGenerations = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, string> _checkpointBoundaries = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, string> _checkpointBoundaryMigrations = new(StringComparer.OrdinalIgnoreCase);
+    private IReadOnlyList<CheckpointSource>? _checkpointSources;
+    private readonly Dictionary<string, long> _highestRecordIds = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, EventObject> _highestCheckpointEvents = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _resetCheckpointKeys = new(StringComparer.OrdinalIgnoreCase);
+    private WildcardPattern[] _managedProviderPatterns =
+        Array.Empty<WildcardPattern>();
+    private long _eventsOutput;
     /// <summary>
     /// Name of the log to query.
     /// </summary>
-    [Parameter(Mandatory = true, Position = 0, ParameterSetName = "RecordId")]
-    [Parameter(Mandatory = true, Position = 0, ParameterSetName = "GenericEvents")]
-    public string LogName { get; set; } = null!;
+    [Parameter(
+        Mandatory = true,
+        Position = 0,
+        ValueFromPipeline = true,
+        ValueFromPipelineByPropertyName = true,
+        ParameterSetName = "GenericEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
+    public string[] LogName { get; set; } = Array.Empty<string>();
 
     /// <summary>
     /// Path to an event log file for offline analysis.
     /// </summary>
-    [Parameter(Mandatory = true, ParameterSetName = "PathEvents")]
-    public string Path { get; set; } = null!;
+    [Alias("PSPath")]
+    [Parameter(
+        Mandatory = true,
+        ValueFromPipelineByPropertyName = true,
+        ParameterSetName = "PathEvents")]
+    public string[] Path { get; set; } = Array.Empty<string>();
 
     /// <summary>
     /// Event identifiers used to filter results.
     /// </summary>
     [Alias("Id")]
     [Parameter(Mandatory = false, Position = 1, ParameterSetName = "GenericEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
-    public List<int>? EventId { get; set; }
+    [Parameter(Mandatory = false, Position = 1, ParameterSetName = "ProviderEvents")]
+    public int[]? EventId { get; set; }
 
     /// <summary>
     /// Specific event record identifiers to retrieve.
     /// </summary>
     [Alias("RecordId")]
-    [Parameter(Mandatory = false, ParameterSetName = "RecordId")]
-    public List<long>? EventRecordId { get; set; }
+    [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "ProviderEvents")]
+    public long[]? EventRecordId { get; set; }
 
     /// <summary>
     /// Path to a file storing last processed record ID.
     /// </summary>
-    [Parameter(Mandatory = false, ParameterSetName = "RecordId")]
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "FilterHashtableEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "FilterXmlEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "ProviderEvents")]
     public string? RecordIdFile { get; set; }
 
     /// <summary>
     /// Identifier used when persisting record IDs to allow multiple jobs to share a file.
     /// </summary>
-    [Parameter(Mandatory = false, ParameterSetName = "RecordId")]
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "FilterHashtableEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "FilterXmlEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "ProviderEvents")]
     public string? RecordIdKey { get; set; }
 
     /// <summary>
     /// Computer names against which to run the query.
     /// </summary>
     [Alias("ComputerName", "ServerName")]
-    [Parameter(Mandatory = false, ParameterSetName = "RecordId")]
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "ListLog")]
+    [Parameter(Mandatory = false, ParameterSetName = "FilterHashtableEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "FilterXmlEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "ProviderEvents")]
     public List<string?>? MachineName { get; set; }
 
     /// <summary>
@@ -108,19 +146,25 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
     /// </summary>
     [Alias("Source", "Provider")]
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
-    public string? ProviderName { get; set; }
+    [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
+    [Parameter(Mandatory = true, ParameterSetName = "ProviderEvents")]
+    public string[]? ProviderName { get; set; }
 
     /// <summary>
     /// Keywords used to filter events.
     /// </summary>
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
-    public Keywords? Keywords { get; set; }
+    [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "ProviderEvents")]
+    public long[]? Keywords { get; set; }
 
     /// <summary>
     /// Event level (e.g. Error, Warning) used for filtering.
     /// </summary>
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
-    public Level? Level { get; set; }
+    [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "ProviderEvents")]
+    public int[]? Level { get; set; }
 
     /// <summary>
     /// Start time for the event query.
@@ -129,6 +173,7 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
     [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "ProviderEvents")]
     public DateTime? StartTime { get; set; }
 
     /// <summary>
@@ -138,6 +183,7 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
     [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "ProviderEvents")]
     public DateTime? EndTime { get; set; }
 
     /// <summary>
@@ -145,139 +191,239 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
     /// </summary>
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "ProviderEvents")]
     public TimePeriod? TimePeriod { get; set; }
 
     /// <summary>
     /// User identifier used to filter events.
     /// </summary>
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
-    public string? UserId { get; set; }
+    [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "ProviderEvents")]
+    public string[]? UserId { get; set; }
 
     /// <summary>
     /// Filters events by matching their formatted message against the provided regular expression.
     /// </summary>
-    [Parameter(Mandatory = false, ParameterSetName = "RecordId")]
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "FilterHashtableEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "FilterXmlEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "ProviderEvents")]
     public Regex? MessageRegex { get; set; }
 
     /// <summary>
-    /// Number of parallel threads used for queries.
+    /// Maximum number of independent event sources opened concurrently.
     /// </summary>
-    [Parameter(Mandatory = false, ParameterSetName = "RecordId")]
+    [Alias("NumberOfThreads")]
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
-    [ValidateRange(1, int.MaxValue)]
-    public int NumberOfThreads { get; set; } = 8;
+    [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "FilterHashtableEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "FilterXmlEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "ProviderEvents")]
+    [ValidateRange(1, EventLogLimits.MaximumConcurrency)]
+    public int MaxConcurrency { get; set; } = 8;
 
     /// <summary>
     /// Maximum number of events to return.
     /// </summary>
-    [Parameter(Mandatory = false, ParameterSetName = "RecordId")]
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
-    public int MaxEvents { get; set; }
+    [Parameter(Mandatory = false, ParameterSetName = "FilterHashtableEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "FilterXmlEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "ProviderEvents")]
+    [ValidateRange(0, long.MaxValue)]
+    public long MaxEvents { get; set; }
 
     /// <summary>
-    /// Controls whether queries run in parallel or sequentially.
+    /// Maximum number of merged candidate events delivered for message and checkpoint filtering.
+    /// Zero continues until the output limit is satisfied or the query is exhausted. Native selection may perform
+    /// one initial lookahead per machine/XPath chunk plus bounded page prefetch; those rows are not evaluated by the cmdlet.
     /// </summary>
-    [Parameter(Mandatory = false, ParameterSetName = "RecordId")]
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
-    public ParallelOption ParallelOption { get; set; } = ParallelOption.Parallel;
+    [Parameter(Mandatory = false, ParameterSetName = "FilterHashtableEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "FilterXmlEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "ProviderEvents")]
+    [ValidateRange(0, long.MaxValue)]
+    public long MaxEventsScanned { get; set; }
+
+    /// <summary>
+    /// Resolves reverse-DNS names for supported named events after projection. DNS failures remain visible on the
+    /// event and never remove the event from the pipeline.
+    /// </summary>
+    [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
+    public SwitchParameter ResolveDns { get; set; }
+
+    /// <summary>
+    /// Whole-request timeout in milliseconds for each optional reverse-DNS request, including dependency retries.
+    /// </summary>
+    [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
+    [ValidateRange(1, 60000)]
+    public int DnsTimeoutMs { get; set; } = 1000;
+
+    /// <summary>
+    /// Maximum number of reverse-DNS requests that may overlap. Results and checkpoints remain in event order.
+    /// </summary>
+    [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
+    [ValidateRange(1, 64)]
+    public int DnsMaxConcurrency { get; set; } = 8;
+
+    /// <summary>
+    /// Controls per-event materialization. Metadata skips provider messages, XML, attachments, and bookmarks;
+    /// Message formats the provider message; StructuredData parses XML without formatting the message; Full includes all data.
+    /// Named-event queries default to Full so rule projections receive their structured payload; other query sets default to Message.
+    /// </summary>
+    [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "FilterHashtableEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "FilterXmlEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "ProviderEvents")]
+    public EventReadMode ReadMode { get; set; } =
+        EventReadMode.Message;
+
+    /// <summary>
+    /// Culture used to format provider messages and display names for offline EVTX queries.
+    /// For example, use <c>en-US</c> for deterministic English output.
+    /// </summary>
+    [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "FilterHashtableEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "FilterXmlEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "ProviderEvents")]
+    public CultureInfo? MessageCulture { get; set; } =
+        CultureInfo.GetCultureInfo("en-US");
+
+    /// <summary>
+    /// Overrides both remote connection and no-progress read timeouts in milliseconds.
+    /// Zero uses Settings.SessionTimeoutMs for connection establishment and
+    /// Settings.QuerySessionTimeoutMs for reading.
+    /// </summary>
+    [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "FilterHashtableEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "FilterXmlEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "ProviderEvents")]
+    [ValidateRange(0, int.MaxValue)]
+    public int SessionTimeoutMs { get; set; }
+
+    private int EffectiveRemoteConnectionTimeoutMilliseconds =>
+        SessionTimeoutMs > 0
+            ? SessionTimeoutMs
+            : Settings.SessionTimeoutMs;
+
+    private int EffectiveRemoteReadTimeoutMilliseconds =>
+        SessionTimeoutMs > 0
+            ? SessionTimeoutMs
+            : Settings.QuerySessionTimeoutMs;
+
+    /// <summary>
+    /// Maximum number of projected events buffered between parallel readers and the PowerShell pipeline. Zero selects a bounded default.
+    /// </summary>
+    [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "FilterHashtableEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "FilterXmlEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "ProviderEvents")]
+    [ValidateRange(0, int.MaxValue)]
+    public int BufferCapacity { get; set; }
 
     /// <summary>
     /// Expands event data into individual properties.
     /// </summary>
-    [Parameter(Mandatory = false, ParameterSetName = "RecordId")]
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "FilterHashtableEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "FilterXmlEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "ProviderEvents")]
     public SwitchParameter Expand { get; set; }
 
     /// <summary>
     /// Reads events from oldest to newest when querying files.
     /// </summary>
     [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "FilterHashtableEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "FilterXmlEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "ProviderEvents")]
     public SwitchParameter Oldest { get; set; }
 
     /// <summary>
     /// Hashtable filter for named event data when querying files.
     /// </summary>
     [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "FilterHashtableEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "ProviderEvents")]
     public Hashtable? NamedDataFilter { get; set; }
 
     /// <summary>
     /// Hashtable filter to exclude named event data when querying files.
     /// </summary>
     [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "FilterHashtableEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "ProviderEvents")]
     public Hashtable? NamedDataExcludeFilter { get; set; }
 
     /// <summary>
     /// Disables parallel processing of queries.
     /// </summary>
-    [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "RecordId")]
     [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "FilterHashtableEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "FilterXmlEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "ProviderEvents")]
     public SwitchParameter DisableParallel { get; set; }
 
     /// <summary>
     /// Returns results as an array instead of streaming them.
     /// </summary>
-    [Parameter(Mandatory = false, ParameterSetName = "RecordId")]
     [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
     [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "ListLog")]
+    [Parameter(Mandatory = false, ParameterSetName = "FilterHashtableEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "FilterXmlEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "ProviderEvents")]
     public SwitchParameter AsArray { get; set; }
 
     /// <summary>
     /// Predefined named events to query.
     /// </summary>
+    [Alias("NamedEvents")]
     [Parameter(Mandatory = true, ParameterSetName = "NamedEvents")]
     public NamedEvents[] Type { get; set; } = Array.Empty<NamedEvents>();
 
     /// <summary>
-    /// The list log parameter is used to list the logs on the machine.
-    /// You can use wildcards to search for logs.
-    /// When using wildcards, you can use the * character to match zero or more characters, and the ? character to match a single character.
-    /// </summary>
-    [Parameter(Mandatory = true, ParameterSetName = "ListLog")]
-    public string[] ListLog { get; set; } = new[] { "*" };
-
-
-    /// <summary>
     /// Initializes logging and helper classes before processing.
     /// </summary>
-    protected override Task BeginProcessingAsync() {
-        // Initialize the logger to be able to see verbose, warning, debug, error, progress, and information messages.
-        var internalLogger = new InternalLogger(false);
-        var internalLoggerPowerShell = new InternalLoggerPowerShell(internalLogger, this.WriteVerbose, this.WriteWarning, this.WriteDebug, this.WriteError, this.WriteProgress, this.WriteInformation);
-        var searchEvents = new SearchEvents(internalLogger);
-        if (!string.IsNullOrEmpty(RecordIdFile) && File.Exists(RecordIdFile)) {
-            try {
-                var json = File.ReadAllText(RecordIdFile);
-                _recordMap = JsonSerializer.Deserialize<Dictionary<string, long>>(json) ?? new();
-            } catch {
-                _recordMap = new Dictionary<string, long>();
-            }
-        }
-        _recordIdKey = !string.IsNullOrEmpty(RecordIdKey)
-            ? RecordIdKey!
-            : $"{LogName ?? Path ?? "unknown"}|{string.Join(",", MachineName ?? new List<string?>())}";
-        if (_recordMap.TryGetValue(_recordIdKey, out var lastId)) {
-            _resumeRecordId = lastId;
-        }
-        return Task.CompletedTask;
-    }
-    /// <summary>
-    /// Executes the event query based on provided parameters.
-    /// </summary>
     protected override async Task ProcessRecordAsync() {
+        if (OutputLimitReached) {
+            return;
+        }
+        _checkpointSources = null;
+        _managedProviderPatterns =
+            Array.Empty<WildcardPattern>();
+        _offlineProvidersByPath.Clear();
+        if (ParameterSetName == "NamedEvents" &&
+            !MyInvocation.BoundParameters.ContainsKey(
+                nameof(ReadMode))) {
+            ReadMode = EventReadMode.Full;
+        }
+        ValidateRecordOptions();
+        InitializeCheckpointKey();
+
         CancellationToken token;
 #if NET8_0_OR_GREATER
         using CancellationTokenSource linkedCts = CancellationTokenSource.CreateLinkedTokenSource(StoppingToken, CancelToken);
@@ -287,181 +433,160 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
 #endif
         List<object>? results = AsArray ? new List<object>() : null;
 
-        if (DisableParallel.IsPresent) {
-            ParallelOption = ParallelOption.Disabled;
-        }
-
-        if (ParameterSetName == "ListLog") {
-            foreach (EventLogDetails log in SearchEvents.DisplayEventLogsParallel(ListLog, MachineName, NumberOfThreads, token)) {
-                token.ThrowIfCancellationRequested();
-                if (AsArray) {
-                    results!.Add(log);
-                } else {
-                    WriteObject(log);
-                }
-            }
-        } else if (ParameterSetName == "PathEvents") {
-            // Handle file path queries
-            if (Expand == false) {
-                foreach (EventObject eventObject in SearchEvents.QueryLogFile(Path, EventId, ProviderName, Keywords, Level, StartTime, EndTime, UserId, MaxEvents, null, TimePeriod, Oldest, NamedDataFilter, NamedDataExcludeFilter, token)) {
-                    token.ThrowIfCancellationRequested();
-                    if (!MessageMatches(eventObject) || !ShouldOutput(eventObject)) {
-                        continue;
-                    }
-                    if (AsArray) {
-                        results!.Add(eventObject);
-                    } else {
-                        WriteObject(eventObject);
-                    }
-                }
-            } else {
-                foreach (EventObject eventObject in SearchEvents.QueryLogFile(Path, EventId, ProviderName, Keywords, Level, StartTime, EndTime, UserId, MaxEvents, null, TimePeriod, Oldest, NamedDataFilter, NamedDataExcludeFilter, token)) {
-                    token.ThrowIfCancellationRequested();
-                    if (!MessageMatches(eventObject) || !ShouldOutput(eventObject)) {
-                        continue;
-                    }
-                    if (AsArray) {
-                        results!.Add(GetExpandedObject(eventObject));
-                    } else {
-                        ReturnExpandedObject(eventObject);
-                    }
-                }
-            }
-        } else {
-            if (ParameterSetName == "NamedEvents") {
+        PrepareRecordProcessing(token);
+        if (ParameterSetName == "NamedEvents") {
                 // let's find the events prepared for search
                 List<NamedEvents> typeList = Type.ToList();
-                await foreach (EventObjectSlim eventObject in SearchEvents.FindEventsByNamedEvents(typeList, MachineName, StartTime, EndTime, TimePeriod, maxThreads: NumberOfThreads, maxEvents: MaxEvents, cancellationToken: token)) {
+                int namedEventThreads = DisableParallel.IsPresent
+                    ? 1
+                    : MaxConcurrency;
+                var namedQueryInfo = new NamedEventsQueryExecutionInfo();
+                Func<EventObjectSlim, bool>? namedResultPredicate = MessageRegex == null
+                    ? null
+                    : eventObject => MessageMatches(eventObject.Event);
+                NamedEventEnrichmentOptions? enrichmentOptions = ResolveDns
+                    ? new NamedEventEnrichmentOptions {
+                        ResolveDns = true,
+                        DnsTimeoutMilliseconds = DnsTimeoutMs,
+                        DnsMaxConcurrency = DnsMaxConcurrency,
+                        RetryDnsOnTransient = false
+                    }
+                    : null;
+                var namedQuery =
+                    new NamedEventQuery(typeList) {
+                        MachineNames = MachineName,
+                        StartTime = StartTime,
+                        EndTime = EndTime,
+                        TimePeriod = TimePeriod,
+                        SourceLogName =
+                            LogName.SingleOrDefault(),
+                        SourceEventIds =
+                            EventId,
+                        MaxConcurrency =
+                            namedEventThreads,
+                        MaxEvents = MaxEvents,
+                        MaxCandidates =
+                            MaxEventsScanned,
+                        MinimumRecordIdExclusiveResolver =
+                            GetCheckpointLowerBound,
+                        CandidateObserver =
+                            candidate =>
+                                TrackCheckpointProgress(
+                                    candidate),
+                        Oldest = EffectiveOldest,
+                        ReadMode =
+                            ReadMode,
+                        ResultPredicate =
+                            namedResultPredicate,
+                        Enrichment =
+                            enrichmentOptions,
+                        MessageCulture =
+                            MessageCulture,
+                        FallbackMessageCulture =
+                            FallbackMessageCulture,
+                        Credential =
+                            Credential?.GetNetworkCredential(),
+                        Authentication =
+                            Authentication,
+                        RemoteConnectionTimeoutMilliseconds =
+                            EffectiveRemoteConnectionTimeoutMilliseconds,
+                        RemoteReadTimeoutMilliseconds =
+                            EffectiveRemoteReadTimeoutMilliseconds,
+                        BufferCapacity =
+                            BufferCapacity > 0
+                                ? BufferCapacity
+                                : 64,
+                        ContinueOnRemoteFailure =
+                            ContinueOnError.IsPresent ||
+                            (MachineName?.Count ?? 0) > 1,
+                        IncludeBookmark =
+                            IncludeBookmark.IsPresent
+                    };
+                await foreach (EventObjectSlim eventObject in
+                               NamedEventEngine.ReadAsync(
+                                   namedQuery,
+                                   namedQueryInfo,
+                                   token)) {
                     token.ThrowIfCancellationRequested();
-                    if (!MessageMatches(eventObject._eventObject) || !ShouldOutput(eventObject._eventObject)) {
+                    if (!TrackCheckpointProgress(eventObject.Event)) {
                         continue;
                     }
+                    object output = Expand
+                        ? GetExpandedObject(eventObject, eventObject.Event)
+                        : eventObject;
                     if (AsArray) {
-                        results!.Add(eventObject);
+                        results!.Add(output);
                     } else {
-                        WriteObject(eventObject);
+                        WriteObject(output);
+                    }
+                    _eventsOutput++;
+                    if (OutputLimitReached) {
+                        break;
                     }
                 }
-            } else {
-                if (Expand == false) {
-                    // Let's find the events by generic log name, event id, machine name, provider name, keywords, level, start time, end time, user id, and max events.
-                    if (ParallelOption == ParallelOption.Disabled) {
-                        if (MachineName == null) {
-                            foreach (EventObject eventObject in SearchEvents.QueryLog(LogName, EventId, null, ProviderName, Keywords, Level, StartTime, EndTime, UserId, MaxEvents, EventRecordId, TimePeriod, token)) {
-                                token.ThrowIfCancellationRequested();
-                                if (!MessageMatches(eventObject) || !ShouldOutput(eventObject)) {
-                                    continue;
-                                }
-                                if (AsArray) {
-                                    results!.Add(eventObject);
-                                } else {
-                                    WriteObject(eventObject);
-                                }
-                            }
-                        } else {
-                            foreach (string? machine in MachineName) {
-                                token.ThrowIfCancellationRequested();
-                                foreach (EventObject eventObject in SearchEvents.QueryLog(LogName, EventId, machine, ProviderName, Keywords, Level, StartTime, EndTime, UserId, MaxEvents, EventRecordId, TimePeriod, token)) {
-                                    token.ThrowIfCancellationRequested();
-                                    if (!MessageMatches(eventObject)) {
-                                        continue;
-                                    }
-                                    if (AsArray) {
-                                        results!.Add(eventObject);
-                                    } else {
-                                        WriteObject(eventObject);
-                                    }
-                                }
-                            }
-                        }
-                    } else if (ParallelOption == ParallelOption.Parallel) {
-                        await foreach (EventObject eventObject in SearchEvents.QueryLogsParallel(LogName, EventId, MachineName, ProviderName, Keywords, Level, StartTime, EndTime, UserId, MaxEvents, NumberOfThreads, EventRecordId, TimePeriod, token)) {
-                            token.ThrowIfCancellationRequested();
-                            if (!MessageMatches(eventObject) || !ShouldOutput(eventObject)) {
-                                continue;
-                            }
-                            if (AsArray) {
-                                results!.Add(eventObject);
-                            } else {
-                                WriteObject(eventObject);
-                            }
-                        }
-                    }
-                } else {
-                    // Let's find objects, but we will expand the properties of the object from Data to the PSObject.
-                    if (ParallelOption == ParallelOption.Disabled) {
-                        if (MachineName == null) {
-                            foreach (EventObject eventObject in SearchEvents.QueryLog(LogName, EventId, null, ProviderName, Keywords, Level, StartTime, EndTime, UserId, MaxEvents, EventRecordId, TimePeriod, token)) {
-                                token.ThrowIfCancellationRequested();
-                                if (!MessageMatches(eventObject) || !ShouldOutput(eventObject)) {
-                                    continue;
-                                }
-                                if (AsArray) {
-                                    results!.Add(GetExpandedObject(eventObject));
-                                } else {
-                                    ReturnExpandedObject(eventObject);
-                                }
-                            }
-                        } else {
-                            foreach (string? machine in MachineName) {
-                                token.ThrowIfCancellationRequested();
-                                foreach (EventObject eventObject in SearchEvents.QueryLog(LogName, EventId, machine, ProviderName, Keywords, Level, StartTime, EndTime, UserId, MaxEvents, EventRecordId, TimePeriod, token)) {
-                                    token.ThrowIfCancellationRequested();
-                                    if (!MessageMatches(eventObject) || !ShouldOutput(eventObject)) {
-                                        continue;
-                                    }
-                                    if (AsArray) {
-                                        results!.Add(GetExpandedObject(eventObject));
-                                    } else {
-                                        ReturnExpandedObject(eventObject);
-                                    }
-                                }
-                            }
-                        }
-                    } else if (ParallelOption == ParallelOption.Parallel) {
-                        await foreach (EventObject eventObject in SearchEvents.QueryLogsParallel(LogName, EventId, MachineName, ProviderName, Keywords, Level, StartTime, EndTime, UserId, MaxEvents, NumberOfThreads, EventRecordId, TimePeriod, token)) {
-                            token.ThrowIfCancellationRequested();
-                            if (!MessageMatches(eventObject) || !ShouldOutput(eventObject)) {
-                                continue;
-                            }
-                            if (AsArray) {
-                                results!.Add(GetExpandedObject(eventObject));
-                            } else {
-                                ReturnExpandedObject(eventObject);
-                            }
-                        }
-                    }
-                }
-            }
+                WriteNamedTargetFailures(
+                    namedQueryInfo.TargetFailures);
+        } else {
+            ProcessNativeEvents(token, results);
         }
 
-        // If AsArray is specified, output all results as an array
-        if (AsArray && results != null) {
-            WriteObject(results.ToArray(), false);
-        }
-
-        return;
+        WriteArrayResult(results);
     }
 
-    private bool ShouldOutput(EventObject eventObject) {
-        if (_resumeRecordId.HasValue && eventObject.RecordId.HasValue && eventObject.RecordId.Value <= _resumeRecordId.Value) {
-            return false;
+    private void WriteNamedTargetFailures(
+        IReadOnlyList<EventLogQueryTargetFailure> failures) {
+
+        foreach (EventLogQueryTargetFailure failure in failures) {
+            ErrorCategory category = failure.Kind switch {
+                EventLogRemoteQueryFailureKind.AccessDenied =>
+                    ErrorCategory.PermissionDenied,
+                EventLogRemoteQueryFailureKind.Timeout =>
+                    ErrorCategory.OperationTimeout,
+                EventLogRemoteQueryFailureKind.HostUnavailable =>
+                    ErrorCategory.ResourceUnavailable,
+                _ => ErrorCategory.ReadError
+            };
+            string message =
+                string.IsNullOrWhiteSpace(
+                    failure.Message)
+                    ? $"Failed to read '{failure.LogName}' on '{failure.MachineName}'."
+                    : failure.Message;
+            WriteError(
+                new ErrorRecord(
+                    new InvalidOperationException(
+                        message),
+                    "EVXNamedEventTargetFailed",
+                    category,
+                    $"{failure.LogName} on {failure.MachineName}"));
         }
-        if (eventObject.RecordId.HasValue) {
-            var id = eventObject.RecordId.Value;
-            if (!_highestRecordId.HasValue || id > _highestRecordId.Value) {
-                _highestRecordId = id;
-            }
-        }
-        return true;
     }
-    /// <summary>
-    /// Returns the expanded object - it takes the EventObject and returns the PSObject with the properties expanded from the Data property.
-    /// </summary>
-    /// <param name="eventObject">The event object.</param>
-    private void ReturnExpandedObject(EventObject eventObject) {
-        PSObject outputObj = GetExpandedObject(eventObject);
-        WriteObject(outputObj);
+
+    private bool HasManagedPostReadFilter =>
+        MessageRegex != null ||
+        _managedProviderPatterns.Length > 0 ||
+        UsesCheckpoint;
+
+    private bool UsesManagedOutputSelection =>
+        (MessageRegex != null ||
+         _managedProviderPatterns.Length > 0) &&
+        !UsesCheckpoint &&
+        MaxEvents > 0 &&
+        MaxEventsScanned <= 0;
+
+    private void ProcessEventResult(EventObject eventObject, List<object>? results) {
+        if (!TrackCheckpointProgress(eventObject) ||
+            !ProviderMatches(eventObject) ||
+            !MessageMatches(eventObject)) {
+            return;
+        }
+
+        object output = Expand ? GetExpandedObject(eventObject) : eventObject;
+        if (AsArray) {
+            results!.Add(output);
+        } else {
+            WriteObject(output);
+        }
+        _eventsOutput++;
     }
 
     /// <summary>
@@ -470,10 +595,21 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
     /// <param name="eventObject">The event object.</param>
     /// <returns>PSObject with expanded properties.</returns>
     private PSObject GetExpandedObject(EventObject eventObject) {
-        PSObject outputObj = new(eventObject); // => it's the preferred way to create a wrapper pso when you already know it's not a pso
-                                               // PSObject outputObj = PSObject.AsPSObject(eventObject); => this is the preferred way to convert from PSO to PSObject
+        return GetExpandedObject(eventObject, eventObject);
+    }
+
+    /// <summary>
+    /// Creates an expanded PSObject around the selected output projection using structured data from its source event.
+    /// </summary>
+    /// <param name="output">Object that remains the PowerShell base object.</param>
+    /// <param name="eventObject">Source event whose structured data is expanded.</param>
+    /// <returns>PSObject with non-conflicting structured data properties.</returns>
+    private static PSObject GetExpandedObject(object output, EventObject eventObject) {
+        PSObject outputObj = new(output);
         foreach (var property in eventObject.Data.OrderBy(static d => d.Key, StringComparer.OrdinalIgnoreCase)) {
-            outputObj.Properties.Add(new PSNoteProperty(property.Key, property.Value));
+            if (outputObj.Properties[property.Key] == null) {
+                outputObj.Properties.Add(new PSNoteProperty(property.Key, property.Value));
+            }
         }
         return outputObj;
     }
@@ -492,14 +628,12 @@ public sealed class CmdletGetEVXEvent : AsyncPSCmdlet {
         return MessageRegex.IsMatch(message);
     }
 
-    /// <summary>
-    /// Saves the highest processed record ID to <see cref="RecordIdFile"/> when processing completes.
-    /// </summary>
-    protected override Task EndProcessingAsync() {
-        if (!string.IsNullOrEmpty(RecordIdFile) && _highestRecordId.HasValue) {
-            _recordMap[_recordIdKey] = _highestRecordId.Value;
-            File.WriteAllText(RecordIdFile, JsonSerializer.Serialize(_recordMap));
-        }
-        return Task.CompletedTask;
+    private bool ProviderMatches(EventObject eventObject) {
+        return _managedProviderPatterns.Length == 0 ||
+               _managedProviderPatterns.Any(pattern =>
+                   pattern.IsMatch(
+                       eventObject.ProviderName ??
+                       string.Empty));
     }
+
 }

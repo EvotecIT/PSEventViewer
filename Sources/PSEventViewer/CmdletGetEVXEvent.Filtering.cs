@@ -1,0 +1,286 @@
+using System.Collections;
+using System.Net;
+
+namespace PSEventViewer;
+
+public sealed partial class CmdletGetEVXEvent {
+    private void ConfigureBatch(EventLogBatchQuery batch) {
+        batch.MaxEvents = GetNativeCandidateLimit();
+        batch.MaxConcurrency = DisableParallel.IsPresent
+            ? 1
+            : MaxConcurrency;
+        batch.ContinueOnError = ContinueOnError;
+        batch.FailureHandler = failure => WriteError(new ErrorRecord(
+            failure.Exception,
+            "EVXEventQuerySourceFailed",
+            ErrorCategory.ReadError,
+            string.IsNullOrWhiteSpace(failure.MachineName)
+                ? failure.Source
+                : $"{failure.Source} on {failure.MachineName}"));
+    }
+
+    private EventFilter CreateCommandFilter() {
+        (DateTime? resolvedStart, DateTime? resolvedEnd) =
+            EventTimeRange.Resolve(StartTime, EndTime, TimePeriod);
+        byte[]? levels = Level?
+            .Select(value => {
+                if (value < byte.MinValue || value > byte.MaxValue) {
+                    throw new PSArgumentOutOfRangeException(
+                        nameof(Level),
+                        value,
+                        "Event levels must be between 0 and 255.");
+                }
+                return (byte)value;
+            })
+            .ToArray();
+
+        return new EventFilter {
+            EventIds = EventId,
+            RecordIds = EventRecordId,
+            ProviderNames = ProviderName,
+            Levels = levels,
+            Keywords = Keywords,
+            StartTime = resolvedStart,
+            EndTime = resolvedEnd,
+            UserIds = UserId,
+            NamedData = ConvertNamedData(NamedDataFilter),
+            ExcludedNamedData = ConvertNamedData(NamedDataExcludeFilter)
+        };
+    }
+
+    private EventFilter CopyFilterWithCheckpoint(
+        EventFilter source,
+        string? machineName,
+        string sourceName,
+        bool sourceIsFile = false) {
+
+        return new EventFilter {
+            EventIds = source.EventIds,
+            RecordIds = source.RecordIds,
+            MinimumRecordIdExclusive =
+                GetCheckpointLowerBound(
+                    machineName,
+                    sourceName,
+                    sourceIsFile),
+            MaximumRecordIdExclusive = source.MaximumRecordIdExclusive,
+            ProviderNames = source.ProviderNames,
+            Levels = source.Levels,
+            Keywords = source.Keywords,
+            StartTime = source.StartTime,
+            EndTime = source.EndTime,
+            UserIds = source.UserIds,
+            Data = source.Data,
+            NamedData = source.NamedData,
+            ExcludedNamedData = source.ExcludedNamedData,
+            ExcludedEventIds = source.ExcludedEventIds
+        };
+    }
+
+    private static EventFilter WithProviders(
+        EventFilter source,
+        IReadOnlyList<string> providerNames) {
+
+        return new EventFilter {
+            EventIds = source.EventIds,
+            RecordIds = source.RecordIds,
+            MinimumRecordIdExclusive = source.MinimumRecordIdExclusive,
+            MaximumRecordIdExclusive = source.MaximumRecordIdExclusive,
+            ProviderNames = providerNames,
+            Levels = source.Levels,
+            Keywords = source.Keywords,
+            StartTime = source.StartTime,
+            EndTime = source.EndTime,
+            UserIds = source.UserIds,
+            Data = source.Data,
+            NamedData = source.NamedData,
+            ExcludedNamedData = source.ExcludedNamedData,
+            ExcludedEventIds = source.ExcludedEventIds
+        };
+    }
+
+    private static IReadOnlyDictionary<string, IReadOnlyList<string>>?
+        ConvertNamedData(Hashtable? table) {
+
+        if (table == null || table.Count == 0) {
+            return null;
+        }
+        var converted = new Dictionary<string, IReadOnlyList<string>>(
+            StringComparer.Ordinal);
+        foreach (DictionaryEntry entry in table) {
+            string key = ConvertNamedDataValue(entry.Key);
+            if (key.Length == 0) {
+                throw new PSArgumentException(
+                    "Named-data filter keys cannot be empty.");
+            }
+            IEnumerable values =
+                entry.Value is string || entry.Value is not IEnumerable enumerable
+                    ? new[] { entry.Value }
+                    : enumerable;
+            converted[key] = values
+                .Cast<object?>()
+                .Select(static value => ConvertNamedDataValue(value))
+                .ToArray();
+        }
+        return converted;
+    }
+
+    private static string ConvertNamedDataValue(object? value) {
+        if (value is PSObject psObject) {
+            value = psObject.BaseObject;
+        }
+        return EventFilterValueConverter.ToInvariantString(value);
+    }
+
+    private static string[] NormalizeRequiredValues(
+        IEnumerable<string> values,
+        string parameterName) {
+
+        string[] normalized = values
+            .Select(static value => value?.Trim() ?? string.Empty)
+            .Where(static value => value.Length > 0)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        if (normalized.Length == 0) {
+            throw new PSArgumentException(
+                $"Parameter '{parameterName}' requires at least one non-empty value.");
+        }
+        return normalized;
+    }
+
+    private IReadOnlyList<string> ExpandFilePaths(
+        IEnumerable<string> values,
+        string parameterName) {
+
+        var paths = new HashSet<string>(
+            StringComparer.OrdinalIgnoreCase);
+        foreach (string value in NormalizeRequiredValues(
+                     values,
+                     parameterName)) {
+            if (!WildcardPattern.ContainsWildcardCharacters(value)) {
+                paths.Add(System.IO.Path.GetFullPath(
+                    value.Trim().Trim('"', '\'')));
+                continue;
+            }
+            ProviderInfo provider;
+            foreach (string resolved in
+                     SessionState.Path.GetResolvedProviderPathFromPSPath(
+                         value,
+                         out provider)) {
+                if (!string.Equals(
+                        provider.Name,
+                        "FileSystem",
+                        StringComparison.OrdinalIgnoreCase)) {
+                    throw new PSArgumentException(
+                        $"Path pattern '{value}' resolved through provider '{provider.Name}', but event log paths must use FileSystem.");
+                }
+                paths.Add(System.IO.Path.GetFullPath(resolved));
+            }
+        }
+        if (paths.Count == 0) {
+            throw new ItemNotFoundException(
+                $"No event log files matched parameter '{parameterName}'.");
+        }
+        return paths
+            .OrderBy(static path => path, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
+
+    private IReadOnlyList<string> ExpandChannelPatterns(
+        IReadOnlyList<string> values,
+        string? machineName) {
+
+        if (!values.Any(WildcardPattern.ContainsWildcardCharacters)) {
+            return values;
+        }
+        var query = new EventLogCatalogQuery {
+            MachineName = machineName,
+            Credential = Credential?.GetNetworkCredential(),
+            Authentication = Authentication,
+            ConnectionTimeoutMilliseconds =
+                EffectiveRemoteConnectionTimeoutMilliseconds,
+            Culture = MessageCulture
+        };
+        IReadOnlyList<string> channels =
+            EventLogCatalog.GetChannelNames(
+                query,
+                values,
+                includeAnalyticDebug: Force.IsPresent,
+                cancellationToken: CancelToken);
+        if (channels.Count == 0) {
+            throw new ItemNotFoundException(
+                $"No event channels match pattern(s) '{string.Join(", ", values)}' on '{machineName ?? Environment.MachineName}'.");
+        }
+        return channels;
+    }
+
+    private void ValidateRawXPathCombination(
+        string? rawXPath,
+        EventFilter filter) {
+
+        if (string.IsNullOrWhiteSpace(rawXPath)) {
+            return;
+        }
+        if (filter.HasAny) {
+            throw new PSArgumentException(
+                "FilterXPath cannot be combined with EventId, EventRecordId, ProviderName, Keywords, Level, StartTime, EndTime, TimePeriod, UserId, or named-data filters.");
+        }
+        if (UsesCheckpoint) {
+            throw new PSArgumentException(
+                "FilterXPath cannot be combined with RecordIdFile because an opaque XPath cannot be safely rewritten. Use BookmarkXml or include the record boundary in FilterXPath.");
+        }
+    }
+
+    private void ValidateRemoteCredentialTargets(
+        IReadOnlyList<string?> machines) {
+
+        if (Credential == null) {
+            return;
+        }
+        if (machines.Any(static machine =>
+                EventLogTarget.IsLocalMachine(machine))) {
+            throw new PSArgumentException(
+                "Credential can only be used when every MachineName is remote.");
+        }
+    }
+
+    private void ValidateBookmarkFanOut(int sourceCount) {
+        if (string.IsNullOrWhiteSpace(BookmarkXml)) {
+            if (MyInvocation.BoundParameters.ContainsKey(
+                    nameof(BookmarkOffset)) ||
+                IgnoreStaleBookmark) {
+                throw new PSArgumentException(
+                    "BookmarkOffset and IgnoreStaleBookmark require BookmarkXml.");
+            }
+            return;
+        }
+        if (UsesCheckpoint) {
+            throw new PSArgumentException(
+                "BookmarkXml and RecordIdFile are separate resume models and cannot be combined.");
+        }
+        if (sourceCount != 1) {
+            throw new PSArgumentException(
+                "BookmarkXml can target exactly one independent query source.");
+        }
+    }
+
+    private EventLogBatchQuery ConsolidateAndValidateBookmarkFanOut(
+        EventLogBatchQuery batch) {
+
+        EventLogBatchQuery consolidated =
+            EventLogBatchConsolidator.Consolidate(batch);
+        int sourceCount = checked(
+            consolidated.ChannelQueries.Count +
+            consolidated.FileQueries.Count +
+            consolidated.StructuredQueries.Sum(
+                static query =>
+                    query.GetIndependentSourceCount()));
+        ValidateBookmarkFanOut(sourceCount);
+        return consolidated;
+    }
+
+    private long GetNativeCandidateLimit() {
+        if (MaxEventsScanned > 0) {
+            return MaxEventsScanned;
+        }
+        return HasManagedPostReadFilter ? 0 : MaxEvents;
+    }}

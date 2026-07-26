@@ -9,6 +9,8 @@ namespace EventViewerX.Reports.Security;
 public sealed class SecurityAccountLockoutsReport {
     /// <summary>Number of scanned events passed into the builder.</summary>
     public int Scanned { get; set; }
+    /// <summary>True when at least one additional matching event existed beyond the requested cap.</summary>
+    public bool Truncated { get; set; }
     /// <summary>Number of matched events (typically equals <see cref="Scanned"/> unless caller filters).</summary>
     public int Matched { get; set; }
     /// <summary>Minimum event time (UTC) among matched events.</summary>
@@ -35,8 +37,8 @@ public sealed class SecurityAccountLockoutsReport {
 /// Sample row for a single 4740 event.
 /// </summary>
 public sealed class SecurityAccountLockoutSample {
-    /// <summary>Event time (UTC).</summary>
-    public DateTime TimeCreatedUtc { get; set; }
+    /// <summary>Event time (UTC), or null when the source record has no timestamp.</summary>
+    public DateTime? TimeCreatedUtc { get; set; }
     /// <summary>Event ID (typically 4740).</summary>
     public int Id { get; set; }
     /// <summary>Computer name the event was logged on.</summary>

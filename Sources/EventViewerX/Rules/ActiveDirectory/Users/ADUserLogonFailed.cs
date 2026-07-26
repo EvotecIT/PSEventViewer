@@ -129,37 +129,37 @@ public class ADUserLogonFailed : EventRuleBase {
 
     /// <summary>Initialises a failed logon wrapper from an event record.</summary>
     public ADUserLogonFailed(EventObject eventObject) : base(eventObject) {
-        _eventObject = eventObject;
+        Event = eventObject;
         Type = "ADUserLogonFailed";
-        Computer = _eventObject.ComputerName;
-        Action = _eventObject.MessageSubject;
-        //Who = _eventObject.GetSubjectAccountOrEmpty();
-        Who = _eventObject.GetDataValueOrEmpty(KnownEventField.WorkstationName);
-        ObjectAffected = _eventObject.GetTargetAccountOrEmpty();
-        IpAddress = _eventObject.GetDataValueOrEmpty(KnownEventField.IpAddress);
-        IpPort = _eventObject.GetDataValueOrEmpty(KnownEventField.IpPort);
-        //WorkstationName = _eventObject.GetDataValueOrEmpty(KnownEventField.WorkstationName);
-        LogonProcessName = _eventObject.GetDataValueOrEmpty(KnownEventField.LogonProcessName);
-        LogonType = _eventObject.TryGetDataEnum(KnownEventField.LogonType, out EventViewerX.LogonType parsedLogonType, EventFieldNumericBase.Decimal)
+        Computer = Event.ComputerName;
+        Action = Event.MessageSubject;
+        //Who = Event.GetSubjectAccountOrEmpty();
+        Who = Event.GetDataValueOrEmpty(KnownEventField.WorkstationName);
+        ObjectAffected = Event.GetTargetAccountOrEmpty();
+        IpAddress = Event.GetDataValueOrEmpty(KnownEventField.IpAddress);
+        IpPort = Event.GetDataValueOrEmpty(KnownEventField.IpPort);
+        //WorkstationName = Event.GetDataValueOrEmpty(KnownEventField.WorkstationName);
+        LogonProcessName = Event.GetDataValueOrEmpty(KnownEventField.LogonProcessName);
+        LogonType = Event.TryGetDataEnum(KnownEventField.LogonType, out EventViewerX.LogonType parsedLogonType, EventFieldNumericBase.Decimal)
             ? parsedLogonType
             : null;
-        Status = _eventObject.TryGetDataEnum(KnownEventField.Status, out StatusCode parsedStatus, EventFieldNumericBase.Hexadecimal)
+        Status = Event.TryGetDataEnum(KnownEventField.Status, out StatusCode parsedStatus, EventFieldNumericBase.Hexadecimal)
             ? parsedStatus
             : null;
-        SubStatus = _eventObject.TryGetDataEnum(KnownEventField.SubStatus, out SubStatusCode parsedSubStatus, EventFieldNumericBase.Hexadecimal)
+        SubStatus = Event.TryGetDataEnum(KnownEventField.SubStatus, out SubStatusCode parsedSubStatus, EventFieldNumericBase.Hexadecimal)
             ? parsedSubStatus
             : null;
-        FailureReason = _eventObject.TryGetDataEnum(KnownEventField.FailureReason, out EventViewerX.FailureReason parsedFailureReason, EventFieldNumericBase.Decimal, "%%")
+        FailureReason = Event.TryGetDataEnum(KnownEventField.FailureReason, out EventViewerX.FailureReason parsedFailureReason, EventFieldNumericBase.Decimal, "%%")
             ? parsedFailureReason
             : null;
 
-        LmPackageName = _eventObject.GetDataValueOrEmpty(KnownEventField.LmPackageName);
-        KeyLength = _eventObject.GetDataValueOrEmpty(KnownEventField.KeyLength);
-        ProcessId = _eventObject.GetDataValueOrEmpty(KnownEventField.ProcessId);
-        ProcessName = _eventObject.GetDataValueOrEmpty(KnownEventField.ProcessName);
-        TransmittedServices = _eventObject.GetDataValueOrEmpty(KnownEventField.TransmittedServices);
-        PackageName = _eventObject.GetDataValueOrEmpty(KnownEventField.AuthenticationPackageName);
-        When = _eventObject.TimeCreated;
+        LmPackageName = Event.GetDataValueOrEmpty(KnownEventField.LmPackageName);
+        KeyLength = Event.GetDataValueOrEmpty(KnownEventField.KeyLength);
+        ProcessId = Event.GetDataValueOrEmpty(KnownEventField.ProcessId);
+        ProcessName = Event.GetDataValueOrEmpty(KnownEventField.ProcessName);
+        TransmittedServices = Event.GetDataValueOrEmpty(KnownEventField.TransmittedServices);
+        PackageName = Event.GetDataValueOrEmpty(KnownEventField.AuthenticationPackageName);
+        When = Event.TimeCreated;
     }
 
     /// <summary>

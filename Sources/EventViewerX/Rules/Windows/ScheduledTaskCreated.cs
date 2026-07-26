@@ -29,11 +29,11 @@ public class ScheduledTaskCreated : EventRuleBase {
 
     /// <summary>Initialises a scheduled-task-created wrapper from an event record.</summary>
     public ScheduledTaskCreated(EventObject eventObject) : base(eventObject) {
-        _eventObject = eventObject;
+        Event = eventObject;
         Type = "ScheduledTaskCreated";
-        Computer = _eventObject.ComputerName;
-        TaskName = _eventObject.GetValueFromDataDictionary("TaskName");
-        var taskContent = _eventObject.GetValueFromDataDictionary("TaskContent");
+        Computer = Event.ComputerName;
+        TaskName = Event.GetValueFromDataDictionary("TaskName");
+        var taskContent = Event.GetValueFromDataDictionary("TaskContent");
         if (!string.IsNullOrEmpty(taskContent)) {
             try {
                 var xml = System.Xml.Linq.XDocument.Parse(taskContent);
@@ -46,7 +46,7 @@ public class ScheduledTaskCreated : EventRuleBase {
                 // ignore malformed XML
             }
         }
-        When = _eventObject.TimeCreated;
+        When = Event.TimeCreated;
     }
 }
 

@@ -36,10 +36,8 @@ jobs:
         shell: pwsh
 
       - name: Refresh module manifest
-        env:
-          RefreshPSD1Only: 'true'
         run: |
-          .\Build\Build-Module.ps1
+          .\Build\Build-Module.ps1 -ConfigurationGateMode Manifest
         shell: pwsh
 
       - name: Upload refreshed manifest
@@ -117,4 +115,3 @@ jobs:
       - name: Run PowerShell tests
         shell: pwsh
         run: .\PSEventViewer.Tests.ps1
-

@@ -6,6 +6,8 @@ namespace EventViewerX.Reports.QueryHelpers;
 internal static class QueryValidationHelpers {
     internal static bool IsNegative(int value) => value < 0;
 
+    internal static bool IsNegative(long value) => value < 0;
+
     internal static bool IsNonPositiveWhenProvided(int? value) => value.HasValue && value.Value <= 0;
 
     internal static bool HasInvalidUtcRange(DateTime? startUtc, DateTime? endUtc) =>

@@ -50,16 +50,16 @@ public class ADUserStatus : EventRuleBase {
 
     /// <summary>Initialises a user status change wrapper from an event record.</summary>
     public ADUserStatus(EventObject eventObject) : base(eventObject) {
-        _eventObject = eventObject;
+        Event = eventObject;
         Type = "ADUsersStatus";
 
-        Computer = _eventObject.ComputerName;
-        Action = _eventObject.MessageSubject;
+        Computer = Event.ComputerName;
+        Action = Event.MessageSubject;
 
-        UserAffected = _eventObject.GetTargetAccountOrEmpty();
+        UserAffected = Event.GetTargetAccountOrEmpty();
 
-        Who = _eventObject.GetSubjectAccountOrEmpty();
-        When = _eventObject.TimeCreated;
+        Who = Event.GetSubjectAccountOrEmpty();
+        When = Event.TimeCreated;
     }
 }
 

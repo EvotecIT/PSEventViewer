@@ -94,20 +94,20 @@ namespace EventViewerX.Rules.ActiveDirectory {
         /// <summary>Initialises a detailed OU change wrapper from an event record.</summary>
         public ADOrganizationalUnitChangeDetailed(EventObject eventObject) : base(eventObject) {
             // common fields
-            _eventObject = eventObject;
+            Event = eventObject;
             Type = "ADOrganizationalUnitChangeDetailed";
-            Computer = _eventObject.ComputerName;
-            Action = _eventObject.MessageSubject;
-            Who = _eventObject.GetSubjectAccountOrEmpty();
-            When = _eventObject.TimeCreated;
+            Computer = Event.ComputerName;
+            Action = Event.MessageSubject;
+            Who = Event.GetSubjectAccountOrEmpty();
+            When = Event.TimeCreated;
 
-            OperationType = ConvertFromOperationType(_eventObject.GetDataValueOrEmpty("OperationType"));
-            OrganizationalUnit = _eventObject.GetValueFromDataDictionary("ObjectDN");
-            FieldChanged = _eventObject.GetValueFromDataDictionary("AttributeLDAPDisplayName");
-            FieldValue = _eventObject.GetValueFromDataDictionary("AttributeValue");
+            OperationType = ConvertFromOperationType(Event.GetDataValueOrEmpty("OperationType"));
+            OrganizationalUnit = Event.GetValueFromDataDictionary("ObjectDN");
+            FieldChanged = Event.GetValueFromDataDictionary("AttributeLDAPDisplayName");
+            FieldValue = Event.GetValueFromDataDictionary("AttributeValue");
             // OverwriteByField logic
-            OrganizationalUnit = OverwriteByField(Action, "A directory service object was moved.", OrganizationalUnit, _eventObject.GetValueFromDataDictionary("OldObjectDN"));
-            FieldValue = OverwriteByField(Action, "A directory service object was moved.", FieldValue, _eventObject.GetValueFromDataDictionary("NewObjectDN"));
+            OrganizationalUnit = OverwriteByField(Action, "A directory service object was moved.", OrganizationalUnit, Event.GetValueFromDataDictionary("OldObjectDN"));
+            FieldValue = OverwriteByField(Action, "A directory service object was moved.", FieldValue, Event.GetValueFromDataDictionary("NewObjectDN"));
 
             //OperationType = OverwriteByField(Action, "A directory service object was created.", OperationType, "Organizational Unit Created");
             //OperationType = OverwriteByField(Action, "A directory service object was deleted.", OperationType, "Organizational Unit Deleted");

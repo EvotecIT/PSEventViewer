@@ -46,20 +46,16 @@ public class TestSubscriptionsXml
     }
 
     [Fact]
-    public void SetCollectorSubscriptionXml_RejectsInvalidRoot()
+    public void SetCollectorSubscriptionEnabled_DoesNotCreateMissingSubscription()
     {
-        // Does not hit registry because it fails validation first
-        var badXml = "<NotSubscription></NotSubscription>";
-        var ex = Assert.Throws<ArgumentException>(() => SearchEvents.SetCollectorSubscriptionXml("UnitTest", badXml));
-        Assert.Contains("Root element must be <Subscription>", ex.Message);
-    }
+        if (!OperatingSystem.IsWindows()) return;
 
-    [Fact]
-    public void SetCollectorSubscriptionXml_RejectsDtd()
-    {
-        // DTD is prohibited by validation to avoid XXE-style issues
-        var dtdXml = "<!DOCTYPE foo [ <!ELEMENT foo ANY > ]><Subscription></Subscription>";
-        var ex = Assert.Throws<ArgumentException>(() => SearchEvents.SetCollectorSubscriptionXml("UnitTest", dtdXml));
-        Assert.Contains("Invalid XML content", ex.Message);
+        string name = $"EventViewerX-Missing-{Guid.NewGuid():N}";
+
+        Assert.Throws<FileNotFoundException>(() =>
+            CollectorSubscriptionManager
+                .SetCollectorSubscriptionEnabled(
+                    name,
+                    enabled: true));
     }
 }

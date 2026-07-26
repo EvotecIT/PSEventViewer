@@ -217,7 +217,7 @@ internal static class EventsHelper {
             return null;
         }
 
-        if (value.StartsWith("%%")) {
+        if (value.StartsWith("%%", StringComparison.Ordinal)) {
             value = value.Trim('%');
         }
 
@@ -239,7 +239,7 @@ internal static class EventsHelper {
             return null;
         }
 
-        if (value.StartsWith("%%")) {
+        if (value.StartsWith("%%", StringComparison.Ordinal)) {
             value = value.Trim('%');
         }
 
@@ -261,7 +261,7 @@ internal static class EventsHelper {
             return null;
         }
 
-        if (value.StartsWith("%%")) {
+        if (value.StartsWith("%%", StringComparison.Ordinal)) {
             value = value.Trim('%');
         }
 

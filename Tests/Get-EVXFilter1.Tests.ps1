@@ -7,13 +7,18 @@
         $XPath = Get-EVXFilter -NamedDataFilter @{ FieldName = ('Value1','Value2') } -LogName 'xx' -XPathOnly
         $Xpath | Should -Be '*[EventData[Data[@Name=''FieldName''] = ''Value1'' or Data[@Name=''FieldName''] = ''Value2'']]'
     }
-    It '-NamedDataExcludeFilter should return single named filter query "!="' {
-        $XPath = Get-EVXFilter -NamedDataExcludeFilter @{ FieldName = 'Value1' } -LogName 'xx' -XPathOnly
-        $Xpath | Should -Be '*[EventData[Data[@Name=''FieldName''] != ''Value1'']]'
+    It '-NamedDataExcludeFilter should emit a single named suppression' {
+        [xml] $FilterXml = Get-EVXFilter -NamedDataExcludeFilter @{ FieldName = 'Value1' } -LogName 'xx'
+        $FilterXml.QueryList.Query.Select.'#text' | Should -Be '*'
+        $FilterXml.QueryList.Query.Suppress.'#text' | Should -Be '*[EventData[Data[@Name=''FieldName''] = ''Value1'']]'
     }
-    It '-NamedDataExcludeFilter two-value array should return "and"ed named filter query "!="' {
-        $XPath = Get-EVXFilter -NamedDataExcludeFilter @{ FieldName = ('Value1','Value2') } -LogName 'xx' -XPathOnly
-        $Xpath | Should -Be '*[EventData[Data[@Name=''FieldName''] != ''Value1'' and Data[@Name=''FieldName''] != ''Value2'']]'
+    It '-NamedDataExcludeFilter should suppress every configured value' {
+        [xml] $FilterXml = Get-EVXFilter -NamedDataExcludeFilter @{ FieldName = ('Value1','Value2') } -LogName 'xx'
+        $FilterXml.QueryList.Query.Suppress.'#text' | Should -Be '*[EventData[Data[@Name=''FieldName''] = ''Value1'' or Data[@Name=''FieldName''] = ''Value2'']]'
+    }
+    It '-NamedDataExcludeFilter should reject unsafe XPathOnly output' {
+        { Get-EVXFilter -NamedDataExcludeFilter @{ FieldName = 'Value1' } -LogName 'xx' -XPathOnly } |
+            Should -Throw '*Suppress*'
     }
 }
 

@@ -26,7 +26,7 @@ public sealed class LiveStatsQueryRequest {
     /// <summary>
     /// Maximum events scanned from the live channel.
     /// </summary>
-    public int MaxEventsScanned { get; set; }
+    public long MaxEventsScanned { get; set; }
 
     /// <summary>
     /// Read direction. When true, reads oldest to newest.
@@ -64,7 +64,8 @@ public sealed class LiveStatsQueryRequest {
     public int TopComputers { get; set; } = 10;
 
     /// <summary>
-    /// Optional session timeout override in milliseconds.
+    /// Optional remote session-establishment and per-read timeout override in
+    /// milliseconds.
     /// </summary>
     public int? SessionTimeoutMs { get; set; }
 }
@@ -78,6 +79,12 @@ public enum LiveStatsQueryFailureKind {
     /// </summary>
     InvalidArgument,
 
+    /// <summary>The supplied XPath expression is invalid.</summary>
+    InvalidQuery,
+
+    /// <summary>The requested event log channel does not exist.</summary>
+    LogNotFound,
+
     /// <summary>
     /// Access to event logs was denied.
     /// </summary>
@@ -87,6 +94,9 @@ public enum LiveStatsQueryFailureKind {
     /// Event log session or read timed out.
     /// </summary>
     Timeout,
+
+    /// <summary>The target host or Event Log RPC endpoint is unavailable.</summary>
+    HostUnavailable,
 
     /// <summary>
     /// Unexpected failure.
@@ -159,6 +169,11 @@ public sealed class TopComputerRow {
 /// </summary>
 public sealed class LiveStatsQueryResult {
     /// <summary>
+    /// Effective machine queried. The local machine name is used when no remote target was supplied.
+    /// </summary>
+    public string MachineName { get; set; } = string.Empty;
+
+    /// <summary>
     /// Queried log name.
     /// </summary>
     public string LogName { get; set; } = string.Empty;
@@ -176,17 +191,22 @@ public sealed class LiveStatsQueryResult {
     /// <summary>
     /// Maximum scanned events cap used by query.
     /// </summary>
-    public int MaxEventsScanned { get; set; }
+    public long MaxEventsScanned { get; set; }
 
     /// <summary>
     /// Number of scanned events.
     /// </summary>
-    public int ScannedEvents { get; set; }
+    public long ScannedEvents { get; set; }
+
+    /// <summary>
+    /// Number of matched events whose source record did not expose a level.
+    /// </summary>
+    public long EventsWithoutLevel { get; set; }
 
     /// <summary>
     /// Number of matched events (after time filters).
     /// </summary>
-    public int MatchedEvents { get; set; }
+    public long MatchedEvents { get; set; }
 
     /// <summary>
     /// Indicates whether scanning stopped at cap.

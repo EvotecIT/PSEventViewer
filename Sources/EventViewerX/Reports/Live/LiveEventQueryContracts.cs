@@ -23,9 +23,9 @@ public sealed class LiveEventQueryRequest {
     public string? MachineName { get; set; }
 
     /// <summary>
-    /// Maximum events to return. Use 0 for unlimited.
+    /// Maximum events to return. Defaults to 1,000; set 0 explicitly for unlimited materialization.
     /// </summary>
-    public int MaxEvents { get; set; }
+    public int MaxEvents { get; set; } = 1000;
 
     /// <summary>
     /// Read direction. When true, reads oldest to newest.
@@ -43,7 +43,8 @@ public sealed class LiveEventQueryRequest {
     public int MaxMessageChars { get; set; } = 4000;
 
     /// <summary>
-    /// Optional session timeout override in milliseconds.
+    /// Optional remote session-establishment and per-read timeout override in
+    /// milliseconds.
     /// </summary>
     public int? SessionTimeoutMs { get; set; }
 }
@@ -57,6 +58,12 @@ public enum LiveEventQueryFailureKind {
     /// </summary>
     InvalidArgument,
 
+    /// <summary>The supplied XPath expression is invalid.</summary>
+    InvalidQuery,
+
+    /// <summary>The requested event log channel does not exist.</summary>
+    LogNotFound,
+
     /// <summary>
     /// Access to event logs was denied.
     /// </summary>
@@ -66,6 +73,9 @@ public enum LiveEventQueryFailureKind {
     /// Event log session or read timed out.
     /// </summary>
     Timeout,
+
+    /// <summary>The target host or Event Log RPC endpoint is unavailable.</summary>
+    HostUnavailable,
 
     /// <summary>
     /// Unexpected failure.
@@ -93,9 +103,9 @@ public sealed class LiveEventQueryFailure {
 /// </summary>
 public sealed class LiveEventRow {
     /// <summary>
-    /// Event creation time in UTC (ISO-8601).
+    /// Event creation time in UTC (ISO-8601), or <see langword="null"/> when the source record has no timestamp.
     /// </summary>
-    public string TimeCreatedUtc { get; set; } = string.Empty;
+    public string? TimeCreatedUtc { get; set; }
 
     /// <summary>
     /// Event ID.
@@ -103,9 +113,9 @@ public sealed class LiveEventRow {
     public int Id { get; set; }
 
     /// <summary>
-    /// Event record ID.
+    /// Event record ID, or <see langword="null"/> when the source record does not expose one.
     /// </summary>
-    public long RecordId { get; set; }
+    public long? RecordId { get; set; }
 
     /// <summary>
     /// Source log name.
@@ -118,9 +128,10 @@ public sealed class LiveEventRow {
     public string ProviderName { get; set; } = string.Empty;
 
     /// <summary>
-    /// Numeric event level.
+    /// Numeric event level, or <see langword="null"/> when the source record
+    /// does not expose one.
     /// </summary>
-    public long Level { get; set; }
+    public long? Level { get; set; }
 
     /// <summary>
     /// Localized level name.
@@ -128,19 +139,22 @@ public sealed class LiveEventRow {
     public string LevelDisplayName { get; set; } = string.Empty;
 
     /// <summary>
-    /// Task value.
+    /// Task value, or <see langword="null"/> when the source record does not
+    /// expose one.
     /// </summary>
-    public long Task { get; set; }
+    public long? Task { get; set; }
 
     /// <summary>
-    /// Opcode value.
+    /// Opcode value, or <see langword="null"/> when the source record does not
+    /// expose one.
     /// </summary>
-    public long Opcode { get; set; }
+    public long? Opcode { get; set; }
 
     /// <summary>
-    /// Keywords bitmask value.
+    /// Keywords bitmask value, or <see langword="null"/> when the source record
+    /// does not expose one.
     /// </summary>
-    public long Keywords { get; set; }
+    public long? Keywords { get; set; }
 
     /// <summary>
     /// Computer name.
@@ -162,6 +176,11 @@ public sealed class LiveEventRow {
 /// Query result for live event reads.
 /// </summary>
 public sealed class LiveEventQueryResult {
+    /// <summary>
+    /// Effective machine queried. The local machine name is used when no remote target was supplied.
+    /// </summary>
+    public string MachineName { get; set; } = string.Empty;
+
     /// <summary>
     /// Queried log name.
     /// </summary>

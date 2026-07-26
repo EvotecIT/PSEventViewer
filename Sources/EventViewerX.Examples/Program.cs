@@ -7,7 +7,7 @@
 //Examples.QueryParallelWithCount();
 
 //Examples.QueryParallelCompare();
-//Examples.QueryBasicParallelForEach();
+//await Examples.QueryBasicParallel();
 //Examples.QueryBasicForwardedEvents();
 
 //Examples.FindEventsTargetedBasic();
@@ -19,6 +19,6 @@
 
 //Examples.QueryBasicEventLogList();
 //Examples.WriteBasic();
-Examples.WriteAdvanced();
+Examples.WriteWithRawData();
 
 //Examples.GetProviders();

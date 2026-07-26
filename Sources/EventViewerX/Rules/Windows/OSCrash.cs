@@ -35,22 +35,22 @@ public class OSCrash : EventRuleBase {
 
     /// <summary>Initialises an OS crash wrapper from an event record.</summary>
     public OSCrash(EventObject eventObject) : base(eventObject) {
-        _eventObject = eventObject;
+        Event = eventObject;
 
         Type = "OSCrash";
-        Computer = _eventObject.ComputerName;
-        Action = _eventObject.GetValueFromDataDictionary("EventAction");
-        ObjectAffected = _eventObject.MachineName;
-        ActionDetails = _eventObject.MessageSubject;
-        var rawStartText = _eventObject.GetValueFromDataDictionary("StartTime") ??
-                           _eventObject.GetValueFromDataDictionary("#text") ??
-                           _eventObject.GetValueFromDataDictionary("ActionDetailsDateTime");
+        Computer = Event.ComputerName;
+        Action = Event.GetValueFromDataDictionary("EventAction");
+        ObjectAffected = Event.MachineName;
+        ActionDetails = Event.MessageSubject;
+        var rawStartText = Event.GetValueFromDataDictionary("StartTime") ??
+                           Event.GetValueFromDataDictionary("#text") ??
+                           Event.GetValueFromDataDictionary("ActionDetailsDateTime");
 
-        ActionTimestampUtc = RuleHelpers.ParseUnlabeledOsTimestamp(_eventObject)
+        ActionTimestampUtc = RuleHelpers.ParseUnlabeledOsTimestamp(Event)
                             ?? RuleHelpers.ParseDateTimeLoose(rawStartText)
-                            ?? _eventObject.TimeCreated.ToUniversalTime();
+                            ?? Event.TimeCreated.ToUniversalTime();
 
-        When = ActionTimestampUtc ?? _eventObject.TimeCreated;
+        When = ActionTimestampUtc ?? Event.TimeCreated;
 
         if (string.IsNullOrWhiteSpace(Action)) {
             Action = "Unexpected system shutdown";

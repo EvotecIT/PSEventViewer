@@ -30,16 +30,16 @@ public class ADComputerDeleted : EventRuleBase {
     /// <summary>Initialises a computer deletion wrapper from an event record.</summary>
     public ADComputerDeleted(EventObject eventObject) : base(eventObject) {
         // common fields
-        _eventObject = eventObject;
+        Event = eventObject;
         Type = "ADComputerDeleted";
 
-        Computer = _eventObject.ComputerName;
-        Action = _eventObject.MessageSubject;
+        Computer = Event.ComputerName;
+        Action = Event.MessageSubject;
 
-        ComputerAffected = _eventObject.GetTargetAccountOrEmpty();
+        ComputerAffected = Event.GetTargetAccountOrEmpty();
 
-        Who = _eventObject.GetSubjectAccountOrEmpty();
-        When = _eventObject.TimeCreated;
+        Who = Event.GetSubjectAccountOrEmpty();
+        When = Event.TimeCreated;
     }
 }
 

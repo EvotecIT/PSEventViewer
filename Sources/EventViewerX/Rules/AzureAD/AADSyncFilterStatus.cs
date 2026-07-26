@@ -38,12 +38,12 @@ public class AADSyncFilterStatus : EventRuleBase
     /// <param name="eventObject">Event describing the filter status.</param>
     public AADSyncFilterStatus(EventObject eventObject) : base(eventObject)
     {
-        _eventObject = eventObject;
+        Event = eventObject;
         Type = "AADSyncFilterStatus";
-        Computer = _eventObject.ComputerName;
-        When = _eventObject.TimeCreated;
+        Computer = Event.ComputerName;
+        When = Event.TimeCreated;
 
-        var msg = Rules.RuleHelpers.GetMessage(_eventObject);
+        var msg = Rules.RuleHelpers.GetMessage(Event);
         Enabled = msg.IndexOf("enabled", StringComparison.OrdinalIgnoreCase) >= 0;
         Connector = ExtractAfter(msg, "Connector");
     }

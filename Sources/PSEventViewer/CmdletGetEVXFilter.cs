@@ -25,7 +25,6 @@ namespace PSEventViewer;
 ///   <para>Emits only the XPath expression for use with custom tooling.</para>
 /// </example>
 [Cmdlet(VerbsCommon.Get, "EVXFilter")]
-[Alias("Get-EventViewerXFilter", "Get-WinEventFilter", "Get-EventsFilter")]
 [OutputType(typeof(string))]
 public sealed class CmdletGetEVXFilter : AsyncPSCmdlet {
     /// <summary>
@@ -124,7 +123,7 @@ public sealed class CmdletGetEVXFilter : AsyncPSCmdlet {
     /// Builds the XPath filter based on specified parameters.
     /// </summary>
     protected override Task ProcessRecordAsync() {
-        var output = SearchEvents.BuildWinEventFilter(
+        var output = WindowsEventFilterBuilder.BuildWinEventFilter(
             ID,
             EventRecordID,
             StartTime,

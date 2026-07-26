@@ -48,6 +48,11 @@ public sealed class NamedEventsTimelineQueryRequest {
     public int MaxEvents { get; set; } = 500;
 
     /// <summary>
+    /// Maximum raw event candidates evaluated before named-event and correlation filtering. Zero disables the scan cap.
+    /// </summary>
+    public int MaxEventsScanned { get; set; } = 5000;
+
+    /// <summary>
     /// Maximum query concurrency.
     /// </summary>
     public int MaxThreads { get; set; } = 4;
@@ -310,6 +315,21 @@ public sealed class NamedEventsTimelineQueryResult {
     public int MaxEvents { get; set; }
 
     /// <summary>
+    /// Maximum raw candidate scan cap used by the query. Zero means unlimited.
+    /// </summary>
+    public int MaxEventsScanned { get; set; }
+
+    /// <summary>
+    /// Number of raw event candidates evaluated by named-event rules.
+    /// </summary>
+    public long EventsScanned { get; set; }
+
+    /// <summary>
+    /// Effective per-named-event output cap. Null means no per-name cap.
+    /// </summary>
+    public int? MaxEventsPerNamedEvent { get; set; }
+
+    /// <summary>
     /// Maximum worker concurrency used by the query.
     /// </summary>
     public int MaxThreads { get; set; }
@@ -330,9 +350,40 @@ public sealed class NamedEventsTimelineQueryResult {
     public int BucketMinutes { get; set; }
 
     /// <summary>
-    /// Indicates event collection hit max events cap.
+    /// Indicates an output/scan/per-name cap or an isolated target failure made the result incomplete.
     /// </summary>
     public bool Truncated { get; set; }
+
+    /// <summary>
+    /// Indicates another matching timeline row existed beyond the output cap.
+    /// </summary>
+    public bool OutputTruncated { get; set; }
+
+    /// <summary>
+    /// Indicates another raw candidate existed beyond the candidate scan cap.
+    /// </summary>
+    public bool ScanTruncated { get; set; }
+
+    /// <summary>
+    /// Indicates one or more named-event categories had additional rows beyond the per-name cap.
+    /// </summary>
+    public bool PerNamedEventTruncated { get; set; }
+
+    /// <summary>
+    /// Named-event categories that had additional rows beyond the per-name cap.
+    /// </summary>
+    public IReadOnlyList<string> TruncatedNamedEvents { get; set; } = Array.Empty<string>();
+
+    /// <summary>
+    /// Indicates that one or more requested remote targets could not be queried.
+    /// </summary>
+    public bool Incomplete { get; set; }
+
+    /// <summary>
+    /// Expected per-target failures isolated while other requested targets continued.
+    /// </summary>
+    public IReadOnlyList<EventLogQueryTargetFailure> TargetFailures { get; set; } =
+        Array.Empty<EventLogQueryTargetFailure>();
 
     /// <summary>
     /// Indicates correlation groups were truncated by max group cap.

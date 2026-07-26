@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Diagnostics.Eventing.Reader;
 using System.Threading;
 using EventViewerX.Reports.QueryHelpers;
@@ -73,41 +74,50 @@ public static class LiveEventQueryExecutor {
 
         try {
             var rows = new List<LiveEventRow>();
+            bool truncated = false;
+            long readLimit =
+                request.MaxEvents > 0 &&
+                request.MaxEvents < int.MaxValue
+                    ? request.MaxEvents + 1L
+                    : request.MaxEvents;
+            EventLogChannelQuery query =
+                LiveEventChannelQueryFactory.Create(
+                    request.LogName,
+                    request.MachineName,
+                    xpath,
+                    readLimit,
+                    request.OldestFirst,
+                    request.IncludeMessage
+                    ? EventReadMode.Message
+                    : EventReadMode.Metadata,
+                    request.SessionTimeoutMs);
 
-            foreach (var ev in SearchEvents.QueryLogXPath(
-                         logName: request.LogName,
-                         xpath: xpath,
-                         machineName: request.MachineName,
-                         maxEvents: request.MaxEvents,
-                         oldest: request.OldestFirst,
-                         cancellationToken: cancellationToken,
-                         sessionTimeoutMs: request.SessionTimeoutMs)) {
+            foreach (EventObject ev in
+                     EventLogEngine.ReadChannel(
+                         query,
+                         cancellationToken)) {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                rows.Add(new LiveEventRow {
-                    TimeCreatedUtc = ev.TimeCreated.ToUniversalTime().ToString("O"),
-                    Id = ev.Id,
-                    RecordId = ev.RecordId ?? 0,
-                    LogName = ev.LogName ?? string.Empty,
-                    ProviderName = ev.ProviderName ?? string.Empty,
-                    Level = (long)(ev.Level ?? 0),
-                    LevelDisplayName = ev.LevelDisplayName ?? string.Empty,
-                    Task = (long)(ev.Task ?? 0),
-                    Opcode = (long)(ev.Opcode ?? 0),
-                    Keywords = (long)(ev.Keywords ?? 0),
-                    MachineName = ev.MachineName ?? string.Empty,
-                    UserSid = EventProjectionHelpers.SafeGetUserSid(ev),
-                    Message = request.IncludeMessage
-                        ? EventProjectionHelpers.TruncateSafe(EventProjectionHelpers.SafeGetMessage(ev), request.MaxMessageChars)
-                        : null
-                });
+                if (request.MaxEvents > 0 && rows.Count >= request.MaxEvents) {
+                    truncated = true;
+                    break;
+                }
+
+                rows.Add(
+                    ProjectRow(
+                        ev,
+                        request.IncludeMessage,
+                        request.MaxMessageChars));
             }
 
             result = new LiveEventQueryResult {
+                MachineName = string.IsNullOrWhiteSpace(request.MachineName)
+                    ? Environment.MachineName
+                    : request.MachineName!.Trim(),
                 LogName = request.LogName,
                 XPath = xpath,
                 Count = rows.Count,
-                Truncated = request.MaxEvents > 0 && rows.Count >= request.MaxEvents,
+                Truncated = truncated,
                 Events = rows
             };
             failure = null;
@@ -128,10 +138,48 @@ public static class LiveEventQueryExecutor {
                 Message = ex.Message
             };
             return false;
+        } catch (EventLogSessionException ex) {
+            result = new LiveEventQueryResult();
+            failure = new LiveEventQueryFailure {
+                Kind = LiveEventQueryFailureKind.HostUnavailable,
+                Message = ex.Message
+            };
+            return false;
+        } catch (EventLogNotFoundException ex) {
+            result = new LiveEventQueryResult();
+            failure = new LiveEventQueryFailure {
+                Kind = LiveEventQueryFailureKind.LogNotFound,
+                Message = ex.Message
+            };
+            return false;
+        } catch (Win32Exception ex) {
+            result = new LiveEventQueryResult();
+            failure = new LiveEventQueryFailure {
+                Kind = QueryFailureHelpers.Classify(ex) switch {
+                    NativeQueryFailureKind.InvalidQuery =>
+                        LiveEventQueryFailureKind.InvalidQuery,
+                    NativeQueryFailureKind.LogNotFound =>
+                        LiveEventQueryFailureKind.LogNotFound,
+                    NativeQueryFailureKind.AccessDenied =>
+                        LiveEventQueryFailureKind.AccessDenied,
+                    NativeQueryFailureKind.Timeout =>
+                        LiveEventQueryFailureKind.Timeout,
+                    NativeQueryFailureKind.HostUnavailable =>
+                        LiveEventQueryFailureKind.HostUnavailable,
+                    _ =>
+                        LiveEventQueryFailureKind.Exception
+                },
+                Message = ex.Message
+            };
+            return false;
         } catch (EventLogException ex) {
             result = new LiveEventQueryResult();
             failure = new LiveEventQueryFailure {
-                Kind = QueryFailureHelpers.IsTimeoutLike(ex.Message) ? LiveEventQueryFailureKind.Timeout : LiveEventQueryFailureKind.Exception,
+                Kind = QueryFailureHelpers.IsInvalidEventQuery(ex)
+                    ? LiveEventQueryFailureKind.InvalidQuery
+                    : QueryFailureHelpers.IsTimeoutLike(ex.Message)
+                        ? LiveEventQueryFailureKind.Timeout
+                        : LiveEventQueryFailureKind.Exception,
                 Message = ex.Message
             };
             return false;
@@ -150,5 +198,50 @@ public static class LiveEventQueryExecutor {
             };
             return false;
         }
+    }
+
+    internal static string? FormatTimeCreatedUtc(
+        DateTime timeCreated) {
+
+        return timeCreated == DateTime.MinValue
+            ? null
+            : timeCreated
+                .ToUniversalTime()
+                .ToString("O");
+    }
+
+    internal static LiveEventRow ProjectRow(
+        EventObject eventObject,
+        bool includeMessage,
+        int maxMessageChars) {
+
+        return new LiveEventRow {
+            TimeCreatedUtc = FormatTimeCreatedUtc(
+                eventObject.TimeCreated),
+            Id = eventObject.Id,
+            RecordId = eventObject.RecordId,
+            LogName = eventObject.LogName ??
+                      string.Empty,
+            ProviderName = eventObject.ProviderName ??
+                           string.Empty,
+            Level = eventObject.Level,
+            LevelDisplayName =
+                eventObject.LevelDisplayName ??
+                string.Empty,
+            Task = eventObject.Task,
+            Opcode = eventObject.Opcode,
+            Keywords = eventObject.Keywords,
+            MachineName = eventObject.MachineName ??
+                          string.Empty,
+            UserSid =
+                EventProjectionHelpers.SafeGetUserSid(
+                    eventObject),
+            Message = includeMessage
+                ? EventProjectionHelpers.TruncateSafe(
+                    EventProjectionHelpers.SafeGetMessage(
+                        eventObject),
+                    maxMessageChars)
+                : null
+        };
     }
 }

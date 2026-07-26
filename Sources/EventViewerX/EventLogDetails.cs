@@ -6,6 +6,8 @@ namespace EventViewerX;
 /// Describes configuration and status of a single event log.
 /// </summary>
 public class EventLogDetails {
+    private readonly List<EventLogDetailsDiagnostic> _diagnostics = new();
+
     /// <summary>Machine that hosts the log.</summary>
     public string MachineName { get; set; } = string.Empty;
     /// <summary>Name of the log.</summary>
@@ -51,11 +53,11 @@ public class EventLogDetails {
     /// <summary>Current file size in bytes.</summary>
     public long? FileSize { get; set; }
     /// <summary>Maximum configured file size in bytes.</summary>
-    public long? FileSizeMaximum;
+    public long? FileSizeMaximum { get; set; }
     /// <summary>Current file size in megabytes.</summary>
-    public double? FileSizeCurrentMB;
+    public double? FileSizeCurrentMB { get; set; }
     /// <summary>Maximum file size in megabytes.</summary>
-    public double? FileSizeMaximumMB;
+    public double? FileSizeMaximumMB { get; set; }
     /// <summary>Total number of records.</summary>
     public long? RecordCount { get; set; }
     /// <summary>Oldest record number.</summary>
@@ -66,60 +68,95 @@ public class EventLogDetails {
     public bool IsClassicLog { get; set; }
 
     /// <summary>Newest event timestamp.</summary>
-    public DateTime? NewestEvent;
+    public DateTime? NewestEvent { get; set; }
     /// <summary>Oldest event timestamp.</summary>
-    public DateTime? OldestEvent;
+    public DateTime? OldestEvent { get; set; }
     /// <summary>Additional log attributes.</summary>
     public int? Attributes { get; set; }
+
+    /// <summary>Property-level failures captured while constructing this otherwise usable snapshot.</summary>
+    public IReadOnlyList<EventLogDetailsDiagnostic> Diagnostics => _diagnostics;
+
+    /// <summary>True when one or more configuration or runtime-information properties could not be projected.</summary>
+    public bool HasDiagnostics => _diagnostics.Count > 0;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="EventLogDetails"/> class.
     /// </summary>
-    /// <param name="internalLogger">Logger used for warnings.</param>
+    /// <param name="internalLogger">Compatibility logger parameter; property failures are retained in <see cref="Diagnostics"/>.</param>
     /// <param name="machineName">Name of the computer hosting the log.</param>
     /// <param name="logConfig">Event log configuration.</param>
     /// <param name="logInfoObj">Optional log information object.</param>
     public EventLogDetails(InternalLogger internalLogger, string machineName, EventLogConfiguration logConfig, EventLogInformation? logInfoObj) {
-        LogName = logConfig.LogName ?? string.Empty;
-        LogType = logConfig.LogType.ToString();
-        IsEnabled = logConfig.IsEnabled;
-        MaximumSizeInBytes = logConfig.MaximumSizeInBytes;
-        LogFilePath = logConfig.LogFilePath ?? string.Empty;
-        LogIsolation = logConfig.LogIsolation;
-        LogMode = logConfig.LogMode.ToString();
-        OwningProviderName = logConfig.OwningProviderName ?? string.Empty;
-        try {
-            ProviderNames = new List<string>(logConfig.ProviderNames);
-        } catch (Exception ex) {
-            internalLogger.WriteWarning($"Couldn't get provider names for {LogName} on {machineName}. Error: {ex.Message}");
-            ProviderNames = new List<string>();
-        }
-        ProviderBufferSize = logConfig.ProviderBufferSize.GetValueOrDefault();
-        ProviderMinimumNumberOfBuffers = logConfig.ProviderMinimumNumberOfBuffers.GetValueOrDefault();
-        ProviderMaximumNumberOfBuffers = logConfig.ProviderMaximumNumberOfBuffers.GetValueOrDefault();
-        ProviderLatency = logConfig.ProviderLatency.GetValueOrDefault();
-        ProviderControlGuid = logConfig.ProviderControlGuid?.ToString() ?? string.Empty;
-        SecurityDescriptor = logConfig.SecurityDescriptor ?? string.Empty;
-        ProviderLevel = logConfig.ProviderLevel?.ToString() ?? string.Empty;
-        ProviderKeywords = logConfig.ProviderKeywords?.ToString() ?? string.Empty;
-        IsClassicLog = logConfig.IsClassicLog;
+        if (internalLogger == null) throw new ArgumentNullException(nameof(internalLogger));
+        if (logConfig == null) throw new ArgumentNullException(nameof(logConfig));
+
+        MachineName = machineName ?? string.Empty;
+        Capture(EventLogDetailsReadStage.Configuration, nameof(logConfig.LogName), () => logConfig.LogName ?? string.Empty, value => LogName = value, EventLogDetailsStatus.LogConfigurationUnavailable);
+        Capture(EventLogDetailsReadStage.Configuration, nameof(logConfig.LogType), () => logConfig.LogType.ToString(), value => LogType = value, EventLogDetailsStatus.LogConfigurationUnavailable);
+        Capture(EventLogDetailsReadStage.Configuration, nameof(logConfig.IsEnabled), () => logConfig.IsEnabled, value => IsEnabled = value, EventLogDetailsStatus.LogConfigurationUnavailable);
+        Capture(EventLogDetailsReadStage.Configuration, nameof(logConfig.MaximumSizeInBytes), () => logConfig.MaximumSizeInBytes, value => MaximumSizeInBytes = value, EventLogDetailsStatus.LogConfigurationUnavailable);
+        Capture(EventLogDetailsReadStage.Configuration, nameof(logConfig.LogFilePath), () => logConfig.LogFilePath ?? string.Empty, value => LogFilePath = value, EventLogDetailsStatus.LogConfigurationUnavailable);
+        Capture(EventLogDetailsReadStage.Configuration, nameof(logConfig.LogIsolation), () => logConfig.LogIsolation, value => LogIsolation = value, EventLogDetailsStatus.LogConfigurationUnavailable);
+        Capture(EventLogDetailsReadStage.Configuration, nameof(logConfig.LogMode), () => logConfig.LogMode.ToString(), value => LogMode = value, EventLogDetailsStatus.LogConfigurationUnavailable);
+        Capture(EventLogDetailsReadStage.Configuration, nameof(logConfig.OwningProviderName), () => logConfig.OwningProviderName ?? string.Empty, value => OwningProviderName = value, EventLogDetailsStatus.LogConfigurationUnavailable);
+        Capture(EventLogDetailsReadStage.Configuration, nameof(logConfig.ProviderNames), () => new List<string>(logConfig.ProviderNames), value => ProviderNames = value, EventLogDetailsStatus.LogConfigurationUnavailable);
+        Capture(EventLogDetailsReadStage.Configuration, nameof(logConfig.ProviderBufferSize), () => logConfig.ProviderBufferSize.GetValueOrDefault(), value => ProviderBufferSize = value, EventLogDetailsStatus.LogConfigurationUnavailable);
+        Capture(EventLogDetailsReadStage.Configuration, nameof(logConfig.ProviderMinimumNumberOfBuffers), () => logConfig.ProviderMinimumNumberOfBuffers.GetValueOrDefault(), value => ProviderMinimumNumberOfBuffers = value, EventLogDetailsStatus.LogConfigurationUnavailable);
+        Capture(EventLogDetailsReadStage.Configuration, nameof(logConfig.ProviderMaximumNumberOfBuffers), () => logConfig.ProviderMaximumNumberOfBuffers.GetValueOrDefault(), value => ProviderMaximumNumberOfBuffers = value, EventLogDetailsStatus.LogConfigurationUnavailable);
+        Capture(EventLogDetailsReadStage.Configuration, nameof(logConfig.ProviderLatency), () => logConfig.ProviderLatency.GetValueOrDefault(), value => ProviderLatency = value, EventLogDetailsStatus.LogConfigurationUnavailable);
+        Capture(EventLogDetailsReadStage.Configuration, nameof(logConfig.ProviderControlGuid), () => logConfig.ProviderControlGuid?.ToString() ?? string.Empty, value => ProviderControlGuid = value, EventLogDetailsStatus.LogConfigurationUnavailable);
+        Capture(EventLogDetailsReadStage.Configuration, nameof(logConfig.SecurityDescriptor), () => logConfig.SecurityDescriptor ?? string.Empty, value => SecurityDescriptor = value, EventLogDetailsStatus.LogConfigurationUnavailable);
+        Capture(EventLogDetailsReadStage.Configuration, nameof(logConfig.ProviderLevel), () => logConfig.ProviderLevel?.ToString() ?? string.Empty, value => ProviderLevel = value, EventLogDetailsStatus.LogConfigurationUnavailable);
+        Capture(EventLogDetailsReadStage.Configuration, nameof(logConfig.ProviderKeywords), () => logConfig.ProviderKeywords?.ToString() ?? string.Empty, value => ProviderKeywords = value, EventLogDetailsStatus.LogConfigurationUnavailable);
+        Capture(EventLogDetailsReadStage.Configuration, nameof(logConfig.IsClassicLog), () => logConfig.IsClassicLog, value => IsClassicLog = value, EventLogDetailsStatus.LogConfigurationUnavailable);
 
         if (logInfoObj != null) {
-            FileSize = logInfoObj.FileSize;
-            RecordCount = logInfoObj.RecordCount;
-            OldestRecordNumber = logInfoObj.OldestRecordNumber;
-            LastAccessTime = logInfoObj.LastAccessTime;
-            LastWriteTime = logInfoObj.LastWriteTime;
-            CreationTime = logInfoObj.CreationTime;
-
+            Capture(EventLogDetailsReadStage.RuntimeInformation, nameof(logInfoObj.FileSize), () => logInfoObj.FileSize, value => FileSize = value, EventLogDetailsStatus.LogInformationUnavailable);
+            Capture(EventLogDetailsReadStage.RuntimeInformation, nameof(logInfoObj.RecordCount), () => logInfoObj.RecordCount, value => RecordCount = value, EventLogDetailsStatus.LogInformationUnavailable);
+            Capture(EventLogDetailsReadStage.RuntimeInformation, nameof(logInfoObj.OldestRecordNumber), () => logInfoObj.OldestRecordNumber, value => OldestRecordNumber = value, EventLogDetailsStatus.LogInformationUnavailable);
+            Capture(EventLogDetailsReadStage.RuntimeInformation, nameof(logInfoObj.LastAccessTime), () => logInfoObj.LastAccessTime, value => LastAccessTime = value, EventLogDetailsStatus.LogInformationUnavailable);
+            Capture(EventLogDetailsReadStage.RuntimeInformation, nameof(logInfoObj.LastWriteTime), () => logInfoObj.LastWriteTime, value => LastWriteTime = value, EventLogDetailsStatus.LogInformationUnavailable);
+            Capture(EventLogDetailsReadStage.RuntimeInformation, nameof(logInfoObj.CreationTime), () => logInfoObj.CreationTime, value => CreationTime = value, EventLogDetailsStatus.LogInformationUnavailable);
+            Capture(EventLogDetailsReadStage.RuntimeInformation, nameof(logInfoObj.IsLogFull), () => logInfoObj.IsLogFull, value => IsLogFull = value, EventLogDetailsStatus.LogInformationUnavailable);
+            Capture(EventLogDetailsReadStage.RuntimeInformation, nameof(logInfoObj.Attributes), () => logInfoObj.Attributes, value => Attributes = value, EventLogDetailsStatus.LogInformationUnavailable);
             FileSizeCurrentMB = ConvertSize(FileSize, "B", "MB", 2);
-            IsLogFull = logInfoObj.IsLogFull;
-            Attributes = logInfoObj.Attributes;
         }
 
-        FileSizeMaximum = logConfig.MaximumSizeInBytes;
+        FileSizeMaximum = MaximumSizeInBytes;
         FileSizeMaximumMB = ConvertSize(FileSizeMaximum, "B", "MB", 2);
-        MachineName = machineName ?? string.Empty;
+    }
+
+    private void Capture<T>(
+        EventLogDetailsReadStage stage,
+        string propertyName,
+        Func<T> read,
+        Action<T> assign,
+        EventLogDetailsStatus fallbackStatus) {
+
+        try {
+            assign(read());
+        } catch (Exception ex) {
+            _diagnostics.Add(new EventLogDetailsDiagnostic {
+                Stage = stage,
+                PropertyName = propertyName,
+                Status = ClassifyProjectionFailure(ex, fallbackStatus),
+                ErrorType = ex.GetType().Name,
+                Message = $"Couldn't read {stage} property '{propertyName}' for '{(string.IsNullOrWhiteSpace(LogName) ? "event log" : LogName)}' on '{MachineName}': {ex.Message}"
+            });
+        }
+    }
+
+    private static EventLogDetailsStatus ClassifyProjectionFailure(Exception exception, EventLogDetailsStatus fallbackStatus) {
+        if (exception is EventLogSessionException sessionException) {
+            return EventLogCatalog.MapSessionFailureStatus(sessionException.Status);
+        }
+
+        return exception switch {
+            UnauthorizedAccessException => EventLogDetailsStatus.AccessDenied,
+            TimeoutException => EventLogDetailsStatus.Timeout,
+            _ => fallbackStatus
+        };
     }
 
     /// <summary>
@@ -137,7 +174,7 @@ public class EventLogDetails {
 
         double size = value.Value;
 
-        switch (fromUnit.ToUpper()) {
+        switch (fromUnit.ToUpperInvariant()) {
             case "B":
                 break;
             case "KB":
@@ -157,7 +194,7 @@ public class EventLogDetails {
                 break;
         }
 
-        switch (toUnit.ToUpper()) {
+        switch (toUnit.ToUpperInvariant()) {
             case "B":
                 break;
             case "KB":

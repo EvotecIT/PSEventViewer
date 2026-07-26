@@ -24,7 +24,6 @@ namespace PSEventViewer;
 ///   <para>Asks for confirmation prior to deletion.</para>
 /// </example>
 [Cmdlet(VerbsCommon.Remove, "EVXLog", SupportsShouldProcess = true)]
-[Alias("Remove-EventViewerXLog", "Remove-WinEventLog")]
 [OutputType(typeof(bool))]
 public sealed class CmdletRemoveEVXLog : AsyncPSCmdlet {
     /// <summary>
@@ -44,21 +43,15 @@ public sealed class CmdletRemoveEVXLog : AsyncPSCmdlet {
     /// Removes the specified log.
     /// </summary>
     protected override Task ProcessRecordAsync() {
-        var errorAction = GetErrorActionPreference();
         try {
             if (ShouldProcess($"{LogName} on {MachineName ?? "localhost"}", "Remove event log")) {
-                bool result = SearchEvents.RemoveLog(LogName, MachineName);
+                bool result = ClassicEventLogManager.RemoveLog(
+                    LogName,
+                    MachineName);
                 WriteObject(result);
-            } else {
-                WriteObject(false);
             }
         } catch (Exception ex) {
-            WriteWarning($"Remove-EVXLog - Error removing log {LogName}: {ex.Message}");
-            if (errorAction == ActionPreference.Stop) {
-                ThrowTerminatingError(new ErrorRecord(ex, "RemoveEVXLogFailed", ErrorCategory.InvalidOperation, LogName));
-            } else {
-                WriteObject(false);
-            }
+            WriteError(new ErrorRecord(ex, "RemoveEVXLogFailed", ErrorCategory.InvalidOperation, LogName));
         }
         return Task.CompletedTask;
     }

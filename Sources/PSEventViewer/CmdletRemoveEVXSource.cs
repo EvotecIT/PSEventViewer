@@ -25,7 +25,6 @@ using EventViewerX;
 ///   <para>Limits the lookup to the Application log when removing the source.</para>
 /// </example>
 [Cmdlet(VerbsCommon.Remove, "EVXSource", SupportsShouldProcess = true)]
-[Alias("Remove-EventViewerXSource", "Remove-WinEventSource")]
 [OutputType(typeof(bool))]
 public sealed class CmdletRemoveEVXSource : AsyncPSCmdlet {
     /// <summary>
@@ -52,18 +51,19 @@ public sealed class CmdletRemoveEVXSource : AsyncPSCmdlet {
     /// Removes the specified event source from the system.
     /// </summary>
     protected override Task ProcessRecordAsync() {
-        var errorAction = GetErrorActionPreference();
         try {
             string target = string.IsNullOrEmpty(MachineName)
                 ? SourceName
                 : $"{SourceName} on {MachineName}";
 
             if (!ShouldProcess(target, "Delete event source")) {
-                WriteObject(false);
                 return Task.CompletedTask;
             }
 
-            bool removed = SearchEvents.RemoveSource(SourceName, MachineName, LogName);
+            bool removed = ClassicEventLogManager.RemoveSource(
+                SourceName,
+                MachineName,
+                LogName);
             if (!removed) {
                 WriteWarning(string.IsNullOrEmpty(MachineName)
                     ? $"Remove-EVXSource - Source {SourceName} was not found."
@@ -72,12 +72,7 @@ public sealed class CmdletRemoveEVXSource : AsyncPSCmdlet {
 
             WriteObject(removed);
         } catch (Exception ex) {
-            WriteWarning($"Remove-EVXSource - Error removing source {SourceName}: {ex.Message}");
-            if (errorAction == ActionPreference.Stop) {
-                ThrowTerminatingError(new ErrorRecord(ex, "RemoveEVXSourceFailed", ErrorCategory.InvalidOperation, SourceName));
-            } else {
-                WriteObject(false);
-            }
+            WriteError(new ErrorRecord(ex, "RemoveEVXSourceFailed", ErrorCategory.InvalidOperation, SourceName));
         }
         return Task.CompletedTask;
     }

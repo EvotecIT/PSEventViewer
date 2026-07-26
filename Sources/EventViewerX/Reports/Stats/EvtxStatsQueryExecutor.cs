@@ -35,7 +35,8 @@ public static class EvtxStatsQueryExecutor {
             StartTimeUtc = request.StartTimeUtc,
             EndTimeUtc = request.EndTimeUtc,
             MaxEvents = request.MaxEventsScanned,
-            OldestFirst = request.OldestFirst
+            OldestFirst = request.OldestFirst,
+            ReadMode = EventReadMode.Metadata
         };
 
         if (!EvtxStatsReportBuilder.TryBuildFromFile(evtxRequest, out var report, out failure, cancellationToken)) {
@@ -49,7 +50,8 @@ public static class EvtxStatsQueryExecutor {
             OldestFirst = request.OldestFirst,
             MaxEventsScanned = request.MaxEventsScanned,
             ScannedEvents = report.Scanned,
-            Truncated = request.MaxEventsScanned > 0 && report.Scanned >= request.MaxEventsScanned,
+            EventsWithoutLevel = report.EventsWithoutLevel,
+            Truncated = report.Truncated,
             TimeCreatedUtcMin = report.MinUtc,
             TimeCreatedUtcMax = report.MaxUtc,
             StartTimeUtc = request.StartTimeUtc,
@@ -116,11 +118,15 @@ public static class EvtxStatsQueryExecutor {
             return false;
         }
 
-        if (request.EventIds is not null && request.EventIds.Any(static id => id <= 0)) {
+        if (request.EventIds is not null &&
+            request.EventIds.Any(static id =>
+                id < EventIdValidation.Minimum ||
+                id > EventIdValidation.Maximum)) {
             result = new EvtxStatsQueryResult();
             failure = new EvtxQueryFailure {
                 Kind = EvtxQueryFailureKind.InvalidArgument,
-                Message = "eventIds must contain only positive values."
+                Message =
+                    $"eventIds must contain only values from {EventIdValidation.Minimum} through {EventIdValidation.Maximum}."
             };
             return false;
         }

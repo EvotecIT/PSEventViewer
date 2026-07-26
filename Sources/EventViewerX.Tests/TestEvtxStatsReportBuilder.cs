@@ -69,4 +69,66 @@ public class TestEvtxStatsReportBuilder {
         Assert.Equal(4, topLevels[0].Level);
         Assert.Equal(2, topLevels[0].Count);
     }
+
+    [Fact]
+    public void MissingTimestampsCountWithoutChangingExtrema() {
+        var builder =
+            new EvtxStatsReportBuilder();
+        DateTime valid =
+            new(
+                2026,
+                7,
+                25,
+                12,
+                0,
+                0,
+                DateTimeKind.Utc);
+
+        builder.Add(
+            id: 1,
+            timeCreatedUtc: DateTime.MinValue,
+            providerName: "Provider",
+            computerName: "Computer",
+            level: 4,
+            levelDisplayName: "Information");
+        builder.Add(
+            id: 2,
+            timeCreatedUtc: valid,
+            providerName: "Provider",
+            computerName: "Computer",
+            level: 4,
+            levelDisplayName: "Information");
+
+        Assert.Equal(2, builder.Scanned);
+        Assert.Equal(valid, builder.MinUtc);
+        Assert.Equal(valid, builder.MaxUtc);
+    }
+
+    [Fact]
+    public void BuiltReportDoesNotChangeWhenBuilderIsReused() {
+        var builder =
+            new EvtxStatsReportBuilder();
+        builder.Add(
+            id: 1,
+            timeCreatedUtc: DateTime.UtcNow,
+            providerName: "Provider",
+            computerName: "Computer",
+            level: 4,
+            levelDisplayName: "Information");
+        EvtxStatsReport first =
+            builder.Build();
+
+        builder.Add(
+            id: 2,
+            timeCreatedUtc: DateTime.UtcNow,
+            providerName: "Provider",
+            computerName: "Computer",
+            level: 4,
+            levelDisplayName: "Information");
+
+        Assert.Equal(1, first.Scanned);
+        Assert.Single(first.ByEventId);
+        Assert.Equal(1, first.ByEventId[1]);
+        Assert.Equal(1, first.ByLevel[4].Count);
+    }
 }

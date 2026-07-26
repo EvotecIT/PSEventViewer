@@ -4,6 +4,7 @@ using System.Threading;
 using Xunit;
 
 namespace EventViewerX.Tests {
+    [Collection("WatcherManager")]
     public class TestWatcherTimeout {
         [Fact]
         public void WatcherStopsAfterTimeout() {
@@ -12,10 +13,9 @@ namespace EventViewerX.Tests {
                 "timeoutTest",
                 Environment.MachineName,
                 "Application",
-                new List<int>(),
+                new List<int> { 1 },
                 new List<NamedEvents>(),
                 _ => { },
-                1,
                 false,
                 false,
                 0,
@@ -27,6 +27,29 @@ namespace EventViewerX.Tests {
                 "Watcher did not stop before timeout."
             );
             WatcherManager.StopAll();
+        }
+
+        [Fact]
+        public void WatcherRejectsTimeoutBeyondTaskDelayLimitBeforeStartup() {
+            TimeSpan unsupported =
+                WatcherInfo.MaximumSupportedTimeout +
+                TimeSpan.FromMilliseconds(1);
+
+            ArgumentOutOfRangeException exception =
+                Assert.Throws<ArgumentOutOfRangeException>(() =>
+                    new WatcherInfo(
+                        "unsupported-timeout",
+                        Environment.MachineName,
+                        "Application",
+                        new List<int> { 1 },
+                        new List<NamedEvents>(),
+                        _ => { },
+                        false,
+                        false,
+                        0,
+                        unsupported));
+
+            Assert.Equal("timeout", exception.ParamName);
         }
     }
 }

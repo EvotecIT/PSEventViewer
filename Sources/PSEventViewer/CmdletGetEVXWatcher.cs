@@ -24,7 +24,6 @@ namespace PSEventViewer {
     ///   <para>Retrieves a specific watcher instance using its identifier.</para>
     /// </example>
     [Cmdlet(VerbsCommon.Get, "EVXWatcher")]
-    [Alias("Get-EventViewerXWatcher")]
     [OutputType(typeof(WatcherInfo))]
     public sealed class CmdletGetEVXWatcher : PSCmdlet {
         /// <summary>

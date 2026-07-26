@@ -31,6 +31,31 @@ public class TestChannelPolicyDetailed
     }
 
     [Fact]
+    public void GetChannelPolicyRejectsAnUnboundedCatalogTimeout()
+    {
+        var query = new EventLogCatalogQuery {
+            ConnectionTimeoutMilliseconds = 0
+        };
+
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            EventLogChannelPolicyService.Get(
+                "Application",
+                query));
+    }
+
+    [Fact]
+    public void GetChannelPoliciesValidateTheQueryBeforeReturningTheStream()
+    {
+        var query = new EventLogCatalogQuery {
+            ConnectionTimeoutMilliseconds = 0
+        };
+
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            EventLogChannelPolicyService.GetMany(
+                query));
+    }
+
+    [Fact]
     public void GetChannelPolicies_ParallelEnumerates()
     {
         if (!OperatingSystem.IsWindows())
@@ -39,8 +64,8 @@ public class TestChannelPolicyDetailed
         }
 
         // Parallel enumeration should not throw and produce items when available
-        var items = SearchEvents
-            .GetChannelPolicies(machineName: null, includePatterns: new[] { "*" }, parallel: true, degreeOfParallelism: 2)
+        var items = EventLogChannelPolicyService
+            .GetMany(machineName: null, includePatterns: new[] { "*" }, parallel: true, degreeOfParallelism: 2)
             .Take(5)
             .ToList();
 
@@ -53,23 +78,56 @@ public class TestChannelPolicyDetailed
     }
 
     [Fact]
-    public void SetChannelPolicyDetailed_IsolationUnsupported_ReturnsPartialSuccess()
+    public void SetChannelPolicyDetailed_UnchangedValueReportsTruthfully()
     {
         if (!OperatingSystem.IsWindows())
         {
             return;
         }
 
-        var result = SearchEvents.SetChannelPolicyDetailed(new ChannelPolicy
-        {
-            LogName = "Application",
-            Isolation = EventLogIsolation.Application
-        });
+        ChannelPolicy existing =
+            EventLogChannelPolicyService.Get(
+                "Application") ??
+            throw new InvalidOperationException(
+                "Application log policy was unavailable.");
+        var result =
+            EventLogChannelPolicyService.ApplyDetailed(
+                new ChannelPolicy {
+                    LogName = "Application",
+                    MaximumSizeInBytes =
+                        existing.MaximumSizeInBytes
+                });
 
         Assert.NotNull(result);
-        Assert.False(result.Success);
-        Assert.True(result.PartialSuccess);
-        Assert.Contains("Isolation", result.SkippedOrUnsupported);
+        Assert.True(result.Success);
+        Assert.False(result.PartialSuccess);
+        Assert.False(result.Changed);
+        Assert.Contains(
+            "MaximumSizeInBytes",
+            result.RequestedProperties);
+        Assert.Contains(
+            "MaximumSizeInBytes",
+            result.UnchangedProperties);
+        Assert.Empty(result.AppliedProperties);
         Assert.Empty(result.Errors);
+        Assert.NotNull(result.Before);
+        Assert.NotNull(result.After);
+    }
+
+    [Fact]
+    public void SavedPolicyResultWinsOverPostSaveCancellation() {
+        using var cancellation =
+            new CancellationTokenSource();
+        var applied = new List<string>();
+
+        EventLogChannelPolicyService.PersistChanges(
+            () => cancellation.Cancel(),
+            new[] { "MaximumSizeInBytes" },
+            applied,
+            cancellation.Token);
+
+        Assert.Equal(
+            new[] { "MaximumSizeInBytes" },
+            applied);
     }
 }

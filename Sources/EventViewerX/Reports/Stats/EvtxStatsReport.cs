@@ -13,6 +13,14 @@ public sealed class EvtxStatsReport {
     public int Scanned { get; set; }
 
     /// <summary>
+    /// Number of scanned events whose source record did not expose a level.
+    /// </summary>
+    public long EventsWithoutLevel { get; set; }
+
+    /// <summary>True when at least one additional matching event existed beyond the requested cap.</summary>
+    public bool Truncated { get; set; }
+
+    /// <summary>
     /// Minimum event time (UTC) among scanned events.
     /// </summary>
     public DateTime? MinUtc { get; set; }

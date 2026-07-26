@@ -57,9 +57,19 @@ public sealed class SecurityUserLogonsReportBuilder {
         _scanned++;
         _matched++;
 
-        var utc = ev.TimeCreated.ToUniversalTime();
-        if (!_minUtc.HasValue || utc < _minUtc.Value) _minUtc = utc;
-        if (!_maxUtc.HasValue || utc > _maxUtc.Value) _maxUtc = utc;
+        DateTime? utc =
+            SecurityAggregates.NormalizeUtc(
+                ev.TimeCreated);
+        if (utc.HasValue) {
+            if (!_minUtc.HasValue ||
+                utc.Value < _minUtc.Value) {
+                _minUtc = utc.Value;
+            }
+            if (!_maxUtc.HasValue ||
+                utc.Value > _maxUtc.Value) {
+                _maxUtc = utc.Value;
+            }
+        }
 
         SecurityAggregates.AddCount(_byEventId, ev.Id);
         SecurityAggregates.AddCount(_byComputer, ev.ComputerName ?? string.Empty);
@@ -181,27 +191,30 @@ public sealed class SecurityUserLogonsReportBuilder {
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns><see langword="true"/> when query succeeds; otherwise <see langword="false"/>.</returns>
     public static bool TryBuildFromFile(
-        EvtxQueryRequest request,
+        EvtxQueryRequest? request,
         bool includeSamples,
         int sampleSize,
         out SecurityUserLogonsReport report,
         out EvtxQueryFailure? failure,
         CancellationToken cancellationToken = default) {
-        var eventIds = request.EventIds ?? Array.Empty<int>();
+        var eventIds = request?.EventIds ?? Array.Empty<int>();
         var b = new SecurityUserLogonsReportBuilder(includeSamples, sampleSize, eventIds);
-        if (!EvtxQueryExecutor.TryForEachEvent(
+        if (!EvtxQueryExecutor.TryForEachEventWithInfo(
                 request,
                 ev => {
                     b.Add(ev);
                     return true;
                 },
+                out EvtxQueryExecutionInfo executionInfo,
                 out failure,
-                cancellationToken)) {
+                cancellationToken,
+                readModeOverride: EventReadMode.StructuredData)) {
             report = new SecurityUserLogonsReport();
             return false;
         }
 
         report = b.Build();
+        report.Truncated = executionInfo.Truncated;
         return true;
     }
 
@@ -214,16 +227,26 @@ public sealed class SecurityUserLogonsReportBuilder {
             Matched = _matched,
             MinUtc = _minUtc,
             MaxUtc = _maxUtc,
-            EventIds = _eventIds,
-            ByEventId = _byEventId,
-            ByTargetUser = _byTargetUser,
-            ByTargetDomain = _byTargetDomain,
-            ByLogonType = _byLogonType,
-            ByIpAddress = _byIp,
-            ByWorkstationName = _byWorkstation,
-            ByComputerName = _byComputer,
-            Samples = _samples
+            EventIds = _eventIds.ToArray(),
+            ByEventId =
+                new Dictionary<int, long>(
+                    _byEventId),
+            ByTargetUser = Copy(_byTargetUser),
+            ByTargetDomain = Copy(_byTargetDomain),
+            ByLogonType = Copy(_byLogonType),
+            ByIpAddress = Copy(_byIp),
+            ByWorkstationName = Copy(_byWorkstation),
+            ByComputerName = Copy(_byComputer),
+            Samples = _samples.ToArray()
         };
+    }
+
+    private static Dictionary<string, long> Copy(
+        Dictionary<string, long> source) {
+
+        return new Dictionary<string, long>(
+            source,
+            StringComparer.OrdinalIgnoreCase);
     }
 
     /// <summary>

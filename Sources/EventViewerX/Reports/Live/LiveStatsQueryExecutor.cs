@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Diagnostics.Eventing.Reader;
+using System.Globalization;
 using System.Linq;
 using System.Threading;
 using EventViewerX.Reports.QueryHelpers;
@@ -30,56 +32,82 @@ public static class LiveStatsQueryExecutor {
             return false;
         }
 
-        var xpath = string.IsNullOrWhiteSpace(request.XPath) ? "*" : request.XPath!;
+        string xpath = BuildEffectiveXPath(request.XPath, request.StartTimeUtc, request.EndTimeUtc);
         var builder = new EvtxStatsReportBuilder();
-        var scanned = 0;
-        var matched = 0;
+        long scanned = 0;
+        long matched = 0;
+        bool truncated = false;
         DateTime? minUtc = null;
         DateTime? maxUtc = null;
+        long readLimit =
+            request.MaxEventsScanned > 0 &&
+            request.MaxEventsScanned < long.MaxValue
+                ? request.MaxEventsScanned + 1L
+                : request.MaxEventsScanned;
 
         try {
-            foreach (var ev in SearchEvents.QueryLogXPath(
-                         logName: request.LogName,
-                         xpath: xpath,
-                         machineName: request.MachineName,
-                         maxEvents: request.MaxEventsScanned,
-                         oldest: request.OldestFirst,
-                         cancellationToken: cancellationToken,
-                         sessionTimeoutMs: request.SessionTimeoutMs)) {
+            EventLogChannelQuery query =
+                LiveEventChannelQueryFactory.Create(
+                    request.LogName,
+                    request.MachineName,
+                    xpath,
+                    readLimit,
+                    request.OldestFirst,
+                    EventReadMode.Metadata,
+                    request.SessionTimeoutMs);
+            foreach (EventObject ev in
+                     EventLogEngine.ReadChannel(
+                         query,
+                         cancellationToken)) {
                 cancellationToken.ThrowIfCancellationRequested();
 
+                if (request.MaxEventsScanned > 0 && scanned >= request.MaxEventsScanned) {
+                    truncated = true;
+                    break;
+                }
+
                 scanned++;
-                var createdUtc = ev.TimeCreated.ToUniversalTime();
-                if (!IsWithinRange(createdUtc, request.StartTimeUtc, request.EndTimeUtc)) {
-                    if (request.MaxEventsScanned > 0 && scanned >= request.MaxEventsScanned) {
-                        break;
-                    }
+                bool hasCreatedTime =
+                    TryNormalizeCreatedTimeUtc(
+                        ev.TimeCreated,
+                        out DateTime createdUtc);
+                if (hasCreatedTime &&
+                    !IsWithinRange(
+                        createdUtc,
+                        request.StartTimeUtc,
+                        request.EndTimeUtc)) {
                     continue;
                 }
 
                 matched++;
-                if (!minUtc.HasValue || createdUtc < minUtc.Value) {
-                    minUtc = createdUtc;
-                }
-                if (!maxUtc.HasValue || createdUtc > maxUtc.Value) {
-                    maxUtc = createdUtc;
+                if (hasCreatedTime) {
+                    if (!minUtc.HasValue ||
+                        createdUtc < minUtc.Value) {
+                        minUtc = createdUtc;
+                    }
+                    if (!maxUtc.HasValue ||
+                        createdUtc > maxUtc.Value) {
+                        maxUtc = createdUtc;
+                    }
                 }
 
                 builder.Add(ev);
 
-                if (request.MaxEventsScanned > 0 && scanned >= request.MaxEventsScanned) {
-                    break;
-                }
             }
 
             result = new LiveStatsQueryResult {
+                MachineName = string.IsNullOrWhiteSpace(request.MachineName)
+                    ? Environment.MachineName
+                    : request.MachineName!.Trim(),
                 LogName = request.LogName,
                 XPath = xpath,
                 OldestFirst = request.OldestFirst,
                 MaxEventsScanned = request.MaxEventsScanned,
                 ScannedEvents = scanned,
                 MatchedEvents = matched,
-                Truncated = request.MaxEventsScanned > 0 && scanned >= request.MaxEventsScanned,
+                EventsWithoutLevel =
+                    builder.EventsWithoutLevel,
+                Truncated = truncated,
                 TimeCreatedUtcMin = minUtc,
                 TimeCreatedUtcMax = maxUtc,
                 StartTimeUtc = request.StartTimeUtc,
@@ -113,10 +141,48 @@ public static class LiveStatsQueryExecutor {
                 Message = ex.Message
             };
             return false;
+        } catch (EventLogSessionException ex) {
+            result = new LiveStatsQueryResult();
+            failure = new LiveStatsQueryFailure {
+                Kind = LiveStatsQueryFailureKind.HostUnavailable,
+                Message = ex.Message
+            };
+            return false;
+        } catch (EventLogNotFoundException ex) {
+            result = new LiveStatsQueryResult();
+            failure = new LiveStatsQueryFailure {
+                Kind = LiveStatsQueryFailureKind.LogNotFound,
+                Message = ex.Message
+            };
+            return false;
+        } catch (Win32Exception ex) {
+            result = new LiveStatsQueryResult();
+            failure = new LiveStatsQueryFailure {
+                Kind = QueryFailureHelpers.Classify(ex) switch {
+                    NativeQueryFailureKind.InvalidQuery =>
+                        LiveStatsQueryFailureKind.InvalidQuery,
+                    NativeQueryFailureKind.LogNotFound =>
+                        LiveStatsQueryFailureKind.LogNotFound,
+                    NativeQueryFailureKind.AccessDenied =>
+                        LiveStatsQueryFailureKind.AccessDenied,
+                    NativeQueryFailureKind.Timeout =>
+                        LiveStatsQueryFailureKind.Timeout,
+                    NativeQueryFailureKind.HostUnavailable =>
+                        LiveStatsQueryFailureKind.HostUnavailable,
+                    _ =>
+                        LiveStatsQueryFailureKind.Exception
+                },
+                Message = ex.Message
+            };
+            return false;
         } catch (EventLogException ex) {
             result = new LiveStatsQueryResult();
             failure = new LiveStatsQueryFailure {
-                Kind = QueryFailureHelpers.IsTimeoutLike(ex.Message) ? LiveStatsQueryFailureKind.Timeout : LiveStatsQueryFailureKind.Exception,
+                Kind = QueryFailureHelpers.IsInvalidEventQuery(ex)
+                    ? LiveStatsQueryFailureKind.InvalidQuery
+                    : QueryFailureHelpers.IsTimeoutLike(ex.Message)
+                        ? LiveStatsQueryFailureKind.Timeout
+                        : LiveStatsQueryFailureKind.Exception,
                 Message = ex.Message
             };
             return false;
@@ -135,6 +201,20 @@ public static class LiveStatsQueryExecutor {
             };
             return false;
         }
+    }
+
+    internal static bool TryNormalizeCreatedTimeUtc(
+        DateTime created,
+        out DateTime createdUtc) {
+
+        if (created == DateTime.MinValue) {
+            createdUtc = default;
+            return false;
+        }
+        createdUtc = created.Kind == DateTimeKind.Utc
+            ? created
+            : created.ToUniversalTime();
+        return true;
     }
 
     private static bool TryValidateRequest(
@@ -209,4 +289,30 @@ public static class LiveStatsQueryExecutor {
         }
         return true;
     }
+
+    internal static string BuildEffectiveXPath(string? xpath, DateTime? startUtc, DateTime? endUtc) {
+        string baseXPath = string.IsNullOrWhiteSpace(xpath) ? "*" : xpath!.Trim();
+        if (!startUtc.HasValue && !endUtc.HasValue) {
+            return baseXPath;
+        }
+
+        string timeCondition;
+        if (startUtc.HasValue && endUtc.HasValue) {
+            timeCondition = $"TimeCreated[@SystemTime >= '{FormatUtc(startUtc.Value)}' and @SystemTime <= '{FormatUtc(endUtc.Value)}']";
+        } else if (startUtc.HasValue) {
+            timeCondition = $"TimeCreated[@SystemTime >= '{FormatUtc(startUtc.Value)}']";
+        } else {
+            timeCondition = $"TimeCreated[@SystemTime <= '{FormatUtc(endUtc!.Value)}']";
+        }
+
+        string timePredicate = $"System[{timeCondition}]";
+        return baseXPath == "*"
+            ? $"*[{timePredicate}]"
+            : $"({baseXPath})[{timePredicate}]";
+    }
+
+    private static string FormatUtc(DateTime value) {
+        return value.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffffff'Z'", CultureInfo.InvariantCulture);
+    }
+
 }

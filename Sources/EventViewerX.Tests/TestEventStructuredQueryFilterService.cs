@@ -150,6 +150,29 @@ public class TestEventStructuredQueryFilterService {
     }
 
     [Theory]
+    [InlineData("16", 16)]
+    [InlineData("255", 255)]
+    public void TryNormalize_ShouldAcceptCustomProviderLevels(
+        string rawLevel,
+        int expectedLevel) {
+
+        bool ok = EventStructuredQueryFilterService.TryNormalize(
+            new EventStructuredQueryFilterInput {
+                Level = rawLevel
+            },
+            out EventStructuredQueryFilter? filter,
+            out string? error);
+
+        Assert.True(ok);
+        Assert.Null(error);
+        Assert.Equal(expectedLevel, (int)filter!.Level!.Value);
+        Assert.Contains(
+            $"Level={expectedLevel}",
+            EventStructuredQueryFilterService.BuildXPath(filter),
+            StringComparison.Ordinal);
+    }
+
+    [Theory]
     [InlineData("-1")]
     [InlineData(" -1 ")]
     [InlineData("- 1")]

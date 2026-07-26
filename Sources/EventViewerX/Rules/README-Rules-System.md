@@ -1,232 +1,196 @@
-# EventViewer Rules System Documentation
+# Named-event rule architecture
 
-## Overview
+Named events turn raw Windows records into scenario-specific objects such as
+failed logons, account lockouts, Group Policy changes, Kerberos failures, or
+AAD Connect health signals.
 
-The PSEventViewer project uses a unified rule system where **all event definitions are directly embedded in EventRuleBase classes**, eliminating the need for separate event ID mappings, manual registration, or hybrid approaches. The system uses pure reflection to automatically discover and register all event rules.
+The rule layer is a projection over the shared native engine:
 
-## How It Works
+1. A `NamedEventQuery` selects rules, machines, time, limits, culture, and
+   enrichment.
+2. `NamedEventEngine.ReadAsync` asks each rule for its source channel and event
+   IDs.
+3. Sources are grouped and partitioned into bounded
+   `EventLogChannelQuery` instances.
+4. `EventLogEngine.ReadBatchAsync` performs the native Windows queries.
+5. Matching `EventObject` records are projected to `EventObjectSlim` rule
+   results in source order.
+6. Optional enrichment and checkpoint observation happen before a result is
+   emitted.
 
-### Unified EventRuleBase Approach
+The removed `SearchEvents` facade is not part of this flow.
 
-All event rules now inherit from `EventRuleBase` and define their metadata directly in the class:
+## Rule contract
+
+The normal rule inherits from `EventRuleBase` and owns its source metadata,
+predicate, and projection:
 
 ```csharp
 namespace EventViewerX.Rules.ActiveDirectory;
 
-/// <summary>
-/// Active Directory Computer Created or Changed
-/// 4741: A computer account was created
-/// 4742: A computer account was changed
-/// </summary>
-public class ADComputerCreateChange : EventRuleBase {
+public sealed class ADComputerCreateChange : EventRuleBase {
     public override List<int> EventIds => new() { 4741, 4742 };
     public override string LogName => "Security";
-    public override NamedEvents NamedEvent => NamedEvents.ADComputerCreateChange;
+    public override NamedEvents NamedEvent =>
+        NamedEvents.ADComputerCreateChange;
 
     public override bool CanHandle(EventObject eventObject) {
-        // Simple rule - always handle if event ID and log name match
         return true;
     }
 
-    public ADComputerCreateChange(EventObject eventObject) : base(eventObject) {
-        // Initialize properties from eventObject
-        Type = "ADComputerCreateChange";
-        // ... your processing logic
+    public ADComputerCreateChange(EventObject eventObject)
+        : base(eventObject) {
+
+        Type = nameof(ADComputerCreateChange);
     }
 }
 ```
 
-### Complex Rules with Conditions
-
-For rules that need specific conditions, implement custom logic in `CanHandle`:
+Use `CanHandle` when several rules share an event ID or when an XML payload
+field distinguishes the scenario:
 
 ```csharp
-namespace EventViewerX.Rules.ActiveDirectory;
-
-/// <summary>
-/// Active Directory Computer Change Detailed - only for computer objects
-/// </summary>
-public class ADComputerChangeDetailed : EventRuleBase {
-    public override List<int> EventIds => new() { 5136, 5137, 5139, 5141 };
-    public override string LogName => "Security";
-    public override NamedEvents NamedEvent => NamedEvents.ADComputerChangeDetailed;
-
-    public override bool CanHandle(EventObject eventObject) {
-        // Only handle computer object changes
-        return eventObject.Data.TryGetValue("ObjectClass", out var objectClass) &&
-               objectClass == "computer";
-    }
-
-    public ADComputerChangeDetailed(EventObject eventObject) : base(eventObject) {
-        // Initialize properties from eventObject
-        Type = "ADComputerChangeDetailed";
-        // ... your processing logic
-    }
+public override bool CanHandle(EventObject eventObject) {
+    return eventObject.Data.TryGetValue(
+               "ObjectClass",
+               out string? objectClass) &&
+           string.Equals(
+               objectClass,
+               "computer",
+               StringComparison.OrdinalIgnoreCase);
 }
 ```
 
-## Adding New Event Rules
+The constructor maps the raw event into stable, scenario-specific properties.
+Keep provider-specific parsing in the rule. Keep query, culture, remote
+session, cancellation, export, and checkpoint logic in the shared engines.
 
-### Step 1: Add to NamedEvents Enum
-Add your new event type to the `NamedEvents` enum in `Enums\NamedEvents.cs`:
+## Adding a rule
+
+1. Add the public scenario name to `NamedEvents`.
+2. Add one focused `EventRuleBase` implementation under the appropriate
+   `Rules/<Area>` folder.
+3. Declare the exact channel and positive event IDs.
+4. Implement `CanHandle` for any provider-specific discriminator.
+5. Map only useful, stable fields in the constructor.
+6. Add a focused projection test with representative `EventObject` data.
+7. Add live validation when the provider is available in the test lab.
+
+No central event-ID table is required. Rule metadata stays with the
+projection that understands it.
+
+## Discovery modes
+
+`EventObjectSlim` supports three discovery modes:
+
+| Mode | Behavior | Use |
+| --- | --- | --- |
+| `Auto` | Combines explicitly registered factories with discovered rule types. | Default library and PowerShell use. |
+| `Reflection` | Discovers concrete `EventRuleBase`/`IEventRule` types from EventViewerX. | Conventional runtime hosts. |
+| `ExplicitOnly` | Uses only delegate factories registered before first query. | AOT, trimming, or tightly controlled hosts. |
+
+Configure discovery once, before the first named-event query:
 
 ```csharp
-/// <summary>
-/// Your new event description
-/// </summary>
-YourNewEvent,
+EventObjectSlim.Configure(EventRuleDiscoveryMode.ExplicitOnly);
+
+EventObjectSlim.RegisterRuleFactory(
+    NamedEvents.ADUserLockouts,
+    "Security",
+    new[] { 4740 },
+    eventObject => new ADUserLockouts(eventObject),
+    eventObject => eventObject.Id == 4740,
+    typeof(ADUserLockouts));
 ```
 
-### Step 2: Create the EventRuleBase Class
+Registration after initialization is rejected. This avoids partially changing
+the rule catalog while queries are active.
 
-All rules use the same EventRuleBase pattern:
-
-```csharp
-namespace EventViewerX.Rules.YourCategory;
-
-/// <summary>
-/// Description of your event rule
-/// Event IDs: 1234, 5678
-/// </summary>
-public class YourNewEvent : EventRuleBase {
-    public override List<int> EventIds => new() { 1234, 5678 };
-    public override string LogName => "YourLogName";
-    public override NamedEvents NamedEvent => NamedEvents.YourNewEvent;
-
-    public override bool CanHandle(EventObject eventObject) {
-        // For simple rules that handle all matching events:
-        return true;
-
-        // For complex rules with conditions:
-        // return eventObject.Data.TryGetValue("SomeField", out var value) &&
-        //        value == "ExpectedValue";
-    }
-
-    public YourNewEvent(EventObject eventObject) : base(eventObject) {
-        Type = "YourNewEvent";
-        // Initialize your properties from eventObject
-        // Property1 = eventObject.GetValueFromDataDictionary("DataField");
-        // Property2 = eventObject.ComputerName;
-        // When = eventObject.TimeCreated;
-    }
-}
-```
-
-### Step 3: That's It!
-
-The system will automatically:
-- ✅ Discover your rule class using reflection
-- ✅ Extract event IDs and log name from your rule
-- ✅ Register the rule for automatic processing
-- ✅ Use your `CanHandle` method to determine when to create instances
-- ✅ Query the correct logs and create rule instances as needed
-
-**No manual registration required!**
-
-## System Architecture
-
-### Automatic Discovery Process
-
-1. **Assembly Scanning**: At startup, the system scans for all classes inheriting from `EventRuleBase`
-2. **Rule Registration**: For each rule class, creates a temporary instance to extract metadata:
-   - `EventIds` → List of event IDs the rule handles
-   - `LogName` → Windows Event Log name to query
-   - `NamedEvent` → Enum value linking to the rule
-3. **Event Processing**: When processing events, the system:
-   - Creates rule instances for matching events
-   - Calls `CanHandle()` to validate the rule should process this specific event
-   - Returns the rule instance if conditions are met
-
-### No Manual Mappings Required
-
-The system uses **pure reflection** with no hardcoded mappings:
-- Event IDs and log names come directly from rule properties
-- Rule conditions are evaluated by the rules themselves
-- New rules are automatically discovered on startup
-
-## Benefits
-
-1. **Single Source of Truth**: Event IDs, log names, and conditions are defined once in the rule class
-2. **Automatic Discovery**: Zero configuration - just create the rule class and it's discovered
-3. **Type Safety**: Compile-time checking ensures all rules are properly configured
-4. **Extensibility**: Add new rules without touching any central configuration
-5. **Maintainability**: Event definitions live with their processing logic
-6. **Self-Documenting**: Rules clearly show what events they handle and how
-7. **Consistent**: All rules use the same EventRuleBase pattern
-8. **Testable**: Each rule can be unit tested independently
-
-## Migration Status
-
-### ✅ Completed
-- ✅ **Unified EventRuleBase System**: All rules now use the same consistent pattern
-- ✅ **Pure Reflection Discovery**: Automatic rule discovery with zero manual mappings
-- ✅ **30+ Rules Migrated**: All existing rules converted to EventRuleBase
-- ✅ **Manual Mappings Eliminated**: No more hardcoded event ID or rule mappings
-- ✅ **Build Validation**: System compiles and works with unified approach
-
-### 🎯 Current State
-The system is **fully operational** with the unified EventRuleBase approach:
-- All event rules inherit from EventRuleBase
-- All metadata is auto-detected from rule classes
-- No manual registration or mapping required
-- Consistent behavior across simple and complex rules
-
-### 📊 Rule Examples
-- **Simple Rules**: `ADComputerCreateChange`, `ADUserLogonFailed` (return `true` in CanHandle)
-- **Complex Rules**: `ADComputerChangeDetailed`, `ADUserLogonNTLMv1` (custom conditions in CanHandle)
-- **All Rules**: Use same EventRuleBase pattern with override properties
-
-## Example Usage
-
-The system works seamlessly with existing code:
+## Querying from C#
 
 ```csharp
-// This automatically uses the new reflection-based system
-await foreach (var eventObject in SearchEvents.FindEventsByNamedEvents([
-    NamedEvents.ADComputerCreateChange,
-    NamedEvents.ADComputerChangeDetailed,
+var query = new NamedEventQuery(new[] {
     NamedEvents.ADUserLogonFailed,
-    NamedEvents.ADLdapBindingDetails
-])) {
-    Console.WriteLine($"Found event: {eventObject.Type} from {eventObject.GatheredFrom}");
+    NamedEvents.ADUserLockouts
+}) {
+    MachineNames = new string?[] { "DC01", "DC02" },
+    TimePeriod = TimePeriod.Last24Hours,
+    ReadMode = EventReadMode.Full,
+    MaxConcurrency = 4,
+    MaxEvents = 500,
+    ContinueOnRemoteFailure = true
+};
+
+var execution = new NamedEventsQueryExecutionInfo();
+
+await foreach (EventObjectSlim item in
+               NamedEventEngine.ReadAsync(query, execution)) {
+    Console.WriteLine(
+        $"{item.When:u} {item.Type} {item.Computer}");
 }
 ```
 
-### What Happens Behind the Scenes:
+`MaxEvents` limits matching projected results. `MaxCandidates` separately
+limits raw records evaluated by rules. This distinction prevents a selective
+rule from silently returning too few matches.
 
-1. **Query Planning**: System extracts event IDs and log names from each rule:
-   ```csharp
-   ADComputerCreateChange: EventIds=[4741, 4742], LogName="Security"
-   ADUserLogonFailed: EventIds=[4625], LogName="Security"
-   ADLdapBindingDetails: EventIds=[2889], LogName="Directory Service"
-   ```
+`NamedEventsQueryExecutionInfo` reports candidates examined, results emitted,
+source failures, and limit state without changing the returned object stream.
 
-2. **Log Querying**: Groups by log name and queries efficiently:
-   ```csharp
-   Query "Security" log for events: 4741, 4742, 4625
-   Query "Directory Service" log for events: 2889
-   ```
+## Querying from PowerShell
 
-3. **Rule Processing**: For each event found:
-   ```csharp
-   var rule = new ADComputerCreateChange(eventObject);
-   if (rule.CanHandle(eventObject)) {
-       return rule; // This specific rule handles this event
-   }
-   ```
+```powershell
+Get-EVXEvent `
+    -Type ADUserLogonFailed, ADUserLockouts `
+    -MachineName DC01, DC02 `
+    -TimePeriod Last24Hours `
+    -MaxConcurrency 4 `
+    -MaxEvents 500 |
+    Select-Object When, Type, Computer, UserName, IpAddress
+```
 
-4. **Result**: Returns properly typed, processed event objects with all rule-specific logic applied.
+PowerShell is a thin adapter: it builds `NamedEventQuery`, supplies durable
+checkpoint callbacks and optional DNS enrichment, and streams
+`NamedEventEngine.ReadAsync`.
 
-## Key Files
+## Ordering, failures, and checkpoints
 
-- **`EventRuleBase.cs`**: Abstract base class all rules inherit from
-- **`IEventRule.cs`**: Interface defining the CanHandle contract
-- **`EventObjectSlim.cs`**: Reflection-based discovery and rule creation system
-- **`SearchEvents.NamedEventsDetails.cs`**: Updated to use reflection system
-- **`Rules/`**: Directory containing all EventRuleBase rule implementations
+- Batch results are merged deterministically.
+- Rule projection and optional enrichment complete before the checkpoint
+  observer advances.
+- A failed remote target can be isolated with
+  `ContinueOnRemoteFailure`; local and programming failures remain terminal.
+- Durable PowerShell checkpoints are scoped by machine and channel, guarded by
+  a shared lock, and include generation metadata so a reset cannot be undone
+  by an in-flight query.
+- Native bookmarks are opt-in and remain part of the underlying event when
+  requested.
 
-The system automatically:
-1. ✅ Discovers event IDs and log names from rule classes
-2. ✅ Queries the appropriate logs efficiently
-3. ✅ Creates the correct rule instances based on conditions
-4. ✅ Returns properly typed event objects with rule-specific processing
+## Enrichment
+
+Enrichment is optional and ordered. Reverse DNS, for example, is bounded by a
+whole-operation timeout and a concurrency limit. Failure or timeout annotates
+the result rather than removing the event or advancing its checkpoint early.
+
+Rules must remain useful without network enrichment. Provider payload data is
+the source of truth; enrichment is additional context.
+
+## Key files
+
+- `NamedEventQuery.cs` — public scenario query contract.
+- `NamedEventEngine.cs` and `NamedEventEngine.Projection.cs` — batching,
+  ordered projection, and limits.
+- `EventObjectSlim.cs` — discovery, explicit registration, and rule creation.
+- `IEventRule.cs` — `IEventRule` and `EventRuleBase` contracts.
+- `NamedEventEnricher.cs` and `Enrichment/` — optional ordered enrichment.
+- `Rules/` — provider/scenario projections.
+
+## Design rules
+
+- One source of truth for a scenario's channel, IDs, predicate, and mapping.
+- No independent query engine inside a rule.
+- No network call unless enrichment is explicitly enabled.
+- No swallowed projection failures: errors are reported with the affected rule.
+- No placeholder rules. Add a rule when its provider contract and useful
+  projection are understood and testable.
+- Prefer a focused rule over a large switch statement or central mapping table.

@@ -58,41 +58,22 @@ public class ADComputerChangeDetailed : EventRuleBase {
     /// <param name="eventObject">Underlying event record.</param>
     public ADComputerChangeDetailed(EventObject eventObject) : base(eventObject) {
         // common fields
-        _eventObject = eventObject;
+        Event = eventObject;
         Type = "ADComputerChangeDetailed";
-        Computer = _eventObject.ComputerName;
-        ObjectClass = _eventObject.GetValueFromDataDictionary("ObjectClass");
-        Action = _eventObject.MessageSubject;
-        Who = _eventObject.GetSubjectAccountOrEmpty();
-        When = _eventObject.TimeCreated;
+        Computer = Event.ComputerName;
+        ObjectClass = Event.GetValueFromDataDictionary("ObjectClass");
+        Action = Event.MessageSubject;
+        Who = Event.GetSubjectAccountOrEmpty();
+        When = Event.TimeCreated;
         //
-        OperationType = ConvertFromOperationType(_eventObject.GetDataValueOrEmpty("OperationType"));
-        ComputerObject = _eventObject.GetValueFromDataDictionary("ObjectDN");
-        FieldChanged = _eventObject.GetValueFromDataDictionary("AttributeLDAPDisplayName");
-        FieldValue = _eventObject.GetValueFromDataDictionary("AttributeValue");
+        OperationType = ConvertFromOperationType(Event.GetDataValueOrEmpty("OperationType"));
+        ComputerObject = Event.GetValueFromDataDictionary("ObjectDN");
+        FieldChanged = Event.GetValueFromDataDictionary("AttributeLDAPDisplayName");
+        FieldValue = Event.GetValueFromDataDictionary("AttributeValue");
         // OverwriteByField logic
-        ComputerObject = OverwriteByField(Action, "A directory service object was moved.", ComputerObject, _eventObject.GetValueFromDataDictionary("OldObjectDN"));
-        FieldValue = OverwriteByField(Action, "A directory service object was moved.", FieldValue, _eventObject.GetValueFromDataDictionary("NewObjectDN"));
-
-        //ClientDNSName = QueryDnsAsync("1.1.1.1").ConfigureAwait(false).GetAwaiter().GetResult();
+        ComputerObject = OverwriteByField(Action, "A directory service object was moved.", ComputerObject, Event.GetValueFromDataDictionary("OldObjectDN"));
+        FieldValue = OverwriteByField(Action, "A directory service object was moved.", FieldValue, Event.GetValueFromDataDictionary("NewObjectDN"));
     }
-
-    //private static async Task<string> QueryDnsAsync(string clientAddress) {
-    //    if (string.IsNullOrEmpty(clientAddress)) {
-    //        return null;
-    //    }
-
-    //    try {
-    //        Settings._logger.WriteVerbose($"Querying DNS for address: {clientAddress}");
-    //        var result = await ClientX.QueryDns(clientAddress, DnsRecordType.PTR);
-    //        var resolvedNames = string.Join(", ", result.AnswersMinimal.Select(answer => answer.Data));
-    //        Settings._logger.WriteVerbose($"Resolved names: {resolvedNames}");
-    //        return resolvedNames;
-    //    } catch (Exception ex) {
-    //        Settings._logger.WriteWarning($"Querying DNS for address: {clientAddress} failed: {ex.Message}");
-    //        return null;
-    //    }
-    //}
 }
 
 

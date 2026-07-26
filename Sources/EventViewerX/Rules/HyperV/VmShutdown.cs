@@ -28,28 +28,28 @@ public class VmShutdown : EventRuleBase {
 
     /// <summary>Initialises a Hyper-V VM shutdown wrapper from an event record.</summary>
     public VmShutdown(EventObject eventObject) : base(eventObject) {
-        _eventObject = eventObject;
+        Event = eventObject;
         Type = "HyperVVirtualMachineShutdown";
-        Computer = _eventObject.ComputerName;
-        VmName = _eventObject.GetValueFromDataDictionary("VmName");
+        Computer = Event.ComputerName;
+        VmName = Event.GetValueFromDataDictionary("VmName");
         if (string.IsNullOrEmpty(VmName)) {
-            VmName = _eventObject.GetValueFromDataDictionary("Name");
+            VmName = Event.GetValueFromDataDictionary("Name");
         }
         if (string.IsNullOrEmpty(VmName)) {
-            VmName = _eventObject.GetValueFromDataDictionary("VMName");
+            VmName = Event.GetValueFromDataDictionary("VMName");
         }
 
-        User = _eventObject.GetValueFromDataDictionary("User");
+        User = Event.GetValueFromDataDictionary("User");
         if (string.IsNullOrEmpty(User)) {
-            User = _eventObject.GetValueFromDataDictionary("UserName");
+            User = Event.GetValueFromDataDictionary("UserName");
         }
         if (string.IsNullOrEmpty(User)) {
-            User = _eventObject.GetValueFromDataDictionary("AccountName");
+            User = Event.GetValueFromDataDictionary("AccountName");
         }
         if (string.IsNullOrEmpty(User)) {
-            User = _eventObject.GetSubjectAccountOrEmpty();
+            User = Event.GetSubjectAccountOrEmpty();
         }
-        When = _eventObject.TimeCreated;
+        When = Event.TimeCreated;
     }
 }
 

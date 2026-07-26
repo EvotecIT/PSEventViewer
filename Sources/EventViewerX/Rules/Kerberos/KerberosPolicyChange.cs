@@ -39,12 +39,12 @@ public class KerberosPolicyChange : EventRuleBase
     /// <summary>Initialises a Kerberos policy change wrapper from an event record.</summary>
     public KerberosPolicyChange(EventObject eventObject) : base(eventObject)
     {
-        _eventObject = eventObject;
+        Event = eventObject;
         Type = "KerberosPolicyChange";
-        Computer = _eventObject.ComputerName;
-        Who = _eventObject.GetSubjectAccountOrEmpty();
-        PolicyChanges = _eventObject.GetValueFromDataDictionary("KerberosPolicyChange");
-        When = _eventObject.TimeCreated;
+        Computer = Event.ComputerName;
+        Who = Event.GetSubjectAccountOrEmpty();
+        PolicyChanges = Event.GetValueFromDataDictionary("KerberosPolicyChange");
+        When = Event.TimeCreated;
 
         if (!string.IsNullOrEmpty(PolicyChanges) && PolicyChanges != "--")
         {

@@ -1,10 +1,26 @@
+param(
+    [Alias('ConfigurationGateMode')]
+    [ValidateSet('Manifest', 'Build', 'Publish')]
+    [string] $RunMode = 'Build',
+
+    [bool] $SignModule = $true,
+
+    [string] $ProjectBuildConfigPath = 'Sources\Build\project.build.json',
+
+    [string] $PowerShellGalleryApiKeyPath = 'C:\Support\Important\PowerShellGalleryAPI.txt',
+
+    [string] $GitHubApiKeyPath = 'C:\Support\Important\GitHubAPI.txt'
+)
+
+$ErrorActionPreference = 'Stop'
+
 Import-Module PSPublishModule -Force
 
 Build-Module -ModuleName 'PSEventViewer' {
     # Usual defaults as per standard module
     $Manifest = [ordered] @{
         # Version number of this module.
-        ModuleVersion        = '3.4.X'
+        ModuleVersion        = '4.0.X'
         # Supported PSEditions
         CompatiblePSEditions = @('Desktop', 'Core')
         # ID used to uniquely identify this module
@@ -16,7 +32,7 @@ Build-Module -ModuleName 'PSEventViewer' {
         # Copyright statement for this module
         Copyright            = "(c) 2011 - $((Get-Date).Year) Przemyslaw Klys @ Evotec. All rights reserved."
         # Description of the functionality provided by this module
-        Description          = 'Simple module allowing parsing of event logs. Has its own quirks...'
+        Description          = 'High-performance Windows Event Log queries, streaming exports, subscriptions, diagnostics, and administration for PowerShell.'
         # Tags applied to this module. These help with module discovery in online galleries.
         Tags                 = @('Events', 'Viewer', 'Windows', 'XML', 'XPATH', 'EVTX')
 
@@ -26,22 +42,7 @@ Build-Module -ModuleName 'PSEventViewer' {
 
         PowerShellVersion    = '5.1'
     }
-    New-ConfigurationManifest @Manifest #-CmdletsToExport 'Find-WinEvent', 'Write-WinEvent', 'Start-EventWatching'
-
-    # Add standard module dependencies (directly, but can be used with loop as well)
-    #New-ConfigurationModule -Type RequiredModule -Name 'PSSharedGoods' -Guid 'Auto' -Version 'Latest'
-    # Add external module dependencies, using loop for simplicity
-    #New-ConfigurationModule -Type ExternalModule -Name 'Microsoft.PowerShell.Utility', 'Microsoft.PowerShell.Management', 'Microsoft.PowerShell.Diagnostics'
-    # Add approved modules, that can be used as a dependency, but only when specific function from those modules is used
-    # And on that time only that function and dependant functions will be copied over
-    # Keep in mind it has it's limits when "copying" functions such as it should not depend on DLLs or other external files
-    #New-ConfigurationModule -Type ApprovedModule -Name 'PSSharedGoods', 'PSWriteColor', 'Connectimo', 'PSUnifi', 'PSWebToolbox', 'PSMyPassword'
-
-    #New-ConfigurationModuleSkip -IgnoreModuleName 'ActiveDirectory' -IgnoreFunctionName @(
-    #    'Get-EventsInternal'
-    #    'Initialize-XPathFilter'
-    #    'Join-XPathFilter'
-    #)
+    New-ConfigurationManifest @Manifest
 
     $ConfigurationFormat = [ordered] @{
         RemoveComments                              = $false
@@ -77,34 +78,38 @@ Build-Module -ModuleName 'PSEventViewer' {
     # when creating PSD1 use special style without comments and with only required parameters
     New-ConfigurationFormat -ApplyTo 'DefaultPSD1', 'OnMergePSD1' -PSD1Style 'Minimal'
     # configuration for documentation, at the same time it enables documentation processing
-    New-ConfigurationDocumentation -Enable:$false -StartClean -UpdateWhenNew -PathReadme 'Docs\Readme.md' -Path 'Docs'
+    New-ConfigurationDocumentation -Enable:$false -PathReadme 'Docs\Readme.md' -Path 'Docs'
 
     $newConfigurationBuildSplat = @{
         Enable                            = $true
-        SignModule                        = $true
+        SignModule                        = $SignModule
         MergeModuleOnBuild                = $true
         MergeFunctionsFromApprovedModules = $true
-        CertificateThumbprint             = '483292C9E317AA13B07BB7A96AE9D1A5ED9E7703'
+        CertificateThumbprint             = '92E95FB58EFFA6A4A75E77A33CDD6BFE6DD30F1A'
         ResolveBinaryConflicts            = $true
         ResolveBinaryConflictsName        = 'PSEventViewer'
         NETProjectName                    = 'PSEventViewer'
+        NETProjectPath                    = 'Sources\PSEventViewer\PSEventViewer.csproj'
         NETConfiguration                  = 'Release'
         NETFramework                      = 'net8.0-windows', 'net472'
-        NETSearchClass                    = "PSEventViewer.CmdletFindEvent"
+        NETSearchClass                    = 'PSEventViewer.CmdletGetEVXEvent'
         NETHandleAssemblyWithSameName     = $true
         #NETMergeLibraryDebugging          = $true
         DotSourceLibraries                = $true
         DotSourceClasses                  = $true
         DeleteTargetModuleBeforeBuild     = $true
-        RefreshPSD1Only                   = $true
     }
 
     New-ConfigurationBuild @newConfigurationBuildSplat
 
-    New-ConfigurationArtefact -Type Unpacked -Enable -Path "$PSScriptRoot\..\Artefacts\Unpacked" -RequiredModulesPath "$PSScriptRoot\..\Artefacts\Unpacked\Modules"
-    New-ConfigurationArtefact -Type Packed -Enable -Path "$PSScriptRoot\..\Artefacts\Packed" -IncludeTagName
+    New-ConfigurationProjectBuild -Name 'EventViewerX' -ConfigPath $ProjectBuildConfigPath -Enabled -BuildBeforeModule -UseAsReleaseVersionSource -ProvideLocalNuGetFeed -PublishNuget -PublishGitHub
+    New-ConfigurationRelease -StageRoot 'Artefacts\UploadReady' -VersionSource ProjectBuild -PrimaryProject 'EventViewerX' -SynchronizeModuleVersion -BuildOrder 'Packages', 'Module' -PublishOrder 'NuGet', 'PowerShellGallery', 'GitHub'
 
-    # global options for publishing to github/psgallery
-    #New-ConfigurationPublish -Type PowerShellGallery -FilePath 'C:\Support\Important\PowerShellGalleryAPI.txt' -Enabled:$true
-    #New-ConfigurationPublish -Type GitHub -FilePath 'C:\Support\Important\GitHubAPI.txt' -UserName 'EvotecIT' -Enabled:$true -GenerateReleaseNotes -OverwriteTagName 'PSEventViewer-<TagModuleVersionWithPreRelease>'
+    New-ConfigurationArtefact -Type Unpacked -Enable -Path 'Artefacts\Unpacked' -ModulesPath 'Modules'
+    New-ConfigurationArtefact -Type Packed -Enable -Path 'Artefacts\Packed' -IncludeTagName
+
+    New-ConfigurationPublish -Type PowerShellGallery -FilePath $PowerShellGalleryApiKeyPath -Enabled:$false -UseAsDependencyVersionSource
+    New-ConfigurationPublish -Type GitHub -FilePath $GitHubApiKeyPath -UserName 'EvotecIT' -RepositoryName 'PSEventViewer' -Enabled:$false -GenerateReleaseNotes -OverwriteTagName '{ModuleName}-v{ModuleVersionWithPreRelease}'
+
+    New-ConfigurationGate -Mode $RunMode
 }

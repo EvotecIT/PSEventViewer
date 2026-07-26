@@ -13,5 +13,7 @@ public class TestDisplayEventLogs {
         var logger = new InternalLogger();
         var details = new EventLogDetails(logger, Environment.MachineName, config, null);
         Assert.Equal("Application", details.LogName);
+        Assert.False(details.HasDiagnostics);
+        Assert.Empty(details.Diagnostics);
     }
 }

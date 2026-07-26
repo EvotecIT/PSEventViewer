@@ -19,10 +19,26 @@ public static class EvtxQueryExecutor {
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns><see langword="true"/> when query succeeds; otherwise <see langword="false"/>.</returns>
     public static bool TryForEachEvent(
-        EvtxQueryRequest request,
+        EvtxQueryRequest? request,
         Func<EventObject, bool> eventHandler,
         out EvtxQueryFailure? failure,
         CancellationToken cancellationToken = default) {
+
+        return TryForEachEventWithInfo(request, eventHandler, out _, out failure, cancellationToken);
+    }
+
+    /// <summary>
+    /// Streams EVTX events and reports whether the query was capped or stopped by the callback.
+    /// </summary>
+    public static bool TryForEachEventWithInfo(
+        EvtxQueryRequest? request,
+        Func<EventObject, bool> eventHandler,
+        out EvtxQueryExecutionInfo executionInfo,
+        out EvtxQueryFailure? failure,
+        CancellationToken cancellationToken = default,
+        EventReadMode? readModeOverride = null) {
+
+        executionInfo = new EvtxQueryExecutionInfo();
 
         if (eventHandler is null) {
             failure = new EvtxQueryFailure {
@@ -35,26 +51,86 @@ public static class EvtxQueryExecutor {
         if (!TryValidateRequest(request, out failure)) {
             return false;
         }
+        if (readModeOverride.HasValue &&
+            !Enum.IsDefined(
+                typeof(EventReadMode),
+                readModeOverride.Value)) {
+            failure = new EvtxQueryFailure {
+                Kind = EvtxQueryFailureKind.InvalidArgument,
+                Message = "readModeOverride is not supported."
+            };
+            return false;
+        }
+        EvtxQueryRequest validatedRequest = request!;
+        int maxEvents = validatedRequest.MaxEvents;
 
         try {
-            var eventIds = request.EventIds is null ? null : new List<int>(request.EventIds);
-            foreach (var ev in SearchEvents.QueryLogFile(
-                         filePath: request.FilePath,
-                         eventIds: eventIds,
-                         providerName: request.ProviderName,
-                         startTime: request.StartTimeUtc,
-                         endTime: request.EndTimeUtc,
-                         maxEvents: request.MaxEvents,
-                         oldest: request.OldestFirst,
-                         cancellationToken: cancellationToken)) {
+            long readLimit =
+                maxEvents > 0 &&
+                maxEvents < int.MaxValue
+                    ? maxEvents + 1L
+                    : maxEvents;
+            var query = new EventLogFileQuery(
+                validatedRequest.FilePath) {
+                XPath = EventFilterCompiler.BuildXPath(
+                    new EventFilter {
+                        EventIds = validatedRequest.EventIds,
+                        ProviderNames =
+                            string.IsNullOrWhiteSpace(
+                                validatedRequest.ProviderName)
+                                ? null
+                                : new[] {
+                                    validatedRequest.ProviderName!
+                                },
+                        StartTime =
+                            validatedRequest.StartTimeUtc,
+                        EndTime =
+                            validatedRequest.EndTimeUtc
+                    }),
+                MaxEvents = readLimit,
+                Oldest = validatedRequest.OldestFirst,
+                ReadMode =
+                    readModeOverride ??
+                    validatedRequest.ReadMode
+            };
+            foreach (EventObject ev in
+                     EventLogEngine.ReadFile(
+                         query,
+                         cancellationToken)) {
                 cancellationToken.ThrowIfCancellationRequested();
-                if (!eventHandler(ev)) {
+
+                if (maxEvents > 0 &&
+                    executionInfo.EventsDelivered >= maxEvents) {
+                    executionInfo.Truncated = true;
                     break;
                 }
+
+                bool continueReading;
+                try {
+                    continueReading =
+                        eventHandler(ev);
+                } catch (OperationCanceledException) {
+                    throw;
+                } catch (Exception ex) {
+                    failure = new EvtxQueryFailure {
+                        Kind =
+                            EvtxQueryFailureKind.Exception,
+                        Message = ex.Message
+                    };
+                    return false;
+                }
+                if (!continueReading) {
+                    executionInfo.EventsDelivered++;
+                    executionInfo.StoppedByHandler = true;
+                    break;
+                }
+                executionInfo.EventsDelivered++;
             }
 
             failure = null;
             return true;
+        } catch (OperationCanceledException) {
+            throw;
         } catch (ArgumentException ex) {
             failure = new EvtxQueryFailure {
                 Kind = EvtxQueryFailureKind.InvalidArgument,
@@ -97,17 +173,18 @@ public static class EvtxQueryExecutor {
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns><see langword="true"/> when query succeeds; otherwise <see langword="false"/>.</returns>
     public static bool TryRead(
-        EvtxQueryRequest request,
+        EvtxQueryRequest? request,
         out EvtxQueryResult result,
         out EvtxQueryFailure? failure,
         CancellationToken cancellationToken = default) {
         var list = new List<EventObject>();
-        if (!TryForEachEvent(
+        if (!TryForEachEventWithInfo(
                 request,
                 ev => {
                     list.Add(ev);
                     return true;
                 },
+                out EvtxQueryExecutionInfo executionInfo,
                 out failure,
                 cancellationToken)) {
             result = new EvtxQueryResult();
@@ -115,12 +192,13 @@ public static class EvtxQueryExecutor {
         }
 
         result = new EvtxQueryResult {
-            Events = list
+            Events = list,
+            Truncated = executionInfo.Truncated
         };
         return true;
     }
 
-    private static bool TryValidateRequest(EvtxQueryRequest request, out EvtxQueryFailure? failure) {
+    private static bool TryValidateRequest(EvtxQueryRequest? request, out EvtxQueryFailure? failure) {
         if (request is null) {
             failure = new EvtxQueryFailure {
                 Kind = EvtxQueryFailureKind.InvalidArgument,
@@ -153,10 +231,22 @@ public static class EvtxQueryExecutor {
             return false;
         }
 
-        if (QueryValidationHelpers.HasNonPositiveValues(request.EventIds)) {
+        if (request.EventIds != null &&
+            request.EventIds.Any(static eventId =>
+                eventId < EventIdValidation.Minimum ||
+                eventId > EventIdValidation.Maximum)) {
             failure = new EvtxQueryFailure {
                 Kind = EvtxQueryFailureKind.InvalidArgument,
-                Message = "eventIds must contain only positive values."
+                Message = $"eventIds must contain values from {EventIdValidation.Minimum} through {EventIdValidation.Maximum}."
+            };
+            return false;
+        }
+        if (!Enum.IsDefined(
+                typeof(EventReadMode),
+                request.ReadMode)) {
+            failure = new EvtxQueryFailure {
+                Kind = EvtxQueryFailureKind.InvalidArgument,
+                Message = "readMode is not supported."
             };
             return false;
         }

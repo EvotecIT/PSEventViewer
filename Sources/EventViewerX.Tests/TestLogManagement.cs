@@ -27,24 +27,51 @@ public class TestLogManagement {
         if (!OperatingSystem.IsWindows()) return;
         if (!TestEnv.IsAdmin()) return;
 
-        string logName = "EVXTestCustomLog" + Guid.NewGuid().ToString("N");
-        if (SearchEvents.LogExists(logName)) {
-            SearchEvents.RemoveLog(logName);
+        using IDisposable isolation =
+            TestClassicEventLogIsolation.Acquire();
+        string logName = "EVX" + Guid.NewGuid().ToString("N") + "CustomLog";
+        if (ClassicEventLogManager.LogExists(logName)) {
+            ClassicEventLogManager.RemoveLog(logName);
         }
 
         try {
-            bool created = SearchEvents.CreateLog(logName, logName, null, 256, OverflowAction.OverwriteAsNeeded, 1);
-            if (!created) return; // environments without rights skip
-            Assert.True(SearchEvents.LogExists(logName));
+            ClassicEventLogEnsureResult result =
+                ClassicEventLogManager.EnsureLog(
+                    new ClassicEventLogConfiguration {
+                        LogName = logName,
+                        SourceName = logName,
+                        MaximumKilobytes = 256,
+                        OverflowAction =
+                            OverflowAction.OverwriteAsNeeded
+                    });
+            Assert.True(result.CreatedLog);
+            Assert.True(result.CreatedSource);
+            Assert.True(result.After.LogExists);
+            Assert.True(result.After.SourceExists);
 
-            bool removed = SearchEvents.RemoveLog(logName);
+            bool removed =
+                ClassicEventLogManager.RemoveLog(logName);
             Assert.True(removed);
-            Assert.False(SearchEvents.LogExists(logName));
+            Assert.False(
+                ClassicEventLogManager.LogExists(logName));
         }
         finally {
-            if (SearchEvents.LogExists(logName)) {
-                SearchEvents.RemoveLog(logName);
+            if (ClassicEventLogManager.LogExists(logName)) {
+                ClassicEventLogManager.RemoveLog(logName);
             }
         }
+    }
+
+    [Fact]
+    public void RetentionDaysRequireOverwriteOlder() {
+        Assert.Throws<ArgumentException>(() =>
+            ClassicEventLogManager.EnsureLog(
+                new ClassicEventLogConfiguration {
+                    LogName = "Example",
+                    SourceName = "Example",
+                    OverflowAction =
+                        OverflowAction.OverwriteAsNeeded,
+                    RetentionDays = 7
+                }));
     }
 }

@@ -1,11 +1,34 @@
+using System.Threading;
+
 namespace EventViewerX;
 
 /// <summary>
 /// Provides logging verbosity switches and default timeouts used throughout EventViewerX.
 /// </summary>
-public class Settings {
-    /// <summary>Shared logger used across the library; adjust verbosity via the instance properties.</summary>
-    public static InternalLogger _logger = new InternalLogger();
+public static class Settings {
+    private static readonly AsyncLocal<InternalLogger?> ContextLogger = new();
+    private static readonly InternalLogger DefaultLogger = new();
+
+    /// <summary>
+    /// Logger for the current asynchronous execution context.
+    /// </summary>
+    /// <remarks>
+    /// The value flows to child tasks without allowing concurrent PowerShell runspaces or callers to overwrite
+    /// one another's logging callbacks.
+    /// </remarks>
+    internal static InternalLogger _logger {
+        get => ContextLogger.Value ?? DefaultLogger;
+        set => ContextLogger.Value = value ?? throw new ArgumentNullException(nameof(value));
+    }
+
+    /// <summary>
+    /// Logger for the current asynchronous execution context. Setting it affects
+    /// the caller's context and flows to child tasks without changing unrelated callers.
+    /// </summary>
+    public static InternalLogger Logger {
+        get => _logger;
+        set => _logger = value;
+    }
 
     /// <summary>TTL (seconds) for negative host reachability cache; adjust for slower/faster networks.</summary>
     public static int NegativeCacheTtlSeconds { get; set; } = 15;
@@ -19,49 +42,10 @@ public class Settings {
     /// <summary>Timeout (ms) for RPC probe before attempting a session.</summary>
     public static int RpcProbeTimeoutMs { get; set; } = 2500;
 
-    /// <summary>Timeout (ms) for ICMP ping reachability check.</summary>
-    public static int PingTimeoutMs { get; set; } = 1000;
-
-    /// <summary>Warm-up budget (ms) for listing log names before queries.</summary>
-    public static int ListLogWarmupMs { get; set; } = 3000;
-
     /// <summary>
     /// Stall timeout (ms) while reading events from a log. Values less than or equal to zero disable the stall timeout (unbounded reads).
     /// Session establishment still respects <see cref="SessionTimeoutMs"/>.
     /// </summary>
     public static int QuerySessionTimeoutMs { get; set; } = 0;
-
-    /// <summary>When set, error messages are written to the console.</summary>
-    public bool Error {
-        get => _logger.IsError;
-        set => _logger.IsError = value;
-    }
-
-    /// <summary>Enables verbose output.</summary>
-    public bool Verbose {
-        get => _logger.IsVerbose;
-        set => _logger.IsVerbose = value;
-    }
-
-    /// <summary>Enables warning output.</summary>
-    public bool Warning {
-        get => _logger.IsWarning;
-        set => _logger.IsWarning = value;
-    }
-
-    /// <summary>Enables progress reporting.</summary>
-    public bool Progress {
-        get => _logger.IsProgress;
-        set => _logger.IsProgress = value;
-    }
-
-    /// <summary>Enables debug output.</summary>
-    public bool Debug {
-        get => _logger.IsDebug;
-        set => _logger.IsDebug = value;
-    }
-
-    /// <summary>Default degree of parallelism used by operations that support threading.</summary>
-    public int NumberOfThreads = 8;
 
 }

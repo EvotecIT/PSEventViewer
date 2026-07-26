@@ -42,12 +42,12 @@ public class AADSyncCycleStage : EventRuleBase
     /// <param name="eventObject">Event carrying ADSync cycle information.</param>
     public AADSyncCycleStage(EventObject eventObject) : base(eventObject)
     {
-        _eventObject = eventObject;
+        Event = eventObject;
         Type = "AADSyncCycleStage";
-        Computer = _eventObject.ComputerName;
-        When = _eventObject.TimeCreated;
+        Computer = Event.ComputerName;
+        When = Event.TimeCreated;
 
-        var message = Rules.RuleHelpers.GetMessage(_eventObject);
+        var message = Rules.RuleHelpers.GetMessage(Event);
 
         // Basic stage derivation
         Stage = DeriveStage(message);

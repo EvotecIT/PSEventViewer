@@ -17,6 +17,7 @@ public sealed class EvtxStatsReportBuilder {
     private readonly Dictionary<int, EvtxLevelStats> _byLevel = new();
 
     private int _scanned;
+    private long _eventsWithoutLevel;
     private DateTime? _minUtc;
     private DateTime? _maxUtc;
 
@@ -26,6 +27,8 @@ public sealed class EvtxStatsReportBuilder {
     public DateTime? MinUtc => _minUtc;
     /// <summary>Maximum event time (UTC) among scanned events.</summary>
     public DateTime? MaxUtc => _maxUtc;
+    /// <summary>Number of scanned events that did not expose a level.</summary>
+    public long EventsWithoutLevel => _eventsWithoutLevel;
 
     /// <summary>
     /// Adds a detailed event object to the report.
@@ -35,10 +38,12 @@ public sealed class EvtxStatsReportBuilder {
 
         Add(
             id: ev.Id,
-            timeCreatedUtc: ev.TimeCreated.ToUniversalTime(),
+            timeCreatedUtc: ev.TimeCreated == DateTime.MinValue
+                ? DateTime.MinValue
+                : ev.TimeCreated.ToUniversalTime(),
             providerName: ev.ProviderName,
             computerName: ev.ComputerName,
-            level: (int)(ev.Level ?? 0),
+            level: ev.Level,
             levelDisplayName: ev.LevelDisplayName);
     }
 
@@ -50,18 +55,33 @@ public sealed class EvtxStatsReportBuilder {
         DateTime timeCreatedUtc,
         string? providerName,
         string? computerName,
-        int level,
+        int? level,
         string? levelDisplayName) {
 
         _scanned++;
 
-        if (!_minUtc.HasValue || timeCreatedUtc < _minUtc.Value) _minUtc = timeCreatedUtc;
-        if (!_maxUtc.HasValue || timeCreatedUtc > _maxUtc.Value) _maxUtc = timeCreatedUtc;
+        if (timeCreatedUtc != DateTime.MinValue) {
+            if (!_minUtc.HasValue ||
+                timeCreatedUtc < _minUtc.Value) {
+                _minUtc = timeCreatedUtc;
+            }
+            if (!_maxUtc.HasValue ||
+                timeCreatedUtc > _maxUtc.Value) {
+                _maxUtc = timeCreatedUtc;
+            }
+        }
 
         ReportAggregates.AddCount(_byEventId, id);
         ReportAggregates.AddCount(_byProviderName, providerName, useUnknownPlaceholder: true);
         EvtxStatsAggregates.AddComputerCount(_byComputerName, computerName);
-        EvtxStatsAggregates.AddLevelCount(_byLevel, level, levelDisplayName);
+        if (level.HasValue) {
+            EvtxStatsAggregates.AddLevelCount(
+                _byLevel,
+                level.Value,
+                levelDisplayName);
+        } else {
+            _eventsWithoutLevel++;
+        }
     }
 
     /// <summary>
@@ -86,17 +106,33 @@ public sealed class EvtxStatsReportBuilder {
     public EvtxStatsReport Build() {
         return new EvtxStatsReport {
             Scanned = _scanned,
+            EventsWithoutLevel = _eventsWithoutLevel,
             MinUtc = _minUtc,
             MaxUtc = _maxUtc,
-            ByEventId = _byEventId,
-            ByProviderName = _byProviderName,
-            ByComputerName = _byComputerName,
-            ByLevel = _byLevel
+            ByEventId =
+                new Dictionary<int, long>(
+                    _byEventId),
+            ByProviderName =
+                new Dictionary<string, long>(
+                    _byProviderName,
+                    StringComparer.OrdinalIgnoreCase),
+            ByComputerName =
+                new Dictionary<string, long>(
+                    _byComputerName,
+                    StringComparer.OrdinalIgnoreCase),
+            ByLevel = _byLevel.ToDictionary(
+                static pair => pair.Key,
+                static pair =>
+                    new EvtxLevelStats(
+                        pair.Value.Level,
+                        pair.Value.LevelDisplayName) {
+                            Count = pair.Value.Count
+                        })
         };
     }
 
     /// <summary>
-    /// Convenience API: reads an EVTX file using <see cref="SearchEvents.QueryLogFile"/> and returns a stats report.
+    /// Convenience API: reads an EVTX file using <see cref="EventLogEngine"/> and returns a stats report.
     /// </summary>
     public static EvtxStatsReport BuildFromFile(
         string filePath,
@@ -114,7 +150,8 @@ public sealed class EvtxStatsReportBuilder {
             StartTimeUtc = startTimeUtc,
             EndTimeUtc = endTimeUtc,
             MaxEvents = maxEvents,
-            OldestFirst = oldestFirst
+            OldestFirst = oldestFirst,
+            ReadMode = EventReadMode.Metadata
         };
 
         if (!TryBuildFromFile(request, out var report, out var failure, cancellationToken)) {
@@ -133,24 +170,27 @@ public sealed class EvtxStatsReportBuilder {
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns><see langword="true"/> when query succeeds; otherwise <see langword="false"/>.</returns>
     public static bool TryBuildFromFile(
-        EvtxQueryRequest request,
+        EvtxQueryRequest? request,
         out EvtxStatsReport report,
         out EvtxQueryFailure? failure,
         CancellationToken cancellationToken = default) {
         var builder = new EvtxStatsReportBuilder();
-        if (!EvtxQueryExecutor.TryForEachEvent(
+        if (!EvtxQueryExecutor.TryForEachEventWithInfo(
                 request,
                 ev => {
                     builder.Add(ev);
                     return true;
                 },
+                out EvtxQueryExecutionInfo executionInfo,
                 out failure,
-                cancellationToken)) {
+                cancellationToken,
+                readModeOverride: EventReadMode.Metadata)) {
             report = new EvtxStatsReport();
             return false;
         }
 
         report = builder.Build();
+        report.Truncated = executionInfo.Truncated;
         return true;
     }
 

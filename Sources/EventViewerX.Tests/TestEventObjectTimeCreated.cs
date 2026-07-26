@@ -3,6 +3,9 @@ using System.Collections.Generic;
 using System.Diagnostics.Eventing.Reader;
 using System.Runtime.Serialization;
 using System.Security.Principal;
+using EventViewerX.Reports.Evtx;
+using EventViewerX.Reports.Live;
+using EventViewerX.Reports.Stats;
 using Xunit;
 
 namespace EventViewerX.Tests;
@@ -13,41 +16,116 @@ public class TestEventObjectTimeCreated
     public void TimeCreated_NullFallsBackToMinValue()
     {
         var record = new NullTimeEventRecord();
-        var eo = (EventObject)FormatterServices.GetUninitializedObject(typeof(EventObject));
-
-        SetField(eo, "_eventRecord", record);
-        eo.ContainerLog = string.Empty;
-        eo.XMLData = string.Empty;
-        eo.GatheredFrom = "local";
-        eo.GatheredLogName = string.Empty;
-        eo.MessageSubject = string.Empty;
-        SetProperty(eo, nameof(EventObject.MessageData), new Dictionary<string, string>());
-        SetProperty(eo, nameof(EventObject.Data), new Dictionary<string, string>());
-        SetProperty(eo, nameof(EventObject.Attachments), Array.Empty<byte[]>());
-        SetProperty(eo, nameof(EventObject.NicIdentifiers), new List<string>());
+        var eo = new EventObject(record, "local", EventReadMode.Metadata);
 
         Assert.Equal(DateTime.MinValue, eo.TimeCreated);
     }
 
-    private static void SetField(object target, string name, object value)
+    [Fact]
+    public void MissingTimeDoesNotBecomeAStatisticsExtremum()
     {
-        var f = target.GetType().GetField(name, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public);
-        f!.SetValue(target, value);
+        var record = new NullTimeEventRecord();
+        var eventObject =
+            new EventObject(
+                record,
+                "local",
+                EventReadMode.Metadata);
+        var builder =
+            new EvtxStatsReportBuilder();
+
+        builder.Add(eventObject);
+
+        Assert.Equal(1, builder.Scanned);
+        Assert.Null(builder.MinUtc);
+        Assert.Null(builder.MaxUtc);
     }
 
-    private static void SetProperty(object target, string name, object value)
-    {
-        var p = target.GetType().GetProperty(name, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public);
-        p!.SetValue(target, value);
+    [Fact]
+    public void LiveProjectionPreservesMissingTimeAndRecordId() {
+        var eventObject =
+            new EventObject(
+                new NullTimeEventRecord(),
+                "local",
+                EventReadMode.Metadata);
+
+        LiveEventRow row =
+            LiveEventQueryExecutor.ProjectRow(
+                eventObject,
+                includeMessage: false,
+                maxMessageChars: 0);
+
+        Assert.Null(row.TimeCreatedUtc);
+        Assert.Null(row.RecordId);
+    }
+
+    [Fact]
+    public void EvtxProjectionPreservesMissingTimeAndRecordId() {
+        var eventObject =
+            new EventObject(
+                new NullTimeEventRecord(),
+                "local",
+                EventReadMode.Metadata);
+
+        EvtxEventReportRow row =
+            EvtxEventReportBuilder.ProjectRow(
+                eventObject,
+                includeMessage: false,
+                maxMessageChars: 0);
+
+        Assert.Null(row.TimeCreatedUtc);
+        Assert.Null(row.RecordId);
+    }
+
+    [Fact]
+    public void MissingMetadataRemainsNullAndUsesItsOwnStatisticsCount() {
+        var eventObject =
+            new EventObject(
+                new NullTimeEventRecord(
+                    level: null),
+                "local",
+                EventReadMode.Metadata);
+
+        LiveEventRow live =
+            LiveEventQueryExecutor.ProjectRow(
+                eventObject,
+                includeMessage: false,
+                maxMessageChars: 0);
+        EvtxEventReportRow offline =
+            EvtxEventReportBuilder.ProjectRow(
+                eventObject,
+                includeMessage: false,
+                maxMessageChars: 0);
+        var builder =
+            new EvtxStatsReportBuilder();
+        builder.Add(eventObject);
+        EvtxStatsReport statistics =
+            builder.Build();
+
+        Assert.Null(live.Level);
+        Assert.Null(live.Task);
+        Assert.Equal(0, live.Opcode);
+        Assert.Null(live.Keywords);
+        Assert.Null(offline.Level);
+        Assert.Equal(1, statistics.Scanned);
+        Assert.Equal(1, statistics.EventsWithoutLevel);
+        Assert.Empty(statistics.ByLevel);
     }
 
     private sealed class NullTimeEventRecord : EventRecord
     {
+        private readonly byte? _level;
+
+        public NullTimeEventRecord(
+            byte? level = 4) {
+
+            _level = level;
+        }
+
         public override string ProviderName => "TestProvider";
         public override string LogName => "TestLog";
         public override string MachineName => Environment.MachineName;
         public override int Id => 0;
-        public override byte? Level => 4;
+        public override byte? Level => _level;
         public override int? Task => null;
         public override long? Keywords => null;
         public override IEnumerable<string> KeywordsDisplayNames => Array.Empty<string>();
@@ -65,7 +143,7 @@ public class TestEventObjectTimeCreated
         public override IList<EventProperty> Properties => Array.Empty<EventProperty>();
         public override DateTime? TimeCreated => null;
         public override int? Qualifiers => null;
-        public override long? RecordId => 0;
+        public override long? RecordId => null;
         public override byte? Version => 0;
         public override SecurityIdentifier UserId => null!;
         public override EventBookmark Bookmark => null!;

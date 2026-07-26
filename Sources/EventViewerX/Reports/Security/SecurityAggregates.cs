@@ -8,6 +8,14 @@ namespace EventViewerX.Reports.Security;
 /// Small aggregation helpers for security report builders.
 /// </summary>
 public static class SecurityAggregates {
+    internal static DateTime? NormalizeUtc(
+        DateTime value) {
+
+        return value == DateTime.MinValue
+            ? null
+            : value.ToUniversalTime();
+    }
+
     /// <summary>
     /// Increments a count for <paramref name="key"/> in <paramref name="dict"/>.
     /// </summary>
