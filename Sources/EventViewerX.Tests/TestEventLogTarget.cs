@@ -20,4 +20,16 @@ public sealed class TestEventLogTarget {
                 machineName,
                 domainName));
     }
+
+    [Fact]
+    public void LocalClassificationAcceptsCanonicalTrailingDots() {
+        Assert.True(
+            EventLogTarget.IsLocalMachine("."));
+        Assert.True(
+            EventLogTarget.IsLocalMachine(
+                Environment.MachineName + "."));
+        Assert.True(
+            EventLogTarget.IsLocalMachine(
+                EventLogTarget.LocalMachineName + "."));
+    }
 }

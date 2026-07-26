@@ -104,6 +104,8 @@ public static class LiveStatsQueryExecutor {
                 MaxEventsScanned = request.MaxEventsScanned,
                 ScannedEvents = scanned,
                 MatchedEvents = matched,
+                EventsWithoutLevel =
+                    builder.EventsWithoutLevel,
                 Truncated = truncated,
                 TimeCreatedUtcMin = minUtc,
                 TimeCreatedUtcMax = maxUtc,

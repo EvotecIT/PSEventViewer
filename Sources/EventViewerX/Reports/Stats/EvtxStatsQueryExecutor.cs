@@ -50,6 +50,7 @@ public static class EvtxStatsQueryExecutor {
             OldestFirst = request.OldestFirst,
             MaxEventsScanned = request.MaxEventsScanned,
             ScannedEvents = report.Scanned,
+            EventsWithoutLevel = report.EventsWithoutLevel,
             Truncated = report.Truncated,
             TimeCreatedUtcMin = report.MinUtc,
             TimeCreatedUtcMax = report.MaxUtc,

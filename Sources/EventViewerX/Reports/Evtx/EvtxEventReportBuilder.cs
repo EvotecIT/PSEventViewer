@@ -92,7 +92,7 @@ public static class EvtxEventReportBuilder {
             RecordId = eventObject.RecordId,
             LogName = eventObject.LogName ?? string.Empty,
             ProviderName = eventObject.ProviderName ?? string.Empty,
-            Level = (long)(eventObject.Level ?? 0),
+            Level = eventObject.Level,
             LevelDisplayName =
                 eventObject.LevelDisplayName ?? string.Empty,
             ComputerName =

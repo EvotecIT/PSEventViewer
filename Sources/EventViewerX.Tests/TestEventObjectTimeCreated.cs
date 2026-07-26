@@ -76,13 +76,56 @@ public class TestEventObjectTimeCreated
         Assert.Null(row.RecordId);
     }
 
+    [Fact]
+    public void MissingMetadataRemainsNullAndUsesItsOwnStatisticsCount() {
+        var eventObject =
+            new EventObject(
+                new NullTimeEventRecord(
+                    level: null),
+                "local",
+                EventReadMode.Metadata);
+
+        LiveEventRow live =
+            LiveEventQueryExecutor.ProjectRow(
+                eventObject,
+                includeMessage: false,
+                maxMessageChars: 0);
+        EvtxEventReportRow offline =
+            EvtxEventReportBuilder.ProjectRow(
+                eventObject,
+                includeMessage: false,
+                maxMessageChars: 0);
+        var builder =
+            new EvtxStatsReportBuilder();
+        builder.Add(eventObject);
+        EvtxStatsReport statistics =
+            builder.Build();
+
+        Assert.Null(live.Level);
+        Assert.Null(live.Task);
+        Assert.Equal(0, live.Opcode);
+        Assert.Null(live.Keywords);
+        Assert.Null(offline.Level);
+        Assert.Equal(1, statistics.Scanned);
+        Assert.Equal(1, statistics.EventsWithoutLevel);
+        Assert.Empty(statistics.ByLevel);
+    }
+
     private sealed class NullTimeEventRecord : EventRecord
     {
+        private readonly byte? _level;
+
+        public NullTimeEventRecord(
+            byte? level = 4) {
+
+            _level = level;
+        }
+
         public override string ProviderName => "TestProvider";
         public override string LogName => "TestLog";
         public override string MachineName => Environment.MachineName;
         public override int Id => 0;
-        public override byte? Level => 4;
+        public override byte? Level => _level;
         public override int? Task => null;
         public override long? Keywords => null;
         public override IEnumerable<string> KeywordsDisplayNames => Array.Empty<string>();

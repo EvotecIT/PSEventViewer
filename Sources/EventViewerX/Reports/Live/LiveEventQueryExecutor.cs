@@ -203,14 +203,13 @@ public static class LiveEventQueryExecutor {
                       string.Empty,
             ProviderName = eventObject.ProviderName ??
                            string.Empty,
-            Level = (long)(eventObject.Level ?? 0),
+            Level = eventObject.Level,
             LevelDisplayName =
                 eventObject.LevelDisplayName ??
                 string.Empty,
-            Task = (long)(eventObject.Task ?? 0),
-            Opcode = (long)(eventObject.Opcode ?? 0),
-            Keywords =
-                (long)(eventObject.Keywords ?? 0),
+            Task = eventObject.Task,
+            Opcode = eventObject.Opcode,
+            Keywords = eventObject.Keywords,
             MachineName = eventObject.MachineName ??
                           string.Empty,
             UserSid =

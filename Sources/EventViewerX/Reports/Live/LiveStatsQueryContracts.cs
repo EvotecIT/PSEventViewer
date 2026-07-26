@@ -199,6 +199,11 @@ public sealed class LiveStatsQueryResult {
     public long ScannedEvents { get; set; }
 
     /// <summary>
+    /// Number of matched events whose source record did not expose a level.
+    /// </summary>
+    public long EventsWithoutLevel { get; set; }
+
+    /// <summary>
     /// Number of matched events (after time filters).
     /// </summary>
     public long MatchedEvents { get; set; }

@@ -128,9 +128,10 @@ public sealed class LiveEventRow {
     public string ProviderName { get; set; } = string.Empty;
 
     /// <summary>
-    /// Numeric event level.
+    /// Numeric event level, or <see langword="null"/> when the source record
+    /// does not expose one.
     /// </summary>
-    public long Level { get; set; }
+    public long? Level { get; set; }
 
     /// <summary>
     /// Localized level name.
@@ -138,19 +139,22 @@ public sealed class LiveEventRow {
     public string LevelDisplayName { get; set; } = string.Empty;
 
     /// <summary>
-    /// Task value.
+    /// Task value, or <see langword="null"/> when the source record does not
+    /// expose one.
     /// </summary>
-    public long Task { get; set; }
+    public long? Task { get; set; }
 
     /// <summary>
-    /// Opcode value.
+    /// Opcode value, or <see langword="null"/> when the source record does not
+    /// expose one.
     /// </summary>
-    public long Opcode { get; set; }
+    public long? Opcode { get; set; }
 
     /// <summary>
-    /// Keywords bitmask value.
+    /// Keywords bitmask value, or <see langword="null"/> when the source record
+    /// does not expose one.
     /// </summary>
-    public long Keywords { get; set; }
+    public long? Keywords { get; set; }
 
     /// <summary>
     /// Computer name.

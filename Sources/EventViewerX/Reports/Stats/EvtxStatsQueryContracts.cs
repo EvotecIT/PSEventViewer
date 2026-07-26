@@ -138,6 +138,11 @@ public sealed class EvtxStatsQueryResult {
     public int ScannedEvents { get; set; }
 
     /// <summary>
+    /// Number of scanned events whose source record did not expose a level.
+    /// </summary>
+    public long EventsWithoutLevel { get; set; }
+
+    /// <summary>
     /// Indicates whether scanning stopped at cap.
     /// </summary>
     public bool Truncated { get; set; }

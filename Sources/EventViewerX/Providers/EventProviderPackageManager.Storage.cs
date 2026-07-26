@@ -88,9 +88,26 @@ public static partial class EventProviderPackageManager {
                 options.ToolTimeout);
             Directory.Move(staging, activationDirectory);
         } finally {
+            CleanupStagingDirectory(staging);
+        }
+    }
+
+    /// <summary>
+    /// Removes an invocation-owned staging directory without replacing the
+    /// activation result or its primary failure when cleanup is blocked.
+    /// </summary>
+    internal static void CleanupStagingDirectory(
+        string staging,
+        Action<string, bool>? deleteDirectory = null) {
+
+        deleteDirectory ??= Directory.Delete;
+        try {
             if (Directory.Exists(staging)) {
-                Directory.Delete(staging, recursive: true);
+                deleteDirectory(
+                    staging,
+                    true);
             }
+        } catch (Exception) {
         }
     }
 

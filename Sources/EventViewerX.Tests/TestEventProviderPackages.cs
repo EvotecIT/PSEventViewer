@@ -11,6 +11,27 @@ using ProviderEventDefinition =
 namespace EventViewerX.Tests;
 
 public sealed class TestEventProviderPackages {
+    [Fact]
+    public void StagingCleanupCannotReplaceTheActivationOutcome() {
+        string staging =
+            Path.Combine(
+                Path.GetTempPath(),
+                "EventViewerX.Tests",
+                Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(staging);
+        try {
+            EventProviderPackageManager.CleanupStagingDirectory(
+                staging,
+                static (_, _) =>
+                    throw new IOException(
+                        "Simulated antivirus lock."));
+        } finally {
+            Directory.Delete(
+                staging,
+                recursive: true);
+        }
+    }
+
     [Theory]
     [InlineData(0)]
     [InlineData(-1)]

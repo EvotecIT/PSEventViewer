@@ -33,9 +33,9 @@ public sealed class EvtxEventReportRow {
     public string ProviderName { get; set; } = string.Empty;
 
     /// <summary>
-    /// Numeric level.
+    /// Numeric level, when present.
     /// </summary>
-    public long Level { get; set; }
+    public long? Level { get; set; }
 
     /// <summary>
     /// Localized level name.

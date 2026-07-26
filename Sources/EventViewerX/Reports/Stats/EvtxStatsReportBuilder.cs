@@ -17,6 +17,7 @@ public sealed class EvtxStatsReportBuilder {
     private readonly Dictionary<int, EvtxLevelStats> _byLevel = new();
 
     private int _scanned;
+    private long _eventsWithoutLevel;
     private DateTime? _minUtc;
     private DateTime? _maxUtc;
 
@@ -26,6 +27,8 @@ public sealed class EvtxStatsReportBuilder {
     public DateTime? MinUtc => _minUtc;
     /// <summary>Maximum event time (UTC) among scanned events.</summary>
     public DateTime? MaxUtc => _maxUtc;
+    /// <summary>Number of scanned events that did not expose a level.</summary>
+    public long EventsWithoutLevel => _eventsWithoutLevel;
 
     /// <summary>
     /// Adds a detailed event object to the report.
@@ -40,7 +43,7 @@ public sealed class EvtxStatsReportBuilder {
                 : ev.TimeCreated.ToUniversalTime(),
             providerName: ev.ProviderName,
             computerName: ev.ComputerName,
-            level: (int)(ev.Level ?? 0),
+            level: ev.Level,
             levelDisplayName: ev.LevelDisplayName);
     }
 
@@ -52,7 +55,7 @@ public sealed class EvtxStatsReportBuilder {
         DateTime timeCreatedUtc,
         string? providerName,
         string? computerName,
-        int level,
+        int? level,
         string? levelDisplayName) {
 
         _scanned++;
@@ -71,7 +74,14 @@ public sealed class EvtxStatsReportBuilder {
         ReportAggregates.AddCount(_byEventId, id);
         ReportAggregates.AddCount(_byProviderName, providerName, useUnknownPlaceholder: true);
         EvtxStatsAggregates.AddComputerCount(_byComputerName, computerName);
-        EvtxStatsAggregates.AddLevelCount(_byLevel, level, levelDisplayName);
+        if (level.HasValue) {
+            EvtxStatsAggregates.AddLevelCount(
+                _byLevel,
+                level.Value,
+                levelDisplayName);
+        } else {
+            _eventsWithoutLevel++;
+        }
     }
 
     /// <summary>
@@ -96,6 +106,7 @@ public sealed class EvtxStatsReportBuilder {
     public EvtxStatsReport Build() {
         return new EvtxStatsReport {
             Scanned = _scanned,
+            EventsWithoutLevel = _eventsWithoutLevel,
             MinUtc = _minUtc,
             MaxUtc = _maxUtc,
             ByEventId =

@@ -16,9 +16,13 @@ public static class EventLogTarget {
         if (string.IsNullOrWhiteSpace(machineName)) {
             return true;
         }
-        string name = machineName!.Trim();
-        return name == "." ||
-               name.Equals(
+        string name =
+            machineName!.Trim();
+        if (name == ".") {
+            return true;
+        }
+        name = name.TrimEnd('.');
+        return name.Equals(
                    "localhost",
                    StringComparison.OrdinalIgnoreCase) ||
                name.Equals(
