@@ -30,6 +30,7 @@ public abstract partial class AsyncPSCmdlet : PSCmdlet, IDisposable
         public override void Post(SendOrPostCallback callback, object? state)
             => ThreadPool.QueueUserWorkItem(_ => callback(state));
     }
+
     private sealed class AsyncHookTaskScheduler : TaskScheduler
     {
         protected override System.Collections.Generic.IEnumerable<Task>? GetScheduledTasks()
@@ -61,7 +62,8 @@ public abstract partial class AsyncPSCmdlet : PSCmdlet, IDisposable
         ShouldContinue,
         ShouldContinueAll,
         ShouldContinueSecurity,
-        PromptForCredential
+        PromptForCredential,
+        PromptForCredentialOptions
     }
 
     private sealed class PipelineReply
@@ -76,6 +78,8 @@ public abstract partial class AsyncPSCmdlet : PSCmdlet, IDisposable
     {
         private readonly BlockingCollection<PipelineReply> _pipe = new(boundedCapacity: 1);
         private int _owners = 2;
+        private int _pipelineOwner = 1;
+        private int _requesterOwner = 1;
 
         public PipelineReply Take(CancellationToken cancellationToken)
             => _pipe.Take(cancellationToken);
@@ -84,6 +88,9 @@ public abstract partial class AsyncPSCmdlet : PSCmdlet, IDisposable
         {
             try
             {
+                if (Volatile.Read(ref _requesterOwner) == 0)
+                    return;
+
                 var reply = new PipelineReply(createValue());
                 try
                 {
@@ -96,18 +103,27 @@ public abstract partial class AsyncPSCmdlet : PSCmdlet, IDisposable
             }
             finally
             {
-                Release();
+                ReleasePipeline();
             }
         }
 
         public void Abandon()
         {
-            Release();
-            Release();
+            ReleaseRequester();
+            ReleasePipeline();
         }
 
         public void ReleaseRequester()
-            => Release();
+        {
+            if (Interlocked.Exchange(ref _requesterOwner, 0) == 1)
+                Release();
+        }
+
+        public void ReleasePipeline()
+        {
+            if (Interlocked.Exchange(ref _pipelineOwner, 0) == 1)
+                Release();
+        }
 
         private void Release()
         {
@@ -118,11 +134,16 @@ public abstract partial class AsyncPSCmdlet : PSCmdlet, IDisposable
 
     private sealed class PipelineItem
     {
-        public PipelineItem(object? value, PipelineType type, PipelineReplyChannel? replyPipe = null)
+        public PipelineItem(
+            object? value,
+            PipelineType type,
+            PipelineReplyChannel? replyPipe = null,
+            long hookGeneration = 0)
         {
             Value = value;
             Type = type;
             ReplyPipe = replyPipe;
+            HookGeneration = hookGeneration;
         }
 
         public object? Value { get; }
@@ -130,9 +151,12 @@ public abstract partial class AsyncPSCmdlet : PSCmdlet, IDisposable
         public PipelineType Type { get; }
 
         public PipelineReplyChannel? ReplyPipe { get; }
+
+        public long HookGeneration { get; }
     }
 
     private readonly CancellationTokenSource _cancelSource = new();
+    private readonly AsyncLocal<long> _hookGeneration = new();
     private readonly object _lifecycleLock = new();
     private InternalLogger? _eventViewerLogger;
     private Guid _powerShellResourceOwnerId;
@@ -140,6 +164,9 @@ public abstract partial class AsyncPSCmdlet : PSCmdlet, IDisposable
     private static readonly TaskScheduler HookTaskScheduler = new AsyncHookTaskScheduler();
     private BlockingCollection<PipelineItem>? _currentOutPipe;
     private Func<PipelineItem, bool>? _pipelineThreadQueue;
+    private Action? _pumpQueuedItems;
+    private long _activeHookGeneration;
+    private long _nextHookGeneration;
     private bool _cancelSourceDisposed;
     private bool _disposeRequested;
     private int _activeBlocks;
@@ -203,7 +230,10 @@ public abstract partial class AsyncPSCmdlet : PSCmdlet, IDisposable
     {
         ThrowIfStopped();
         if (CanAccessPipelineDirectly)
+        {
+            PrepareDirectPipelineInteraction();
             return base.ShouldProcess(target ?? string.Empty);
+        }
 
         return (bool)RequestPipelineReply(target ?? string.Empty, PipelineType.ShouldProcessTarget)!;
     }
@@ -213,7 +243,10 @@ public abstract partial class AsyncPSCmdlet : PSCmdlet, IDisposable
     {
         ThrowIfStopped();
         if (CanAccessPipelineDirectly)
+        {
+            PrepareDirectPipelineInteraction();
             return base.ShouldProcess(target ?? string.Empty, action);
+        }
 
         return (bool)RequestPipelineReply((target ?? string.Empty, action), PipelineType.ShouldProcess)!;
     }
@@ -223,7 +256,10 @@ public abstract partial class AsyncPSCmdlet : PSCmdlet, IDisposable
     {
         ThrowIfStopped();
         if (CanAccessPipelineDirectly)
+        {
+            PrepareDirectPipelineInteraction();
             return base.ShouldProcess(verboseDescription, verboseWarning, caption);
+        }
 
         return (bool)RequestPipelineReply(
             (verboseDescription, verboseWarning, caption),
@@ -239,7 +275,10 @@ public abstract partial class AsyncPSCmdlet : PSCmdlet, IDisposable
     {
         ThrowIfStopped();
         if (CanAccessPipelineDirectly)
+        {
+            PrepareDirectPipelineInteraction();
             return base.ShouldProcess(verboseDescription, verboseWarning, caption, out shouldProcessReason);
+        }
 
         var reply = ((bool Result, ShouldProcessReason Reason))RequestPipelineReply(
             (verboseDescription, verboseWarning, caption),
@@ -253,7 +292,10 @@ public abstract partial class AsyncPSCmdlet : PSCmdlet, IDisposable
     {
         ThrowIfStopped();
         if (CanAccessPipelineDirectly)
+        {
+            PrepareDirectPipelineInteraction();
             return base.ShouldContinue(query, caption);
+        }
 
         return (bool)RequestPipelineReply((query, caption), PipelineType.ShouldContinue)!;
     }
@@ -263,7 +305,10 @@ public abstract partial class AsyncPSCmdlet : PSCmdlet, IDisposable
     {
         ThrowIfStopped();
         if (CanAccessPipelineDirectly)
+        {
+            PrepareDirectPipelineInteraction();
             return base.ShouldContinue(query, caption, ref yesToAll, ref noToAll);
+        }
 
         var reply = ((bool Result, bool YesToAll, bool NoToAll))RequestPipelineReply(
             (query, caption, yesToAll, noToAll),
@@ -283,7 +328,10 @@ public abstract partial class AsyncPSCmdlet : PSCmdlet, IDisposable
     {
         ThrowIfStopped();
         if (CanAccessPipelineDirectly)
+        {
+            PrepareDirectPipelineInteraction();
             return base.ShouldContinue(query, caption, hasSecurityImpact, ref yesToAll, ref noToAll);
+        }
 
         var reply = ((bool Result, bool YesToAll, bool NoToAll))RequestPipelineReply(
             (query, caption, hasSecurityImpact, yesToAll, noToAll),
@@ -298,11 +346,41 @@ public abstract partial class AsyncPSCmdlet : PSCmdlet, IDisposable
     {
         ThrowIfStopped();
         if (CanAccessPipelineDirectly)
+        {
+            PrepareDirectPipelineInteraction();
             return Host.UI.PromptForCredential(caption, message, userName, targetName);
+        }
 
         return (PSCredential?)RequestPipelineReply(
             (caption, message, userName, targetName),
             PipelineType.PromptForCredential);
+    }
+
+    /// <summary>Thread-safe credential prompt bridge for asynchronous cmdlet code.</summary>
+    public PSCredential? PromptForCredential(
+        string caption,
+        string message,
+        string userName,
+        string targetName,
+        PSCredentialTypes allowedCredentialTypes,
+        PSCredentialUIOptions options)
+    {
+        ThrowIfStopped();
+        if (CanAccessPipelineDirectly)
+        {
+            PrepareDirectPipelineInteraction();
+            return Host.UI.PromptForCredential(
+                caption,
+                message,
+                userName,
+                targetName,
+                allowedCredentialTypes,
+                options);
+        }
+
+        return (PSCredential?)RequestPipelineReply(
+            (caption, message, userName, targetName, allowedCredentialTypes, options),
+            PipelineType.PromptForCredentialOptions);
     }
 
     /// <summary>Thread-safe output bridge for asynchronous cmdlet code.</summary>
@@ -312,9 +390,9 @@ public abstract partial class AsyncPSCmdlet : PSCmdlet, IDisposable
     /// <summary>Thread-safe output bridge for asynchronous cmdlet code.</summary>
     public new void WriteObject(object? sendToPipeline, bool enumerateCollection)
     {
-        if (CanAccessPipelineDirectly && Volatile.Read(ref _currentOutPipe) is null)
+        if (CanAccessPipelineDirectly)
         {
-            ThrowIfStopped();
+            PrepareDirectPipelineAccess();
             base.WriteObject(sendToPipeline, enumerateCollection);
             return;
         }
@@ -330,9 +408,9 @@ public abstract partial class AsyncPSCmdlet : PSCmdlet, IDisposable
     /// <summary>Thread-safe error bridge for asynchronous cmdlet code.</summary>
     public new void WriteError(ErrorRecord errorRecord)
     {
-        if (CanAccessPipelineDirectly && Volatile.Read(ref _currentOutPipe) is null)
+        if (CanAccessPipelineDirectly)
         {
-            ThrowIfStopped();
+            PrepareDirectPipelineAccess();
             base.WriteError(errorRecord);
             return;
         }
@@ -349,6 +427,7 @@ public abstract partial class AsyncPSCmdlet : PSCmdlet, IDisposable
         ThrowIfStopped();
         if (CanAccessPipelineDirectly)
         {
+            PrepareDirectPipelineAccess();
             base.ThrowTerminatingError(errorRecord);
             return;
         }
@@ -366,9 +445,9 @@ public abstract partial class AsyncPSCmdlet : PSCmdlet, IDisposable
     /// <summary>Thread-safe warning bridge for asynchronous cmdlet code.</summary>
     public new void WriteWarning(string text)
     {
-        if (CanAccessPipelineDirectly && Volatile.Read(ref _currentOutPipe) is null)
+        if (CanAccessPipelineDirectly)
         {
-            ThrowIfStopped();
+            PrepareDirectPipelineAccess();
             base.WriteWarning(text);
             return;
         }
@@ -382,9 +461,9 @@ public abstract partial class AsyncPSCmdlet : PSCmdlet, IDisposable
     /// <summary>Thread-safe verbose bridge for asynchronous cmdlet code.</summary>
     public new void WriteVerbose(string text)
     {
-        if (CanAccessPipelineDirectly && Volatile.Read(ref _currentOutPipe) is null)
+        if (CanAccessPipelineDirectly)
         {
-            ThrowIfStopped();
+            PrepareDirectPipelineAccess();
             base.WriteVerbose(text);
             return;
         }
@@ -398,9 +477,9 @@ public abstract partial class AsyncPSCmdlet : PSCmdlet, IDisposable
     /// <summary>Thread-safe debug bridge for asynchronous cmdlet code.</summary>
     public new void WriteDebug(string text)
     {
-        if (CanAccessPipelineDirectly && Volatile.Read(ref _currentOutPipe) is null)
+        if (CanAccessPipelineDirectly)
         {
-            ThrowIfStopped();
+            PrepareDirectPipelineAccess();
             base.WriteDebug(text);
             return;
         }
@@ -414,9 +493,9 @@ public abstract partial class AsyncPSCmdlet : PSCmdlet, IDisposable
     /// <summary>Thread-safe information bridge for asynchronous cmdlet code.</summary>
     public new void WriteInformation(InformationRecord informationRecord)
     {
-        if (CanAccessPipelineDirectly && Volatile.Read(ref _currentOutPipe) is null)
+        if (CanAccessPipelineDirectly)
         {
-            ThrowIfStopped();
+            PrepareDirectPipelineAccess();
             base.WriteInformation(informationRecord);
             return;
         }
@@ -428,12 +507,12 @@ public abstract partial class AsyncPSCmdlet : PSCmdlet, IDisposable
     }
 
     /// <summary>Thread-safe information bridge for asynchronous cmdlet code.</summary>
-    public new void WriteInformation(object messageData, string[] tags)
+    public new void WriteInformation(object messageData, string[]? tags)
     {
-        if (CanAccessPipelineDirectly && Volatile.Read(ref _currentOutPipe) is null)
+        if (CanAccessPipelineDirectly)
         {
-            ThrowIfStopped();
-            base.WriteInformation(messageData, tags);
+            PrepareDirectPipelineAccess();
+            base.WriteInformation(messageData, tags!);
             return;
         }
 
@@ -441,7 +520,7 @@ public abstract partial class AsyncPSCmdlet : PSCmdlet, IDisposable
             return;
 
         _ = TryQueue(new PipelineItem(
-            (messageData, (string[])tags.Clone()),
+            (messageData, tags is null ? null : (string[])tags.Clone()),
             PipelineType.InformationWithTags));
     }
 }
