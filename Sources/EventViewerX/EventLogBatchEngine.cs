@@ -224,59 +224,36 @@ public static partial class EventLogBatchEngine {
         Action<EventLogQueryFailure>? failureHandler,
         CancellationToken cancellationToken) {
 
-        var primed = new EventSourceCursor?[sources.Length];
-        int nextSource = -1;
-        int workerCount = Math.Min(
+        return PrimeConcurrently<EventSourceCursor>(
+            sources.Length,
             maxConcurrency,
-            sources.Length);
-        Task[] workers =
-            Enumerable
-                .Range(0, workerCount)
-                .Select(_ => Task.Run(() => {
-                    while (true) {
-                        cancellationToken.ThrowIfCancellationRequested();
-                        int index = Interlocked.Increment(
-                            ref nextSource);
-                        if (index >= sources.Length) {
-                            break;
-                        }
-
-                        EventSourceCursor? cursor = TryOpenCursor(
-                            index,
-                            sources[index],
+            cancellationToken,
+            (index, primingToken) => {
+                EventSourceCursor? cursor = TryOpenCursor(
+                    index,
+                    sources[index],
+                    continueOnError,
+                    failureHandler,
+                    primingToken);
+                if (cursor == null) {
+                    return null;
+                }
+                try {
+                    if (TryMoveNext(
+                            cursor,
                             continueOnError,
                             failureHandler,
-                            cancellationToken);
-                        if (cursor == null) {
-                            continue;
-                        }
-                        try {
-                            if (TryMoveNext(
-                                    cursor,
-                                    continueOnError,
-                                    failureHandler,
-                                    cancellationToken)) {
-                                primed[index] = cursor;
-                                cursor = null;
-                            }
-                        } finally {
-                            cursor?.Dispose();
-                        }
+                            primingToken)) {
+                        EventSourceCursor result =
+                            cursor;
+                        cursor = null;
+                        return result;
                     }
-                }, CancellationToken.None))
-                .ToArray();
-
-        try {
-            Task.WhenAll(workers)
-                .GetAwaiter()
-                .GetResult();
-            return primed;
-        } catch {
-            foreach (EventSourceCursor? cursor in primed) {
-                cursor?.Dispose();
-            }
-            throw;
-        }
+                    return null;
+                } finally {
+                    cursor?.Dispose();
+                }
+            });
     }
 
     private static EventSourceCursor? TryOpenCursor(

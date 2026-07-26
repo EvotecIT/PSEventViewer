@@ -61,4 +61,24 @@ public class TestLiveEventQueryExecutor {
         Assert.NotNull(failure);
         Assert.Equal(LiveEventQueryFailureKind.InvalidArgument, failure!.Kind);
     }
+
+    [Fact]
+    public void TryRead_ShouldClassifyNativeInvalidXPath() {
+        if (!OperatingSystem.IsWindows()) return;
+
+        bool ok = LiveEventQueryExecutor.TryRead(
+            new LiveEventQueryRequest {
+                LogName = "Application",
+                XPath = "*[System[(EventID=]]",
+                MaxEvents = 1
+            },
+            out _,
+            out LiveEventQueryFailure? failure);
+
+        Assert.False(ok);
+        Assert.NotNull(failure);
+        Assert.Equal(
+            LiveEventQueryFailureKind.InvalidQuery,
+            failure!.Kind);
+    }
 }

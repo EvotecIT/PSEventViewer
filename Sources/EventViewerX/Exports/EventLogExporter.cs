@@ -284,10 +284,13 @@ public static class EventLogExporter {
         }
     }
 
-    private static void DeleteTemporaryFile(string temporaryPath) {
+    internal static void DeleteTemporaryFile(
+        string temporaryPath,
+        Action<string>? delete = null) {
+
         try {
             if (File.Exists(temporaryPath)) {
-                File.Delete(temporaryPath);
+                (delete ?? File.Delete)(temporaryPath);
             }
         } catch (IOException) {
             // A canceled native export retains ownership until its worker
@@ -340,9 +343,7 @@ public static class EventLogExporter {
             PromoteTemporaryFile(temporaryPath, destination, overwrite);
             return new EventExportResult(destination, format, count, bytes, sha256);
         } finally {
-            if (File.Exists(temporaryPath)) {
-                File.Delete(temporaryPath);
-            }
+            DeleteTemporaryFile(temporaryPath);
         }
     }
 

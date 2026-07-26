@@ -22,33 +22,19 @@ public static partial class EventLogBatchEngine {
             [EnumeratorCancellation]
             CancellationToken cancellationToken) {
 
-        using var concurrencyGate =
-            new SemaphoreSlim(
-                plan.MaxConcurrency,
-                plan.MaxConcurrency);
-        Task<EventSourceCursor?>[] primeTasks =
-            plan.Sources
-                .Select((source, index) =>
-                    PrimeSourceAsync(
-                        index,
-                        source,
-                        plan.ContinueOnError,
-                        plan.FailureHandler,
-                        concurrencyGate,
-                        cancellationToken))
-                .ToArray();
-        EventSourceCursor?[] primed;
-        try {
-            primed = await Task.WhenAll(primeTasks)
+        EventSourceCursor?[] primed =
+            await PrimeConcurrentlyAsync<EventSourceCursor>(
+                    plan.Sources.Length,
+                    plan.MaxConcurrency,
+                    cancellationToken,
+                    (index, primingToken) =>
+                        PrimeSourceAsync(
+                            index,
+                            plan.Sources[index],
+                            plan.ContinueOnError,
+                            plan.FailureHandler,
+                            primingToken))
                 .ConfigureAwait(false);
-        } catch {
-            foreach (Task<EventSourceCursor?> task in primeTasks) {
-                if (task.Status == TaskStatus.RanToCompletion) {
-                    task.Result?.Dispose();
-                }
-            }
-            throw;
-        }
         var cursors = primed
             .Where(static cursor => cursor != null)
             .Cast<EventSourceCursor>()
@@ -96,40 +82,32 @@ public static partial class EventLogBatchEngine {
         EventSourceSnapshot source,
         bool continueOnError,
         Action<EventLogQueryFailure>? failureHandler,
-        SemaphoreSlim concurrencyGate,
         CancellationToken cancellationToken) {
 
-        await concurrencyGate.WaitAsync(
-                cancellationToken)
-            .ConfigureAwait(false);
-        try {
-            return await Task.Run(() => {
-                EventSourceCursor? cursor = TryOpenCursor(
-                    index,
-                    source,
-                    continueOnError,
-                    failureHandler,
-                    cancellationToken);
-                if (cursor == null) {
-                    return null;
+        return await Task.Run(() => {
+            EventSourceCursor? cursor = TryOpenCursor(
+                index,
+                source,
+                continueOnError,
+                failureHandler,
+                cancellationToken);
+            if (cursor == null) {
+                return null;
+            }
+            try {
+                if (TryMoveNext(
+                        cursor,
+                        continueOnError,
+                        failureHandler,
+                        cancellationToken)) {
+                    EventSourceCursor result = cursor;
+                    cursor = null;
+                    return result;
                 }
-                try {
-                    if (TryMoveNext(
-                            cursor,
-                            continueOnError,
-                            failureHandler,
-                            cancellationToken)) {
-                        EventSourceCursor result = cursor;
-                        cursor = null;
-                        return result;
-                    }
-                    return null;
-                } finally {
-                    cursor?.Dispose();
-                }
-            }, CancellationToken.None).ConfigureAwait(false);
-        } finally {
-            concurrencyGate.Release();
-        }
+                return null;
+            } finally {
+                cursor?.Dispose();
+            }
+        }, CancellationToken.None).ConfigureAwait(false);
     }
 }

@@ -193,6 +193,23 @@ public sealed class TestEventLogExporter {
     }
 
     [Fact]
+    public void TemporaryCleanupDoesNotReplaceTheExportFailure() {
+        using var fixture = new ExportFixture();
+        string temporaryPath =
+            fixture.GetPath("cleanup.tmp");
+        File.WriteAllText(
+            temporaryPath,
+            "partial");
+
+        EventLogExporter.DeleteTemporaryFile(
+            temporaryPath,
+            static _ => throw new IOException(
+                "cleanup failed"));
+
+        Assert.True(File.Exists(temporaryPath));
+    }
+
+    [Fact]
     public void NativeExportCancellationDefersCleanupUntilTheWorkerStops() {
         using var fixture = new ExportFixture();
         string outputPath = fixture.GetPath("existing.evtx");

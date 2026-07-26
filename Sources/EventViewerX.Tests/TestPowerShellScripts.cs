@@ -406,6 +406,42 @@ namespace EventViewerX.Tests {
         }
 
         [Fact]
+        public void FailedRestoredScriptWriteRemovesItsPartialFile() {
+            string destination = Path.Combine(
+                Path.GetTempPath(),
+                "EventViewerX.Tests." +
+                Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(destination);
+            string path = Path.Combine(
+                destination,
+                "partial.ps1");
+            try {
+                IOException exception =
+                    Assert.Throws<IOException>(() =>
+                        RestoredPowerShellScript.WriteNewFile(
+                            path,
+                            "Get-Date",
+                            static (writer, _) => {
+                                writer.Write("partial");
+                                writer.Flush();
+                                throw new IOException(
+                                    "volume full");
+                            }));
+
+                Assert.Equal(
+                    "volume full",
+                    exception.Message);
+                Assert.False(File.Exists(path));
+            } finally {
+                if (Directory.Exists(destination)) {
+                    Directory.Delete(
+                        destination,
+                        recursive: true);
+                }
+            }
+        }
+
+        [Fact]
         public void RestoredScriptSaveRefusesAPreexistingHardLink() {
             string destination = Path.Combine(Path.GetTempPath(), "EventViewerX.Tests." + Guid.NewGuid().ToString("N"));
             string outsidePath = Path.Combine(Path.GetTempPath(), "EventViewerX.Tests.Outside." + Guid.NewGuid().ToString("N") + ".ps1");

@@ -87,18 +87,54 @@ public class RestoredPowerShellScript {
                 WriteNewFile(filePath + ":Zone.Identifier", "[ZoneTransfer]\r\nZoneId=3");
             }
         } catch {
-            if (created && File.Exists(filePath)) {
-                File.Delete(filePath);
+            if (created) {
+                DeleteOwnedFile(filePath);
             }
             throw;
         }
         return filePath;
     }
 
-    private static void WriteNewFile(string path, string contents) {
-        using var stream = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None);
-        using var writer = new StreamWriter(stream, new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
-        writer.Write(contents);
+    internal static void WriteNewFile(
+        string path,
+        string contents,
+        Action<StreamWriter, string>? write = null) {
+
+        bool created = false;
+        try {
+            using var stream = new FileStream(
+                path,
+                FileMode.CreateNew,
+                FileAccess.Write,
+                FileShare.None);
+            created = true;
+            using var writer = new StreamWriter(
+                stream,
+                new System.Text.UTF8Encoding(
+                    encoderShouldEmitUTF8Identifier: false));
+            if (write == null) {
+                writer.Write(contents);
+            } else {
+                write(writer, contents);
+            }
+        } catch {
+            if (created) {
+                DeleteOwnedFile(path);
+            }
+            throw;
+        }
+    }
+
+    private static void DeleteOwnedFile(
+        string path) {
+
+        try {
+            File.Delete(path);
+        } catch (IOException) {
+            // Preserve the authoritative write or metadata failure.
+        } catch (UnauthorizedAccessException) {
+            // Preserve the authoritative write or metadata failure.
+        }
     }
 
     private static string SanitizeFileNameComponent(string? value, string fallback) {

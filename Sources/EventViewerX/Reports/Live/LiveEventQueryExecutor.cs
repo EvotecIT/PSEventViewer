@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Diagnostics.Eventing.Reader;
 using System.Threading;
 using EventViewerX.Reports.QueryHelpers;
@@ -148,6 +149,26 @@ public static class LiveEventQueryExecutor {
             result = new LiveEventQueryResult();
             failure = new LiveEventQueryFailure {
                 Kind = LiveEventQueryFailureKind.LogNotFound,
+                Message = ex.Message
+            };
+            return false;
+        } catch (Win32Exception ex) {
+            result = new LiveEventQueryResult();
+            failure = new LiveEventQueryFailure {
+                Kind = QueryFailureHelpers.Classify(ex) switch {
+                    NativeQueryFailureKind.InvalidQuery =>
+                        LiveEventQueryFailureKind.InvalidQuery,
+                    NativeQueryFailureKind.LogNotFound =>
+                        LiveEventQueryFailureKind.LogNotFound,
+                    NativeQueryFailureKind.AccessDenied =>
+                        LiveEventQueryFailureKind.AccessDenied,
+                    NativeQueryFailureKind.Timeout =>
+                        LiveEventQueryFailureKind.Timeout,
+                    NativeQueryFailureKind.HostUnavailable =>
+                        LiveEventQueryFailureKind.HostUnavailable,
+                    _ =>
+                        LiveEventQueryFailureKind.Exception
+                },
                 Message = ex.Message
             };
             return false;

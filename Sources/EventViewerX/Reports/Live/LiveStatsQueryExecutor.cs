@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Diagnostics.Eventing.Reader;
 using System.Globalization;
 using System.Linq;
@@ -151,6 +152,26 @@ public static class LiveStatsQueryExecutor {
             result = new LiveStatsQueryResult();
             failure = new LiveStatsQueryFailure {
                 Kind = LiveStatsQueryFailureKind.LogNotFound,
+                Message = ex.Message
+            };
+            return false;
+        } catch (Win32Exception ex) {
+            result = new LiveStatsQueryResult();
+            failure = new LiveStatsQueryFailure {
+                Kind = QueryFailureHelpers.Classify(ex) switch {
+                    NativeQueryFailureKind.InvalidQuery =>
+                        LiveStatsQueryFailureKind.InvalidQuery,
+                    NativeQueryFailureKind.LogNotFound =>
+                        LiveStatsQueryFailureKind.LogNotFound,
+                    NativeQueryFailureKind.AccessDenied =>
+                        LiveStatsQueryFailureKind.AccessDenied,
+                    NativeQueryFailureKind.Timeout =>
+                        LiveStatsQueryFailureKind.Timeout,
+                    NativeQueryFailureKind.HostUnavailable =>
+                        LiveStatsQueryFailureKind.HostUnavailable,
+                    _ =>
+                        LiveStatsQueryFailureKind.Exception
+                },
                 Message = ex.Message
             };
             return false;

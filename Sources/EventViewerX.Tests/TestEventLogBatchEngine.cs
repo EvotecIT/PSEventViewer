@@ -815,6 +815,82 @@ namespace EventViewerX.Tests;
     }
 
     [Fact]
+    public void FatalSynchronousPrimerCancelsItsSibling() {
+        using var siblingStarted =
+            new ManualResetEventSlim();
+        var stopwatch =
+            System.Diagnostics.Stopwatch.StartNew();
+
+        InvalidOperationException exception =
+            Assert.Throws<InvalidOperationException>(() =>
+                EventLogBatchEngine
+                    .PrimeConcurrently<PrimerResource>(
+                        sourceCount: 2,
+                        maxConcurrency: 2,
+                        CancellationToken.None,
+                        (index, cancellationToken) => {
+                            if (index == 0) {
+                                Assert.True(
+                                    siblingStarted.Wait(
+                                        TimeSpan.FromSeconds(5)));
+                                throw new InvalidOperationException(
+                                    "fatal source");
+                            }
+                            siblingStarted.Set();
+                            Assert.True(
+                                cancellationToken.WaitHandle.WaitOne(
+                                    TimeSpan.FromSeconds(5)));
+                            cancellationToken
+                                .ThrowIfCancellationRequested();
+                            return new PrimerResource();
+                        }));
+
+        Assert.Equal(
+            "fatal source",
+            exception.Message);
+        Assert.True(
+            stopwatch.Elapsed <
+            TimeSpan.FromSeconds(5));
+    }
+
+    [Fact]
+    public async Task FatalAsynchronousPrimerCancelsItsSibling() {
+        var siblingStarted =
+            new TaskCompletionSource<bool>(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+        var stopwatch =
+            System.Diagnostics.Stopwatch.StartNew();
+
+        InvalidOperationException exception =
+            await Assert.ThrowsAsync<InvalidOperationException>(
+                async () =>
+                    await EventLogBatchEngine
+                        .PrimeConcurrentlyAsync<PrimerResource>(
+                            sourceCount: 2,
+                            maxConcurrency: 2,
+                            CancellationToken.None,
+                            async (index, cancellationToken) => {
+                                if (index == 0) {
+                                    await siblingStarted.Task;
+                                    throw new InvalidOperationException(
+                                        "fatal source");
+                                }
+                                siblingStarted.SetResult(true);
+                                await Task.Delay(
+                                    TimeSpan.FromSeconds(30),
+                                    cancellationToken);
+                                return new PrimerResource();
+                            }));
+
+        Assert.Equal(
+            "fatal source",
+            exception.Message);
+        Assert.True(
+            stopwatch.Elapsed <
+            TimeSpan.FromSeconds(5));
+    }
+
+    [Fact]
     public void CancellationStopsTheMergedBatchEnumeration() {
         if (!OperatingSystem.IsWindows()) return;
         var query = EventLogBatchQuery.ForFiles(new[] {
@@ -885,6 +961,11 @@ namespace EventViewerX.Tests;
                     observed) == observed) {
                 return;
             }
+        }
+    }
+
+    private sealed class PrimerResource : IDisposable {
+        public void Dispose() {
         }
     }
 }

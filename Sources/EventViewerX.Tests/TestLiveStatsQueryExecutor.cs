@@ -36,6 +36,26 @@ public class TestLiveStatsQueryExecutor {
     }
 
     [Fact]
+    public void TryBuild_ShouldClassifyNativeInvalidXPath() {
+        if (!OperatingSystem.IsWindows()) return;
+
+        bool ok = LiveStatsQueryExecutor.TryBuild(
+            new LiveStatsQueryRequest {
+                LogName = "Application",
+                XPath = "*[System[(EventID=]]",
+                MaxEventsScanned = 1
+            },
+            out _,
+            out LiveStatsQueryFailure? failure);
+
+        Assert.False(ok);
+        Assert.NotNull(failure);
+        Assert.Equal(
+            LiveStatsQueryFailureKind.InvalidQuery,
+            failure!.Kind);
+    }
+
+    [Fact]
     public void BuildEffectiveXPath_IntersectsCustomSelectorWithNativeTimeRange() {
         var start = new DateTime(2026, 2, 10, 10, 0, 0, DateTimeKind.Utc);
         var end = start.AddHours(1);
