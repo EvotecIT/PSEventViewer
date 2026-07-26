@@ -40,12 +40,35 @@ public class TestEventLogDetailsResult {
             "Application",
             session,
             timeoutMs: 10000,
-            machineName: Environment.MachineName);
+            machineName: Environment.MachineName,
+            includeEventTimes: true);
 
         Assert.True(result.Success);
         Assert.Equal(EventLogDetailsStatus.Success, result.Status);
         Assert.NotNull(result.Details);
         Assert.Equal(Environment.MachineName, result.MachineName);
+    }
+
+    [Fact]
+    public void CallerOwnedSessionOperationCompletesBeforeReturning() {
+        bool completed = false;
+        bool lateCleanupCalled = false;
+
+        int result = EventLogCatalog.ExecuteSessionOperation(
+            () => {
+                Thread.Sleep(50);
+                completed = true;
+                return 42;
+            },
+            timeoutMilliseconds: 1,
+            timeoutMessage: "Caller-owned work must not be abandoned.",
+            CancellationToken.None,
+            lateResultCleanup: _ =>
+                lateCleanupCalled = true);
+
+        Assert.Equal(42, result);
+        Assert.True(completed);
+        Assert.False(lateCleanupCalled);
     }
 
     [Fact]

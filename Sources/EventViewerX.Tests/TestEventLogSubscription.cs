@@ -341,6 +341,54 @@ public sealed class TestEventLogSubscription {
     }
 
     [Fact]
+    public async Task InitialDiagnosticsCancellationRetainsNativeLifetimeUntilCompletion() {
+        using var started =
+            new ManualResetEventSlim();
+        using var release =
+            new ManualResetEventSlim();
+        using var cancellation =
+            new CancellationTokenSource();
+        var operationLease =
+            new TestOperationLease();
+        Task diagnostics = Task.Run(() =>
+            EventLogSubscription
+                .ReportInitialQueryFailuresBounded(
+                    () => {
+                        started.Set();
+                        release.Wait();
+                    },
+                    5000,
+                    cancellation.Token,
+                    operationLease));
+        Assert.True(
+            started.Wait(
+                TimeSpan.FromSeconds(5)));
+
+        cancellation.Cancel();
+        Task completed = await Task.WhenAny(
+            diagnostics,
+            Task.Delay(
+                TimeSpan.FromSeconds(5)));
+        try {
+            Assert.Same(
+                diagnostics,
+                completed);
+            await Assert.ThrowsAnyAsync<
+                OperationCanceledException>(
+                async () =>
+                    await diagnostics);
+            Assert.False(
+                operationLease.IsDisposed);
+        } finally {
+            release.Set();
+        }
+        Assert.True(
+            SpinWait.SpinUntil(
+                () => operationLease.IsDisposed,
+                TimeSpan.FromSeconds(5)));
+    }
+
+    [Fact]
     public void CancellationReportedDuringQueryDiagnosticsFailsStartup() {
         if (!OperatingSystem.IsWindows()) return;
         const string missingLog =
@@ -503,6 +551,19 @@ public sealed class TestEventLogSubscription {
                     static query => query.XPath));
         } finally {
             WatcherManager.StopWatcher(watcher.Id);
+        }
+    }
+
+    private sealed class TestOperationLease : IDisposable {
+        private int _disposed;
+
+        internal bool IsDisposed =>
+            Volatile.Read(ref _disposed) != 0;
+
+        public void Dispose() {
+            Interlocked.Exchange(
+                ref _disposed,
+                1);
         }
     }
 }

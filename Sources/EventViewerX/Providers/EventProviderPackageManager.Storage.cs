@@ -4,14 +4,11 @@ using System.Security.Principal;
 namespace EventViewerX.Providers;
 
 public static partial class EventProviderPackageManager {
-    private static void ValidateUpgrade(
+    internal static void ValidateUpgrade(
         EventProviderDefinition baseline,
         EventProviderDefinition candidate,
         EventProviderPackageInstallOptions options) {
 
-        EventProviderCompatibility.EnsureCompatible(
-            baseline,
-            candidate);
         EventProviderPackageVersion baselineVersion =
             EventProviderPackageVersion.Parse(
                 baseline.PackageVersion);
@@ -24,11 +21,17 @@ public static partial class EventProviderPackageManager {
             throw new InvalidOperationException(
                 $"Provider package downgrade from {baseline.PackageVersion} to {candidate.PackageVersion} is disabled.");
         }
+        if (comparison < 0) {
+            return;
+        }
         if (comparison == 0 &&
             !options.AllowSameVersionReplacement) {
             throw new InvalidOperationException(
                 $"Provider package version {candidate.PackageVersion} is already active with different bytes. Publish a new immutable version or explicitly allow same-version replacement.");
         }
+        EventProviderCompatibility.EnsureCompatible(
+            baseline,
+            candidate);
     }
 
     private static void PrepareActivationDirectory(

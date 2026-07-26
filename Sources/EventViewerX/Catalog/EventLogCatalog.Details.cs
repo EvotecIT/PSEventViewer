@@ -38,6 +38,10 @@ public static partial class EventLogCatalog {
     /// <summary>
     /// Reuses an existing EventLogSession (caller owns it) to avoid repeated handshakes per host.
     /// </summary>
+    /// <remarks>
+    /// Native setup against a caller-owned session completes before this method
+    /// returns so the caller can safely dispose the session afterward.
+    /// </remarks>
     public static EventLogDetails? GetLogDetails(string logName, EventLogSession session, int timeoutMs = 3000, string? machineName = null, bool includeEventTimes = false)
     {
         if (session == null) throw new ArgumentNullException(nameof(session));
@@ -51,6 +55,10 @@ public static partial class EventLogCatalog {
     /// <summary>
     /// Reuses an existing EventLogSession (caller owns it) and returns diagnostic status when the log cannot be read.
     /// </summary>
+    /// <remarks>
+    /// Native setup against a caller-owned session completes before this method
+    /// returns so the caller can safely dispose the session afterward.
+    /// </remarks>
     public static EventLogDetailsResult GetLogDetailsResult(string logName, EventLogSession session, int timeoutMs = 3000, string? machineName = null, bool includeEventTimes = false) {
         if (session == null) throw new ArgumentNullException(nameof(session));
         if (string.IsNullOrWhiteSpace(logName)) throw new ArgumentException("logName cannot be null or empty", nameof(logName));
@@ -128,10 +136,11 @@ public static partial class EventLogCatalog {
             string hostName = machineName ?? EventLogTarget.LocalMachineName;
 
             try {
-                logConfig = EventLogNativeOperation.Execute(
+                logConfig = ExecuteSessionOperation(
                     () => new EventLogConfiguration(logName, session),
                     timeoutMs,
                     $"Timed out reading configuration for '{logName}' on '{hostName}' after {timeoutMs} ms.",
+                    cancellationToken,
                     static configuration => configuration.Dispose(),
                     sessionLifetime?.Retain());
                 cancellationToken.ThrowIfCancellationRequested();
@@ -149,10 +158,11 @@ public static partial class EventLogCatalog {
 
             Exception? logInformationFailure = null;
             try {
-                logInfoObj = EventLogNativeOperation.Execute(
+                logInfoObj = ExecuteSessionOperation(
                     () => session.GetLogInformation(logName, PathType.LogName),
                     timeoutMs,
                     $"Timed out reading runtime information for '{logName}' on '{hostName}' after {timeoutMs} ms.",
+                    cancellationToken,
                     operationLease:
                         sessionLifetime?.Retain());
                 cancellationToken.ThrowIfCancellationRequested();
@@ -212,6 +222,36 @@ public static partial class EventLogCatalog {
         }
     }
 
+    /// <summary>
+    /// Executes work against an owned session through the bounded worker, while
+    /// caller-owned session work completes inline and cannot outlive the call.
+    /// </summary>
+    internal static T ExecuteSessionOperation<T>(
+        Func<T> operation,
+        int timeoutMilliseconds,
+        string timeoutMessage,
+        CancellationToken cancellationToken,
+        Action<T>? lateResultCleanup = null,
+        IDisposable? operationLease = null) {
+
+        if (operation == null) {
+            operationLease?.Dispose();
+            throw new ArgumentNullException(
+                nameof(operation));
+        }
+        if (operationLease == null) {
+            cancellationToken.ThrowIfCancellationRequested();
+            return operation();
+        }
+        return EventLogNativeOperation.Execute(
+            operation,
+            timeoutMilliseconds,
+            timeoutMessage,
+            cancellationToken,
+            lateResultCleanup,
+            operationLease);
+    }
+
     private static Exception? ReadEventTimes(
         string logName,
         EventLogSession session,
@@ -229,10 +269,14 @@ public static partial class EventLogCatalog {
                 Session = session
             };
             using (EventLogReader oldestReader =
-                   EventLogNativeOperation.CreateReader(
-                       oldestQuery,
-                       details.MachineName,
+                   ExecuteSessionOperation(
+                       () => new EventLogReader(
+                           oldestQuery),
                        timeoutMs,
+                       $"Timed out creating an Event Log reader for '{details.MachineName}' after {timeoutMs} ms.",
+                       cancellationToken,
+                       static reader =>
+                           reader.Dispose(),
                        sessionLifetime?.Retain())) {
                 cancellationToken.ThrowIfCancellationRequested();
                 using EventRecord? oldest =
@@ -252,10 +296,14 @@ public static partial class EventLogCatalog {
                 ReverseDirection = true
             };
             using (EventLogReader newestReader =
-                   EventLogNativeOperation.CreateReader(
-                       newestQuery,
-                       details.MachineName,
+                   ExecuteSessionOperation(
+                       () => new EventLogReader(
+                           newestQuery),
                        timeoutMs,
+                       $"Timed out creating an Event Log reader for '{details.MachineName}' after {timeoutMs} ms.",
+                       cancellationToken,
+                       static reader =>
+                           reader.Dispose(),
                        sessionLifetime?.Retain())) {
                 cancellationToken.ThrowIfCancellationRequested();
                 using EventRecord? newest =

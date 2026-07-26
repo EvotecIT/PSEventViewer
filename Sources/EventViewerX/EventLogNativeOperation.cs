@@ -38,32 +38,6 @@ internal static class EventLogNativeOperation {
             operationLease);
     }
 
-    internal static EventLogReader CreateReader(
-        EventLogQuery query,
-        string? machineName,
-        int timeoutMilliseconds = 0,
-        IDisposable? operationLease = null) {
-
-        if (query == null) {
-            throw new ArgumentNullException(nameof(query));
-        }
-        if (timeoutMilliseconds <= 0) {
-            using (operationLease) {
-                return new EventLogReader(query);
-            }
-        }
-
-        string target = string.IsNullOrWhiteSpace(machineName)
-            ? "the local computer"
-            : $"'{machineName}'";
-        return Execute(
-            () => new EventLogReader(query),
-            timeoutMilliseconds,
-            $"Timed out creating an Event Log reader for {target} after {timeoutMilliseconds} ms.",
-            static reader => reader.Dispose(),
-            operationLease);
-    }
-
     internal static EventRecord? ReadEvent(
         EventLogReader reader,
         int timeoutMilliseconds,

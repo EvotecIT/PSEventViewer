@@ -34,4 +34,36 @@ public sealed class TestEventProviderCompatibility {
             issue => issue.Code ==
                      "TaskEventGuidChanged");
     }
+
+    [Fact]
+    public void AllowedDowngradeDoesNotApplyForwardCompatibilityRules() {
+        EventProviderDefinition active =
+            TestEventProviderPackages.CreateDefinition();
+        active.PackageVersion = "2.0.0";
+        active.Channels.Add(
+            EventProviderChannelDefinition.Operational(
+                "AddedLater",
+                "Evotec-EventViewerX-PackageTest/AddedLater"));
+        EventProviderDefinition older =
+            TestEventProviderPackages.CreateDefinition();
+        older.PackageVersion = "1.0.0";
+
+        EventProviderPackageManager.ValidateUpgrade(
+            active,
+            older,
+            new EventProviderPackageInstallOptions {
+                AllowDowngrade = true
+            });
+
+        InvalidOperationException disabled =
+            Assert.Throws<InvalidOperationException>(() =>
+                EventProviderPackageManager.ValidateUpgrade(
+                    active,
+                    older,
+                    new EventProviderPackageInstallOptions()));
+        Assert.Contains(
+            "downgrade",
+            disabled.Message,
+            StringComparison.OrdinalIgnoreCase);
+    }
 }

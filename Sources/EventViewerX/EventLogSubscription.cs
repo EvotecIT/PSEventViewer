@@ -140,7 +140,8 @@ public sealed class EventLogSubscription : IDisposable {
                 cancellationToken,
                 operationLease);
 
-            ReportInitialQueryFailures();
+            ReportInitialQueryFailuresBounded(
+                cancellationToken);
             _producer = Task.Run(ProduceAsync);
             _consumer = Task.Run(ConsumeAsync);
             _externalCancellation =
@@ -345,6 +346,46 @@ public sealed class EventLogSubscription : IDisposable {
         WindowsEventQueryDiagnostics.ReportFailures(
             _subscription!,
             nativeQuery);
+    }
+
+    private void ReportInitialQueryFailuresBounded(
+        CancellationToken cancellationToken) {
+
+        if (!_query.TolerateQueryErrors) {
+            return;
+        }
+        SafeHandleOperationLease operationLease =
+            SafeHandleOperationLease.Capture(
+                _session,
+                _subscription);
+        ReportInitialQueryFailuresBounded(
+            ReportInitialQueryFailures,
+            _query.RemoteConnectionTimeoutMilliseconds,
+            cancellationToken,
+            operationLease);
+    }
+
+    internal static void ReportInitialQueryFailuresBounded(
+        Action reportFailures,
+        int timeoutMilliseconds,
+        CancellationToken cancellationToken,
+        IDisposable? operationLease = null) {
+
+        if (reportFailures == null) {
+            operationLease?.Dispose();
+            throw new ArgumentNullException(
+                nameof(reportFailures));
+        }
+        _ = BoundedNativeOperation.Execute(
+            () => {
+                reportFailures();
+                return true;
+            },
+            timeoutMilliseconds,
+            $"Timed out reading initial subscription query diagnostics after {timeoutMilliseconds} ms.",
+            cancellationToken,
+            operationLease:
+                operationLease);
     }
 
     private void ReportFailure(
