@@ -11,11 +11,70 @@ public sealed class TestRemoteConnectionBudget {
         cancellation.Cancel();
 
         Assert.Throws<OperationCanceledException>(() =>
-            Native.RpcEndpointProbe.TryConnect(
+            Native.RpcEndpointProbe.Probe(
                 "192.0.2.1",
                 135,
                 30000,
                 cancellation.Token));
+    }
+
+    [Fact]
+    public void RpcProbeClassifiesDeadlineExpirationSeparately() {
+        var incomplete =
+            new TaskCompletionSource<object?>(
+                TaskCreationOptions
+                    .RunContinuationsAsynchronously);
+
+        RpcEndpointProbeStatus status =
+            RpcEndpointProbe.Probe(
+                "eventviewerx-rpc-timeout.invalid",
+                135,
+                25,
+                CancellationToken.None,
+                connectAsyncOverride:
+                    () => incomplete.Task,
+                connectedOverride:
+                    static () => false);
+
+        Assert.Equal(
+            RpcEndpointProbeStatus.TimedOut,
+            status);
+    }
+
+    [Fact]
+    public void RemoteReaderCachesOnlyDefinitiveRpcFailure() {
+        const string host =
+            "eventviewerx-native-rpc-timeout.invalid";
+        EventLogSessionManager.ClearHostCache(host);
+        try {
+            Assert.Throws<TimeoutException>(() =>
+                WindowsEventRemoteReader
+                    .EnsureRpcEndpointAvailable(
+                        host,
+                        135,
+                        25,
+                        RpcEndpointProbeStatus.TimedOut));
+            Assert.False(
+                EventLogSessionManager
+                    .TryGetHostNegativeCacheExpiry(
+                        host,
+                        out _));
+
+            Assert.Throws<System.ComponentModel.Win32Exception>(
+                () => WindowsEventRemoteReader
+                    .EnsureRpcEndpointAvailable(
+                        host,
+                        135,
+                        25,
+                        RpcEndpointProbeStatus.Failed));
+            Assert.True(
+                EventLogSessionManager
+                    .TryGetHostNegativeCacheExpiry(
+                        host,
+                        out _));
+        } finally {
+            EventLogSessionManager.ClearHostCache(host);
+        }
     }
 
     [Fact]

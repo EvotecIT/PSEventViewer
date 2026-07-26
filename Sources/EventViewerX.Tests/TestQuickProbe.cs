@@ -109,7 +109,6 @@ namespace EventViewerX.Tests {
             const string host =
                 "eventviewerx-rpc-budget-timeout.invalid";
             EventLogSessionManager.ClearHostCache(host);
-            using var release = new ManualResetEventSlim();
             try {
                 using EventLogSessionOpenResult result =
                     EventLogSessionManager.CreateSessionResult(
@@ -117,10 +116,10 @@ namespace EventViewerX.Tests {
                         "QuickProbe",
                         "Application",
                         timeoutMs: 100,
-                        rpcProbeOverride: (_, _) => {
-                            release.Wait();
-                            return true;
-                        });
+                        rpcProbeStatusOverride:
+                            static (_, _) =>
+                                Native.RpcEndpointProbeStatus
+                                    .TimedOut);
 
                 Assert.False(result.Success);
                 Assert.Equal(
@@ -132,8 +131,21 @@ namespace EventViewerX.Tests {
                         .TryGetHostNegativeCacheExpiry(
                             host,
                             out _));
+                using EventLogSessionOpenResult retry =
+                    EventLogSessionManager.CreateSessionResult(
+                        host,
+                        "QuickProbe",
+                        "Application",
+                        timeoutMs: 1000,
+                        rpcProbeStatusOverride:
+                            static (_, _) =>
+                                Native.RpcEndpointProbeStatus
+                                    .Connected,
+                        remoteSessionFactory:
+                            static _ => new System.Diagnostics
+                                .Eventing.Reader.EventLogSession());
+                Assert.True(retry.Success);
             } finally {
-                release.Set();
                 EventLogSessionManager.ClearHostCache(host);
             }
         }

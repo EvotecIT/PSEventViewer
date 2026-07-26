@@ -95,20 +95,20 @@ internal static class WindowsEventRemoteReader {
                 1722,
                 $"Host '{machineName}' is temporarily cached as unreachable until {cachedUntilUtc:u}.");
         }
-        if (!RpcEndpointProbe.TryConnect(
+        RpcEndpointProbeStatus rpcStatus =
+            RpcEndpointProbe.Probe(
                 machineName,
                 rpcEndpointPort,
                 GetRemainingConnectionTimeout(
                     connectionBudget,
                     connectionTimeoutMilliseconds,
                     connectionTimeoutMessage),
-                cancellationToken)) {
-            EventLogSessionManager.MarkHostUnreachable(
-                machineName);
-            throw new System.ComponentModel.Win32Exception(
-                1722,
-                $"RPC preflight to '{machineName}' on port {rpcEndpointPort} failed within {connectionTimeoutMilliseconds} ms.");
-        }
+                cancellationToken);
+        EnsureRpcEndpointAvailable(
+            machineName,
+            rpcEndpointPort,
+            connectionTimeoutMilliseconds,
+            rpcStatus);
         IDisposable operationSlot = BoundedNativeOperation.Acquire(
             GetRemainingConnectionTimeout(
                 connectionBudget,
@@ -382,6 +382,26 @@ internal static class WindowsEventRemoteReader {
                    out EventLogQueryFailure? failure)) {
             failureHandler(failure);
         }
+    }
+
+    internal static void EnsureRpcEndpointAvailable(
+        string machineName,
+        int rpcEndpointPort,
+        int connectionTimeoutMilliseconds,
+        RpcEndpointProbeStatus status) {
+
+        if (status == RpcEndpointProbeStatus.Connected) {
+            return;
+        }
+        if (status == RpcEndpointProbeStatus.TimedOut) {
+            throw new TimeoutException(
+                $"Timed out probing RPC on '{machineName}' after {connectionTimeoutMilliseconds} ms.");
+        }
+        EventLogSessionManager.MarkHostUnreachable(
+            machineName);
+        throw new System.ComponentModel.Win32Exception(
+            1722,
+            $"RPC preflight to '{machineName}' on port {rpcEndpointPort} failed within {connectionTimeoutMilliseconds} ms.");
     }
 
     internal static int GetRemainingConnectionTimeout(

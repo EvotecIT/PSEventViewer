@@ -47,6 +47,8 @@ public static class EventLogSessionManager {
         int? timeoutMs = null,
         Func<EventLogSession>? localSessionFactory = null,
         Func<string, int, bool>? rpcProbeOverride = null,
+        Func<string, int, RpcEndpointProbeStatus>?
+            rpcProbeStatusOverride = null,
         Func<string, EventLogSession>? remoteSessionFactory = null,
         bool emitDiagnostics = true,
         NetworkCredential? credential = null,
@@ -154,21 +156,34 @@ public static class EventLogSessionManager {
                 budget,
                 nameof(EventLogSessionOpenStatus.Timeout));
         }
-        bool rpcAvailable;
+        RpcEndpointProbeStatus rpcStatus;
         try {
-            rpcAvailable = rpcProbeOverride != null
-                ? BoundedNativeOperation.Execute(
+            if (rpcProbeStatusOverride != null) {
+                rpcStatus = BoundedNativeOperation.Execute(
+                    () => rpcProbeStatusOverride(
+                        normalizedHost,
+                        rpcBudget),
+                    rpcBudget,
+                    $"Timed out probing RPC on '{targetHost}' after {rpcBudget} ms.",
+                    cancellationToken);
+            } else if (rpcProbeOverride != null) {
+                bool rpcAvailable = BoundedNativeOperation.Execute(
                     () => rpcProbeOverride(
                         normalizedHost,
                         rpcBudget),
                     rpcBudget,
                     $"Timed out probing RPC on '{targetHost}' after {rpcBudget} ms.",
-                    cancellationToken)
-                : RpcProbe(
+                    cancellationToken);
+                rpcStatus = rpcAvailable
+                    ? RpcEndpointProbeStatus.Connected
+                    : RpcEndpointProbeStatus.Failed;
+            } else {
+                rpcStatus = RpcProbe(
                     normalizedHost,
                     rpcBudget,
                     emitDiagnostics,
                     cancellationToken);
+            }
         } catch (OperationCanceledException)
             when (cancellationToken.IsCancellationRequested) {
             throw;
@@ -201,7 +216,18 @@ public static class EventLogSessionManager {
                 budget,
                 exception.GetType().Name);
         }
-        if (!rpcAvailable) {
+        if (rpcStatus == RpcEndpointProbeStatus.TimedOut) {
+            return SessionFailure(
+                machineName,
+                targetHost,
+                operation,
+                channel,
+                EventLogSessionOpenStatus.Timeout,
+                $"Timed out probing RPC on '{targetHost}' after {rpcBudget} ms.",
+                budget,
+                nameof(TimeoutException));
+        }
+        if (rpcStatus == RpcEndpointProbeStatus.Failed) {
             if (emitDiagnostics) {
                 Settings._logger.WriteVerbose($"{operation}: RPC preflight failed for '{machineName}'");
             }
@@ -425,21 +451,22 @@ public static class EventLogSessionManager {
         _unreachable.Clear();
     }
 
-    private static bool RpcProbe(
+    private static RpcEndpointProbeStatus RpcProbe(
         string host,
         int timeoutMs,
         bool emitDiagnostics,
         CancellationToken cancellationToken) {
 
-        bool connected = RpcEndpointProbe.TryConnect(
+        RpcEndpointProbeStatus status = RpcEndpointProbe.Probe(
             host,
             Settings.RpcProbePort,
             timeoutMs,
             cancellationToken);
-        if (!connected && emitDiagnostics) {
+        if (status != RpcEndpointProbeStatus.Connected &&
+            emitDiagnostics) {
             Settings._logger.WriteVerbose($"Session: RPC probe failed for '{host}'.");
         }
-        return connected;
+        return status;
     }
 
     private static bool IsHostNegativeCached(string host) {

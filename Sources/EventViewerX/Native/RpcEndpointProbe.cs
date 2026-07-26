@@ -5,29 +5,28 @@ using System.Threading.Tasks;
 
 namespace EventViewerX.Native;
 
+/// <summary>Classifies an RPC endpoint probe without conflating its deadline with a definitive failure.</summary>
+internal enum RpcEndpointProbeStatus {
+    Connected,
+    Failed,
+    TimedOut
+}
+
 internal static class RpcEndpointProbe {
-    internal static bool TryConnect(
-        string host,
-        int port,
-        int timeoutMilliseconds) {
-
-        return TryConnect(
-            host,
-            port,
-            timeoutMilliseconds,
-            CancellationToken.None);
-    }
-
-    internal static bool TryConnect(
+    /// <summary>Attempts one bounded TCP connection and preserves timeout as a distinct result.</summary>
+    internal static RpcEndpointProbeStatus Probe(
         string host,
         int port,
         int timeoutMilliseconds,
-        CancellationToken cancellationToken) {
+        CancellationToken cancellationToken,
+        Func<Task>? connectAsyncOverride = null,
+        Func<bool>? connectedOverride = null) {
 
         cancellationToken.ThrowIfCancellationRequested();
         try {
             using var client = new TcpClient();
-            Task connect = client.ConnectAsync(host, port);
+            Task connect = connectAsyncOverride?.Invoke() ??
+                           client.ConnectAsync(host, port);
             bool completed;
             try {
                 completed = connect.Wait(
@@ -39,20 +38,22 @@ internal static class RpcEndpointProbe {
                 throw;
             } catch (AggregateException) {
                 connect.GetAwaiter().GetResult();
-                return false;
+                return RpcEndpointProbeStatus.Failed;
             }
 
-            if (completed && client.Connected) {
-                return true;
+            if (!completed) {
+                ObserveLateFault(connect);
+                return RpcEndpointProbeStatus.TimedOut;
             }
-
-            ObserveLateFault(connect);
-            return false;
+            return (connectedOverride?.Invoke() ??
+                    client.Connected)
+                ? RpcEndpointProbeStatus.Connected
+                : RpcEndpointProbeStatus.Failed;
         } catch (OperationCanceledException)
             when (cancellationToken.IsCancellationRequested) {
             throw;
         } catch {
-            return false;
+            return RpcEndpointProbeStatus.Failed;
         }
     }
 
