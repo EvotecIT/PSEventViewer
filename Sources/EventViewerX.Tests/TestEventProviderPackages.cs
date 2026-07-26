@@ -1,10 +1,10 @@
+using EventViewerX.Providers;
+using System.Diagnostics.Eventing.Reader;
 using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Text.Json;
-using System.Diagnostics.Eventing.Reader;
-using EventViewerX.Providers;
 using Xunit;
 using ProviderEventDefinition =
     EventViewerX.Providers.EventProviderEventDefinition;
@@ -980,6 +980,76 @@ public sealed class TestEventProviderPackages {
                 "competing-content",
                 File.ReadAllText(destinationPath));
             Assert.True(File.Exists(temporaryPath));
+        } finally {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void ActivationPromotionReplacesAnIncompleteExistingDirectory() {
+        string root = Path.Combine(
+            Path.GetTempPath(),
+            "EventViewerX.Tests",
+            Guid.NewGuid().ToString("N"));
+        string staging = Path.Combine(
+            root,
+            "staging");
+        string activation = Path.Combine(
+            root,
+            "activation");
+        Directory.CreateDirectory(staging);
+        Directory.CreateDirectory(activation);
+        File.WriteAllText(
+            Path.Combine(staging, "new.txt"),
+            "new");
+        File.WriteAllText(
+            Path.Combine(activation, "old.txt"),
+            "old");
+        try {
+            EventProviderPackageManager
+                .PromoteActivationDirectory(
+                    staging,
+                    activation);
+
+            Assert.False(Directory.Exists(staging));
+            Assert.True(
+                File.Exists(
+                    Path.Combine(
+                        activation,
+                        "new.txt")));
+            Assert.False(
+                File.Exists(
+                    Path.Combine(
+                        activation,
+                        "old.txt")));
+            Assert.Empty(
+                Directory.GetDirectories(
+                    root,
+                    "activation.replaced-*"));
+        } finally {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void MissingPackagePreservesFileStreamFailureSemantics() {
+        string root = Path.Combine(
+            Path.GetTempPath(),
+            "EventViewerX.Tests",
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        string missing = Path.Combine(
+            root,
+            "missing.evxprovider");
+        try {
+            FileNotFoundException exception =
+                Assert.Throws<FileNotFoundException>(() =>
+                    EventProviderPackageReader.Open(
+                        missing));
+
+            Assert.Equal(
+                Path.GetFullPath(missing),
+                exception.FileName);
         } finally {
             Directory.Delete(root, recursive: true);
         }

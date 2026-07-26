@@ -6,6 +6,8 @@ namespace EventViewerX.Providers;
 internal static class EventProviderManagedDirectorySecurity {
     private const string ManagedRootMarker =
         ".eventviewerx-provider-root";
+    private const string ManagedRootClaimLock =
+        ".eventviewerx-provider-root.lock";
     private const int FullControlMask = 0x1F01FF;
     private const int ReadAndExecuteMask = 0x1200A9;
 
@@ -27,26 +29,72 @@ internal static class EventProviderManagedDirectorySecurity {
         string marker = Path.Combine(
             root,
             ManagedRootMarker);
-        if (!File.Exists(marker)) {
-            string[] unrelated =
-                Directory.EnumerateFileSystemEntries(root)
-                    .Where(path =>
-                        !IsManagedProviderDirectory(path))
-                    .ToArray();
-            if (unrelated.Length > 0) {
-                throw new InvalidOperationException(
-                    $"Provider root '{root}' contains unrelated content and cannot be claimed as an EventViewerX-managed security boundary: " +
-                    string.Join(
-                        ", ",
-                        unrelated.Select(Path.GetFileName)));
+        string claimLock = Path.Combine(
+            root,
+            ManagedRootClaimLock);
+        try {
+            using FileStream claim =
+                AcquireRootClaim(
+                    claimLock,
+                    timeout);
+            if (!File.Exists(marker)) {
+                string[] unrelated =
+                    Directory.EnumerateFileSystemEntries(root)
+                        .Where(path =>
+                            !string.Equals(
+                                path,
+                                claimLock,
+                                StringComparison.OrdinalIgnoreCase) &&
+                            !IsManagedProviderDirectory(path))
+                        .ToArray();
+                if (unrelated.Length > 0) {
+                    throw new InvalidOperationException(
+                        $"Provider root '{root}' contains unrelated content and cannot be claimed as an EventViewerX-managed security boundary: " +
+                        string.Join(
+                            ", ",
+                            unrelated.Select(Path.GetFileName)));
+                }
+                File.WriteAllText(
+                    marker,
+                    "EventViewerX managed provider root" +
+                    Environment.NewLine,
+                    new UTF8Encoding(false));
             }
-            File.WriteAllText(
-                marker,
-                "EventViewerX managed provider root" +
-                Environment.NewLine,
-                new UTF8Encoding(false));
+            EnsureExact(root, timeout);
+        } finally {
+            try {
+                File.Delete(claimLock);
+            } catch (Exception) {
+            }
         }
-        EnsureExact(root, timeout);
+    }
+
+    private static FileStream AcquireRootClaim(
+        string claimLock,
+        TimeSpan timeout) {
+
+        if (timeout < TimeSpan.Zero) {
+            throw new ArgumentOutOfRangeException(
+                nameof(timeout),
+                "Root claim timeout must be greater than or equal to zero.");
+        }
+        DateTime deadline = DateTime.UtcNow.Add(timeout);
+        while (true) {
+            try {
+                return new FileStream(
+                    claimLock,
+                    FileMode.OpenOrCreate,
+                    FileAccess.ReadWrite,
+                    FileShare.None);
+            } catch (IOException exception) {
+                if (DateTime.UtcNow >= deadline) {
+                    throw new TimeoutException(
+                        $"Timed out claiming managed provider root '{Path.GetDirectoryName(claimLock)}'.",
+                        exception);
+                }
+                Thread.Sleep(50);
+            }
+        }
     }
 
     internal static void EnsureExact(
