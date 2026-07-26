@@ -7,7 +7,12 @@ public sealed class TestNamedEventEngine {
     public async Task EmptyRestrictedQueryResetsReusableExecutionInfo() {
         var executionInfo = new NamedEventsQueryExecutionInfo();
         executionInfo.Reset(maxEventsScanned: 1);
-        Assert.True(executionInfo.TryRecordCandidate());
+        var candidateCounter =
+            new NamedEventCandidateCounter(
+                maxEventsScanned: 1,
+                executionInfo);
+        Assert.True(
+            candidateCounter.TryRecordCandidate());
         executionInfo.EventsEmitted = 1;
         executionInfo.RecordTargetFailure(
             new EventLogQueryTargetFailure(
@@ -34,6 +39,29 @@ public sealed class TestNamedEventEngine {
         Assert.Equal(7, executionInfo.MaxEventsScanned);
         Assert.False(executionInfo.ScanLimitReached);
         Assert.Empty(executionInfo.TargetFailures);
+    }
+
+    [Fact]
+    public void CandidateCapsRemainLocalWhenExecutionInfoIsReused() {
+        var executionInfo =
+            new NamedEventsQueryExecutionInfo();
+        executionInfo.Reset(maxEventsScanned: 1);
+        var capped =
+            new NamedEventCandidateCounter(
+                maxEventsScanned: 1,
+                executionInfo);
+
+        Assert.True(capped.TryRecordCandidate());
+
+        executionInfo.Reset(maxEventsScanned: 0);
+        var unlimited =
+            new NamedEventCandidateCounter(
+                maxEventsScanned: 0,
+                executionInfo);
+
+        Assert.True(unlimited.TryRecordCandidate());
+        Assert.True(unlimited.TryRecordCandidate());
+        Assert.False(capped.TryRecordCandidate());
     }
 
     [Fact]

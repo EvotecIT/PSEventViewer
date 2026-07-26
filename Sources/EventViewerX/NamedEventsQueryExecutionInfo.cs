@@ -45,16 +45,6 @@ public sealed class NamedEventsQueryExecutionInfo {
         _targetFailures.Clear();
     }
 
-    internal bool TryRecordCandidate() {
-        if (MaxEventsScanned > 0 && EventsScanned >= MaxEventsScanned) {
-            ScanLimitReached = true;
-            return false;
-        }
-
-        EventsScanned++;
-        return true;
-    }
-
     internal void RecordTargetFailure(EventLogQueryTargetFailure failure) {
         if (failure == null ||
             string.IsNullOrWhiteSpace(failure.MachineName) ||
@@ -64,5 +54,31 @@ public sealed class NamedEventsQueryExecutionInfo {
         }
 
         _targetFailures.TryAdd(failure.MachineName + "\0" + failure.LogName, failure);
+    }
+}
+
+internal sealed class NamedEventCandidateCounter {
+    private readonly NamedEventsQueryExecutionInfo _executionInfo;
+    private readonly long _maxEventsScanned;
+    private long _eventsScanned;
+
+    internal NamedEventCandidateCounter(
+        long maxEventsScanned,
+        NamedEventsQueryExecutionInfo executionInfo) {
+
+        _maxEventsScanned = maxEventsScanned;
+        _executionInfo = executionInfo;
+    }
+
+    internal bool TryRecordCandidate() {
+        if (_maxEventsScanned > 0 &&
+            _eventsScanned >= _maxEventsScanned) {
+            _executionInfo.ScanLimitReached = true;
+            return false;
+        }
+
+        _eventsScanned++;
+        _executionInfo.EventsScanned = _eventsScanned;
+        return true;
     }
 }

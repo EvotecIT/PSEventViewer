@@ -52,6 +52,10 @@ public static partial class NamedEventEngine {
                 query,
                 eventInfo,
                 info);
+        var candidateCounter =
+            new NamedEventCandidateCounter(
+                query.MaxCandidates,
+                info);
         long emitted = 0;
 
         await foreach (NamedEventProjection projection in
@@ -59,9 +63,10 @@ public static partial class NamedEventEngine {
                            EventLogEngine.ReadBatchAsync(
                                batch,
                                cancellationToken),
-                           query.NamedEvents,
-                           enricher,
-                           info.TryRecordCandidate,
+                            query.NamedEvents,
+                            enricher,
+                            candidateCounter
+                                .TryRecordCandidate,
                            query.CandidateObserver,
                            cancellationToken)) {
             EventObjectSlim? target = projection.Target;

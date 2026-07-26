@@ -276,13 +276,16 @@ public static class EventLogProbe {
         }
     }
 
-    private static long? TryReadRecordCount(
+    internal static long? TryReadRecordCount(
         string logName,
         string? machineName,
         NetworkCredential? credential,
         EventLogAuthentication authentication,
         TimeSpan remaining,
-        CancellationToken cancellationToken) {
+        CancellationToken cancellationToken,
+        Func<EventLogSession>? localSessionFactory = null,
+        Func<EventLogSession, EventLogInformation>?
+            informationFactory = null) {
 
         if (remaining <= TimeSpan.Zero) {
             return null;
@@ -304,7 +307,11 @@ public static class EventLogProbe {
                         emitDiagnostics: false,
                         credential: credential,
                         authentication:
-                            authentication);
+                            authentication,
+                        cancellationToken:
+                            cancellationToken,
+                        localSessionFactory:
+                            localSessionFactory);
             try {
                 cancellationToken.ThrowIfCancellationRequested();
                 if (!sessionResult.Success ||
@@ -321,12 +328,16 @@ public static class EventLogProbe {
                         stopwatch.Elapsed);
                 EventLogInformation information =
                     EventLogNativeOperation.Execute(
-                        () => sessionLifetime.Value.Session!
-                            .GetLogInformation(
-                                logName,
-                                PathType.LogName),
+                        () => informationFactory == null
+                            ? sessionLifetime.Value.Session!
+                                .GetLogInformation(
+                                    logName,
+                                    PathType.LogName)
+                            : informationFactory(
+                                sessionLifetime.Value.Session!),
                         informationBudget,
                         $"Timed out reading the record count for '{logName}' after {informationBudget} ms.",
+                        cancellationToken,
                         operationLease:
                             sessionLifetime.Retain());
                 cancellationToken.ThrowIfCancellationRequested();

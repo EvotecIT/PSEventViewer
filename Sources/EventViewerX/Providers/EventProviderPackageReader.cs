@@ -280,6 +280,10 @@ public static class EventProviderPackageReader {
             throw new InvalidDataException(
                 $"Provider package format {manifest.FormatVersion} is not supported.");
         }
+        if (manifest.Files == null) {
+            throw new InvalidDataException(
+                "Provider package manifest does not declare a file map.");
+        }
         if (manifest.Files.ContainsKey(
                 EventProviderPackageLayout.PackageManifestFileName)) {
             throw new InvalidDataException(

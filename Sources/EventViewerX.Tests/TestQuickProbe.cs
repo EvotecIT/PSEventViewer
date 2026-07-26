@@ -318,6 +318,76 @@ namespace EventViewerX.Tests {
         }
 
         [Fact]
+        public void RecordCountSessionOpenHonorsCancellation() {
+            using var cancellation =
+                new CancellationTokenSource(
+                    TimeSpan.FromMilliseconds(100));
+            using var release =
+                new ManualResetEventSlim();
+            var stopwatch = Stopwatch.StartNew();
+            try {
+                Assert.Throws<OperationCanceledException>(() =>
+                    EventLogProbe.TryReadRecordCount(
+                        "Application",
+                        machineName: null,
+                        credential: null,
+                        authentication:
+                            EventLogAuthentication.Default,
+                        remaining:
+                            TimeSpan.FromSeconds(30),
+                        cancellationToken:
+                            cancellation.Token,
+                        localSessionFactory: () => {
+                            release.Wait();
+                            return new System.Diagnostics
+                                .Eventing.Reader
+                                .EventLogSession();
+                        }));
+
+                Assert.True(
+                    stopwatch.Elapsed <
+                    TimeSpan.FromSeconds(5),
+                    $"Cancellation took {stopwatch.Elapsed.TotalMilliseconds:F0} ms.");
+            } finally {
+                release.Set();
+            }
+        }
+
+        [Fact]
+        public void RecordCountInformationReadHonorsCancellation() {
+            using var cancellation =
+                new CancellationTokenSource(
+                    TimeSpan.FromMilliseconds(100));
+            using var release =
+                new ManualResetEventSlim();
+            var stopwatch = Stopwatch.StartNew();
+            try {
+                Assert.Throws<OperationCanceledException>(() =>
+                    EventLogProbe.TryReadRecordCount(
+                        "Application",
+                        machineName: null,
+                        credential: null,
+                        authentication:
+                            EventLogAuthentication.Default,
+                        remaining:
+                            TimeSpan.FromSeconds(30),
+                        cancellationToken:
+                            cancellation.Token,
+                        informationFactory: _ => {
+                            release.Wait();
+                            return null!;
+                        }));
+
+                Assert.True(
+                    stopwatch.Elapsed <
+                    TimeSpan.FromSeconds(5),
+                    $"Cancellation took {stopwatch.Elapsed.TotalMilliseconds:F0} ms.");
+            } finally {
+                release.Set();
+            }
+        }
+
+        [Fact]
         public void ProbeLatestEventRejectsCredentialsForLocalSessions() {
             var credential = new NetworkCredential(
                 "eventviewerx-test",

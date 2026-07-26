@@ -87,6 +87,48 @@ public sealed class TestEventProviderPackages {
     }
 
     [Fact]
+    public void RejectsANullPackageFileMapAsInvalidData() {
+        string root = Path.Combine(
+            Path.GetTempPath(),
+            "EventViewerX.Tests",
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        string packagePath = Path.Combine(
+            root,
+            "null-files.evxprovider");
+        try {
+            using (ZipArchive archive = ZipFile.Open(
+                       packagePath,
+                       ZipArchiveMode.Create)) {
+                ZipArchiveEntry entry =
+                    archive.CreateEntry(
+                        EventProviderPackageLayout
+                            .PackageManifestFileName);
+                using var writer =
+                    new StreamWriter(
+                        entry.Open(),
+                        new UTF8Encoding(false));
+                writer.Write(
+                    "{\"formatVersion\":1,\"files\":null}");
+            }
+
+            InvalidDataException exception =
+                Assert.Throws<InvalidDataException>(() =>
+                    EventProviderPackageReader.Open(
+                        packagePath));
+
+            Assert.Contains(
+                "file map",
+                exception.Message,
+                StringComparison.OrdinalIgnoreCase);
+        } finally {
+            Directory.Delete(
+                root,
+                recursive: true);
+        }
+    }
+
+    [Fact]
     public void GeneratesNamedMessagesAndStableFields() {
         EventProviderDefinition definition = CreateDefinition();
 
