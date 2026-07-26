@@ -246,6 +246,88 @@ public sealed class TestEventFilterCompiler {
     }
 
     [Fact]
+    public void ChannelUnionScopesNamedDataExclusionsToTheirSelect() {
+        string xml =
+            EventFilterCompiler
+                .BuildChannelUnionQueryXml(
+                    new[] { "Application" },
+                    new[] {
+                        new EventFilter {
+                            EventIds =
+                                new[] { 1 },
+                            ExcludedNamedData =
+                                new Dictionary<
+                                    string,
+                                    IReadOnlyList<string>> {
+                                    ["State"] =
+                                        new[] { "Ignored" }
+                                }
+                        },
+                        new EventFilter {
+                            EventIds =
+                                new[] { 2 }
+                        }
+                    });
+        XElement query = XDocument.Parse(xml)
+            .Root!
+            .Element("Query")!;
+        XElement suppression =
+            Assert.Single(
+                query.Elements("Suppress"));
+
+        Assert.Contains(
+            "EventID=1",
+            suppression.Value,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "EventID=2",
+            suppression.Value,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "State",
+            suppression.Value,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "Ignored",
+            suppression.Value,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ChannelUnionOmitsImpossibleSameFieldSuppression() {
+        string xml =
+            EventFilterCompiler
+                .BuildChannelUnionQueryXml(
+                    new[] { "Application" },
+                    new[] {
+                        new EventFilter {
+                            EventIds =
+                                new[] { 1 },
+                            NamedData =
+                                new Dictionary<
+                                    string,
+                                    IReadOnlyList<string>> {
+                                    ["State"] =
+                                        new[] { "Included" }
+                                },
+                            ExcludedNamedData =
+                                new Dictionary<
+                                    string,
+                                    IReadOnlyList<string>> {
+                                    ["State"] =
+                                        new[] { "Ignored" }
+                                }
+                        }
+                    });
+        XElement query = XDocument.Parse(xml)
+            .Root!
+            .Element("Query")!;
+
+        Assert.Empty(
+            query.Elements("Suppress"));
+    }
+
+    [Fact]
     public void PartitionerPreservesNamedDataAcrossOtherDimensions() {
         var filter = new EventFilter {
             EventIds = Enumerable.Range(1, 30).ToArray(),

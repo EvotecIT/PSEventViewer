@@ -138,11 +138,12 @@ public static class EventFilterCompiler {
             new List<EventFilter?>();
         foreach (EventFilter select in selectFilters) {
             EventFilter? namedDataSuppression =
-                CreateExcludedNamedDataSuppression(
+                CreateScopedExcludedNamedDataSuppression(
                     select);
             if (namedDataSuppression != null) {
-                combinedSuppressions.Add(
-                    namedDataSuppression);
+                combinedSuppressions.AddRange(
+                    EventFilterPartitioner.Partition(
+                        namedDataSuppression));
             }
             normalizedSelects.Add(
                 WithoutExcludedNamedData(
@@ -357,6 +358,81 @@ public static class EventFilterCompiler {
                 NamedData = filter!.ExcludedNamedData
             }
             : null;
+    }
+
+    private static EventFilter?
+        CreateScopedExcludedNamedDataSuppression(
+            EventFilter filter) {
+
+        if (!HasExcludedNamedData(filter)) {
+            return null;
+        }
+        IReadOnlyDictionary<string, IReadOnlyList<string>>?
+            namedData = MergeNamedDataForSuppression(
+                filter.NamedData,
+                filter.ExcludedNamedData!);
+        if (namedData == null) {
+            return null;
+        }
+        return new EventFilter {
+            EventIds = filter.EventIds,
+            RecordIds = filter.RecordIds,
+            MinimumRecordIdExclusive =
+                filter.MinimumRecordIdExclusive,
+            MaximumRecordIdExclusive =
+                filter.MaximumRecordIdExclusive,
+            ProviderNames = filter.ProviderNames,
+            Levels = filter.Levels,
+            Keywords = filter.Keywords,
+            StartTime = filter.StartTime,
+            EndTime = filter.EndTime,
+            UserIds = filter.UserIds,
+            Data = filter.Data,
+            NamedData = namedData,
+            ExcludedEventIds =
+                filter.ExcludedEventIds
+        };
+    }
+
+    private static IReadOnlyDictionary<string, IReadOnlyList<string>>?
+        MergeNamedDataForSuppression(
+            IReadOnlyDictionary<string, IReadOnlyList<string>>?
+                selected,
+            IReadOnlyDictionary<string, IReadOnlyList<string>>
+                excluded) {
+
+        var merged =
+            new Dictionary<string, IReadOnlyList<string>>(
+                StringComparer.OrdinalIgnoreCase);
+        if (selected != null) {
+            foreach (KeyValuePair<string, IReadOnlyList<string>>
+                     entry in selected) {
+                merged[entry.Key] =
+                    entry.Value;
+            }
+        }
+        foreach (KeyValuePair<string, IReadOnlyList<string>>
+                 entry in excluded) {
+            if (!merged.TryGetValue(
+                    entry.Key,
+                    out IReadOnlyList<string>? selectedValues)) {
+                merged[entry.Key] =
+                    entry.Value;
+                continue;
+            }
+            string[] intersection =
+                selectedValues
+                    .Intersect(
+                        entry.Value,
+                        StringComparer.OrdinalIgnoreCase)
+                    .ToArray();
+            if (intersection.Length == 0) {
+                return null;
+            }
+            merged[entry.Key] =
+                intersection;
+        }
+        return merged;
     }
 
     internal static EventFilter? WithoutExcludedNamedData(
