@@ -1205,6 +1205,69 @@ public sealed class TestEventProviderPackages {
         }
     }
 
+    [Fact]
+    public void ExtractionWriteDoesNotOverwriteACompetingPackageFile() {
+        string root = Path.Combine(
+            Path.GetTempPath(),
+            "EventViewerX.Tests",
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        string competingPath = Path.Combine(
+            root,
+            EventProviderPackageLayout.DefinitionFileName);
+        try {
+            File.WriteAllText(
+                competingPath,
+                "competing-content",
+                new UTF8Encoding(false));
+            var writtenPaths = new List<string>();
+
+            Assert.Throws<IOException>(() =>
+                EventProviderPackageReader.WriteNewFile(
+                    competingPath,
+                    Encoding.UTF8.GetBytes("replacement"),
+                    writtenPaths));
+            Assert.Equal(
+                "competing-content",
+                File.ReadAllText(competingPath));
+            Assert.Empty(writtenPaths);
+        } finally {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void TemporaryCleanupFailuresDoNotReplaceTheBuildOutcome() {
+        string root = Path.Combine(
+            Path.GetTempPath(),
+            "EventViewerX.Tests",
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        string temporaryPackage = Path.Combine(
+            root,
+            "provider.tmp");
+        string buildRoot = Path.Combine(
+            root,
+            "build");
+        Directory.CreateDirectory(buildRoot);
+        File.WriteAllText(temporaryPackage, "temporary");
+        try {
+            Exception? failure = Record.Exception(() =>
+                EventProviderPackageBuilder
+                    .CleanupTemporaryArtifacts(
+                        temporaryPackage,
+                        buildRoot,
+                        static _ => throw new IOException(
+                            "File is in use."),
+                        static (_, _) => throw new IOException(
+                            "Directory is in use.")));
+
+            Assert.Null(failure);
+        } finally {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
     private static void ReplaceEntry(
         ZipArchiveEntry entry,
         byte[] contents) {

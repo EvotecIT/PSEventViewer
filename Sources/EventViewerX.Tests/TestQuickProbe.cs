@@ -79,8 +79,61 @@ namespace EventViewerX.Tests {
 
                 Assert.False(result.Success);
                 Assert.Equal(EventLogSessionOpenStatus.Timeout, result.Status);
+                Assert.Null(result.CachedUntilUtc);
+                Assert.False(
+                    EventLogSessionManager
+                        .TryGetHostNegativeCacheExpiry(
+                            host,
+                            out _));
+                using EventLogSessionOpenResult retry =
+                    EventLogSessionManager.CreateSessionResult(
+                        host,
+                        "QuickProbe",
+                        "Application",
+                        timeoutMs: 1000,
+                        rpcProbeOverride: static (_, _) => true,
+                        remoteSessionFactory:
+                            static _ => new System.Diagnostics
+                                .Eventing.Reader.EventLogSession());
+                Assert.True(retry.Success);
                 Assert.True(stopwatch.Elapsed < TimeSpan.FromMilliseconds(1500), $"Elapsed {stopwatch.Elapsed.TotalMilliseconds:F0} ms.");
             } finally {
+                EventLogSessionManager.ClearHostCache(host);
+            }
+        }
+
+        [Fact]
+        public void RpcProbeBudgetTimeoutDoesNotMarkTheHostUnreachable() {
+            if (!OperatingSystem.IsWindows()) return;
+
+            const string host =
+                "eventviewerx-rpc-budget-timeout.invalid";
+            EventLogSessionManager.ClearHostCache(host);
+            using var release = new ManualResetEventSlim();
+            try {
+                using EventLogSessionOpenResult result =
+                    EventLogSessionManager.CreateSessionResult(
+                        host,
+                        "QuickProbe",
+                        "Application",
+                        timeoutMs: 100,
+                        rpcProbeOverride: (_, _) => {
+                            release.Wait();
+                            return true;
+                        });
+
+                Assert.False(result.Success);
+                Assert.Equal(
+                    EventLogSessionOpenStatus.Timeout,
+                    result.Status);
+                Assert.Null(result.CachedUntilUtc);
+                Assert.False(
+                    EventLogSessionManager
+                        .TryGetHostNegativeCacheExpiry(
+                            host,
+                            out _));
+            } finally {
+                release.Set();
                 EventLogSessionManager.ClearHostCache(host);
             }
         }

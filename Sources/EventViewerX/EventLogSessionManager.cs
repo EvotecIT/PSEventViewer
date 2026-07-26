@@ -191,10 +191,6 @@ public static class EventLogSessionManager {
                 Settings._logger.WriteWarning(
                     $"{operation}: {exception.Message}");
             }
-            MarkHostUnreachable(normalizedHost);
-            TryGetHostNegativeCacheExpiry(
-                normalizedHost,
-                out DateTime probeCachedUntilUtc);
             return SessionFailure(
                 machineName,
                 targetHost,
@@ -203,8 +199,7 @@ public static class EventLogSessionManager {
                 EventLogSessionOpenStatus.Timeout,
                 exception.Message,
                 budget,
-                exception.GetType().Name,
-                probeCachedUntilUtc);
+                exception.GetType().Name);
         }
         if (!rpcAvailable) {
             if (emitDiagnostics) {
@@ -277,8 +272,6 @@ public static class EventLogSessionManager {
             if (emitDiagnostics) {
                 Settings._logger.WriteWarning($"{operation}: {ex.Message}");
             }
-            MarkHostUnreachable(normalizedHost);
-            TryGetHostNegativeCacheExpiry(normalizedHost, out DateTime timeoutCachedUntilUtc);
             return SessionFailure(
                 machineName,
                 targetHost,
@@ -287,8 +280,7 @@ public static class EventLogSessionManager {
                 EventLogSessionOpenStatus.Timeout,
                 ex.Message,
                 budget,
-                ex.GetType().Name,
-                timeoutCachedUntilUtc);
+                ex.GetType().Name);
         } catch (UnauthorizedAccessException ex) {
             if (emitDiagnostics) {
                 Settings._logger.WriteWarning($"{operation}: access denied opening session to '{machineName}' for '{channel}': {ex.Message}");

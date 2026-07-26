@@ -79,23 +79,23 @@ public static class EventProviderPackageReader {
                      contents.Files) {
                 string filePath =
                     Path.Combine(destination, file.Key);
-                writtenPaths.Add(filePath);
-                File.WriteAllBytes(
+                WriteNewFile(
                     filePath,
-                    file.Value);
+                    file.Value,
+                    writtenPaths);
             }
             string manifestPath =
                 Path.Combine(
                     destination,
                     EventProviderPackageLayout
                         .PackageManifestFileName);
-            writtenPaths.Add(manifestPath);
-            File.WriteAllText(
+            WriteNewFile(
                 manifestPath,
-                JsonSerializer.Serialize(
-                    contents.Manifest,
-                    EventProviderDefinitionJson.SerializerOptions),
-                new UTF8Encoding(false));
+                Encoding.UTF8.GetBytes(
+                    JsonSerializer.Serialize(
+                        contents.Manifest,
+                        EventProviderDefinitionJson.SerializerOptions)),
+                writtenPaths);
             return package;
         } catch {
             package.Dispose();
@@ -105,6 +105,27 @@ public static class EventProviderPackageReader {
                 writtenPaths);
             throw;
         }
+    }
+
+    /// <summary>
+    /// Creates one extraction file exclusively and records ownership only
+    /// after creation succeeds.
+    /// </summary>
+    internal static void WriteNewFile(
+        string path,
+        byte[] contents,
+        ICollection<string> writtenPaths) {
+
+        using var stream = new FileStream(
+            path,
+            FileMode.CreateNew,
+            FileAccess.Write,
+            FileShare.None);
+        writtenPaths.Add(path);
+        stream.Write(
+            contents,
+            0,
+            contents.Length);
     }
 
     private static void CleanupFailedExtraction(

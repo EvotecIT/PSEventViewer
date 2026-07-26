@@ -117,12 +117,37 @@ public static class EventProviderPackageBuilder {
                     string.Empty
             };
         } finally {
+            CleanupTemporaryArtifacts(
+                temporaryPackage,
+                buildRoot);
+        }
+    }
+
+    /// <summary>
+    /// Removes build-owned temporary artifacts without replacing the build
+    /// outcome when cleanup itself fails.
+    /// </summary>
+    internal static void CleanupTemporaryArtifacts(
+        string temporaryPackage,
+        string buildRoot,
+        Action<string>? deleteFile = null,
+        Action<string, bool>? deleteDirectory = null) {
+
+        deleteFile ??= File.Delete;
+        deleteDirectory ??= Directory.Delete;
+        try {
             if (File.Exists(temporaryPackage)) {
-                File.Delete(temporaryPackage);
+                deleteFile(temporaryPackage);
             }
+        } catch (Exception) {
+        }
+        try {
             if (Directory.Exists(buildRoot)) {
-                Directory.Delete(buildRoot, recursive: true);
+                deleteDirectory(
+                    buildRoot,
+                    true);
             }
+        } catch (Exception) {
         }
     }
 
