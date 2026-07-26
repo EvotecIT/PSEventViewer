@@ -328,6 +328,72 @@ public sealed class TestEventFilterCompiler {
     }
 
     [Fact]
+    public void ChannelUnionRetainsExclusionsForExistenceOnlyNamedData() {
+        string xml =
+            EventFilterCompiler
+                .BuildChannelUnionQueryXml(
+                    new[] { "Application" },
+                    new[] {
+                        new EventFilter {
+                            NamedData =
+                                new Dictionary<
+                                    string,
+                                    IReadOnlyList<string>> {
+                                    ["State"] =
+                                        Array.Empty<string>()
+                                },
+                            ExcludedNamedData =
+                                new Dictionary<
+                                    string,
+                                    IReadOnlyList<string>> {
+                                    ["State"] =
+                                        new[] { "Ignored" }
+                                }
+                        }
+                    });
+        XElement query = XDocument.Parse(xml)
+            .Root!
+            .Element("Query")!;
+        XElement suppression =
+            Assert.Single(
+                query.Elements("Suppress"));
+
+        Assert.Contains(
+            "State",
+            suppression.Value,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "Ignored",
+            suppression.Value,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void FileQueryEscapesReservedUriCharacters() {
+        string path = Path.GetFullPath(
+            Path.Combine(
+                "logs",
+                "compiler#source?.evtx"));
+        string xml =
+            EventFilterCompiler.BuildFileQueryXml(
+                new[] { path });
+        EventLogStructuredQuerySource source =
+            Assert.Single(
+                new EventLogStructuredQuery(xml)
+                    .ResolveSources());
+
+        Assert.Equal(path, source.Source);
+        Assert.Contains(
+            "%23",
+            xml,
+            StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(
+            "%3F",
+            xml,
+            StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void PartitionerPreservesNamedDataAcrossOtherDimensions() {
         var filter = new EventFilter {
             EventIds = Enumerable.Range(1, 30).ToArray(),

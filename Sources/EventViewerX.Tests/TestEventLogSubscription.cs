@@ -183,6 +183,56 @@ public sealed class TestEventLogSubscription {
     }
 
     [Fact]
+    public void ExternalCancellationDoesNotWaitForAConsumerCallback() {
+        if (!OperatingSystem.IsWindows()) {
+            return;
+        }
+        EventObject current = EventLogEngine.ReadChannel(
+            new EventLogChannelQuery("System") {
+                ReadMode = EventReadMode.Metadata,
+                MaxEvents = 1
+            }).Single();
+        using var callbackEntered = new ManualResetEventSlim();
+        using var releaseCallback = new ManualResetEventSlim();
+        using var cancellation = new CancellationTokenSource();
+        EventLogSubscription? subscription = null;
+        Task? cancelTask = null;
+        try {
+            subscription = new EventLogSubscription(
+                new EventLogSubscriptionQuery("System") {
+                    XPath =
+                        $"*[System[EventRecordID={current.RecordId!.Value}]]",
+                    Start = EventLogSubscriptionStart.Oldest,
+                    ReadMode = EventReadMode.Metadata
+                },
+                _ => {
+                    callbackEntered.Set();
+                    releaseCallback.Wait(
+                        TimeSpan.FromSeconds(10));
+                },
+                cancellationToken:
+                    cancellation.Token);
+
+            Assert.True(
+                callbackEntered.Wait(
+                    TimeSpan.FromSeconds(10)));
+            cancelTask = Task.Run(
+                cancellation.Cancel);
+
+            Assert.True(
+                cancelTask.Wait(
+                    TimeSpan.FromSeconds(2)));
+        } finally {
+            releaseCallback.Set();
+            Assert.True(
+                cancelTask?.Wait(
+                    TimeSpan.FromSeconds(10)) ??
+                true);
+            subscription?.Dispose();
+        }
+    }
+
+    [Fact]
     public void FailureCallbackCanDisposeItsSubscriptionWithoutDeadlock() {
         if (!OperatingSystem.IsWindows()) {
             return;

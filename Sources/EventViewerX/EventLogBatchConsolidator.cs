@@ -143,8 +143,9 @@ public static class EventLogBatchConsolidator {
         foreach (EventLogFileQuery file in
                  query.FileQueries) {
             string source =
-                "file://" +
-                Path.GetFullPath(file.Path);
+                EventLogStructuredQueryParser
+                    .CreateFileSourceIdentity(
+                        file.Path);
             QueryProfile profile =
                 QueryProfile.From(file);
             XElement queryElement =
@@ -154,7 +155,7 @@ public static class EventLogBatchConsolidator {
             inputs.Add(new QueryInput(
                 profile,
                 EventLogQuerySourceKind.File,
-                "file://" + Path.GetFullPath(file.Path),
+                source,
                 new[] { queryElement },
                 consolidationScope:
                     GetConsolidationScope(

@@ -303,10 +303,12 @@ public static partial class EventProviderPackageManager {
             Exception? rollbackError = null;
             try {
                 if (candidateAttempted) {
-                    EventProviderManifestRegistrar.Uninstall(
-                        candidateManifest,
-                        options.ToolTimeout,
-                        ignoreMissing: true);
+                    if (EventProviderManifestRegistrar.IsRegistered(
+                            package.Definition.Name)) {
+                        EventProviderManifestRegistrar.Uninstall(
+                            candidateManifest,
+                            options.ToolTimeout);
+                    }
                 }
                 if (registrationPresent &&
                     oldDefinition != null) {
@@ -632,14 +634,14 @@ public static partial class EventProviderPackageManager {
                 },
                 enforceTrust: false);
         }
-        EventProviderManifestRegistrar.Uninstall(
-            Path.Combine(
-                manifestDirectory,
-                EventProviderPackageLayout.ManifestFileName),
-            timeout,
-            ignoreMissing:
-                !EventProviderManifestRegistrar.IsRegistered(
-                    installed.ProviderName));
+        if (EventProviderManifestRegistrar.IsRegistered(
+                installed.ProviderName)) {
+            EventProviderManifestRegistrar.Uninstall(
+                Path.Combine(
+                    manifestDirectory,
+                    EventProviderPackageLayout.ManifestFileName),
+                timeout);
+        }
 
         string statePath = Path.Combine(
             providerRoot,

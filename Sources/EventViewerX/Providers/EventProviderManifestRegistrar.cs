@@ -27,8 +27,7 @@ internal static class EventProviderManifestRegistrar {
 
     internal static void Uninstall(
         string manifestPath,
-        TimeSpan timeout,
-        bool ignoreMissing = false) {
+        TimeSpan timeout) {
 
         EventProviderProcessResult result =
             EventProviderProcessRunner.Run(
@@ -39,11 +38,9 @@ internal static class EventProviderManifestRegistrar {
                 },
                 Path.GetDirectoryName(manifestPath)!,
                 timeout);
-        if (result.ExitCode != 0 && !ignoreMissing) {
-            EventProviderProcessRunner.EnsureSuccess(
-                result,
-                "Windows Event Log manifest uninstaller");
-        }
+        EventProviderProcessRunner.EnsureSuccess(
+            result,
+            "Windows Event Log manifest uninstaller");
     }
 
     internal static void EnsureReadable(
@@ -120,9 +117,16 @@ internal static class EventProviderManifestRegistrar {
                 CultureInfo.InvariantCulture);
             _ = metadata.Id;
             return true;
-        } catch (EventLogException) {
+        } catch (EventLogException exception)
+            when (IsMissingRegistrationFailure(exception)) {
             return false;
         }
+    }
+
+    internal static bool IsMissingRegistrationFailure(
+        EventLogException exception) {
+
+        return exception is EventLogNotFoundException;
     }
 
     private static string ToolPath(string fileName) {

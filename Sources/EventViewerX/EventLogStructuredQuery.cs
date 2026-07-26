@@ -207,7 +207,8 @@ public sealed class EventLogStructuredQuery {
             .Select(source => source?.Trim() ?? string.Empty)
             .Where(static source => source.Length > 0)
             .Select(source => filePaths
-                ? "file://" + Path.GetFullPath(source)
+                ? EventLogStructuredQueryParser
+                    .CreateFileSourceIdentity(source)
                 : source)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();

@@ -229,11 +229,13 @@ public static partial class WindowsEventFilterBuilder {
 
         if (!string.IsNullOrEmpty(path)) {
             var selectFilter = EscapeXmlValue(string.IsNullOrEmpty(filter) ? "*" : filter);
-            var escapedPath = EscapeXmlValue(path!);
+            var escapedPath = EscapeXmlValue(
+                EventLogStructuredQueryParser
+                    .CreateFileSourceIdentity(path!));
             var suppress = string.IsNullOrWhiteSpace(suppressFilter)
                 ? string.Empty
                 : $"<Suppress>{EscapeXmlValue(suppressFilter)}</Suppress>";
-            return $"<QueryList><Query Id=\"0\" Path=\"file://{escapedPath}\"><Select>{selectFilter}</Select>{suppress}</Query></QueryList>";
+            return $"<QueryList><Query Id=\"0\" Path=\"{escapedPath}\"><Select>{selectFilter}</Select>{suppress}</Query></QueryList>";
         }
         var escapedLog = EscapeXmlValue(logName ?? string.Empty);
         var escapedFilter = EscapeXmlValue(filter);

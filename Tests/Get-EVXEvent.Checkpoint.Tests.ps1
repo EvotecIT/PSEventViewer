@@ -210,6 +210,31 @@ Describe 'Get-EVXEvent checkpoint compatibility' {
         @($Persisted.PSObject.Properties.Name | Where-Object { $_ -like 'normalized|*' }) | Should -BeNullOrEmpty
     }
 
+    It 'derives explicit checkpoint keys for pipeline-bound log sources' {
+        $CheckpointPath = Join-Path $TestDrive 'pipeline-source-checkpoint.json'
+        $Events = @(
+            'System', 'Application' |
+                Get-EVXEvent `
+                    -RecordIdFile $CheckpointPath `
+                    -RecordIdKey 'pipeline-sources' `
+                    -MaxEvents 1 `
+                    -ReadMode Metadata
+        )
+        if ($Events.Count -lt 2) {
+            Set-ItResult -Skipped -Because 'The System and Application logs did not both contain a checkpointable event.'
+            return
+        }
+
+        $Persisted = Get-Content -LiteralPath $CheckpointPath -Raw |
+            ConvertFrom-Json
+        $Keys = @($Persisted.PSObject.Properties.Name)
+        @($Keys | Where-Object { $_ -like 'pipeline-sources|*|System' }).Count |
+            Should -Be 1
+        @($Keys | Where-Object { $_ -like 'pipeline-sources|*|Application' }).Count |
+            Should -Be 1
+        $Keys | Should -Not -Contain 'pipeline-sources'
+    }
+
     It 'advances the checkpoint for scanned records rejected by MessageRegex' {
         $CheckpointPath = Join-Path $TestDrive 'filtered-progress-checkpoint.json'
 

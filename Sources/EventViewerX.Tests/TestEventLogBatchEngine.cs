@@ -674,6 +674,36 @@ namespace EventViewerX.Tests;
     }
 
     [Fact]
+    public void ConsolidationEscapesReservedOfflinePathCharacters() {
+        string path = Path.GetFullPath(
+            Path.Combine(
+                "logs",
+                "batch#source?.evtx"));
+        EventLogBatchQuery consolidated =
+            EventLogBatchConsolidator.Consolidate(
+                EventLogBatchQuery.ForFiles(
+                    new[] {
+                        new EventLogFileQuery(path)
+                    }));
+        EventLogStructuredQuery structured =
+            Assert.Single(
+                consolidated.StructuredQueries);
+        EventLogStructuredQuerySource source =
+            Assert.Single(
+                structured.ResolveSources());
+
+        Assert.Equal(path, source.Source);
+        Assert.Contains(
+            "%23",
+            structured.QueryXml,
+            StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(
+            "%3F",
+            structured.QueryXml,
+            StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void ConsolidationKeepsStructuredErrorPoliciesOnSeparateNativeHandles() {
         const string firstQuery =
             "<QueryList><Query Id=\"0\" Path=\"System\">" +

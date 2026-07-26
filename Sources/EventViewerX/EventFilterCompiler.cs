@@ -251,7 +251,9 @@ public static class EventFilterCompiler {
             writer.WriteStartElement("QueryList");
             for (int index = 0; index < normalizedSources.Count; index++) {
                 string source = filePaths
-                    ? "file://" + Path.GetFullPath(normalizedSources[index])
+                    ? EventLogStructuredQueryParser
+                        .CreateFileSourceIdentity(
+                            normalizedSources[index])
                     : normalizedSources[index];
                 writer.WriteStartElement("Query");
                 writer.WriteAttributeString(
@@ -416,6 +418,11 @@ public static class EventFilterCompiler {
             if (!merged.TryGetValue(
                     entry.Key,
                     out IReadOnlyList<string>? selectedValues)) {
+                merged[entry.Key] =
+                    entry.Value;
+                continue;
+            }
+            if (selectedValues.Count == 0) {
                 merged[entry.Key] =
                     entry.Value;
                 continue;

@@ -115,7 +115,13 @@ namespace EventViewerX.Tests {
         public void PathQueryUsesFilePrefix() {
             var ht = new Hashtable { { "param4", "BITS" } };
             var result = WindowsEventFilterBuilder.BuildWinEventFilter(id: ["7040"], namedDataExcludeFilter: [ht], path: "C:/file.evtx");
-            Assert.Contains("Path=\"file://C:/file.evtx\"", result);
+            Assert.Contains(
+                "Path=\"" +
+                EventLogStructuredQueryParser
+                    .CreateFileSourceIdentity(
+                        "C:/file.evtx") +
+                "\"",
+                result);
             Assert.DoesNotContain("Select Path", result);
         }
 

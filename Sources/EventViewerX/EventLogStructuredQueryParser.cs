@@ -237,6 +237,30 @@ internal static class EventLogStructuredQueryParser {
                     Path.DirectorySeparatorChar));
     }
 
+    /// <summary>
+    /// Converts a local offline-event path into an escaped absolute file URI
+    /// suitable for QueryList Path attributes.
+    /// </summary>
+    internal static string CreateFileSourceIdentity(
+        string path) {
+
+        string fullPath = Path.GetFullPath(path);
+        string escapedPath = fullPath
+            .Replace("%", "%25")
+            .Replace("#", "%23")
+            .Replace("?", "%3F")
+            .Replace(
+                Path.DirectorySeparatorChar,
+                '/');
+        if (escapedPath.StartsWith(
+                "//",
+                StringComparison.Ordinal)) {
+            return "file://" +
+                   escapedPath.Substring(2);
+        }
+        return "file://" + escapedPath;
+    }
+
     private static string[] GetPaths(XElement query) {
         string fallbackPath =
             GetPathAttribute(query);

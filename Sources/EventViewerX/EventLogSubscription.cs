@@ -148,7 +148,8 @@ public sealed class EventLogSubscription : IDisposable {
                 cancellationToken.CanBeCanceled
                     ? cancellationToken.Register(
                         static state =>
-                            ((EventLogSubscription)state!).Dispose(),
+                            ((EventLogSubscription)state!)
+                                .RequestExternalStop(),
                         this)
                     : default;
             try {
@@ -159,7 +160,9 @@ public sealed class EventLogSubscription : IDisposable {
                 throw;
             }
         } catch {
-            ReleaseSetupResources();
+            RequestStop();
+            _externalCancellation.Dispose();
+            WaitAndReleaseResources();
             throw;
         }
     }
@@ -425,6 +428,14 @@ public sealed class EventLogSubscription : IDisposable {
             WindowsEventNativeMethods.EvtCancel(
                 _subscription);
         }
+    }
+
+    private void RequestExternalStop() {
+        _ = Task.Run(() => {
+            RequestStop();
+            _externalCancellation.Dispose();
+            WaitAndReleaseResources();
+        });
     }
 
     /// <summary>Stops delivery and releases native handles.</summary>

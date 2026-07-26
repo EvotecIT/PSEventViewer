@@ -54,4 +54,34 @@ public class TestEventLogStructuredQuery {
             exception.Message,
             StringComparison.OrdinalIgnoreCase);
     }
+
+    [Fact]
+    public void OfflineFileSourcesEscapeReservedUriCharacters() {
+        string path = Path.GetFullPath(
+            Path.Combine(
+                "logs",
+                "a#b?c%20.evtx"));
+        EventLogStructuredQuery query =
+            EventLogStructuredQuery.ForFiles(
+                new[] { path });
+        EventLogStructuredQuerySource source =
+            Assert.Single(
+                query.ResolveSources());
+
+        Assert.Equal(
+            path,
+            source.Source);
+        Assert.Contains(
+            "%23",
+            query.QueryXml,
+            StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(
+            "%3F",
+            query.QueryXml,
+            StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(
+            "%2520",
+            query.QueryXml,
+            StringComparison.OrdinalIgnoreCase);
+    }
 }

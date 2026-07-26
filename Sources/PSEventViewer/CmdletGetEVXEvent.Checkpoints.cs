@@ -273,11 +273,7 @@ public sealed partial class CmdletGetEVXEvent {
     }
 
     private string GetCheckpointKey(EventObject eventObject) {
-        bool hasMultipleSources =
-            ParameterSetName == "NamedEvents" ||
-            GetCheckpointSourceCount() > 1 ||
-            GetEffectiveCheckpointMachines().Count > 1;
-        if (!hasMultipleSources) {
+        if (!UsesDerivedCheckpointKeys()) {
             return _recordIdKey;
         }
 
@@ -323,11 +319,7 @@ public sealed partial class CmdletGetEVXEvent {
         checkpointKey = _recordIdKey;
         checkpoint = 0;
 
-        bool hasMultipleSources =
-            ParameterSetName == "NamedEvents" ||
-            GetCheckpointSourceCount() > 1 ||
-            GetEffectiveCheckpointMachines().Count > 1;
-        if (!hasMultipleSources) {
+        if (!UsesDerivedCheckpointKeys()) {
             return _recordMap.TryGetValue(_recordIdKey, out checkpoint);
         }
 
@@ -341,6 +333,14 @@ public sealed partial class CmdletGetEVXEvent {
         }
 
         return false;
+    }
+
+    private bool UsesDerivedCheckpointKeys() {
+        return ParameterSetName == "NamedEvents" ||
+               GetCheckpointSourceCount() > 1 ||
+               GetEffectiveCheckpointMachines().Count > 1 ||
+               (ParameterSetName == "GenericEvents" &&
+                MyInvocation.ExpectingInput);
     }
 
     private static HashSet<string> GetCheckpointSourceNames(string? machineName) {

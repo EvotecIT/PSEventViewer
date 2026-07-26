@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Text.Json;
+using System.Diagnostics.Eventing.Reader;
 using EventViewerX.Providers;
 using Xunit;
 using ProviderEventDefinition =
@@ -11,6 +12,27 @@ using ProviderEventDefinition =
 namespace EventViewerX.Tests;
 
 public sealed class TestEventProviderPackages {
+    [Fact]
+    public void GenericMetadataFailuresAreNotTreatedAsMissingRegistration() {
+        Assert.False(
+            EventProviderManifestRegistrar
+                .IsMissingRegistrationFailure(
+                    new EventLogException(
+                        "Transient Event Log service failure.")));
+    }
+
+    [Fact]
+    public void MissingProviderRegistrationIsConfirmedAsAbsent() {
+        if (!OperatingSystem.IsWindows()) {
+            return;
+        }
+
+        Assert.False(
+            EventProviderManifestRegistrar.IsRegistered(
+                "EventViewerX.Tests.Missing." +
+                Guid.NewGuid().ToString("N")));
+    }
+
     [Fact]
     public void StagingCleanupCannotReplaceTheActivationOutcome() {
         string staging =
