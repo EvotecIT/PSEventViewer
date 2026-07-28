@@ -42,7 +42,7 @@ internal sealed class EventLogAsyncEnumerable : IAsyncEnumerable<EventObject> {
     private sealed class Enumerator : IAsyncEnumerator<EventObject> {
         private readonly Func<CancellationToken, IEnumerable<EventObject>>
             _source;
-        private readonly CancellationTokenSource? _consumerLink;
+        private CancellationTokenSource? _consumerLink;
         private readonly CancellationToken _consumerCancellationToken;
         private readonly CancellationTokenSource _stop;
         private readonly Channel<EventObject> _channel;
@@ -132,6 +132,8 @@ internal sealed class EventLogAsyncEnumerable : IAsyncEnumerable<EventObject> {
             }
 
             _stop.Cancel();
+            _consumerLink?.Dispose();
+            _consumerLink = null;
             await _moveGate.WaitAsync().ConfigureAwait(false);
             _moveGate.Release();
             DisposeCancellationWhenProducerStops();
@@ -188,7 +190,6 @@ internal sealed class EventLogAsyncEnumerable : IAsyncEnumerable<EventObject> {
 
         private void DisposeCancellationSources() {
             _stop.Dispose();
-            _consumerLink?.Dispose();
         }
 
         private static CancellationToken SelectConsumerCancellationToken(
