@@ -78,7 +78,7 @@ Build-Module -ModuleName 'PSEventViewer' {
     # when creating PSD1 use special style without comments and with only required parameters
     New-ConfigurationFormat -ApplyTo 'DefaultPSD1', 'OnMergePSD1' -PSD1Style 'Minimal'
     # configuration for documentation, at the same time it enables documentation processing
-    New-ConfigurationDocumentation -Enable:$false -PathReadme 'Docs\Readme.md' -Path 'Docs'
+    New-ConfigurationDocumentation -Enable -PathReadme 'Docs\Readme.md' -Path 'Docs' -SyncExternalHelpToProjectRoot
 
     $newConfigurationBuildSplat = @{
         Enable                            = $true
@@ -94,6 +94,7 @@ Build-Module -ModuleName 'PSEventViewer' {
         NETFramework                      = 'net8.0-windows', 'net472'
         NETSearchClass                    = 'PSEventViewer.CmdletGetEVXEvent'
         NETHandleAssemblyWithSameName     = $true
+        NETBinaryModuleDocumentation      = $true
         #NETMergeLibraryDebugging          = $true
         DotSourceLibraries                = $true
         DotSourceClasses                  = $true
