@@ -13,7 +13,7 @@ Configures enabled state, maximum size, retention mode, file path, or security d
 ## SYNTAX
 ### __AllParameterSets
 ```powershell
-Set-EVXLog [-LogName] <string[]> [-MachineName <string[]>] [-Credential <pscredential>] [-Authentication <EventLogAuthentication>] [-TimeoutMs <int>] [-Enabled <bool>] [-MaximumSizeMB <int>] [-MaximumSizeBytes <long>] [-Mode <EventLogMode>] [-LogFilePath <string>] [-SecurityDescriptor <string>] [-WhatIf] [-Confirm] [<CommonParameters>]
+Set-EVXLog [-LogName] <string[]> [-MachineName <string[]>] [-Credential <pscredential>] [-Authentication <EventLogAuthentication>] [-TimeoutMs <int>] [-Enabled <Boolean>] [-MaximumSizeMB <Int32>] [-MaximumSizeBytes <Int64>] [-Mode <EventLogMode>] [-LogFilePath <string>] [-SecurityDescriptor <string>] [-WhatIf] [-Confirm] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -75,7 +75,7 @@ Accept wildcard characters: False
 Enables or disables the channel.
 
 ```yaml
-Type: Nullable`1
+Type: Boolean
 Parameter Sets: __AllParameterSets
 Aliases: None
 Possible values:
@@ -139,7 +139,7 @@ Accept wildcard characters: False
 Maximum channel size in bytes.
 
 ```yaml
-Type: Nullable`1
+Type: Int64
 Parameter Sets: __AllParameterSets
 Aliases: MaximumSizeInBytes
 Possible values:
@@ -155,7 +155,7 @@ Accept wildcard characters: False
 Maximum channel size in megabytes.
 
 ```yaml
-Type: Nullable`1
+Type: Int32
 Parameter Sets: __AllParameterSets
 Aliases: None
 Possible values:
@@ -171,10 +171,10 @@ Accept wildcard characters: False
 Circular, AutoBackup, or Retain channel mode.
 
 ```yaml
-Type: Nullable`1
+Type: EventLogMode
 Parameter Sets: __AllParameterSets
 Aliases: LogMode
-Possible values:
+Possible values: Circular, AutoBackup, Retain
 
 Required: False
 Position: named

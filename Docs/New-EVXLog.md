@@ -13,7 +13,7 @@ Applies explicit desired state through ClassicEventLogManager and reports exactl
 ## SYNTAX
 ### __AllParameterSets
 ```powershell
-New-EVXLog [-LogName] <string> [[-ProviderName] <string>] [-MachineName <string>] [-MaximumKilobytes <long>] [-OverflowAction <OverflowAction>] [-RetentionDays <int>] [-WhatIf] [-Confirm] [<CommonParameters>]
+New-EVXLog [-LogName] <string> [[-ProviderName] <string>] [-MachineName <string>] [-MaximumKilobytes <Int64>] [-OverflowAction <OverflowAction>] [-RetentionDays <Int32>] [-WhatIf] [-Confirm] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -82,7 +82,7 @@ Accept wildcard characters: False
 Maximum log size in kilobytes.
 
 ```yaml
-Type: Nullable`1
+Type: Int64
 Parameter Sets: __AllParameterSets
 Aliases: None
 Possible values:
@@ -98,10 +98,10 @@ Accept wildcard characters: False
 Overflow behavior when the log is full.
 
 ```yaml
-Type: Nullable`1
+Type: OverflowAction
 Parameter Sets: __AllParameterSets
 Aliases: None
-Possible values:
+Possible values: OverwriteAsNeeded, OverwriteOlder, DoNotOverwrite
 
 Required: False
 Position: named
@@ -130,7 +130,7 @@ Accept wildcard characters: False
 Minimum days to retain events when using OverwriteOlder policy.
 
 ```yaml
-Type: Nullable`1
+Type: Int32
 Parameter Sets: __AllParameterSets
 Aliases: None
 Possible values:

@@ -13,7 +13,7 @@ Produces filter strings compatible with Get-WinEvent -FilterXPath and Event View
 ## SYNTAX
 ### __AllParameterSets
 ```powershell
-Get-EVXFilter [-ID <string[]>] [-EventRecordID <string[]>] [-StartTime <datetime>] [-EndTime <datetime>] [-Data <string[]>] [-ProviderName <string[]>] [-Keywords <long[]>] [-Level <string[]>] [-UserID <string[]>] [-NamedDataFilter <hashtable[]>] [-NamedDataExcludeFilter <hashtable[]>] [-ExcludeID <string[]>] [-LogName <string>] [-Path <string>] [-XPathOnly] [<CommonParameters>]
+Get-EVXFilter [-ID <string[]>] [-EventRecordID <string[]>] [-StartTime <DateTime>] [-EndTime <DateTime>] [-Data <string[]>] [-ProviderName <string[]>] [-Keywords <long[]>] [-Level <string[]>] [-UserID <string[]>] [-NamedDataFilter <hashtable[]>] [-NamedDataExcludeFilter <hashtable[]>] [-ExcludeID <string[]>] [-LogName <string>] [-Path <string>] [-XPathOnly] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -73,7 +73,7 @@ Accept wildcard characters: False
 End time for the filter range.
 
 ```yaml
-Type: Nullable`1
+Type: DateTime
 Parameter Sets: __AllParameterSets
 Aliases: None
 Possible values:
@@ -249,7 +249,7 @@ Accept wildcard characters: False
 Start time for the filter range.
 
 ```yaml
-Type: Nullable`1
+Type: DateTime
 Parameter Sets: __AllParameterSets
 Aliases: None
 Possible values:

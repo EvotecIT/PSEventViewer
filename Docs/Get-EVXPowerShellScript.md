@@ -11,7 +11,7 @@ Retrieves PowerShell scripts from event logs and optionally saves them.
 ## SYNTAX
 ### __AllParameterSets
 ```powershell
-Get-EVXPowerShellScript [-Type] <PowerShellEdition> [-Path <string>] [-Format] [-ContainsText <string[]>] [-MaxScripts <int>] [-MaxPendingScripts <int>] [-MaxCachedEvents <int>] [-MachineName <string[]>] [-EventLogPath <string>] [-DateFrom <datetime>] [-DateTo <datetime>] [-MaxEventsScanned <int>] [-IncludeQueryInfo] [<CommonParameters>]
+Get-EVXPowerShellScript [-Type] <PowerShellEdition> [-Path <string>] [-Format] [-ContainsText <string[]>] [-MaxScripts <int>] [-MaxPendingScripts <int>] [-MaxCachedEvents <int>] [-MachineName <string[]>] [-EventLogPath <string>] [-DateFrom <DateTime>] [-DateTo <DateTime>] [-MaxEventsScanned <int>] [-IncludeQueryInfo] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -44,10 +44,10 @@ Accept wildcard characters: False
 ```
 
 ### -DateFrom
-{{ Fill DateFrom Description }}
+Only reads events logged after this date.
 
 ```yaml
-Type: Nullable`1
+Type: DateTime
 Parameter Sets: __AllParameterSets
 Aliases: None
 Possible values:
@@ -60,10 +60,10 @@ Accept wildcard characters: False
 ```
 
 ### -DateTo
-{{ Fill DateTo Description }}
+Only reads events logged before this date.
 
 ```yaml
-Type: Nullable`1
+Type: DateTime
 Parameter Sets: __AllParameterSets
 Aliases: None
 Possible values:
@@ -76,7 +76,8 @@ Accept wildcard characters: False
 ```
 
 ### -EventLogPath
-{{ Fill EventLogPath Description }}
+Exported EVTX file to query locally instead of a live operational log.
+This cannot be combined with MachineName.
 
 ```yaml
 Type: String
@@ -108,7 +109,7 @@ Accept wildcard characters: False
 ```
 
 ### -IncludeQueryInfo
-{{ Fill IncludeQueryInfo Description }}
+Emits a machine-readable completion record after each computer.
 
 ```yaml
 Type: SwitchParameter
@@ -124,7 +125,8 @@ Accept wildcard characters: False
 ```
 
 ### -MachineName
-{{ Fill MachineName Description }}
+Computer names to query. When omitted, the local machine is used.
+This cannot be combined with EventLogPath.
 
 ```yaml
 Type: String[]
@@ -156,7 +158,7 @@ Accept wildcard characters: False
 ```
 
 ### -MaxEventsScanned
-{{ Fill MaxEventsScanned Description }}
+Maximum native records to scan per computer. Zero scans the complete query.
 
 ```yaml
 Type: Int32
@@ -220,7 +222,7 @@ Accept wildcard characters: False
 ```
 
 ### -Type
-{{ Fill Type Description }}
+PowerShell edition whose operational log should be queried.
 
 ```yaml
 Type: PowerShellEdition

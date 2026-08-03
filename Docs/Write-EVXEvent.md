@@ -15,17 +15,17 @@ EventName is available for providers installed through an EventViewerX .evxprovi
 ## SYNTAX
 ### ByIdPayload (Default)
 ```powershell
-Write-EVXEvent [-ProviderName] <string> [-Id] <int> [[-Payload] <Object[]>] [-Version <byte>] [-WhatIf] [-Confirm] [<CommonParameters>]
+Write-EVXEvent [-ProviderName] <string> [-Id] <int> [[-Payload] <Object[]>] [-Version <Byte>] [-WhatIf] [-Confirm] [<CommonParameters>]
 ```
 
 ### ByIdData
 ```powershell
-Write-EVXEvent [-ProviderName] <string> [-Id] <int> [-Data] <IDictionary> [-Version <byte>] [-WhatIf] [-Confirm] [<CommonParameters>]
+Write-EVXEvent [-ProviderName] <string> [-Id] <int> [-Data] <IDictionary> [-Version <Byte>] [-WhatIf] [-Confirm] [<CommonParameters>]
 ```
 
 ### ByNameData
 ```powershell
-Write-EVXEvent [-ProviderName] <string> [-EventName] <string> [-Data] <IDictionary> [-Version <byte>] [-WhatIf] [-Confirm] [<CommonParameters>]
+Write-EVXEvent [-ProviderName] <string> [-EventName] <string> [-Data] <IDictionary> [-Version <Byte>] [-WhatIf] [-Confirm] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -137,7 +137,7 @@ Accept wildcard characters: False
 Event version. Required when the selected identity has multiple schema versions.
 
 ```yaml
-Type: Nullable`1
+Type: Byte
 Parameter Sets: ByIdPayload, ByIdData, ByNameData
 Aliases: None
 Possible values:

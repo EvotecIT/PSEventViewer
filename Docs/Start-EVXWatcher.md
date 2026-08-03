@@ -13,22 +13,22 @@ Supports explicit event IDs or NamedEvents, provider-side filtering, optional st
 ## SYNTAX
 ### EventId (Default)
 ```powershell
-Start-EVXWatcher [-LogName] <string> [-EventId] <int[]> [-Action] <scriptblock> [-MachineName <string>] [-Staging] [-Credential <pscredential>] [-Authentication <EventLogAuthentication>] [-Start <EventLogSubscriptionStart>] [-BookmarkXml <string>] [-IgnoreStaleBookmark] [-TolerateQueryErrors] [-ReadMode <EventReadMode>] [-MessageCulture <cultureinfo>] [-FallbackMessageCulture <cultureinfo>] [-BufferCapacity <int>] [-SessionTimeoutMs <int>] [-Name <string>] [-ActionIdentity <string>] [-TimeOut <timespan>] [-StopOnMatch] [-StopAfter <int>] [<CommonParameters>]
+Start-EVXWatcher [-LogName] <string> [-EventId] <int[]> [-Action] <scriptblock> [-MachineName <string>] [-Staging] [-Credential <pscredential>] [-Authentication <EventLogAuthentication>] [-Start <EventLogSubscriptionStart>] [-BookmarkXml <string>] [-IgnoreStaleBookmark] [-TolerateQueryErrors] [-ReadMode <EventReadMode>] [-MessageCulture <cultureinfo>] [-FallbackMessageCulture <cultureinfo>] [-BufferCapacity <int>] [-SessionTimeoutMs <int>] [-Name <string>] [-ActionIdentity <string>] [-TimeOut <TimeSpan>] [-StopOnMatch] [-StopAfter <int>] [<CommonParameters>]
 ```
 
 ### NamedEvent
 ```powershell
-Start-EVXWatcher [-LogName] <string> [-NamedEvent] <NamedEvents[]> [-Action] <scriptblock> [-MachineName <string>] [-Staging] [-Credential <pscredential>] [-Authentication <EventLogAuthentication>] [-Start <EventLogSubscriptionStart>] [-BookmarkXml <string>] [-IgnoreStaleBookmark] [-TolerateQueryErrors] [-ReadMode <EventReadMode>] [-MessageCulture <cultureinfo>] [-FallbackMessageCulture <cultureinfo>] [-BufferCapacity <int>] [-SessionTimeoutMs <int>] [-Name <string>] [-ActionIdentity <string>] [-TimeOut <timespan>] [-StopOnMatch] [-StopAfter <int>] [<CommonParameters>]
+Start-EVXWatcher [-LogName] <string> [-NamedEvent] <NamedEvents[]> [-Action] <scriptblock> [-MachineName <string>] [-Staging] [-Credential <pscredential>] [-Authentication <EventLogAuthentication>] [-Start <EventLogSubscriptionStart>] [-BookmarkXml <string>] [-IgnoreStaleBookmark] [-TolerateQueryErrors] [-ReadMode <EventReadMode>] [-MessageCulture <cultureinfo>] [-FallbackMessageCulture <cultureinfo>] [-BufferCapacity <int>] [-SessionTimeoutMs <int>] [-Name <string>] [-ActionIdentity <string>] [-TimeOut <TimeSpan>] [-StopOnMatch] [-StopAfter <int>] [<CommonParameters>]
 ```
 
 ### FilterHashtable
 ```powershell
-Start-EVXWatcher [-LogName] <string> [-FilterHashtable] <hashtable> [-Action] <scriptblock> [-MachineName <string>] [-Credential <pscredential>] [-Authentication <EventLogAuthentication>] [-Start <EventLogSubscriptionStart>] [-BookmarkXml <string>] [-IgnoreStaleBookmark] [-TolerateQueryErrors] [-ReadMode <EventReadMode>] [-MessageCulture <cultureinfo>] [-FallbackMessageCulture <cultureinfo>] [-BufferCapacity <int>] [-SessionTimeoutMs <int>] [-Name <string>] [-ActionIdentity <string>] [-TimeOut <timespan>] [-StopOnMatch] [-StopAfter <int>] [<CommonParameters>]
+Start-EVXWatcher [-LogName] <string> [-FilterHashtable] <hashtable> [-Action] <scriptblock> [-MachineName <string>] [-Credential <pscredential>] [-Authentication <EventLogAuthentication>] [-Start <EventLogSubscriptionStart>] [-BookmarkXml <string>] [-IgnoreStaleBookmark] [-TolerateQueryErrors] [-ReadMode <EventReadMode>] [-MessageCulture <cultureinfo>] [-FallbackMessageCulture <cultureinfo>] [-BufferCapacity <int>] [-SessionTimeoutMs <int>] [-Name <string>] [-ActionIdentity <string>] [-TimeOut <TimeSpan>] [-StopOnMatch] [-StopAfter <int>] [<CommonParameters>]
 ```
 
 ### FilterXPath
 ```powershell
-Start-EVXWatcher [-LogName] <string> [-FilterXPath] <string> [-Action] <scriptblock> [-MachineName <string>] [-Credential <pscredential>] [-Authentication <EventLogAuthentication>] [-Start <EventLogSubscriptionStart>] [-BookmarkXml <string>] [-IgnoreStaleBookmark] [-TolerateQueryErrors] [-ReadMode <EventReadMode>] [-MessageCulture <cultureinfo>] [-FallbackMessageCulture <cultureinfo>] [-BufferCapacity <int>] [-SessionTimeoutMs <int>] [-Name <string>] [-ActionIdentity <string>] [-TimeOut <timespan>] [-StopOnMatch] [-StopAfter <int>] [<CommonParameters>]
+Start-EVXWatcher [-LogName] <string> [-FilterXPath] <string> [-Action] <scriptblock> [-MachineName <string>] [-Credential <pscredential>] [-Authentication <EventLogAuthentication>] [-Start <EventLogSubscriptionStart>] [-BookmarkXml <string>] [-IgnoreStaleBookmark] [-TolerateQueryErrors] [-ReadMode <EventReadMode>] [-MessageCulture <cultureinfo>] [-FallbackMessageCulture <cultureinfo>] [-BufferCapacity <int>] [-SessionTimeoutMs <int>] [-Name <string>] [-ActionIdentity <string>] [-TimeOut <TimeSpan>] [-StopOnMatch] [-StopAfter <int>] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -426,7 +426,7 @@ Accept wildcard characters: False
 Duration after which the watcher stops automatically.
 
 ```yaml
-Type: Nullable`1
+Type: TimeSpan
 Parameter Sets: EventId, NamedEvent, FilterHashtable, FilterXPath
 Aliases: None
 Possible values:

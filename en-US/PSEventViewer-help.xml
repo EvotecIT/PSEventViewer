@@ -1529,9 +1529,9 @@ Each isolated failure is emitted as a non-terminating PowerShell error.</maml:pa
           <maml:description>
             <maml:para>End time for the event query.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">DateTime</command:parameterValue>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>DateTime</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -1835,9 +1835,9 @@ Settings.QuerySessionTimeoutMs for reading.</maml:para>
           <maml:description>
             <maml:para>Start time for the event query.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">DateTime</command:parameterValue>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>DateTime</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -1847,9 +1847,39 @@ Settings.QuerySessionTimeoutMs for reading.</maml:para>
           <maml:description>
             <maml:para>Relative time period for filtering events.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">TimePeriod</command:parameterValue>
+          <command:parameterValueGroup>
+            <command:parameterValue required="false" variableLength="false">PastHour</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">CurrentHour</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">PastDay</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">CurrentDay</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">PastMonth</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">CurrentMonth</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">PastQuarter</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">CurrentQuarter</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last3Days</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last7Days</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last14Days</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last1Hour</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last2Hours</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last3Hours</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last6Hours</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last12Hours</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last16Hours</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last24Hours</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Today</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Yesterday</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Everything</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">TillLastMonday</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">TillLastTuesday</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">TillLastWednesday</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">TillLastThursday</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">TillLastFriday</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">TillLastSaturday</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">TillLastSunday</command:parameterValue>
+          </command:parameterValueGroup>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>TimePeriod</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -1978,9 +2008,9 @@ Each isolated failure is emitted as a non-terminating PowerShell error.</maml:pa
           <maml:description>
             <maml:para>End time for the event query.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">DateTime</command:parameterValue>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>DateTime</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -2309,9 +2339,9 @@ Settings.QuerySessionTimeoutMs for reading.</maml:para>
           <maml:description>
             <maml:para>Start time for the event query.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">DateTime</command:parameterValue>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>DateTime</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -2321,9 +2351,39 @@ Settings.QuerySessionTimeoutMs for reading.</maml:para>
           <maml:description>
             <maml:para>Relative time period for filtering events.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">TimePeriod</command:parameterValue>
+          <command:parameterValueGroup>
+            <command:parameterValue required="false" variableLength="false">PastHour</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">CurrentHour</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">PastDay</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">CurrentDay</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">PastMonth</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">CurrentMonth</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">PastQuarter</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">CurrentQuarter</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last3Days</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last7Days</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last14Days</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last1Hour</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last2Hours</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last3Hours</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last6Hours</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last12Hours</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last16Hours</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last24Hours</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Today</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Yesterday</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Everything</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">TillLastMonday</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">TillLastTuesday</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">TillLastWednesday</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">TillLastThursday</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">TillLastFriday</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">TillLastSaturday</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">TillLastSunday</command:parameterValue>
+          </command:parameterValueGroup>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>TimePeriod</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -2451,9 +2511,9 @@ Each isolated failure is emitted as a non-terminating PowerShell error.</maml:pa
           <maml:description>
             <maml:para>End time for the event query.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">DateTime</command:parameterValue>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>DateTime</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -2685,9 +2745,9 @@ Settings.QuerySessionTimeoutMs for reading.</maml:para>
           <maml:description>
             <maml:para>Start time for the event query.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">DateTime</command:parameterValue>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>DateTime</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -2697,9 +2757,39 @@ Settings.QuerySessionTimeoutMs for reading.</maml:para>
           <maml:description>
             <maml:para>Relative time period for filtering events.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">TimePeriod</command:parameterValue>
+          <command:parameterValueGroup>
+            <command:parameterValue required="false" variableLength="false">PastHour</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">CurrentHour</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">PastDay</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">CurrentDay</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">PastMonth</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">CurrentMonth</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">PastQuarter</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">CurrentQuarter</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last3Days</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last7Days</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last14Days</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last1Hour</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last2Hours</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last3Hours</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last6Hours</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last12Hours</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last16Hours</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last24Hours</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Today</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Yesterday</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Everything</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">TillLastMonday</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">TillLastTuesday</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">TillLastWednesday</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">TillLastThursday</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">TillLastFriday</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">TillLastSaturday</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">TillLastSunday</command:parameterValue>
+          </command:parameterValueGroup>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>TimePeriod</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -2880,9 +2970,9 @@ Each isolated failure is emitted as a non-terminating PowerShell error.</maml:pa
           <maml:description>
             <maml:para>End time for the event query.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">DateTime</command:parameterValue>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>DateTime</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -3172,9 +3262,9 @@ Named-event queries default to Full so rule projections receive their structured
           <maml:description>
             <maml:para>Start time for the event query.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">DateTime</command:parameterValue>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>DateTime</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -3184,9 +3274,39 @@ Named-event queries default to Full so rule projections receive their structured
           <maml:description>
             <maml:para>Relative time period for filtering events.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">TimePeriod</command:parameterValue>
+          <command:parameterValueGroup>
+            <command:parameterValue required="false" variableLength="false">PastHour</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">CurrentHour</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">PastDay</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">CurrentDay</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">PastMonth</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">CurrentMonth</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">PastQuarter</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">CurrentQuarter</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last3Days</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last7Days</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last14Days</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last1Hour</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last2Hours</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last3Hours</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last6Hours</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last12Hours</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last16Hours</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last24Hours</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Today</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Yesterday</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Everything</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">TillLastMonday</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">TillLastTuesday</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">TillLastWednesday</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">TillLastThursday</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">TillLastFriday</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">TillLastSaturday</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">TillLastSunday</command:parameterValue>
+          </command:parameterValueGroup>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>TimePeriod</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -4034,9 +4154,9 @@ Each isolated failure is emitted as a non-terminating PowerShell error.</maml:pa
         <maml:description>
           <maml:para>End time for the event query.</maml:para>
         </maml:description>
-        <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+        <command:parameterValue required="false" variableLength="false">DateTime</command:parameterValue>
         <dev:type>
-          <maml:name>Nullable`1</maml:name>
+          <maml:name>DateTime</maml:name>
           <maml:uri />
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
@@ -4416,9 +4536,9 @@ Settings.QuerySessionTimeoutMs for reading.</maml:para>
         <maml:description>
           <maml:para>Start time for the event query.</maml:para>
         </maml:description>
-        <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+        <command:parameterValue required="false" variableLength="false">DateTime</command:parameterValue>
         <dev:type>
-          <maml:name>Nullable`1</maml:name>
+          <maml:name>DateTime</maml:name>
           <maml:uri />
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
@@ -4428,9 +4548,39 @@ Settings.QuerySessionTimeoutMs for reading.</maml:para>
         <maml:description>
           <maml:para>Relative time period for filtering events.</maml:para>
         </maml:description>
-        <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+        <command:parameterValue required="false" variableLength="false">TimePeriod</command:parameterValue>
+        <command:parameterValueGroup>
+          <command:parameterValue required="false" variableLength="false">PastHour</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">CurrentHour</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">PastDay</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">CurrentDay</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">PastMonth</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">CurrentMonth</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">PastQuarter</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">CurrentQuarter</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Last3Days</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Last7Days</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Last14Days</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Last1Hour</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Last2Hours</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Last3Hours</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Last6Hours</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Last12Hours</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Last16Hours</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Last24Hours</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Today</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Yesterday</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Everything</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">TillLastMonday</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">TillLastTuesday</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">TillLastWednesday</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">TillLastThursday</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">TillLastFriday</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">TillLastSaturday</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">TillLastSunday</command:parameterValue>
+        </command:parameterValueGroup>
         <dev:type>
-          <maml:name>Nullable`1</maml:name>
+          <maml:name>TimePeriod</maml:name>
           <maml:uri />
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
@@ -4656,9 +4806,9 @@ Settings.QuerySessionTimeoutMs for reading.</maml:para>
           <maml:description>
             <maml:para>Optional inclusive upper time bound.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">DateTime</command:parameterValue>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>DateTime</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -4728,9 +4878,9 @@ Settings.QuerySessionTimeoutMs for reading.</maml:para>
           <maml:description>
             <maml:para>Optional inclusive lower time bound.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">DateTime</command:parameterValue>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>DateTime</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -4767,9 +4917,9 @@ Settings.QuerySessionTimeoutMs for reading.</maml:para>
         <maml:description>
           <maml:para>Optional inclusive upper time bound.</maml:para>
         </maml:description>
-        <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+        <command:parameterValue required="false" variableLength="false">DateTime</command:parameterValue>
         <dev:type>
-          <maml:name>Nullable`1</maml:name>
+          <maml:name>DateTime</maml:name>
           <maml:uri />
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
@@ -4839,9 +4989,9 @@ Settings.QuerySessionTimeoutMs for reading.</maml:para>
         <maml:description>
           <maml:para>Optional inclusive lower time bound.</maml:para>
         </maml:description>
-        <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+        <command:parameterValue required="false" variableLength="false">DateTime</command:parameterValue>
         <dev:type>
-          <maml:name>Nullable`1</maml:name>
+          <maml:name>DateTime</maml:name>
           <maml:uri />
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
@@ -4942,9 +5092,9 @@ Settings.QuerySessionTimeoutMs for reading.</maml:para>
           <maml:description>
             <maml:para>End time for the filter range.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">DateTime</command:parameterValue>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>DateTime</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -5082,9 +5232,9 @@ Settings.QuerySessionTimeoutMs for reading.</maml:para>
           <maml:description>
             <maml:para>Start time for the filter range.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">DateTime</command:parameterValue>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>DateTime</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -5133,9 +5283,9 @@ Settings.QuerySessionTimeoutMs for reading.</maml:para>
         <maml:description>
           <maml:para>End time for the filter range.</maml:para>
         </maml:description>
-        <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+        <command:parameterValue required="false" variableLength="false">DateTime</command:parameterValue>
         <dev:type>
-          <maml:name>Nullable`1</maml:name>
+          <maml:name>DateTime</maml:name>
           <maml:uri />
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
@@ -5273,9 +5423,9 @@ Settings.QuerySessionTimeoutMs for reading.</maml:para>
         <maml:description>
           <maml:para>Start time for the filter range.</maml:para>
         </maml:description>
-        <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+        <command:parameterValue required="false" variableLength="false">DateTime</command:parameterValue>
         <dev:type>
-          <maml:name>Nullable`1</maml:name>
+          <maml:name>DateTime</maml:name>
           <maml:uri />
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
@@ -5692,11 +5842,11 @@ Settings.QuerySessionTimeoutMs for reading.</maml:para>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>DateFrom</maml:name>
           <maml:description>
-            <maml:para></maml:para>
+            <maml:para>Only reads events logged after this date.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">DateTime</command:parameterValue>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>DateTime</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -5704,11 +5854,11 @@ Settings.QuerySessionTimeoutMs for reading.</maml:para>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>DateTo</maml:name>
           <maml:description>
-            <maml:para></maml:para>
+            <maml:para>Only reads events logged before this date.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">DateTime</command:parameterValue>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>DateTime</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -5716,7 +5866,8 @@ Settings.QuerySessionTimeoutMs for reading.</maml:para>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>EventLogPath</maml:name>
           <maml:description>
-            <maml:para></maml:para>
+            <maml:para>Exported EVTX file to query locally instead of a live operational log.&#xD;
+This cannot be combined with MachineName.</maml:para>
           </maml:description>
           <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
           <dev:type>
@@ -5740,7 +5891,7 @@ Settings.QuerySessionTimeoutMs for reading.</maml:para>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>IncludeQueryInfo</maml:name>
           <maml:description>
-            <maml:para></maml:para>
+            <maml:para>Emits a machine-readable completion record after each computer.</maml:para>
           </maml:description>
           <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
           <dev:type>
@@ -5752,7 +5903,8 @@ Settings.QuerySessionTimeoutMs for reading.</maml:para>
         <command:parameter required="false" variableLength="true" globbing="false" pipelineInput="False" position="named" aliases="ComputerName">
           <maml:name>MachineName</maml:name>
           <maml:description>
-            <maml:para></maml:para>
+            <maml:para>Computer names to query. When omitted, the local machine is used.&#xD;
+This cannot be combined with EventLogPath.</maml:para>
           </maml:description>
           <command:parameterValue required="false" variableLength="false">String[]</command:parameterValue>
           <dev:type>
@@ -5776,7 +5928,7 @@ Settings.QuerySessionTimeoutMs for reading.</maml:para>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>MaxEventsScanned</maml:name>
           <maml:description>
-            <maml:para></maml:para>
+            <maml:para>Maximum native records to scan per computer. Zero scans the complete query.</maml:para>
           </maml:description>
           <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
           <dev:type>
@@ -5824,7 +5976,7 @@ Settings.QuerySessionTimeoutMs for reading.</maml:para>
         <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="False" position="0" aliases="None">
           <maml:name>Type</maml:name>
           <maml:description>
-            <maml:para></maml:para>
+            <maml:para>PowerShell edition whose operational log should be queried.</maml:para>
           </maml:description>
           <command:parameterValue required="true" variableLength="false">PowerShellEdition</command:parameterValue>
           <command:parameterValueGroup>
@@ -5855,11 +6007,11 @@ Settings.QuerySessionTimeoutMs for reading.</maml:para>
       <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
         <maml:name>DateFrom</maml:name>
         <maml:description>
-          <maml:para></maml:para>
+          <maml:para>Only reads events logged after this date.</maml:para>
         </maml:description>
-        <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+        <command:parameterValue required="false" variableLength="false">DateTime</command:parameterValue>
         <dev:type>
-          <maml:name>Nullable`1</maml:name>
+          <maml:name>DateTime</maml:name>
           <maml:uri />
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
@@ -5867,11 +6019,11 @@ Settings.QuerySessionTimeoutMs for reading.</maml:para>
       <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
         <maml:name>DateTo</maml:name>
         <maml:description>
-          <maml:para></maml:para>
+          <maml:para>Only reads events logged before this date.</maml:para>
         </maml:description>
-        <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+        <command:parameterValue required="false" variableLength="false">DateTime</command:parameterValue>
         <dev:type>
-          <maml:name>Nullable`1</maml:name>
+          <maml:name>DateTime</maml:name>
           <maml:uri />
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
@@ -5879,7 +6031,8 @@ Settings.QuerySessionTimeoutMs for reading.</maml:para>
       <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
         <maml:name>EventLogPath</maml:name>
         <maml:description>
-          <maml:para></maml:para>
+          <maml:para>Exported EVTX file to query locally instead of a live operational log.&#xD;
+This cannot be combined with MachineName.</maml:para>
         </maml:description>
         <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
         <dev:type>
@@ -5903,7 +6056,7 @@ Settings.QuerySessionTimeoutMs for reading.</maml:para>
       <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
         <maml:name>IncludeQueryInfo</maml:name>
         <maml:description>
-          <maml:para></maml:para>
+          <maml:para>Emits a machine-readable completion record after each computer.</maml:para>
         </maml:description>
         <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
         <dev:type>
@@ -5915,7 +6068,8 @@ Settings.QuerySessionTimeoutMs for reading.</maml:para>
       <command:parameter required="false" variableLength="true" globbing="false" pipelineInput="False" position="named" aliases="ComputerName">
         <maml:name>MachineName</maml:name>
         <maml:description>
-          <maml:para></maml:para>
+          <maml:para>Computer names to query. When omitted, the local machine is used.&#xD;
+This cannot be combined with EventLogPath.</maml:para>
         </maml:description>
         <command:parameterValue required="false" variableLength="false">String[]</command:parameterValue>
         <dev:type>
@@ -5939,7 +6093,7 @@ Settings.QuerySessionTimeoutMs for reading.</maml:para>
       <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
         <maml:name>MaxEventsScanned</maml:name>
         <maml:description>
-          <maml:para></maml:para>
+          <maml:para>Maximum native records to scan per computer. Zero scans the complete query.</maml:para>
         </maml:description>
         <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
         <dev:type>
@@ -5987,7 +6141,7 @@ Settings.QuerySessionTimeoutMs for reading.</maml:para>
       <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="False" position="0" aliases="None">
         <maml:name>Type</maml:name>
         <maml:description>
-          <maml:para></maml:para>
+          <maml:para>PowerShell edition whose operational log should be queried.</maml:para>
         </maml:description>
         <command:parameterValue required="true" variableLength="false">PowerShellEdition</command:parameterValue>
         <command:parameterValueGroup>
@@ -6059,11 +6213,11 @@ Settings.QuerySessionTimeoutMs for reading.</maml:para>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>DateFrom</maml:name>
           <maml:description>
-            <maml:para></maml:para>
+            <maml:para>Only reads events logged after this date.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">DateTime</command:parameterValue>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>DateTime</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -6071,11 +6225,11 @@ Settings.QuerySessionTimeoutMs for reading.</maml:para>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>DateTo</maml:name>
           <maml:description>
-            <maml:para></maml:para>
+            <maml:para>Only reads events logged before this date.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">DateTime</command:parameterValue>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>DateTime</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -6083,7 +6237,8 @@ Settings.QuerySessionTimeoutMs for reading.</maml:para>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>EventLogPath</maml:name>
           <maml:description>
-            <maml:para></maml:para>
+            <maml:para>Exported EVTX file to query locally instead of a live operational log.&#xD;
+This cannot be combined with MachineName.</maml:para>
           </maml:description>
           <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
           <dev:type>
@@ -6095,7 +6250,7 @@ Settings.QuerySessionTimeoutMs for reading.</maml:para>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>IncludeQueryInfo</maml:name>
           <maml:description>
-            <maml:para></maml:para>
+            <maml:para>Emits a machine-readable completion record after each computer.</maml:para>
           </maml:description>
           <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
           <dev:type>
@@ -6107,7 +6262,8 @@ Settings.QuerySessionTimeoutMs for reading.</maml:para>
         <command:parameter required="false" variableLength="true" globbing="false" pipelineInput="False" position="named" aliases="ComputerName">
           <maml:name>MachineName</maml:name>
           <maml:description>
-            <maml:para></maml:para>
+            <maml:para>Computer names to query. When omitted, the local machine is used.&#xD;
+This cannot be combined with EventLogPath.</maml:para>
           </maml:description>
           <command:parameterValue required="false" variableLength="false">String[]</command:parameterValue>
           <dev:type>
@@ -6131,7 +6287,7 @@ Settings.QuerySessionTimeoutMs for reading.</maml:para>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>MaxEventsScanned</maml:name>
           <maml:description>
-            <maml:para></maml:para>
+            <maml:para>Maximum native records to scan per computer. Zero scans the complete query.</maml:para>
           </maml:description>
           <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
           <dev:type>
@@ -6143,7 +6299,7 @@ Settings.QuerySessionTimeoutMs for reading.</maml:para>
         <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="False" position="0" aliases="None">
           <maml:name>Type</maml:name>
           <maml:description>
-            <maml:para></maml:para>
+            <maml:para>PowerShell edition whose operational log should be queried.</maml:para>
           </maml:description>
           <command:parameterValue required="true" variableLength="false">PowerShellEdition</command:parameterValue>
           <command:parameterValueGroup>
@@ -6162,11 +6318,11 @@ Settings.QuerySessionTimeoutMs for reading.</maml:para>
       <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
         <maml:name>DateFrom</maml:name>
         <maml:description>
-          <maml:para></maml:para>
+          <maml:para>Only reads events logged after this date.</maml:para>
         </maml:description>
-        <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+        <command:parameterValue required="false" variableLength="false">DateTime</command:parameterValue>
         <dev:type>
-          <maml:name>Nullable`1</maml:name>
+          <maml:name>DateTime</maml:name>
           <maml:uri />
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
@@ -6174,11 +6330,11 @@ Settings.QuerySessionTimeoutMs for reading.</maml:para>
       <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
         <maml:name>DateTo</maml:name>
         <maml:description>
-          <maml:para></maml:para>
+          <maml:para>Only reads events logged before this date.</maml:para>
         </maml:description>
-        <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+        <command:parameterValue required="false" variableLength="false">DateTime</command:parameterValue>
         <dev:type>
-          <maml:name>Nullable`1</maml:name>
+          <maml:name>DateTime</maml:name>
           <maml:uri />
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
@@ -6186,7 +6342,8 @@ Settings.QuerySessionTimeoutMs for reading.</maml:para>
       <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
         <maml:name>EventLogPath</maml:name>
         <maml:description>
-          <maml:para></maml:para>
+          <maml:para>Exported EVTX file to query locally instead of a live operational log.&#xD;
+This cannot be combined with MachineName.</maml:para>
         </maml:description>
         <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
         <dev:type>
@@ -6198,7 +6355,7 @@ Settings.QuerySessionTimeoutMs for reading.</maml:para>
       <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
         <maml:name>IncludeQueryInfo</maml:name>
         <maml:description>
-          <maml:para></maml:para>
+          <maml:para>Emits a machine-readable completion record after each computer.</maml:para>
         </maml:description>
         <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
         <dev:type>
@@ -6210,7 +6367,8 @@ Settings.QuerySessionTimeoutMs for reading.</maml:para>
       <command:parameter required="false" variableLength="true" globbing="false" pipelineInput="False" position="named" aliases="ComputerName">
         <maml:name>MachineName</maml:name>
         <maml:description>
-          <maml:para></maml:para>
+          <maml:para>Computer names to query. When omitted, the local machine is used.&#xD;
+This cannot be combined with EventLogPath.</maml:para>
         </maml:description>
         <command:parameterValue required="false" variableLength="false">String[]</command:parameterValue>
         <dev:type>
@@ -6234,7 +6392,7 @@ Settings.QuerySessionTimeoutMs for reading.</maml:para>
       <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
         <maml:name>MaxEventsScanned</maml:name>
         <maml:description>
-          <maml:para></maml:para>
+          <maml:para>Maximum native records to scan per computer. Zero scans the complete query.</maml:para>
         </maml:description>
         <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
         <dev:type>
@@ -6246,7 +6404,7 @@ Settings.QuerySessionTimeoutMs for reading.</maml:para>
       <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="False" position="0" aliases="None">
         <maml:name>Type</maml:name>
         <maml:description>
-          <maml:para></maml:para>
+          <maml:para>PowerShell edition whose operational log should be queried.</maml:para>
         </maml:description>
         <command:parameterValue required="true" variableLength="false">PowerShellEdition</command:parameterValue>
         <command:parameterValueGroup>
@@ -7013,9 +7171,9 @@ Settings.QuerySessionTimeoutMs for reading.</maml:para>
           <maml:description>
             <maml:para>Maximum log size in kilobytes.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Int64</command:parameterValue>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>Int64</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -7025,9 +7183,14 @@ Settings.QuerySessionTimeoutMs for reading.</maml:para>
           <maml:description>
             <maml:para>Overflow behavior when the log is full.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">OverflowAction</command:parameterValue>
+          <command:parameterValueGroup>
+            <command:parameterValue required="false" variableLength="false">OverwriteAsNeeded</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">OverwriteOlder</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">DoNotOverwrite</command:parameterValue>
+          </command:parameterValueGroup>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>OverflowAction</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -7049,9 +7212,9 @@ Settings.QuerySessionTimeoutMs for reading.</maml:para>
           <maml:description>
             <maml:para>Minimum days to retain events when using OverwriteOlder policy.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>Int32</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -7088,9 +7251,9 @@ Settings.QuerySessionTimeoutMs for reading.</maml:para>
         <maml:description>
           <maml:para>Maximum log size in kilobytes.</maml:para>
         </maml:description>
-        <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+        <command:parameterValue required="false" variableLength="false">Int64</command:parameterValue>
         <dev:type>
-          <maml:name>Nullable`1</maml:name>
+          <maml:name>Int64</maml:name>
           <maml:uri />
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
@@ -7100,9 +7263,14 @@ Settings.QuerySessionTimeoutMs for reading.</maml:para>
         <maml:description>
           <maml:para>Overflow behavior when the log is full.</maml:para>
         </maml:description>
-        <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+        <command:parameterValue required="false" variableLength="false">OverflowAction</command:parameterValue>
+        <command:parameterValueGroup>
+          <command:parameterValue required="false" variableLength="false">OverwriteAsNeeded</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">OverwriteOlder</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">DoNotOverwrite</command:parameterValue>
+        </command:parameterValueGroup>
         <dev:type>
-          <maml:name>Nullable`1</maml:name>
+          <maml:name>OverflowAction</maml:name>
           <maml:uri />
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
@@ -7124,9 +7292,9 @@ Settings.QuerySessionTimeoutMs for reading.</maml:para>
         <maml:description>
           <maml:para>Minimum days to retain events when using OverwriteOlder policy.</maml:para>
         </maml:description>
-        <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+        <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
         <dev:type>
-          <maml:name>Nullable`1</maml:name>
+          <maml:name>Int32</maml:name>
           <maml:uri />
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
@@ -8210,9 +8378,9 @@ Settings.QuerySessionTimeoutMs for reading.</maml:para>
           <maml:description>
             <maml:para>Enables or disables the channel.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Boolean</command:parameterValue>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>Boolean</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -8258,9 +8426,9 @@ Settings.QuerySessionTimeoutMs for reading.</maml:para>
           <maml:description>
             <maml:para>Maximum channel size in bytes.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Int64</command:parameterValue>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>Int64</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -8270,9 +8438,9 @@ Settings.QuerySessionTimeoutMs for reading.</maml:para>
           <maml:description>
             <maml:para>Maximum channel size in megabytes.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>Int32</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -8282,9 +8450,14 @@ Settings.QuerySessionTimeoutMs for reading.</maml:para>
           <maml:description>
             <maml:para>Circular, AutoBackup, or Retain channel mode.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">EventLogMode</command:parameterValue>
+          <command:parameterValueGroup>
+            <command:parameterValue required="false" variableLength="false">Circular</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">AutoBackup</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Retain</command:parameterValue>
+          </command:parameterValueGroup>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>EventLogMode</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -8351,9 +8524,9 @@ Settings.QuerySessionTimeoutMs for reading.</maml:para>
         <maml:description>
           <maml:para>Enables or disables the channel.</maml:para>
         </maml:description>
-        <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+        <command:parameterValue required="false" variableLength="false">Boolean</command:parameterValue>
         <dev:type>
-          <maml:name>Nullable`1</maml:name>
+          <maml:name>Boolean</maml:name>
           <maml:uri />
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
@@ -8399,9 +8572,9 @@ Settings.QuerySessionTimeoutMs for reading.</maml:para>
         <maml:description>
           <maml:para>Maximum channel size in bytes.</maml:para>
         </maml:description>
-        <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+        <command:parameterValue required="false" variableLength="false">Int64</command:parameterValue>
         <dev:type>
-          <maml:name>Nullable`1</maml:name>
+          <maml:name>Int64</maml:name>
           <maml:uri />
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
@@ -8411,9 +8584,9 @@ Settings.QuerySessionTimeoutMs for reading.</maml:para>
         <maml:description>
           <maml:para>Maximum channel size in megabytes.</maml:para>
         </maml:description>
-        <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+        <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
         <dev:type>
-          <maml:name>Nullable`1</maml:name>
+          <maml:name>Int32</maml:name>
           <maml:uri />
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
@@ -8423,9 +8596,14 @@ Settings.QuerySessionTimeoutMs for reading.</maml:para>
         <maml:description>
           <maml:para>Circular, AutoBackup, or Retain channel mode.</maml:para>
         </maml:description>
-        <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+        <command:parameterValue required="false" variableLength="false">EventLogMode</command:parameterValue>
+        <command:parameterValueGroup>
+          <command:parameterValue required="false" variableLength="false">Circular</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">AutoBackup</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Retain</command:parameterValue>
+        </command:parameterValueGroup>
         <dev:type>
-          <maml:name>Nullable`1</maml:name>
+          <maml:name>EventLogMode</maml:name>
           <maml:uri />
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
@@ -8761,9 +8939,9 @@ Omit this parameter to reject reuse when the action delegate is not the same ins
           <maml:description>
             <maml:para>Duration after which the watcher stops automatically.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">TimeSpan</command:parameterValue>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>TimeSpan</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -9117,9 +9295,9 @@ Omit this parameter to reject reuse when the action delegate is not the same ins
           <maml:description>
             <maml:para>Duration after which the watcher stops automatically.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">TimeSpan</command:parameterValue>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>TimeSpan</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -9380,9 +9558,9 @@ LogName and Path are not included because this watcher targets one LogName.</mam
           <maml:description>
             <maml:para>Duration after which the watcher stops automatically.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">TimeSpan</command:parameterValue>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>TimeSpan</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -9642,9 +9820,9 @@ Omit this parameter to reject reuse when the action delegate is not the same ins
           <maml:description>
             <maml:para>Duration after which the watcher stops automatically.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">TimeSpan</command:parameterValue>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>TimeSpan</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -10035,9 +10213,9 @@ LogName and Path are not included because this watcher targets one LogName.</mam
         <maml:description>
           <maml:para>Duration after which the watcher stops automatically.</maml:para>
         </maml:description>
-        <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+        <command:parameterValue required="false" variableLength="false">TimeSpan</command:parameterValue>
         <dev:type>
-          <maml:name>Nullable`1</maml:name>
+          <maml:name>TimeSpan</maml:name>
           <maml:uri />
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
@@ -11206,9 +11384,9 @@ LogName and Path are not included because this watcher targets one LogName.</mam
           <maml:description>
             <maml:para>Event version. Required when the selected identity has multiple schema versions.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Byte</command:parameterValue>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>Byte</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -11257,9 +11435,9 @@ LogName and Path are not included because this watcher targets one LogName.</mam
           <maml:description>
             <maml:para>Event version. Required when the selected identity has multiple schema versions.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Byte</command:parameterValue>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>Byte</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -11308,9 +11486,9 @@ LogName and Path are not included because this watcher targets one LogName.</mam
           <maml:description>
             <maml:para>Event version. Required when the selected identity has multiple schema versions.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Byte</command:parameterValue>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>Byte</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -11383,9 +11561,9 @@ LogName and Path are not included because this watcher targets one LogName.</mam
         <maml:description>
           <maml:para>Event version. Required when the selected identity has multiple schema versions.</maml:para>
         </maml:description>
-        <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+        <command:parameterValue required="false" variableLength="false">Byte</command:parameterValue>
         <dev:type>
-          <maml:name>Nullable`1</maml:name>
+          <maml:name>Byte</maml:name>
           <maml:uri />
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>

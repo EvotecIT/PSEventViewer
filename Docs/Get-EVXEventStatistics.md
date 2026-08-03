@@ -13,7 +13,7 @@ Scans event metadata without formatting messages or parsing XML and reports top 
 ## SYNTAX
 ### __AllParameterSets
 ```powershell
-Get-EVXEventStatistics [-LogName] <string> [-MachineName <string>] [-XPath <string>] [-MaxEvents <long>] [-Oldest] [-StartTime <datetime>] [-EndTime <datetime>] [-Top <int>] [-SessionTimeoutMs <int>] [<CommonParameters>]
+Get-EVXEventStatistics [-LogName] <string> [-MachineName <string>] [-XPath <string>] [-MaxEvents <long>] [-Oldest] [-StartTime <DateTime>] [-EndTime <DateTime>] [-Top <int>] [-SessionTimeoutMs <int>] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -43,7 +43,7 @@ Returns a typed statistics result or a PowerShell error with the underlying fail
 Optional inclusive upper time bound.
 
 ```yaml
-Type: Nullable`1
+Type: DateTime
 Parameter Sets: __AllParameterSets
 Aliases: None
 Possible values:
@@ -139,7 +139,7 @@ Accept wildcard characters: False
 Optional inclusive lower time bound.
 
 ```yaml
-Type: Nullable`1
+Type: DateTime
 Parameter Sets: __AllParameterSets
 Aliases: None
 Possible values:

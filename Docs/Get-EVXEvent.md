@@ -13,22 +13,22 @@ Supports local/remote logs, named event shortcuts, record ID resumes, parallel q
 ## SYNTAX
 ### ProviderEvents (Default)
 ```powershell
-Get-EVXEvent [[-EventId] <int[]>] -ProviderName <string[]> [-EventRecordId <long[]>] [-RecordIdFile <string>] [-RecordIdKey <string>] [-MachineName <List[string]>] [-Keywords <long[]>] [-Level <int[]>] [-StartTime <datetime>] [-EndTime <datetime>] [-TimePeriod <TimePeriod>] [-UserId <string[]>] [-MessageRegex <regex>] [-MaxConcurrency <int>] [-MaxEvents <long>] [-MaxEventsScanned <long>] [-ReadMode <EventReadMode>] [-MessageCulture <cultureinfo>] [-SessionTimeoutMs <int>] [-BufferCapacity <int>] [-Expand] [-Oldest] [-NamedDataFilter <hashtable>] [-NamedDataExcludeFilter <hashtable>] [-DisableParallel] [-AsArray] [-FallbackMessageCulture <cultureinfo>] [-Credential <pscredential>] [-Authentication <EventLogAuthentication>] [-BookmarkXml <string>] [-BookmarkOffset <long>] [-IgnoreStaleBookmark] [-ContinueOnError] [-Force] [-IncludeBookmark] [<CommonParameters>]
+Get-EVXEvent [[-EventId] <int[]>] -ProviderName <string[]> [-EventRecordId <long[]>] [-RecordIdFile <string>] [-RecordIdKey <string>] [-MachineName <List[string]>] [-Keywords <long[]>] [-Level <int[]>] [-StartTime <DateTime>] [-EndTime <DateTime>] [-TimePeriod <TimePeriod>] [-UserId <string[]>] [-MessageRegex <regex>] [-MaxConcurrency <int>] [-MaxEvents <long>] [-MaxEventsScanned <long>] [-ReadMode <EventReadMode>] [-MessageCulture <cultureinfo>] [-SessionTimeoutMs <int>] [-BufferCapacity <int>] [-Expand] [-Oldest] [-NamedDataFilter <hashtable>] [-NamedDataExcludeFilter <hashtable>] [-DisableParallel] [-AsArray] [-FallbackMessageCulture <cultureinfo>] [-Credential <pscredential>] [-Authentication <EventLogAuthentication>] [-BookmarkXml <string>] [-BookmarkOffset <long>] [-IgnoreStaleBookmark] [-ContinueOnError] [-Force] [-IncludeBookmark] [<CommonParameters>]
 ```
 
 ### GenericEvents
 ```powershell
-Get-EVXEvent [-LogName] <string[]> [[-EventId] <int[]>] [-EventRecordId <long[]>] [-RecordIdFile <string>] [-RecordIdKey <string>] [-MachineName <List[string]>] [-ProviderName <string[]>] [-Keywords <long[]>] [-Level <int[]>] [-StartTime <datetime>] [-EndTime <datetime>] [-TimePeriod <TimePeriod>] [-UserId <string[]>] [-MessageRegex <regex>] [-MaxConcurrency <int>] [-MaxEvents <long>] [-MaxEventsScanned <long>] [-ReadMode <EventReadMode>] [-MessageCulture <cultureinfo>] [-SessionTimeoutMs <int>] [-BufferCapacity <int>] [-Expand] [-Oldest] [-NamedDataFilter <hashtable>] [-NamedDataExcludeFilter <hashtable>] [-DisableParallel] [-AsArray] [-FallbackMessageCulture <cultureinfo>] [-FilterXPath <string>] [-Credential <pscredential>] [-Authentication <EventLogAuthentication>] [-BookmarkXml <string>] [-BookmarkOffset <long>] [-IgnoreStaleBookmark] [-ContinueOnError] [-Force] [-IncludeBookmark] [<CommonParameters>]
+Get-EVXEvent [-LogName] <string[]> [[-EventId] <int[]>] [-EventRecordId <long[]>] [-RecordIdFile <string>] [-RecordIdKey <string>] [-MachineName <List[string]>] [-ProviderName <string[]>] [-Keywords <long[]>] [-Level <int[]>] [-StartTime <DateTime>] [-EndTime <DateTime>] [-TimePeriod <TimePeriod>] [-UserId <string[]>] [-MessageRegex <regex>] [-MaxConcurrency <int>] [-MaxEvents <long>] [-MaxEventsScanned <long>] [-ReadMode <EventReadMode>] [-MessageCulture <cultureinfo>] [-SessionTimeoutMs <int>] [-BufferCapacity <int>] [-Expand] [-Oldest] [-NamedDataFilter <hashtable>] [-NamedDataExcludeFilter <hashtable>] [-DisableParallel] [-AsArray] [-FallbackMessageCulture <cultureinfo>] [-FilterXPath <string>] [-Credential <pscredential>] [-Authentication <EventLogAuthentication>] [-BookmarkXml <string>] [-BookmarkOffset <long>] [-IgnoreStaleBookmark] [-ContinueOnError] [-Force] [-IncludeBookmark] [<CommonParameters>]
 ```
 
 ### NamedEvents
 ```powershell
-Get-EVXEvent -Type <NamedEvents[]> [-LogName <string[]>] [-EventId <int[]>] [-RecordIdFile <string>] [-RecordIdKey <string>] [-MachineName <List[string]>] [-StartTime <datetime>] [-EndTime <datetime>] [-TimePeriod <TimePeriod>] [-MessageRegex <regex>] [-MaxConcurrency <int>] [-MaxEvents <long>] [-MaxEventsScanned <long>] [-ResolveDns] [-DnsTimeoutMs <int>] [-DnsMaxConcurrency <int>] [-ReadMode <EventReadMode>] [-MessageCulture <cultureinfo>] [-SessionTimeoutMs <int>] [-BufferCapacity <int>] [-Expand] [-Oldest] [-DisableParallel] [-AsArray] [-FallbackMessageCulture <cultureinfo>] [-Credential <pscredential>] [-Authentication <EventLogAuthentication>] [-ContinueOnError] [-IncludeBookmark] [<CommonParameters>]
+Get-EVXEvent -Type <NamedEvents[]> [-LogName <string[]>] [-EventId <int[]>] [-RecordIdFile <string>] [-RecordIdKey <string>] [-MachineName <List[string]>] [-StartTime <DateTime>] [-EndTime <DateTime>] [-TimePeriod <TimePeriod>] [-MessageRegex <regex>] [-MaxConcurrency <int>] [-MaxEvents <long>] [-MaxEventsScanned <long>] [-ResolveDns] [-DnsTimeoutMs <int>] [-DnsMaxConcurrency <int>] [-ReadMode <EventReadMode>] [-MessageCulture <cultureinfo>] [-SessionTimeoutMs <int>] [-BufferCapacity <int>] [-Expand] [-Oldest] [-DisableParallel] [-AsArray] [-FallbackMessageCulture <cultureinfo>] [-Credential <pscredential>] [-Authentication <EventLogAuthentication>] [-ContinueOnError] [-IncludeBookmark] [<CommonParameters>]
 ```
 
 ### PathEvents
 ```powershell
-Get-EVXEvent -Path <string[]> [-EventId <int[]>] [-EventRecordId <long[]>] [-RecordIdFile <string>] [-RecordIdKey <string>] [-ProviderName <string[]>] [-Keywords <long[]>] [-Level <int[]>] [-StartTime <datetime>] [-EndTime <datetime>] [-TimePeriod <TimePeriod>] [-UserId <string[]>] [-MessageRegex <regex>] [-MaxConcurrency <int>] [-MaxEvents <long>] [-MaxEventsScanned <long>] [-ReadMode <EventReadMode>] [-MessageCulture <cultureinfo>] [-BufferCapacity <int>] [-Expand] [-Oldest] [-NamedDataFilter <hashtable>] [-NamedDataExcludeFilter <hashtable>] [-DisableParallel] [-AsArray] [-FallbackMessageCulture <cultureinfo>] [-FilterXPath <string>] [-BookmarkXml <string>] [-BookmarkOffset <long>] [-IgnoreStaleBookmark] [-ContinueOnError] [-IncludeBookmark] [<CommonParameters>]
+Get-EVXEvent -Path <string[]> [-EventId <int[]>] [-EventRecordId <long[]>] [-RecordIdFile <string>] [-RecordIdKey <string>] [-ProviderName <string[]>] [-Keywords <long[]>] [-Level <int[]>] [-StartTime <DateTime>] [-EndTime <DateTime>] [-TimePeriod <TimePeriod>] [-UserId <string[]>] [-MessageRegex <regex>] [-MaxConcurrency <int>] [-MaxEvents <long>] [-MaxEventsScanned <long>] [-ReadMode <EventReadMode>] [-MessageCulture <cultureinfo>] [-BufferCapacity <int>] [-Expand] [-Oldest] [-NamedDataFilter <hashtable>] [-NamedDataExcludeFilter <hashtable>] [-DisableParallel] [-AsArray] [-FallbackMessageCulture <cultureinfo>] [-FilterXPath <string>] [-BookmarkXml <string>] [-BookmarkOffset <long>] [-IgnoreStaleBookmark] [-ContinueOnError] [-IncludeBookmark] [<CommonParameters>]
 ```
 
 ### FilterHashtableEvents
@@ -258,7 +258,7 @@ Accept wildcard characters: False
 End time for the event query.
 
 ```yaml
-Type: Nullable`1
+Type: DateTime
 Parameter Sets: ProviderEvents, GenericEvents, NamedEvents, PathEvents
 Aliases: DateTo
 Possible values:
@@ -753,7 +753,7 @@ Accept wildcard characters: False
 Start time for the event query.
 
 ```yaml
-Type: Nullable`1
+Type: DateTime
 Parameter Sets: ProviderEvents, GenericEvents, NamedEvents, PathEvents
 Aliases: DateFrom
 Possible values:
@@ -769,10 +769,10 @@ Accept wildcard characters: False
 Relative time period for filtering events.
 
 ```yaml
-Type: Nullable`1
+Type: TimePeriod
 Parameter Sets: ProviderEvents, GenericEvents, NamedEvents, PathEvents
 Aliases: None
-Possible values:
+Possible values: PastHour, CurrentHour, PastDay, CurrentDay, PastMonth, CurrentMonth, PastQuarter, CurrentQuarter, Last3Days, Last7Days, Last14Days, Last1Hour, Last2Hours, Last3Hours, Last6Hours, Last12Hours, Last16Hours, Last24Hours, Today, Yesterday, Everything, TillLastMonday, TillLastTuesday, TillLastWednesday, TillLastThursday, TillLastFriday, TillLastSaturday, TillLastSunday
 
 Required: False
 Position: named
