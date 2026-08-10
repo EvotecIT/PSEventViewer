@@ -23,9 +23,9 @@
   </ItemGroup>
 
   <ItemGroup Condition=" '$(TargetFramework)' == 'net472' ">
-      <PackageReference Include="System.Text.Json" Version="8.0.5" />
-      <PackageReference Include="Microsoft.Bcl.AsyncInterfaces" Version="8.0.0" />
-      <PackageReference Include="System.Threading.Tasks.Extensions" Version="4.5.4" />
+      <PackageReference Include="System.Text.Json" Version="10.0.10" />
+      <PackageReference Include="Microsoft.Bcl.AsyncInterfaces" Version="10.0.10" />
+      <PackageReference Include="System.Threading.Tasks.Extensions" Version="4.6.3" />
   </ItemGroup>
 
     <!-- Make sure the output DLL's from library are included in the output -->
