@@ -1,7 +1,9 @@
 version: 2
 updates:
   - package-ecosystem: nuget
-    directory: /
+    directories:
+      - /Sources
+      - /Benchmarks/EventLogParsing/EventLogParsing.BenchmarkHost
     schedule:
       interval: daily
     cooldown:
