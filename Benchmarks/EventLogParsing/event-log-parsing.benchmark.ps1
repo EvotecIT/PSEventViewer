@@ -1,14 +1,14 @@
 $repositoryRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
-$hostDll = input BenchmarkHostPath (Join-Path $PSScriptRoot 'EventLogParsing.BenchmarkHost\bin\Release\net10.0-windows\EventLogParsing.BenchmarkHost.dll')
-$modulePath = input PSEventViewerPath (Join-Path $repositoryRoot 'Sources\PSEventViewer\bin\Release\net10.0-windows\PSEventViewer.dll')
-$baselineHostPath = input BaselineHostPath
-$baselineModulePath = input BaselineModulePath
-$evtxECmdPath = input EvtxECmdPath
-$evtxMapsPath = input EvtxMapsPath
-$largeFixturePath = input LargeFixturePath
-$expectedLargeCount = inputInt ExpectedLargeCount 0
-$expensiveSampleCount = inputInt ExpensiveSampleCount 100000
-$readmeTable = input ReadmeTable None
+$hostDll = Get-BenchmarkInput -Name BenchmarkHostPath -Default (Join-Path $PSScriptRoot 'EventLogParsing.BenchmarkHost\bin\Release\net10.0-windows\EventLogParsing.BenchmarkHost.dll')
+$modulePath = Get-BenchmarkInput -Name PSEventViewerPath -Default (Join-Path $repositoryRoot 'Sources\PSEventViewer\bin\Release\net10.0-windows\PSEventViewer.dll')
+$baselineHostPath = Get-BenchmarkInput -Name BaselineHostPath
+$baselineModulePath = Get-BenchmarkInput -Name BaselineModulePath
+$evtxECmdPath = Get-BenchmarkInput -Name EvtxECmdPath
+$evtxMapsPath = Get-BenchmarkInput -Name EvtxMapsPath
+$largeFixturePath = Get-BenchmarkInput -Name LargeFixturePath
+$expectedLargeCount = Get-BenchmarkInput -Name ExpectedLargeCount -Int -Default 0
+$expensiveSampleCount = Get-BenchmarkInput -Name ExpensiveSampleCount -Int -Default 100000
+$readmeTable = Get-BenchmarkInput -Name ReadmeTable -Default None
 $smokeFixturePath = Join-Path $repositoryRoot 'Tests\Logs\NamedFilterExamples.evtx'
 $powerShellRunner = Join-Path $PSScriptRoot 'Invoke-PowerShellEventLogBenchmark.ps1'
 $evtxRunner = Join-Path $PSScriptRoot 'Invoke-EvtxECmdBenchmark.ps1'
@@ -171,23 +171,23 @@ $caseDefinitions = @{}
 $commonIdentitySignatures = @{}
 $exactOutputHashes = @{}
 
-benchmark 'event-log-parsing' -out (Join-Path $repositoryRoot 'Ignore\Benchmarks\EventLogParsing\Runs') {
-    metadata RepositoryHead ([string] (git -C $repositoryRoot rev-parse HEAD))
+New-BenchmarkSuite 'event-log-parsing' -OutputRoot (Join-Path $repositoryRoot 'Ignore\Benchmarks\EventLogParsing\Runs') {
+    Add-BenchmarkMetadata RepositoryHead ([string] (git -C $repositoryRoot rev-parse HEAD))
     [array] $repositoryStatus = @(git -C $repositoryRoot status --porcelain=v1 --untracked-files=normal)
     $repositoryStatusText = if ($repositoryStatus.Count -gt 0) {
         [string] ($repositoryStatus -join "`n")
     } else {
         '<clean>'
     }
-    metadata RepositoryDirty ([string] ($repositoryStatus.Count -gt 0))
-    metadata RepositoryStatus $repositoryStatusText
-    metadata DotNetVersion ([string] (& $dotnetPath --version))
-    metadata PowerShellVersion $PSVersionTable.PSVersion.ToString()
-    metadata BenchmarkHostSha256 (Get-FileHash -LiteralPath $hostDll -Algorithm SHA256).Hash
-    metadata PSEventViewerSha256 (Get-FileHash -LiteralPath $modulePath -Algorithm SHA256).Hash
-    metadata BenchmarkHostEventViewerXSha256 (Get-FileHash -LiteralPath (Join-Path (Split-Path -Parent $hostDll) 'EventViewerX.dll') -Algorithm SHA256).Hash
-    metadata PSEventViewerEventViewerXSha256 (Get-FileHash -LiteralPath (Join-Path (Split-Path -Parent $modulePath) 'EventViewerX.dll') -Algorithm SHA256).Hash
-    metadata BenchmarkScriptManifest ([string] (@(
+    Add-BenchmarkMetadata RepositoryDirty ([string] ($repositoryStatus.Count -gt 0))
+    Add-BenchmarkMetadata RepositoryStatus $repositoryStatusText
+    Add-BenchmarkMetadata DotNetVersion ([string] (& $dotnetPath --version))
+    Add-BenchmarkMetadata PowerShellVersion $PSVersionTable.PSVersion.ToString()
+    Add-BenchmarkMetadata BenchmarkHostSha256 (Get-FileHash -LiteralPath $hostDll -Algorithm SHA256).Hash
+    Add-BenchmarkMetadata PSEventViewerSha256 (Get-FileHash -LiteralPath $modulePath -Algorithm SHA256).Hash
+    Add-BenchmarkMetadata BenchmarkHostEventViewerXSha256 (Get-FileHash -LiteralPath (Join-Path (Split-Path -Parent $hostDll) 'EventViewerX.dll') -Algorithm SHA256).Hash
+    Add-BenchmarkMetadata PSEventViewerEventViewerXSha256 (Get-FileHash -LiteralPath (Join-Path (Split-Path -Parent $modulePath) 'EventViewerX.dll') -Algorithm SHA256).Hash
+    Add-BenchmarkMetadata BenchmarkScriptManifest ([string] (@(
         foreach ($scriptPath in $benchmarkWrapper, $benchmarkSpec, $powerShellRunner, $evtxRunner) {
             [ordered] @{
                 Path   = $scriptPath
@@ -195,7 +195,7 @@ benchmark 'event-log-parsing' -out (Join-Path $repositoryRoot 'Ignore\Benchmarks
             }
         }
     ) | ConvertTo-Json -Compress))
-    metadata FixtureManifest ([string] (@(
+    Add-BenchmarkMetadata FixtureManifest ([string] (@(
         foreach ($fixture in $fixtures) {
             $fixtureFile = Get-Item -LiteralPath $fixture.Path
             [ordered] @{
@@ -206,25 +206,25 @@ benchmark 'event-log-parsing' -out (Join-Path $repositoryRoot 'Ignore\Benchmarks
             }
         }
     ) | ConvertTo-Json -Compress))
-    metadata ComparisonContract 'Exact output, common public work, different-schema native output, and EvtxECmd-native workflows are reported separately.'
-    metadata ReadmeTable $readmeTable
+    Add-BenchmarkMetadata ComparisonContract 'Exact output, common public work, different-schema native output, and EvtxECmd-native workflows are reported separately.'
+    Add-BenchmarkMetadata ReadmeTable $readmeTable
     if ($baselineHostPath) {
-        metadata BaselineHostSha256 (Get-FileHash -LiteralPath $baselineHostPath -Algorithm SHA256).Hash
+        Add-BenchmarkMetadata BaselineHostSha256 (Get-FileHash -LiteralPath $baselineHostPath -Algorithm SHA256).Hash
         $baselineHostEventViewerXPath = Join-Path (Split-Path -Parent $baselineHostPath) 'EventViewerX.dll'
         if (Test-Path -LiteralPath $baselineHostEventViewerXPath -PathType Leaf) {
-            metadata BaselineHostEventViewerXSha256 (Get-FileHash -LiteralPath $baselineHostEventViewerXPath -Algorithm SHA256).Hash
+            Add-BenchmarkMetadata BaselineHostEventViewerXSha256 (Get-FileHash -LiteralPath $baselineHostEventViewerXPath -Algorithm SHA256).Hash
         }
     }
     if ($baselineModulePath) {
-        metadata BaselineModuleSha256 (Get-FileHash -LiteralPath $baselineModulePath -Algorithm SHA256).Hash
+        Add-BenchmarkMetadata BaselineModuleSha256 (Get-FileHash -LiteralPath $baselineModulePath -Algorithm SHA256).Hash
         $baselineModuleEventViewerXPath = Join-Path (Split-Path -Parent $baselineModulePath) 'EventViewerX.dll'
         if (Test-Path -LiteralPath $baselineModuleEventViewerXPath -PathType Leaf) {
-            metadata BaselineModuleEventViewerXSha256 (Get-FileHash -LiteralPath $baselineModuleEventViewerXPath -Algorithm SHA256).Hash
+            Add-BenchmarkMetadata BaselineModuleEventViewerXSha256 (Get-FileHash -LiteralPath $baselineModuleEventViewerXPath -Algorithm SHA256).Hash
         }
     }
     if ($evtxECmdPath) {
-        metadata EvtxECmdVersion ([Diagnostics.FileVersionInfo]::GetVersionInfo([IO.Path]::GetFullPath($evtxECmdPath)).ProductVersion)
-        metadata EvtxECmdSha256 (Get-FileHash -LiteralPath $evtxECmdPath -Algorithm SHA256).Hash
+        Add-BenchmarkMetadata EvtxECmdVersion ([Diagnostics.FileVersionInfo]::GetVersionInfo([IO.Path]::GetFullPath($evtxECmdPath)).ProductVersion)
+        Add-BenchmarkMetadata EvtxECmdSha256 (Get-FileHash -LiteralPath $evtxECmdPath -Algorithm SHA256).Hash
     }
     if ($evtxMapsPath) {
         $mapsFullPath = [IO.Path]::GetFullPath($evtxMapsPath)
@@ -246,16 +246,16 @@ benchmark 'event-log-parsing' -out (Join-Path $repositoryRoot 'Ignore\Benchmarks
         } finally {
             $sha256.Dispose()
         }
-        metadata EvtxMapsFileCount ([string] $mapManifest.Count)
-        metadata EvtxMapsManifestSha256 $mapManifestSha256
-        metadata EvtxMapsManifest $mapManifestJson
+        Add-BenchmarkMetadata EvtxMapsFileCount ([string] $mapManifest.Count)
+        Add-BenchmarkMetadata EvtxMapsManifestSha256 $mapManifestSha256
+        Add-BenchmarkMetadata EvtxMapsManifest $mapManifestJson
     }
 
-    policy -Warmup 0 -Iterations 1 -Order Rotated -OutlierMode None
-    profile Current -Cleanup KeepOnFailure
-    caseSource $cases
+    Set-BenchmarkPolicy -Warmup 0 -Iterations 1 -Order Rotated -OutlierMode None
+    Set-BenchmarkProfile Current -Cleanup KeepOnFailure
+    Add-BenchmarkCaseSource $cases
 
-    setup {
+    Set-BenchmarkSetup {
         param($case, $run)
 
         $run.Definition = $caseDefinitions[$case.Scenario]
@@ -279,7 +279,7 @@ benchmark 'event-log-parsing' -out (Join-Path $repositoryRoot 'Ignore\Benchmarks
         Remove-Item -LiteralPath $cleanupPaths -Force -ErrorAction SilentlyContinue
     }
 
-    skip {
+    Add-BenchmarkSkipRule {
         param($case)
 
         $definition = $caseDefinitions[$case.Scenario]
@@ -316,8 +316,8 @@ benchmark 'event-log-parsing' -out (Join-Path $repositoryRoot 'Ignore\Benchmarks
         return $false
     }
 
-    engine DotNet {
-        operation Scan {
+    Add-BenchmarkEngine DotNet {
+        Add-BenchmarkOperation Scan {
             param($case, $run)
 
             $definition = $run.Definition
@@ -357,8 +357,8 @@ benchmark 'event-log-parsing' -out (Join-Path $repositoryRoot 'Ignore\Benchmarks
         }
     }
 
-    engine PropertySelector {
-        operation Scan {
+    Add-BenchmarkEngine PropertySelector {
+        Add-BenchmarkOperation Scan {
             param($case, $run)
 
             $definition = $run.Definition
@@ -374,8 +374,8 @@ benchmark 'event-log-parsing' -out (Join-Path $repositoryRoot 'Ignore\Benchmarks
         }
     }
 
-    engine EventViewerX {
-        operation Scan {
+    Add-BenchmarkEngine EventViewerX {
+        Add-BenchmarkOperation Scan {
             param($case, $run)
 
             $definition = $run.Definition
@@ -391,8 +391,8 @@ benchmark 'event-log-parsing' -out (Join-Path $repositoryRoot 'Ignore\Benchmarks
         }
     }
 
-    engine EventViewerXExport {
-        operation Scan {
+    Add-BenchmarkEngine EventViewerXExport {
+        Add-BenchmarkOperation Scan {
             param($case, $run)
 
             $definition = $run.Definition
@@ -411,8 +411,8 @@ benchmark 'event-log-parsing' -out (Join-Path $repositoryRoot 'Ignore\Benchmarks
         }
     }
 
-    engine EventViewerXBaseline {
-        operation Scan {
+    Add-BenchmarkEngine EventViewerXBaseline {
+        Add-BenchmarkOperation Scan {
             param($case, $run)
 
             $definition = $run.Definition
@@ -428,8 +428,8 @@ benchmark 'event-log-parsing' -out (Join-Path $repositoryRoot 'Ignore\Benchmarks
         }
     }
 
-    engine PSEventViewer {
-        operation Scan {
+    Add-BenchmarkEngine PSEventViewer {
+        Add-BenchmarkOperation Scan {
             param($case, $run)
 
             $definition = $run.Definition
@@ -475,8 +475,8 @@ benchmark 'event-log-parsing' -out (Join-Path $repositoryRoot 'Ignore\Benchmarks
         }
     }
 
-    engine PSEventViewerBaseline {
-        operation Scan {
+    Add-BenchmarkEngine PSEventViewerBaseline {
+        Add-BenchmarkOperation Scan {
             param($case, $run)
 
             $definition = $run.Definition
@@ -522,8 +522,8 @@ benchmark 'event-log-parsing' -out (Join-Path $repositoryRoot 'Ignore\Benchmarks
         }
     }
 
-    engine GetWinEvent {
-        operation Scan {
+    Add-BenchmarkEngine GetWinEvent {
+        Add-BenchmarkOperation Scan {
             param($case, $run)
 
             $definition = $run.Definition
@@ -567,8 +567,8 @@ benchmark 'event-log-parsing' -out (Join-Path $repositoryRoot 'Ignore\Benchmarks
         }
     }
 
-    engine EvtxECmd {
-        operation Scan {
+    Add-BenchmarkEngine EvtxECmd {
+        Add-BenchmarkOperation Scan {
             param($case, $run)
 
             $definition = $run.Definition
@@ -611,19 +611,19 @@ benchmark 'event-log-parsing' -out (Join-Path $repositoryRoot 'Ignore\Benchmarks
         }
     }
 
-    validate {
+    Add-BenchmarkValidation {
         param($case, $run)
 
         $definition = $run.Definition
-        assertPath $run.ResultPath
+        Assert-BenchmarkPath $run.ResultPath
         $run.Result = Get-Content -LiteralPath $run.ResultPath -Raw | ConvertFrom-Json
         if ($definition.ExpectedCount -gt 0) {
-            assertValue -Actual ([long] $run.Result.Count) -Expected ([long] $definition.ExpectedCount) -Message 'Every engine must process the expected event count.'
+            Assert-BenchmarkValue -Actual ([long] $run.Result.Count) -Expected ([long] $definition.ExpectedCount) -Message 'Every engine must process the expected event count.'
         } elseif ([long] $run.Result.Count -le 0) {
             throw 'The benchmark engine did not process any events.'
         }
         if ($run.Result.PSObject.Properties.Name -contains 'Errors') {
-            assertValue -Actual ([long] $run.Result.Errors) -Expected ([long] 0) -Message 'The parser must not report EVTX errors.'
+            Assert-BenchmarkValue -Actual ([long] $run.Result.Errors) -Expected ([long] 0) -Message 'The parser must not report EVTX errors.'
         }
 
         $requiresOutput = $definition.Workload -eq 'MetadataCsv' -or
@@ -631,7 +631,7 @@ benchmark 'event-log-parsing' -out (Join-Path $repositoryRoot 'Ignore\Benchmarks
             ($definition.Workload -like 'Evtx*' -and $definition.Workload -ne 'EvtxNativeParse') -or
             $definition.Workload -like 'NativeOutput*'
         if ($requiresOutput) {
-            assertPath $run.EventOutputPath
+            Assert-BenchmarkPath $run.EventOutputPath
             $outputFile = Get-Item -LiteralPath $run.EventOutputPath
             if ($outputFile.Length -le 0) {
                 throw "The $($definition.Workload) benchmark did not produce a non-empty output file."
@@ -664,7 +664,7 @@ benchmark 'event-log-parsing' -out (Join-Path $repositoryRoot 'Ignore\Benchmarks
                 [long] $run.Result.FirstRecordId,
                 [long] $run.Result.LastRecordId
             if ($commonIdentitySignatures.ContainsKey($identityKey)) {
-                assertValue -Actual $identitySignature -Expected $commonIdentitySignatures[$identityKey] -Message 'Common-work engines must process the same ordered event identity set.'
+                Assert-BenchmarkValue -Actual $identitySignature -Expected $commonIdentitySignatures[$identityKey] -Message 'Common-work engines must process the same ordered event identity set.'
             } else {
                 $commonIdentitySignatures[$identityKey] = $identitySignature
             }
@@ -673,24 +673,24 @@ benchmark 'event-log-parsing' -out (Join-Path $repositoryRoot 'Ignore\Benchmarks
                 $outputKey = '{0}|{1}' -f $definition.Fixture, $definition.ExpectedCount
                 $outputHash = [string] $run.Result.OutputSha256
                 if ($exactOutputHashes.ContainsKey($outputKey)) {
-                    assertValue -Actual $outputHash -Expected $exactOutputHashes[$outputKey] -Message 'Exact-output engines must produce a byte-identical metadata CSV.'
+                    Assert-BenchmarkValue -Actual $outputHash -Expected $exactOutputHashes[$outputKey] -Message 'Exact-output engines must produce a byte-identical metadata CSV.'
                 } else {
                     $exactOutputHashes[$outputKey] = $outputHash
                 }
             }
 
             if ($readMode -eq 'Metadata') {
-                assertValue -Actual ([long] $run.Result.MessageCharacters) -Expected ([long] 0) -Message 'Metadata mode must not format messages.'
-                assertValue -Actual ([long] $run.Result.XmlCharacters) -Expected ([long] 0) -Message 'Metadata mode must not materialize XML.'
-                assertValue -Actual ([long] $run.Result.PropertyCount) -Expected ([long] 0) -Message 'Metadata mode must not materialize event properties.'
+                Assert-BenchmarkValue -Actual ([long] $run.Result.MessageCharacters) -Expected ([long] 0) -Message 'Metadata mode must not format messages.'
+                Assert-BenchmarkValue -Actual ([long] $run.Result.XmlCharacters) -Expected ([long] 0) -Message 'Metadata mode must not materialize XML.'
+                Assert-BenchmarkValue -Actual ([long] $run.Result.PropertyCount) -Expected ([long] 0) -Message 'Metadata mode must not materialize event properties.'
             } elseif ($readMode -eq 'Message') {
                 if ([long] $run.Result.MessageCharacters -le 0) {
                     throw 'Message mode did not format any provider messages.'
                 }
-                assertValue -Actual ([long] $run.Result.XmlCharacters) -Expected ([long] 0) -Message 'Message mode must not materialize XML.'
-                assertValue -Actual ([long] $run.Result.PropertyCount) -Expected ([long] 0) -Message 'Message mode must not materialize event properties.'
+                Assert-BenchmarkValue -Actual ([long] $run.Result.XmlCharacters) -Expected ([long] 0) -Message 'Message mode must not materialize XML.'
+                Assert-BenchmarkValue -Actual ([long] $run.Result.PropertyCount) -Expected ([long] 0) -Message 'Message mode must not materialize event properties.'
             } elseif ($readMode -eq 'StructuredData') {
-                assertValue -Actual ([long] $run.Result.MessageCharacters) -Expected ([long] 0) -Message 'StructuredData mode must not format messages.'
+                Assert-BenchmarkValue -Actual ([long] $run.Result.MessageCharacters) -Expected ([long] 0) -Message 'StructuredData mode must not format messages.'
                 if ([long] $run.Result.XmlCharacters -le 0 -or [long] $run.Result.PropertyCount -le 0) {
                     throw 'StructuredData mode did not materialize XML and event properties.'
                 }
@@ -706,7 +706,7 @@ benchmark 'event-log-parsing' -out (Join-Path $repositoryRoot 'Ignore\Benchmarks
             $outputKey = '{0}|{1}|RawXml' -f $definition.Fixture, $definition.ExpectedCount
             $outputHash = [string] $run.Result.OutputSha256
             if ($exactOutputHashes.ContainsKey($outputKey)) {
-                assertValue -Actual $outputHash -Expected $exactOutputHashes[$outputKey] -Message 'Exact-output engines must produce byte-identical raw XML.'
+                Assert-BenchmarkValue -Actual $outputHash -Expected $exactOutputHashes[$outputKey] -Message 'Exact-output engines must produce byte-identical raw XML.'
             } else {
                 $exactOutputHashes[$outputKey] = $outputHash
             }
@@ -719,12 +719,12 @@ benchmark 'event-log-parsing' -out (Join-Path $repositoryRoot 'Ignore\Benchmarks
         }
     }
 
-    metric Events {
+    Add-BenchmarkMetric Events {
         param($case, $run)
         [long] $run.Result.Count
     }
 
-    metric EventsPerSecond {
+    Add-BenchmarkMetric EventsPerSecond {
         param($case, $run)
         if ([double] $run.Result.ElapsedMilliseconds -le 0) {
             0
@@ -733,12 +733,12 @@ benchmark 'event-log-parsing' -out (Join-Path $repositoryRoot 'Ignore\Benchmarks
         }
     }
 
-    metric InternalMs {
+    Add-BenchmarkMetric InternalMs {
         param($case, $run)
         [double] $run.Result.ElapsedMilliseconds
     }
 
-    metric IdSum {
+    Add-BenchmarkMetric IdSum {
         param($case, $run)
         if ($run.Result.PSObject.Properties.Name -contains 'IdSum') {
             [long] $run.Result.IdSum
@@ -747,7 +747,7 @@ benchmark 'event-log-parsing' -out (Join-Path $repositoryRoot 'Ignore\Benchmarks
         }
     }
 
-    metric RecordIdSum {
+    Add-BenchmarkMetric RecordIdSum {
         param($case, $run)
         if ($run.Result.PSObject.Properties.Name -contains 'RecordIdSum') {
             [long] $run.Result.RecordIdSum
@@ -756,7 +756,7 @@ benchmark 'event-log-parsing' -out (Join-Path $repositoryRoot 'Ignore\Benchmarks
         }
     }
 
-    metric OrderSignature {
+    Add-BenchmarkMetric OrderSignature {
         param($case, $run)
         if ($run.Result.PSObject.Properties.Name -contains 'OrderSignature') {
             [long] $run.Result.OrderSignature
@@ -765,7 +765,7 @@ benchmark 'event-log-parsing' -out (Join-Path $repositoryRoot 'Ignore\Benchmarks
         }
     }
 
-    metric FirstRecordId {
+    Add-BenchmarkMetric FirstRecordId {
         param($case, $run)
         if ($null -ne $run.Result.FirstRecordId) {
             [long] $run.Result.FirstRecordId
@@ -774,7 +774,7 @@ benchmark 'event-log-parsing' -out (Join-Path $repositoryRoot 'Ignore\Benchmarks
         }
     }
 
-    metric LastRecordId {
+    Add-BenchmarkMetric LastRecordId {
         param($case, $run)
         if ($null -ne $run.Result.LastRecordId) {
             [long] $run.Result.LastRecordId
@@ -783,17 +783,17 @@ benchmark 'event-log-parsing' -out (Join-Path $repositoryRoot 'Ignore\Benchmarks
         }
     }
 
-    metric EngineAllocatedBytes {
+    Add-BenchmarkMetric EngineAllocatedBytes {
         param($case, $run)
         [long] $run.Result.AllocatedBytes
     }
 
-    metric EnginePeakWorkingSetBytes {
+    Add-BenchmarkMetric EnginePeakWorkingSetBytes {
         param($case, $run)
         [long] $run.Result.PeakWorkingSetBytes
     }
 
-    metric MessageCharacters {
+    Add-BenchmarkMetric MessageCharacters {
         param($case, $run)
         if ($run.Result.PSObject.Properties.Name -contains 'MessageCharacters') {
             [long] $run.Result.MessageCharacters
@@ -802,7 +802,7 @@ benchmark 'event-log-parsing' -out (Join-Path $repositoryRoot 'Ignore\Benchmarks
         }
     }
 
-    metric XmlCharacters {
+    Add-BenchmarkMetric XmlCharacters {
         param($case, $run)
         if ($run.Result.PSObject.Properties.Name -contains 'XmlCharacters') {
             [long] $run.Result.XmlCharacters
@@ -811,7 +811,7 @@ benchmark 'event-log-parsing' -out (Join-Path $repositoryRoot 'Ignore\Benchmarks
         }
     }
 
-    metric PropertyCount {
+    Add-BenchmarkMetric PropertyCount {
         param($case, $run)
         if ($run.Result.PSObject.Properties.Name -contains 'PropertyCount') {
             [long] $run.Result.PropertyCount
@@ -820,7 +820,7 @@ benchmark 'event-log-parsing' -out (Join-Path $repositoryRoot 'Ignore\Benchmarks
         }
     }
 
-    metric StructuredFieldCount {
+    Add-BenchmarkMetric StructuredFieldCount {
         param($case, $run)
         if ($run.Result.PSObject.Properties.Name -contains 'StructuredFieldCount') {
             [long] $run.Result.StructuredFieldCount
@@ -829,7 +829,7 @@ benchmark 'event-log-parsing' -out (Join-Path $repositoryRoot 'Ignore\Benchmarks
         }
     }
 
-    metric MessageFieldCount {
+    Add-BenchmarkMetric MessageFieldCount {
         param($case, $run)
         if ($run.Result.PSObject.Properties.Name -contains 'MessageFieldCount') {
             [long] $run.Result.MessageFieldCount
@@ -838,7 +838,7 @@ benchmark 'event-log-parsing' -out (Join-Path $repositoryRoot 'Ignore\Benchmarks
         }
     }
 
-    metric AttachmentBytes {
+    Add-BenchmarkMetric AttachmentBytes {
         param($case, $run)
         if ($run.Result.PSObject.Properties.Name -contains 'AttachmentBytes') {
             [long] $run.Result.AttachmentBytes
@@ -847,7 +847,7 @@ benchmark 'event-log-parsing' -out (Join-Path $repositoryRoot 'Ignore\Benchmarks
         }
     }
 
-    metric OutputBytes {
+    Add-BenchmarkMetric OutputBytes {
         param($case, $run)
         if ($run.Result.PSObject.Properties.Name -contains 'OutputBytes') {
             [long] $run.Result.OutputBytes
@@ -857,16 +857,16 @@ benchmark 'event-log-parsing' -out (Join-Path $repositoryRoot 'Ignore\Benchmarks
     }
 
     if ($readmeTable -eq 'Common' -or $readmeTable -eq 'ExactOutput') {
-        comparison Engine -Baseline PSEventViewer -Metric MedianMs -TieTolerance 0.03
+        Add-BenchmarkComparison Engine -Baseline PSEventViewer -Metric MedianMs -TieTolerance 0.03
         if ($readmeTable -eq 'ExactOutput') {
-            comparison Engine -Baseline PSEventViewer -Metric OutputBytes
+            Add-BenchmarkComparison Engine -Baseline PSEventViewer -Metric OutputBytes
         }
     } elseif ($readmeTable -eq 'NativeOutput') {
-        comparison Engine -Baseline EventViewerXExport -Metric MedianMs -TieTolerance 0.03
-        comparison Engine -Baseline EventViewerXExport -Metric OutputBytes
+        Add-BenchmarkComparison Engine -Baseline EventViewerXExport -Metric MedianMs -TieTolerance 0.03
+        Add-BenchmarkComparison Engine -Baseline EventViewerXExport -Metric OutputBytes
     } elseif ($readmeTable -eq 'EvtxNative') {
-        comparison Engine -Baseline EvtxECmd -Metric MedianMs -TieTolerance 0.03
-        comparison Engine -Baseline EvtxECmd -Metric OutputBytes
+        Add-BenchmarkComparison Engine -Baseline EvtxECmd -Metric MedianMs -TieTolerance 0.03
+        Add-BenchmarkComparison Engine -Baseline EvtxECmd -Metric OutputBytes
     }
-    artifacts Json, Csv, Markdown
+    Set-BenchmarkArtifacts Json, Csv, Markdown
 }
