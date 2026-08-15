@@ -34,11 +34,11 @@ public static class DataTableHelper {
     }
 
     /// <summary>
-    /// Converts a collection of <see cref="EventObjectSlim"/> instances to a <see cref="DataTable"/>.
+    /// Converts a collection of <see cref="NamedEventRecord"/> instances to a <see cref="DataTable"/>.
     /// </summary>
     /// <param name="events">Events to convert.</param>
     /// <returns>DataTable containing event data.</returns>
-    public static DataTable ToDataTable(this IEnumerable<EventObjectSlim> events) {
+    public static DataTable ToDataTable(this IEnumerable<NamedEventRecord> events) {
         return ToDataTableInternal(events);
     }
 

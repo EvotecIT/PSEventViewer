@@ -30,7 +30,7 @@ namespace PSEventViewer;
 [Cmdlet(
     VerbsData.Export,
     "EVXEvent",
-    DefaultParameterSetName = "File",
+    DefaultParameterSetName = "Path",
     SupportsShouldProcess = true)]
 public sealed class CmdletExportEVXEvent : PSCmdlet {
     private readonly CancellationTokenSource _cancellation = new();
@@ -40,7 +40,7 @@ public sealed class CmdletExportEVXEvent : PSCmdlet {
     /// <summary>
     /// Path to an offline log accepted by the Windows Event Log API. EVTX is the validated format.
     /// </summary>
-    [Parameter(Mandatory = true, Position = 0, ParameterSetName = "File")]
+    [Parameter(Mandatory = true, Position = 0, ParameterSetName = "Path")]
     [Alias("LiteralPath")]
     public string[] Path { get; set; } = Array.Empty<string>();
 
@@ -50,32 +50,39 @@ public sealed class CmdletExportEVXEvent : PSCmdlet {
     [Parameter(Mandatory = true, Position = 0, ParameterSetName = "Channel")]
     public string[] LogName { get; set; } = Array.Empty<string>();
 
+    /// <summary>Registered provider names or wildcard patterns.</summary>
+    [Parameter(Mandatory = true, Position = 0, ParameterSetName = "Provider")]
+    public string[] ProviderName { get; set; } = Array.Empty<string>();
+
     /// <summary>
     /// Complete QueryList XML for a direct multi-channel or multi-file export.
     /// </summary>
     [Parameter(
         Mandatory = true,
         Position = 0,
-        ParameterSetName = "Structured")]
+        ParameterSetName = "Xml")]
     public string FilterXml { get; set; } = null!;
 
     /// <summary>
     /// Remote computer name. Omit to export the local channel.
     /// </summary>
     [Parameter(ParameterSetName = "Channel")]
-    [Parameter(ParameterSetName = "Structured")]
+    [Parameter(ParameterSetName = "Xml")]
+    [Parameter(ParameterSetName = "Provider")]
     [Alias("ComputerName", "ServerName")]
     public string? MachineName { get; set; }
 
     /// <summary>Credentials for a remote channel export.</summary>
     [Credential]
     [Parameter(ParameterSetName = "Channel")]
-    [Parameter(ParameterSetName = "Structured")]
+    [Parameter(ParameterSetName = "Xml")]
+    [Parameter(ParameterSetName = "Provider")]
     public PSCredential? Credential { get; set; }
 
     /// <summary>Authentication package for a remote channel export.</summary>
     [Parameter(ParameterSetName = "Channel")]
-    [Parameter(ParameterSetName = "Structured")]
+    [Parameter(ParameterSetName = "Xml")]
+    [Parameter(ParameterSetName = "Provider")]
     public EventLogAuthentication Authentication { get; set; }
 
     /// <summary>
@@ -100,9 +107,49 @@ public sealed class CmdletExportEVXEvent : PSCmdlet {
     /// <summary>
     /// Native Windows event XPath expression. The default selects every record.
     /// </summary>
-    [Parameter(ParameterSetName = "File")]
+    [Parameter(ParameterSetName = "Path")]
     [Parameter(ParameterSetName = "Channel")]
-    public string XPath { get; set; } = "*";
+    [Alias("XPath")]
+    public string? FilterXPath { get; set; }
+
+    /// <summary>Reusable typed filter produced by New-EVXFilter or EventViewerX.</summary>
+    [Parameter(ParameterSetName = "Path")]
+    [Parameter(ParameterSetName = "Channel")]
+    [Parameter(ParameterSetName = "Provider")]
+    public EventFilter? Filter { get; set; }
+
+    /// <summary>Event identifiers selected natively.</summary>
+    [Alias("Id")]
+    [Parameter(ParameterSetName = "Path")]
+    [Parameter(ParameterSetName = "Channel")]
+    [Parameter(ParameterSetName = "Provider")]
+    public int[]? EventId { get; set; }
+
+    /// <summary>Event levels selected natively.</summary>
+    [Parameter(ParameterSetName = "Path")]
+    [Parameter(ParameterSetName = "Channel")]
+    [Parameter(ParameterSetName = "Provider")]
+    public EventViewerX.Level[]? Level { get; set; }
+
+    /// <summary>Absolute beginning of the event time range.</summary>
+    [Alias("DateFrom")]
+    [Parameter(ParameterSetName = "Path")]
+    [Parameter(ParameterSetName = "Channel")]
+    [Parameter(ParameterSetName = "Provider")]
+    public DateTime? StartTime { get; set; }
+
+    /// <summary>Absolute end of the event time range.</summary>
+    [Alias("DateTo")]
+    [Parameter(ParameterSetName = "Path")]
+    [Parameter(ParameterSetName = "Channel")]
+    [Parameter(ParameterSetName = "Provider")]
+    public DateTime? EndTime { get; set; }
+
+    /// <summary>Named relative time range, such as LastHour or CurrentDay.</summary>
+    [Parameter(ParameterSetName = "Path")]
+    [Parameter(ParameterSetName = "Channel")]
+    [Parameter(ParameterSetName = "Provider")]
+    public TimePeriod? TimePeriod { get; set; }
 
     /// <summary>
     /// Returns records from oldest to newest.
@@ -121,7 +168,8 @@ public sealed class CmdletExportEVXEvent : PSCmdlet {
     /// Maximum time for remote RPC probing, worker admission, and session establishment.
     /// </summary>
     [Parameter(ParameterSetName = "Channel")]
-    [Parameter(ParameterSetName = "Structured")]
+    [Parameter(ParameterSetName = "Xml")]
+    [Parameter(ParameterSetName = "Provider")]
     [ValidateRange(1, int.MaxValue)]
     public int RemoteConnectionTimeoutMilliseconds { get; set; } = 5000;
 
@@ -129,7 +177,8 @@ public sealed class CmdletExportEVXEvent : PSCmdlet {
     /// Maximum time without remote read progress. Zero keeps the read unbounded.
     /// </summary>
     [Parameter(ParameterSetName = "Channel")]
-    [Parameter(ParameterSetName = "Structured")]
+    [Parameter(ParameterSetName = "Xml")]
+    [Parameter(ParameterSetName = "Provider")]
     [ValidateRange(0, int.MaxValue)]
     public int RemoteReadTimeoutMilliseconds { get; set; }
 
@@ -137,7 +186,8 @@ public sealed class CmdletExportEVXEvent : PSCmdlet {
     /// Maximum number of detached remote events buffered between the native reader and exporter.
     /// </summary>
     [Parameter(ParameterSetName = "Channel")]
-    [Parameter(ParameterSetName = "Structured")]
+    [Parameter(ParameterSetName = "Xml")]
+    [Parameter(ParameterSetName = "Provider")]
     [ValidateRange(1, 4096)]
     public int BufferCapacity { get; set; } = 64;
 
@@ -178,7 +228,7 @@ public sealed class CmdletExportEVXEvent : PSCmdlet {
     /// <summary>
     /// Allows a structured QueryList export to continue when one path cannot be evaluated.
     /// </summary>
-    [Parameter(ParameterSetName = "Structured")]
+    [Parameter(ParameterSetName = "Xml")]
     public SwitchParameter TolerateQueryErrors { get; set; }
 
     /// <inheritdoc />
@@ -188,170 +238,117 @@ public sealed class CmdletExportEVXEvent : PSCmdlet {
             throw new PSArgumentException(
                 "ArchiveResources is only valid with Format Evtx.");
         }
-        if (ParameterSetName == "File" &&
-            Credential != null) {
-            throw new PSArgumentException(
-                "Credential can only be used with a remote channel export.");
-        }
-        if ((ParameterSetName == "Channel" ||
-             ParameterSetName == "Structured") &&
-            EventLogTarget.IsLocalMachine(MachineName) &&
-            Credential != null) {
-            throw new PSArgumentException(
-                "Credential can only be used with a remote MachineName.");
-        }
         string source = ParameterSetName switch {
             "Channel" => string.IsNullOrWhiteSpace(MachineName)
                 ? string.Join(", ", LogName)
                 : $"{MachineName}\\{string.Join(", ", LogName)}",
-            "Structured" => "structured QueryList",
+            "Provider" => string.Join(", ", ProviderName),
+            "Xml" => "QueryList XML",
             _ => string.Join(", ", Path)
         };
         if (!ShouldProcess(OutputPath, $"Export events from '{source}'")) {
             return;
         }
 
-        EventExportResult result;
-        if (ParameterSetName == "Channel") {
-            string[] channels = ResolveChannels();
-            if (channels.Length == 1) {
-                result = EventLogExporter.ExportChannel(
-                    CreateChannelQuery(channels[0]),
-                    OutputPath,
-                    Format,
-                    Force.IsPresent,
-                    _cancellation.Token,
-                    computeSha256: !SkipHash.IsPresent,
-                    archiveResources: ArchiveResources.IsPresent);
-            } else if (Format == EventExportFormat.Evtx) {
-                EventLogStructuredQuery query =
-                    CreateStructuredQuery(
-                        EventLogStructuredQuery
-                            .ForChannels(channels, XPath));
-                result = EventLogExporter.ExportStructured(
-                    query,
-                    OutputPath,
-                    Format,
-                    Force.IsPresent,
-                    _cancellation.Token,
-                    computeSha256: !SkipHash.IsPresent,
-                    archiveResources:
-                        ArchiveResources.IsPresent);
-            } else {
-                EventLogBatchQuery batch =
-                    EventLogBatchQuery.ForChannels(
-                        channels.Select(CreateChannelQuery));
-                batch.MaxEvents = MaxEvents;
-                result = EventLogExporter.ExportBatch(
-                    batch,
-                    OutputPath,
-                    Format,
-                    Force.IsPresent,
-                    _cancellation.Token,
-                    computeSha256: !SkipHash.IsPresent);
-            }
-        } else if (ParameterSetName == "Structured") {
-            EventLogStructuredQuery query =
-                CreateStructuredQuery(
-                    new EventLogStructuredQuery(FilterXml));
-            result = EventLogExporter.ExportStructured(
-                query,
+        EventLogBatchQuery batch = EventQueryPlanner.CreateBatch(
+            CreateQueryDefinition(),
+            _cancellation.Token);
+        EventExportResult result = Format == EventExportFormat.Evtx
+            ? ExportNativeBatch(batch)
+            : EventLogExporter.ExportBatch(
+                batch,
                 OutputPath,
                 Format,
                 Force.IsPresent,
                 _cancellation.Token,
-                computeSha256: !SkipHash.IsPresent,
-                archiveResources:
-                    ArchiveResources.IsPresent);
-        } else {
-            string[] paths = ResolvePaths();
-            if (paths.Length == 1) {
-                result = EventLogExporter.ExportFile(
-                    CreateFileQuery(paths[0]),
-                    OutputPath,
-                    Format,
-                    Force.IsPresent,
-                    _cancellation.Token,
-                    computeSha256: !SkipHash.IsPresent,
-                    archiveResources: ArchiveResources.IsPresent);
-            } else {
-                if (Format == EventExportFormat.Evtx) {
-                    throw new PSNotSupportedException(
-                        "Windows cannot merge several offline event-log files into one native EVTX. Export each source separately or choose Csv, JsonLines, or Xml.");
-                }
-                EventLogBatchQuery batch =
-                    EventLogBatchQuery.ForFiles(
-                        paths.Select(CreateFileQuery));
-                batch.MaxEvents = MaxEvents;
-                result = EventLogExporter.ExportBatch(
-                    batch,
-                    OutputPath,
-                    Format,
-                    Force.IsPresent,
-                    _cancellation.Token,
-                    computeSha256: !SkipHash.IsPresent);
-            }
-        }
+                computeSha256: !SkipHash.IsPresent);
         WriteStructuredFailures();
         WriteObject(result);
     }
 
-    private EventLogChannelQuery CreateChannelQuery(string logName) {
-        return new EventLogChannelQuery(logName) {
-            MachineName = MachineName,
-            Credential = Credential?.GetNetworkCredential(),
-            Authentication = Authentication,
-            XPath = XPath,
-            Oldest = Oldest.IsPresent,
-            ReadMode = ReadMode,
-            MaxEvents = MaxEvents,
-            MessageCulture = MessageCulture,
-            FallbackMessageCulture = FallbackMessageCulture,
-            RemoteConnectionTimeoutMilliseconds =
-                RemoteConnectionTimeoutMilliseconds,
-            RemoteReadTimeoutMilliseconds =
-                RemoteReadTimeoutMilliseconds,
-            BufferCapacity = BufferCapacity
+    private EventQueryDefinition CreateQueryDefinition() {
+        if (Filter != null &&
+            new[] { nameof(EventId), nameof(Level), nameof(StartTime), nameof(EndTime), nameof(TimePeriod) }
+                .Any(MyInvocation.BoundParameters.ContainsKey)) {
+            throw new PSArgumentException(
+                "Filter cannot be combined with EventId, Level, StartTime, EndTime, or TimePeriod.");
+        }
+        if (ParameterSetName == "Provider" &&
+            (Filter?.ProviderNames?.Count ?? 0) > 0) {
+            throw new PSArgumentException(
+                "ProviderName already defines the provider source in the Provider parameter set; Filter.ProviderNames must be empty.");
+        }
+        (DateTime? start, DateTime? end) =
+            EventTimeRange.Resolve(StartTime, EndTime, TimePeriod);
+        var definition = new EventQueryDefinition {
+            LogNames = ParameterSetName == "Channel" ? LogName : null,
+            ProviderNames = ParameterSetName == "Provider" ? ProviderName : null,
+            Paths = ParameterSetName == "Path" ? ResolvePaths() : null,
+            QueryXml = ParameterSetName == "Xml" ? FilterXml : null,
+            MachineNames = ParameterSetName == "Path"
+                ? null
+                : new[] { MachineName },
+            Filter = ParameterSetName == "Xml"
+                ? null
+                : Filter ?? new EventFilter {
+                    EventIds = EventId,
+                    Levels = Level?.Select(static value => (byte)value).ToArray(),
+                    StartTime = start,
+                    EndTime = end
+                },
+            FilterXPath = FilterXPath,
+            TolerateQueryErrors = TolerateQueryErrors.IsPresent,
+            Options = new EventLogQueryOptions {
+                Oldest = Oldest.IsPresent,
+                ReadMode = ReadMode,
+                MaxEvents = MaxEvents,
+                Credential = Credential?.GetNetworkCredential(),
+                Authentication = Authentication,
+                MessageCulture = MessageCulture,
+                FallbackMessageCulture = FallbackMessageCulture,
+                RemoteConnectionTimeoutMilliseconds =
+                    RemoteConnectionTimeoutMilliseconds,
+                RemoteReadTimeoutMilliseconds =
+                    RemoteReadTimeoutMilliseconds,
+                BufferCapacity = BufferCapacity,
+                ContinueOnError = TolerateQueryErrors.IsPresent,
+                FailureHandler = QueueQueryFailure
+            }
         };
+        return definition;
     }
 
-    private EventLogFileQuery CreateFileQuery(string path) {
-        return new EventLogFileQuery(path) {
-            XPath = XPath,
-            Oldest = Oldest.IsPresent,
-            ReadMode = ReadMode,
-            MaxEvents = MaxEvents,
-            MessageCulture = MessageCulture,
-            FallbackMessageCulture = FallbackMessageCulture
-        };
+    private EventExportResult ExportNativeBatch(
+        EventLogBatchQuery batch) {
+
+        if (batch.ChannelQueries.Count != 0 ||
+            batch.FileQueries.Count != 0 ||
+            batch.StructuredQueries.Count != 1) {
+            throw new PSNotSupportedException(
+                "Windows can write one native EVTX only from one native query session. " +
+                "Narrow the source to one machine/query, export each source separately, " +
+                "or choose Csv, JsonLines, or Xml.");
+        }
+        EventLogStructuredQuery query = batch.StructuredQueries[0];
+        query.FailureHandler = QueueQueryFailure;
+        return EventLogExporter.ExportStructured(
+            query,
+            OutputPath,
+            Format,
+            Force.IsPresent,
+            _cancellation.Token,
+            computeSha256: !SkipHash.IsPresent,
+            archiveResources: ArchiveResources.IsPresent);
     }
 
-    private EventLogStructuredQuery CreateStructuredQuery(
-        EventLogStructuredQuery query) {
-
-        query.MachineName = MachineName;
-        query.Credential = Credential?.GetNetworkCredential();
-        query.Authentication = Authentication;
-        query.Oldest = Oldest.IsPresent;
-        query.ReadMode = ReadMode;
-        query.MaxEvents = MaxEvents;
-        query.MessageCulture = MessageCulture;
-        query.FallbackMessageCulture =
-            FallbackMessageCulture;
-        query.RemoteConnectionTimeoutMilliseconds =
-            RemoteConnectionTimeoutMilliseconds;
-        query.RemoteReadTimeoutMilliseconds =
-            RemoteReadTimeoutMilliseconds;
-        query.BufferCapacity = BufferCapacity;
-        query.TolerateQueryErrors =
-            TolerateQueryErrors.IsPresent;
-        query.FailureHandler = failure =>
-            _structuredFailures.Enqueue(new ErrorRecord(
-                failure.Exception,
-                "EVXStructuredExportPathFailed",
-                ErrorCategory.ReadError,
-                failure.Source));
-        return query;
+    private void QueueQueryFailure(EventLogQueryFailure failure) {
+        _structuredFailures.Enqueue(new ErrorRecord(
+            failure.Exception,
+            "EVXExportQuerySourceFailed",
+            ErrorCategory.ReadError,
+            string.IsNullOrWhiteSpace(failure.MachineName)
+                ? failure.Source
+                : $"{failure.Source} on {failure.MachineName}"));
     }
 
     private void WriteStructuredFailures() {
@@ -359,28 +356,6 @@ public sealed class CmdletExportEVXEvent : PSCmdlet {
                    out ErrorRecord? failure)) {
             WriteError(failure);
         }
-    }
-
-    private string[] ResolveChannels() {
-        var query = new EventLogCatalogQuery {
-            MachineName = MachineName,
-            Credential = Credential?.GetNetworkCredential(),
-            Authentication = Authentication,
-            ConnectionTimeoutMilliseconds =
-                RemoteConnectionTimeoutMilliseconds,
-            Culture = MessageCulture
-        };
-        string[] channels = EventLogCatalog
-            .GetChannelNames(
-                query,
-                LogName,
-                cancellationToken: _cancellation.Token)
-            .ToArray();
-        if (channels.Length == 0) {
-            throw new ItemNotFoundException(
-                $"No event channels match '{string.Join(", ", LogName)}' on '{MachineName ?? Environment.MachineName}'.");
-        }
-        return channels;
     }
 
     private string[] ResolvePaths() {

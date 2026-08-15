@@ -1,0 +1,103 @@
+Describe 'PSEventViewer v4 command surface' {
+    BeforeAll {
+        $ExpectedCommands = @(
+            'Clear-EVXLog'
+            'Export-EVXEvent'
+            'Get-EVXCollectorSubscription'
+            'Get-EVXEvent'
+            'Get-EVXLog'
+            'Get-EVXPowerShellScript'
+            'Get-EVXProvider'
+            'Get-EVXWatcher'
+            'Install-EVXProviderPackage'
+            'New-EVXCollectorSubscription'
+            'New-EVXFilter'
+            'New-EVXLog'
+            'New-EVXProviderPackage'
+            'New-EVXSource'
+            'Remove-EVXLog'
+            'Remove-EVXSource'
+            'Reset-EVXEventCheckpoint'
+            'Set-EVXCollectorSubscription'
+            'Set-EVXLog'
+            'Start-EVXWatcher'
+            'Stop-EVXWatcher'
+            'Test-EVXLog'
+            'Test-EVXProviderDefinition'
+            'Uninstall-EVXProviderPackage'
+            'Update-EVXLogArchive'
+            'Write-EVXEvent'
+        )
+    }
+
+    It 'exports only the canonical cmdlets' {
+        $Actual = Get-Command -Module PSEventViewer -CommandType Cmdlet |
+            Select-Object -ExpandProperty Name |
+            Sort-Object
+
+        $Actual | Should -Be ($ExpectedCommands | Sort-Object)
+    }
+
+    It 'keeps only deliberate migration aliases' {
+        $Aliases = Get-Command -Module PSEventViewer -CommandType Alias |
+            Select-Object -ExpandProperty Name |
+            Sort-Object
+
+        $Aliases | Should -Be @(
+            'Find-WinEvent'
+            'Get-EVXFilter'
+            'Write-EVXEntry'
+        )
+        (Get-Alias Find-WinEvent).ResolvedCommandName | Should -Be 'Get-EVXEvent'
+        (Get-Alias Get-EVXFilter).ResolvedCommandName | Should -Be 'New-EVXFilter'
+        (Get-Alias Write-EVXEntry).ResolvedCommandName | Should -Be 'Write-EVXEvent'
+    }
+
+    It 'does not re-export superseded duplicate workflows' {
+        foreach ($Name in @(
+                'ConvertTo-EVXProviderDefinition'
+                'Get-EVXEventStatistics'
+                'Get-EVXPowerShellScriptExecution'
+                'Get-EVXProviderPackage'
+            )) {
+            Get-Command -Name $Name -Module PSEventViewer -ErrorAction SilentlyContinue |
+                Should -BeNullOrEmpty
+        }
+    }
+
+    It 'declares both collector subscription result shapes' {
+        $OutputTypes = (Get-Command Set-EVXCollectorSubscription).OutputType.Name
+
+        $OutputTypes | Should -Contain 'EventViewerX.CollectorSubscriptionUpdateResult'
+        $OutputTypes | Should -Contain 'EventViewerX.CollectorSubscriptionSnapshot'
+    }
+
+    It 'has valid and intentional parameter sets on every canonical cmdlet' {
+        foreach ($Command in Get-Command -Module PSEventViewer -CommandType Cmdlet) {
+            { $Command.ParameterSets.Count } | Should -Not -Throw
+            $Command.ParameterSets.Count | Should -BeGreaterThan 0
+        }
+
+        (Get-Command Get-EVXEvent).ParameterSets.Name |
+            Should -Be @('Channel', 'NamedEvent', 'Path', 'Provider', 'Hashtable', 'Xml')
+        (Get-Command New-EVXFilter).ParameterSets.Name |
+            Should -Be @('Object', 'XPath', 'ChannelXml', 'FileXml')
+        (Get-Command Get-EVXPowerShellScript).ParameterSets.Name |
+            Should -Be @('Script', 'Execution')
+        (Get-Command Write-EVXEvent).ParameterSets.Name |
+            Should -Contain 'Classic'
+        $WriteCommand = Get-Command Write-EVXEvent
+        ($WriteCommand.ParameterSets |
+                Where-Object Name -EQ 'Classic').Parameters.Name |
+            Should -Not -Contain 'Version'
+        foreach ($Name in 'ByIdPayload', 'ByIdData', 'ByNameData') {
+            ($WriteCommand.ParameterSets |
+                    Where-Object Name -EQ $Name).Parameters.Name |
+                Should -Contain 'Version'
+        }
+        $WriteCommand.Parameters.ProviderName.Aliases |
+            Should -Contain 'Source'
+        $WriteCommand.Parameters.ProviderName.Aliases |
+            Should -Contain 'Provider'
+    }
+}

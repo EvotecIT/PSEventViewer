@@ -3,9 +3,8 @@ using System.ComponentModel;
 namespace PSEventViewer;
 
 /// <summary>
-/// <para type="synopsis">Writes a registered manifest/ETW event using positional, named, or typed schema values.</para>
-/// <para type="description">Resolves and caches the exact registered event schema, validates every value, converts values according to native Windows types, and writes through the dependency-free EventViewerX engine. Named hashtable order does not matter.</para>
-/// <para type="description">EventName is available for providers installed through an EventViewerX .evxprovider package. ProviderName plus Id works with any registered manifest provider. Use Write-EVXEntry for classic Event Log sources.</para>
+/// <para type="synopsis">Writes classic Event Log entries or registered manifest/ETW events.</para>
+/// <para type="description">The Classic parameter set writes through a registered classic source. Manifest parameter sets resolve the registered event schema, validate native values, and write positional, named, or typed payloads.</para>
 /// </summary>
 /// <example>
 ///   <summary>Write a package-managed event by friendly name</summary>
@@ -25,6 +24,7 @@ namespace PSEventViewer;
     DefaultParameterSetName = "ByIdPayload",
     SupportsShouldProcess = true,
     ConfirmImpact = ConfirmImpact.Medium)]
+[Alias("Write-EVXEntry")]
 [OutputType(typeof(ManifestEventWriteResult))]
 public sealed class CmdletWriteEVXEvent : PSCmdlet {
     private ResolvedManifestEventWriter? _namedWriter;
@@ -32,7 +32,11 @@ public sealed class CmdletWriteEVXEvent : PSCmdlet {
     /// <summary>
     /// <para>Name of a registered local manifest event provider.</para>
     /// </summary>
-    [Parameter(Mandatory = true, Position = 0)]
+    [Parameter(Mandatory = true, Position = 0, ParameterSetName = "ByIdPayload")]
+    [Parameter(Mandatory = true, Position = 0, ParameterSetName = "ByIdData")]
+    [Parameter(Mandatory = true, Position = 0, ParameterSetName = "ByNameData")]
+    [Parameter(Mandatory = true, Position = 1, ParameterSetName = "Classic")]
+    [Alias("Source", "Provider")]
     [ValidateNotNullOrEmpty]
     public string ProviderName { get; set; } = null!;
 
@@ -48,8 +52,44 @@ public sealed class CmdletWriteEVXEvent : PSCmdlet {
         Mandatory = true,
         Position = 1,
         ParameterSetName = "ByIdData")]
+    [Parameter(
+        Mandatory = true,
+        Position = 2,
+        ParameterSetName = "Classic")]
     [ValidateRange(0, ushort.MaxValue)]
     public int Id { get; set; }
+
+    /// <summary>Classic event log receiving the entry.</summary>
+    [Parameter(Mandatory = true, Position = 0, ParameterSetName = "Classic")]
+    [ValidateNotNullOrEmpty]
+    public string LogName { get; set; } = string.Empty;
+
+    /// <summary>Remote computer receiving the classic entry. Omit for the local computer.</summary>
+    [Alias("ComputerName", "ServerName")]
+    [Parameter(ParameterSetName = "Classic")]
+    public string? MachineName { get; set; }
+
+    /// <summary>Message written to the classic event source.</summary>
+    [Parameter(Mandatory = true, Position = 3, ParameterSetName = "Classic")]
+    public string Message { get; set; } = string.Empty;
+
+    /// <summary>Classic event entry severity.</summary>
+    [Alias("EntryType")]
+    [Parameter(ParameterSetName = "Classic")]
+    public System.Diagnostics.EventLogEntryType EventLogEntryType { get; set; } =
+        System.Diagnostics.EventLogEntryType.Information;
+
+    /// <summary>Classic event category.</summary>
+    [Parameter(ParameterSetName = "Classic")]
+    public int Category { get; set; }
+
+    /// <summary>Additional replacement strings stored with the classic entry.</summary>
+    [Parameter(ParameterSetName = "Classic")]
+    public string[]? AdditionalFields { get; set; }
+
+    /// <summary>Registers a missing classic source before writing. Registration normally requires elevation.</summary>
+    [Parameter(ParameterSetName = "Classic")]
+    public SwitchParameter CreateSource { get; set; }
 
     /// <summary>
     /// <para>Friendly event name from an EventViewerX-managed provider package.</para>
@@ -64,7 +104,9 @@ public sealed class CmdletWriteEVXEvent : PSCmdlet {
     /// <summary>
     /// <para>Event version. Required when the selected identity has multiple schema versions.</para>
     /// </summary>
-    [Parameter]
+    [Parameter(ParameterSetName = "ByIdPayload")]
+    [Parameter(ParameterSetName = "ByIdData")]
+    [Parameter(ParameterSetName = "ByNameData")]
     public byte? Version { get; set; }
 
     /// <summary>
@@ -96,6 +138,11 @@ public sealed class CmdletWriteEVXEvent : PSCmdlet {
 
     /// <summary>Writes the schema-validated event and returns the native result.</summary>
     protected override void ProcessRecord() {
+        if (ParameterSetName == "Classic") {
+            WriteClassicEvent();
+            return;
+        }
+
         bool named = ParameterSetName != "ByIdPayload";
         string identity = ParameterSetName == "ByNameData"
             ? EventName
@@ -146,6 +193,37 @@ public sealed class CmdletWriteEVXEvent : PSCmdlet {
                 new ErrorRecord(
                     exception,
                     "EVXManifestEventWriteFailed",
+                    ErrorCategory.WriteError,
+                    target));
+        }
+    }
+
+    private void WriteClassicEvent() {
+        string target = string.IsNullOrWhiteSpace(MachineName)
+            ? $"{LogName}/{ProviderName}"
+            : $"{MachineName}/{LogName}/{ProviderName}";
+        if (!ShouldProcess(target, $"Write classic event {Id}")) {
+            return;
+        }
+
+        try {
+            ClassicEventLogManager.Write(
+                new ClassicEventWriteRequest {
+                    SourceName = ProviderName,
+                    LogName = LogName,
+                    Message = Message,
+                    EntryType = EventLogEntryType,
+                    Category = Category,
+                    EventId = Id,
+                    MachineName = MachineName,
+                    ReplacementStrings = AdditionalFields,
+                    CreateSourceIfMissing = CreateSource.IsPresent
+                });
+        } catch (Exception exception) {
+            WriteError(
+                new ErrorRecord(
+                    exception,
+                    "EVXClassicEventWriteFailed",
                     ErrorCategory.WriteError,
                     target));
         }

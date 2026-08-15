@@ -47,16 +47,16 @@ public class ADLdapBindingDetails : EventRuleBase {
 
     /// <summary>Initialises a detailed LDAP bind warning wrapper from an event record.</summary>
     public ADLdapBindingDetails(EventObject eventObject) : base(eventObject) {
-        Event = eventObject;
+        SourceEvent = eventObject;
 
-        Type = "ADLdapBindingDetails";
-        Computer = Event.ComputerName;
-        Action = Event.MessageSubject;
-        RemoteEndpoint = Event.GetValueFromDataDictionary("NoNameA0");
+        NamedEventName = "ADLdapBindingDetails";
+        Computer = SourceEvent.ComputerName;
+        Action = SourceEvent.MessageSubject;
+        RemoteEndpoint = SourceEvent.GetValueFromDataDictionary("NoNameA0");
         (RemoteIp, RemotePort) = ParseEndpoint(RemoteEndpoint);
-        AccountName = Event.GetValueFromDataDictionary("NoNameA1");
-        BindType = TranslateBindType(Event.GetValueFromDataDictionary("NoNameA2"));
-        When = Event.TimeCreated;
+        AccountName = SourceEvent.GetValueFromDataDictionary("NoNameA1");
+        BindType = TranslateBindType(SourceEvent.GetValueFromDataDictionary("NoNameA2"));
+        When = SourceEvent.TimeCreated;
     }
 
     private static string TranslateBindType(string raw)

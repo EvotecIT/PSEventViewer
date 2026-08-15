@@ -348,7 +348,7 @@ public class TestNamedEventDnsEnrichment {
             });
 
         EventRuleProjectionException exception = Assert.Throws<EventRuleProjectionException>(() =>
-            EventObjectSlim.CreateEventRule(eventObject, new List<NamedEvents> { NamedEvents.KerberosPolicyChange }));
+            NamedEventCatalog.CreateEventRule(eventObject, new List<NamedEvents> { NamedEvents.KerberosPolicyChange }));
 
         Assert.Equal(4713, exception.EventId);
         Assert.Equal(42L, exception.RecordId);

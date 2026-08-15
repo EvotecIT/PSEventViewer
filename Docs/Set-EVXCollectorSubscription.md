@@ -6,20 +6,25 @@ schema: 2.0.0
 ---
 # Set-EVXCollectorSubscription
 ## SYNOPSIS
-Enables or disables an existing local Windows Event Collector subscription.
+Applies a typed local WEC subscription definition or changes its enabled state.
 
-Uses the supported Windows Event Collector service API, saves the subscription, and verifies the persisted value. Remote registry mutation and wholesale XML replacement are intentionally not exposed.
+Definition input creates or updates a subscription through the Windows inbox collector utility. The state set uses the supported WEC API. Both paths verify persisted state. Definition apply is cancellable and time-bounded; failed apply is rolled back and reports explicitly when rollback cannot establish a known persisted state.
 
 ## SYNTAX
-### __AllParameterSets
+### Enabled
 ```powershell
 Set-EVXCollectorSubscription [-Name] <string> -Enabled <bool> [-WhatIf] [-Confirm] [<CommonParameters>]
 ```
 
-## DESCRIPTION
-Enables or disables an existing local Windows Event Collector subscription.
+### Definition
+```powershell
+Set-EVXCollectorSubscription -Definition <CollectorSubscriptionDefinition> [-WhatIf] [-Confirm] [<CommonParameters>]
+```
 
-Uses the supported Windows Event Collector service API, saves the subscription, and verifies the persisted value. Remote registry mutation and wholesale XML replacement are intentionally not exposed.
+## DESCRIPTION
+Applies a typed local WEC subscription definition or changes its enabled state.
+
+Definition input creates or updates a subscription through the Windows inbox collector utility. The state set uses the supported WEC API. Both paths verify persisted state. Definition apply is cancellable and time-bounded; failed apply is rolled back and reports explicitly when rollback cannot establish a known persisted state.
 
 ## EXAMPLES
 
@@ -30,14 +35,37 @@ Set-EVXCollectorSubscription -Name 'Domain Controllers' -Enabled $false
 
 Returns before and after snapshots plus whether the persisted state changed.
 
+### EXAMPLE 2
+```powershell
+New-EVXCollectorSubscription -Name FailedLogons -SourceComputer DC01,DC02 -LogName Security -EventId 4625 | Set-EVXCollectorSubscription
+```
+
+Applies the typed definition transactionally and verifies the persisted Windows configuration.
+
 ## PARAMETERS
+
+### -Definition
+Typed subscription definition produced by New-EVXCollectorSubscription.
+
+```yaml
+Type: CollectorSubscriptionDefinition
+Parameter Sets: Definition
+Aliases: None
+Possible values:
+
+Required: True
+Position: named
+Default value: None
+Accept pipeline input: True (ByValue)
+Accept wildcard characters: False
+```
 
 ### -Enabled
 Desired enabled state.
 
 ```yaml
 Type: Boolean
-Parameter Sets: __AllParameterSets
+Parameter Sets: Enabled
 Aliases: None
 Possible values:
 
@@ -53,7 +81,7 @@ Exact local collector subscription name.
 
 ```yaml
 Type: String
-Parameter Sets: __AllParameterSets
+Parameter Sets: Enabled
 Aliases: SubscriptionName
 Possible values:
 
@@ -70,10 +98,12 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 ## INPUTS
 
 - `System.String`
+- `EventViewerX.CollectorSubscriptionDefinition`
 
 ## OUTPUTS
 
 - `EventViewerX.CollectorSubscriptionUpdateResult`
+- `EventViewerX.CollectorSubscriptionSnapshot`
 
 ## RELATED LINKS
 

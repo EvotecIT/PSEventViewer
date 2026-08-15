@@ -10,7 +10,7 @@ Describe 'Clear-EVXLog cmdlet' {
             Remove-EVXSource -SourceName $script:provider -LogName $script:log -ErrorAction SilentlyContinue
             Remove-EVXLog -LogName $script:log -ErrorAction SilentlyContinue
             New-EVXLog -LogName $script:log -ProviderName $script:provider | Out-Null
-            Write-EVXEntry -LogName $script:log -ProviderName $script:provider -Message 'test' -EventId 1000
+            Write-EVXEvent -LogName $script:log -ProviderName $script:provider -Message 'test' -Id 1000
         }
     }
     AfterAll {

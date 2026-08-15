@@ -33,7 +33,7 @@ namespace PSEventViewer;
 /// </example>
 /// <example>
 ///   <summary>Use named event shortcuts</summary>
-///   <code>Get-EVXEvent -NamedEvents ADUserLogonFailed -StartTime (Get-Date).AddDays(-1)</code>
+///   <code>Get-EVXEvent -NamedEvent ADUserLogonFailed -StartTime (Get-Date).AddDays(-1)</code>
 ///   <para>Expands the named event definition to fetch all related logon failure IDs.</para>
 /// </example>
 /// <example>
@@ -46,13 +46,13 @@ namespace PSEventViewer;
 ///   <code>Get-EVXEvent -Path C:\Logs\Security.evtx -Oldest -ReadMode Metadata | Select-Object TimeCreated, RecordId, Id, ProviderName, MachineName | Export-Csv C:\Logs\Security-metadata.csv -NoTypeInformation</code>
 ///   <para>Skips provider message formatting, XML parsing, attachments, and bookmarks while streaming every record.</para>
 /// </example>
-[OutputType(typeof(EventObject), ParameterSetName = new string[] { "GenericEvents" })]
-[OutputType(typeof(EventObject), ParameterSetName = new string[] { "PathEvents" })]
-[OutputType(typeof(EventObject), ParameterSetName = new string[] { "FilterHashtableEvents" })]
-[OutputType(typeof(EventObject), ParameterSetName = new string[] { "FilterXmlEvents" })]
-[OutputType(typeof(EventObject), ParameterSetName = new string[] { "ProviderEvents" })]
-[OutputType(typeof(EventObjectSlim), ParameterSetName = new string[] { "NamedEvents" })]
-[Cmdlet(VerbsCommon.Get, "EVXEvent", DefaultParameterSetName = "ProviderEvents")]
+[OutputType(typeof(EventObject), ParameterSetName = new string[] { "Channel" })]
+[OutputType(typeof(EventObject), ParameterSetName = new string[] { "Path" })]
+[OutputType(typeof(EventObject), ParameterSetName = new string[] { "Hashtable" })]
+[OutputType(typeof(EventObject), ParameterSetName = new string[] { "Xml" })]
+[OutputType(typeof(EventObject), ParameterSetName = new string[] { "Provider" })]
+[OutputType(typeof(NamedEventRecord), ParameterSetName = new string[] { "NamedEvent" })]
+[Cmdlet(VerbsCommon.Get, "EVXEvent", DefaultParameterSetName = "Channel")]
 [Alias("Find-WinEvent")]
 public sealed partial class CmdletGetEVXEvent : AsyncPSCmdlet {
     private string _recordIdKey = string.Empty;
@@ -75,8 +75,8 @@ public sealed partial class CmdletGetEVXEvent : AsyncPSCmdlet {
         Position = 0,
         ValueFromPipeline = true,
         ValueFromPipelineByPropertyName = true,
-        ParameterSetName = "GenericEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
+        ParameterSetName = "Channel")]
+    [Parameter(Mandatory = false, ParameterSetName = "NamedEvent")]
     public string[] LogName { get; set; } = Array.Empty<string>();
 
     /// <summary>
@@ -86,156 +86,155 @@ public sealed partial class CmdletGetEVXEvent : AsyncPSCmdlet {
     [Parameter(
         Mandatory = true,
         ValueFromPipelineByPropertyName = true,
-        ParameterSetName = "PathEvents")]
+        ParameterSetName = "Path")]
     public string[] Path { get; set; } = Array.Empty<string>();
 
     /// <summary>
     /// Event identifiers used to filter results.
     /// </summary>
     [Alias("Id")]
-    [Parameter(Mandatory = false, Position = 1, ParameterSetName = "GenericEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
-    [Parameter(Mandatory = false, Position = 1, ParameterSetName = "ProviderEvents")]
+    [Parameter(Mandatory = false, Position = 1, ParameterSetName = "Channel")]
+    [Parameter(Mandatory = false, ParameterSetName = "NamedEvent")]
+    [Parameter(Mandatory = false, ParameterSetName = "Path")]
+    [Parameter(Mandatory = false, Position = 1, ParameterSetName = "Provider")]
     public int[]? EventId { get; set; }
 
     /// <summary>
     /// Specific event record identifiers to retrieve.
     /// </summary>
     [Alias("RecordId")]
-    [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "ProviderEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "Channel")]
+    [Parameter(Mandatory = false, ParameterSetName = "Path")]
+    [Parameter(Mandatory = false, ParameterSetName = "Provider")]
     public long[]? EventRecordId { get; set; }
 
     /// <summary>
     /// Path to a file storing last processed record ID.
     /// </summary>
-    [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "FilterHashtableEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "FilterXmlEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "ProviderEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "Channel")]
+    [Parameter(Mandatory = false, ParameterSetName = "NamedEvent")]
+    [Parameter(Mandatory = false, ParameterSetName = "Path")]
+    [Parameter(Mandatory = false, ParameterSetName = "Hashtable")]
+    [Parameter(Mandatory = false, ParameterSetName = "Xml")]
+    [Parameter(Mandatory = false, ParameterSetName = "Provider")]
     public string? RecordIdFile { get; set; }
 
     /// <summary>
     /// Identifier used when persisting record IDs to allow multiple jobs to share a file.
     /// </summary>
-    [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "FilterHashtableEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "FilterXmlEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "ProviderEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "Channel")]
+    [Parameter(Mandatory = false, ParameterSetName = "NamedEvent")]
+    [Parameter(Mandatory = false, ParameterSetName = "Path")]
+    [Parameter(Mandatory = false, ParameterSetName = "Hashtable")]
+    [Parameter(Mandatory = false, ParameterSetName = "Xml")]
+    [Parameter(Mandatory = false, ParameterSetName = "Provider")]
     public string? RecordIdKey { get; set; }
 
     /// <summary>
     /// Computer names against which to run the query.
     /// </summary>
     [Alias("ComputerName", "ServerName")]
-    [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "FilterHashtableEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "FilterXmlEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "ProviderEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "Channel")]
+    [Parameter(Mandatory = false, ParameterSetName = "NamedEvent")]
+    [Parameter(Mandatory = false, ParameterSetName = "Hashtable")]
+    [Parameter(Mandatory = false, ParameterSetName = "Xml")]
+    [Parameter(Mandatory = false, ParameterSetName = "Provider")]
     public List<string?>? MachineName { get; set; }
 
     /// <summary>
     /// Event provider name to filter results.
     /// </summary>
     [Alias("Source", "Provider")]
-    [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
-    [Parameter(Mandatory = true, ParameterSetName = "ProviderEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "Path")]
+    [Parameter(Mandatory = true, ParameterSetName = "Provider")]
     public string[]? ProviderName { get; set; }
 
     /// <summary>
     /// Keywords used to filter events.
     /// </summary>
-    [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "ProviderEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "Channel")]
+    [Parameter(Mandatory = false, ParameterSetName = "Path")]
+    [Parameter(Mandatory = false, ParameterSetName = "Provider")]
     public long[]? Keywords { get; set; }
 
     /// <summary>
     /// Event level (e.g. Error, Warning) used for filtering.
     /// </summary>
-    [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "ProviderEvents")]
-    public int[]? Level { get; set; }
+    [Parameter(Mandatory = false, ParameterSetName = "Channel")]
+    [Parameter(Mandatory = false, ParameterSetName = "Path")]
+    [Parameter(Mandatory = false, ParameterSetName = "Provider")]
+    public EventViewerX.Level[]? Level { get; set; }
 
     /// <summary>
     /// Start time for the event query.
     /// </summary>
     [Alias("DateFrom")]
-    [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "ProviderEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "NamedEvent")]
+    [Parameter(Mandatory = false, ParameterSetName = "Channel")]
+    [Parameter(Mandatory = false, ParameterSetName = "Path")]
+    [Parameter(Mandatory = false, ParameterSetName = "Provider")]
     public DateTime? StartTime { get; set; }
 
     /// <summary>
     /// End time for the event query.
     /// </summary>
     [Alias("DateTo")]
-    [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "ProviderEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "NamedEvent")]
+    [Parameter(Mandatory = false, ParameterSetName = "Channel")]
+    [Parameter(Mandatory = false, ParameterSetName = "Path")]
+    [Parameter(Mandatory = false, ParameterSetName = "Provider")]
     public DateTime? EndTime { get; set; }
 
     /// <summary>
     /// Relative time period for filtering events.
     /// </summary>
-    [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "ProviderEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "Channel")]
+    [Parameter(Mandatory = false, ParameterSetName = "NamedEvent")]
+    [Parameter(Mandatory = false, ParameterSetName = "Path")]
+    [Parameter(Mandatory = false, ParameterSetName = "Provider")]
     public TimePeriod? TimePeriod { get; set; }
 
     /// <summary>
     /// User identifier used to filter events.
     /// </summary>
-    [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "ProviderEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "Channel")]
+    [Parameter(Mandatory = false, ParameterSetName = "Path")]
+    [Parameter(Mandatory = false, ParameterSetName = "Provider")]
     public string[]? UserId { get; set; }
 
     /// <summary>
     /// Filters events by matching their formatted message against the provided regular expression.
     /// </summary>
-    [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "FilterHashtableEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "FilterXmlEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "ProviderEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "Channel")]
+    [Parameter(Mandatory = false, ParameterSetName = "NamedEvent")]
+    [Parameter(Mandatory = false, ParameterSetName = "Path")]
+    [Parameter(Mandatory = false, ParameterSetName = "Hashtable")]
+    [Parameter(Mandatory = false, ParameterSetName = "Xml")]
+    [Parameter(Mandatory = false, ParameterSetName = "Provider")]
     public Regex? MessageRegex { get; set; }
 
     /// <summary>
     /// Maximum number of independent event sources opened concurrently.
     /// </summary>
     [Alias("NumberOfThreads")]
-    [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "FilterHashtableEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "FilterXmlEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "ProviderEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "Channel")]
+    [Parameter(Mandatory = false, ParameterSetName = "NamedEvent")]
+    [Parameter(Mandatory = false, ParameterSetName = "Path")]
+    [Parameter(Mandatory = false, ParameterSetName = "Hashtable")]
+    [Parameter(Mandatory = false, ParameterSetName = "Xml")]
+    [Parameter(Mandatory = false, ParameterSetName = "Provider")]
     [ValidateRange(1, EventLogLimits.MaximumConcurrency)]
     public int MaxConcurrency { get; set; } = 8;
 
     /// <summary>
     /// Maximum number of events to return.
     /// </summary>
-    [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "FilterHashtableEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "FilterXmlEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "ProviderEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "Channel")]
+    [Parameter(Mandatory = false, ParameterSetName = "NamedEvent")]
+    [Parameter(Mandatory = false, ParameterSetName = "Path")]
+    [Parameter(Mandatory = false, ParameterSetName = "Hashtable")]
+    [Parameter(Mandatory = false, ParameterSetName = "Xml")]
+    [Parameter(Mandatory = false, ParameterSetName = "Provider")]
     [ValidateRange(0, long.MaxValue)]
     public long MaxEvents { get; set; }
 
@@ -244,12 +243,12 @@ public sealed partial class CmdletGetEVXEvent : AsyncPSCmdlet {
     /// Zero continues until the output limit is satisfied or the query is exhausted. Native selection may perform
     /// one initial lookahead per machine/XPath chunk plus bounded page prefetch; those rows are not evaluated by the cmdlet.
     /// </summary>
-    [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "FilterHashtableEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "FilterXmlEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "ProviderEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "Channel")]
+    [Parameter(Mandatory = false, ParameterSetName = "NamedEvent")]
+    [Parameter(Mandatory = false, ParameterSetName = "Path")]
+    [Parameter(Mandatory = false, ParameterSetName = "Hashtable")]
+    [Parameter(Mandatory = false, ParameterSetName = "Xml")]
+    [Parameter(Mandatory = false, ParameterSetName = "Provider")]
     [ValidateRange(0, long.MaxValue)]
     public long MaxEventsScanned { get; set; }
 
@@ -257,20 +256,20 @@ public sealed partial class CmdletGetEVXEvent : AsyncPSCmdlet {
     /// Resolves reverse-DNS names for supported named events after projection. DNS failures remain visible on the
     /// event and never remove the event from the pipeline.
     /// </summary>
-    [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "NamedEvent")]
     public SwitchParameter ResolveDns { get; set; }
 
     /// <summary>
     /// Whole-request timeout in milliseconds for each optional reverse-DNS request, including dependency retries.
     /// </summary>
-    [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "NamedEvent")]
     [ValidateRange(1, 60000)]
     public int DnsTimeoutMs { get; set; } = 1000;
 
     /// <summary>
     /// Maximum number of reverse-DNS requests that may overlap. Results and checkpoints remain in event order.
     /// </summary>
-    [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "NamedEvent")]
     [ValidateRange(1, 64)]
     public int DnsMaxConcurrency { get; set; } = 8;
 
@@ -279,12 +278,12 @@ public sealed partial class CmdletGetEVXEvent : AsyncPSCmdlet {
     /// Message formats the provider message; StructuredData parses XML without formatting the message; Full includes all data.
     /// Named-event queries default to Full so rule projections receive their structured payload; other query sets default to Message.
     /// </summary>
-    [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "FilterHashtableEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "FilterXmlEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "ProviderEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "Channel")]
+    [Parameter(Mandatory = false, ParameterSetName = "NamedEvent")]
+    [Parameter(Mandatory = false, ParameterSetName = "Path")]
+    [Parameter(Mandatory = false, ParameterSetName = "Hashtable")]
+    [Parameter(Mandatory = false, ParameterSetName = "Xml")]
+    [Parameter(Mandatory = false, ParameterSetName = "Provider")]
     public EventReadMode ReadMode { get; set; } =
         EventReadMode.Message;
 
@@ -292,12 +291,12 @@ public sealed partial class CmdletGetEVXEvent : AsyncPSCmdlet {
     /// Culture used to format provider messages and display names for offline EVTX queries.
     /// For example, use <c>en-US</c> for deterministic English output.
     /// </summary>
-    [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "FilterHashtableEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "FilterXmlEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "ProviderEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "Path")]
+    [Parameter(Mandatory = false, ParameterSetName = "Channel")]
+    [Parameter(Mandatory = false, ParameterSetName = "NamedEvent")]
+    [Parameter(Mandatory = false, ParameterSetName = "Hashtable")]
+    [Parameter(Mandatory = false, ParameterSetName = "Xml")]
+    [Parameter(Mandatory = false, ParameterSetName = "Provider")]
     public CultureInfo? MessageCulture { get; set; } =
         CultureInfo.GetCultureInfo("en-US");
 
@@ -306,11 +305,11 @@ public sealed partial class CmdletGetEVXEvent : AsyncPSCmdlet {
     /// Zero uses Settings.SessionTimeoutMs for connection establishment and
     /// Settings.QuerySessionTimeoutMs for reading.
     /// </summary>
-    [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "FilterHashtableEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "FilterXmlEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "ProviderEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "Channel")]
+    [Parameter(Mandatory = false, ParameterSetName = "NamedEvent")]
+    [Parameter(Mandatory = false, ParameterSetName = "Hashtable")]
+    [Parameter(Mandatory = false, ParameterSetName = "Xml")]
+    [Parameter(Mandatory = false, ParameterSetName = "Provider")]
     [ValidateRange(0, int.MaxValue)]
     public int SessionTimeoutMs { get; set; }
 
@@ -327,83 +326,73 @@ public sealed partial class CmdletGetEVXEvent : AsyncPSCmdlet {
     /// <summary>
     /// Maximum number of projected events buffered between parallel readers and the PowerShell pipeline. Zero selects a bounded default.
     /// </summary>
-    [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "FilterHashtableEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "FilterXmlEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "ProviderEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "Channel")]
+    [Parameter(Mandatory = false, ParameterSetName = "NamedEvent")]
+    [Parameter(Mandatory = false, ParameterSetName = "Path")]
+    [Parameter(Mandatory = false, ParameterSetName = "Hashtable")]
+    [Parameter(Mandatory = false, ParameterSetName = "Xml")]
+    [Parameter(Mandatory = false, ParameterSetName = "Provider")]
     [ValidateRange(0, int.MaxValue)]
     public int BufferCapacity { get; set; }
 
     /// <summary>
     /// Expands event data into individual properties.
     /// </summary>
-    [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "FilterHashtableEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "FilterXmlEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "ProviderEvents")]
-    public SwitchParameter Expand { get; set; }
+    [Parameter(Mandatory = false, ParameterSetName = "Channel")]
+    [Parameter(Mandatory = false, ParameterSetName = "NamedEvent")]
+    [Parameter(Mandatory = false, ParameterSetName = "Path")]
+    [Parameter(Mandatory = false, ParameterSetName = "Hashtable")]
+    [Parameter(Mandatory = false, ParameterSetName = "Xml")]
+    [Parameter(Mandatory = false, ParameterSetName = "Provider")]
+    [Alias("Expand")]
+    public SwitchParameter ExpandData { get; set; }
 
     /// <summary>
     /// Reads events from oldest to newest when querying files.
     /// </summary>
-    [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "FilterHashtableEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "FilterXmlEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "ProviderEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "Path")]
+    [Parameter(Mandatory = false, ParameterSetName = "Channel")]
+    [Parameter(Mandatory = false, ParameterSetName = "NamedEvent")]
+    [Parameter(Mandatory = false, ParameterSetName = "Hashtable")]
+    [Parameter(Mandatory = false, ParameterSetName = "Xml")]
+    [Parameter(Mandatory = false, ParameterSetName = "Provider")]
     public SwitchParameter Oldest { get; set; }
 
     /// <summary>
     /// Hashtable filter for named event data when querying files.
     /// </summary>
-    [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "FilterHashtableEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "ProviderEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "Path")]
+    [Parameter(Mandatory = false, ParameterSetName = "Channel")]
+    [Parameter(Mandatory = false, ParameterSetName = "Hashtable")]
+    [Parameter(Mandatory = false, ParameterSetName = "Provider")]
     public Hashtable? NamedDataFilter { get; set; }
 
     /// <summary>
     /// Hashtable filter to exclude named event data when querying files.
     /// </summary>
-    [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "FilterHashtableEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "ProviderEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "Path")]
+    [Parameter(Mandatory = false, ParameterSetName = "Channel")]
+    [Parameter(Mandatory = false, ParameterSetName = "Hashtable")]
+    [Parameter(Mandatory = false, ParameterSetName = "Provider")]
     public Hashtable? NamedDataExcludeFilter { get; set; }
 
     /// <summary>
     /// Disables parallel processing of queries.
     /// </summary>
-    [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "FilterHashtableEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "FilterXmlEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "ProviderEvents")]
+    [Parameter(Mandatory = false, ParameterSetName = "Channel")]
+    [Parameter(Mandatory = false, ParameterSetName = "NamedEvent")]
+    [Parameter(Mandatory = false, ParameterSetName = "Path")]
+    [Parameter(Mandatory = false, ParameterSetName = "Hashtable")]
+    [Parameter(Mandatory = false, ParameterSetName = "Xml")]
+    [Parameter(Mandatory = false, ParameterSetName = "Provider")]
     public SwitchParameter DisableParallel { get; set; }
-
-    /// <summary>
-    /// Returns results as an array instead of streaming them.
-    /// </summary>
-    [Parameter(Mandatory = false, ParameterSetName = "GenericEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "NamedEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "PathEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "FilterHashtableEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "FilterXmlEvents")]
-    [Parameter(Mandatory = false, ParameterSetName = "ProviderEvents")]
-    public SwitchParameter AsArray { get; set; }
 
     /// <summary>
     /// Predefined named events to query.
     /// </summary>
-    [Alias("NamedEvents")]
-    [Parameter(Mandatory = true, ParameterSetName = "NamedEvents")]
-    public NamedEvents[] Type { get; set; } = Array.Empty<NamedEvents>();
+    [Alias("NamedEvents", "Type")]
+    [Parameter(Mandatory = true, ParameterSetName = "NamedEvent")]
+    public NamedEvents[] NamedEvent { get; set; } = Array.Empty<NamedEvents>();
 
     /// <summary>
     /// Initializes logging and helper classes before processing.
@@ -416,7 +405,7 @@ public sealed partial class CmdletGetEVXEvent : AsyncPSCmdlet {
         _managedProviderPatterns =
             Array.Empty<WildcardPattern>();
         _offlineProvidersByPath.Clear();
-        if (ParameterSetName == "NamedEvents" &&
+        if (ParameterSetName == "NamedEvent" &&
             !MyInvocation.BoundParameters.ContainsKey(
                 nameof(ReadMode))) {
             ReadMode = EventReadMode.Full;
@@ -431,19 +420,19 @@ public sealed partial class CmdletGetEVXEvent : AsyncPSCmdlet {
 #else
         token = CancelToken;
 #endif
-        List<object>? results = AsArray ? new List<object>() : null;
+        List<object>? results = null;
 
         PrepareRecordProcessing(token);
-        if (ParameterSetName == "NamedEvents") {
+        if (ParameterSetName == "NamedEvent") {
                 // let's find the events prepared for search
-                List<NamedEvents> typeList = Type.ToList();
+                List<NamedEvents> typeList = NamedEvent.ToList();
                 int namedEventThreads = DisableParallel.IsPresent
                     ? 1
                     : MaxConcurrency;
                 var namedQueryInfo = new NamedEventsQueryExecutionInfo();
-                Func<EventObjectSlim, bool>? namedResultPredicate = MessageRegex == null
+                Func<NamedEventRecord, bool>? namedResultPredicate = MessageRegex == null
                     ? null
-                    : eventObject => MessageMatches(eventObject.Event);
+                    : eventObject => MessageMatches(eventObject.SourceEvent);
                 NamedEventEnrichmentOptions? enrichmentOptions = ResolveDns
                     ? new NamedEventEnrichmentOptions {
                         ResolveDns = true,
@@ -502,23 +491,19 @@ public sealed partial class CmdletGetEVXEvent : AsyncPSCmdlet {
                         IncludeBookmark =
                             IncludeBookmark.IsPresent
                     };
-                await foreach (EventObjectSlim eventObject in
+                await foreach (NamedEventRecord eventObject in
                                NamedEventEngine.ReadAsync(
                                    namedQuery,
                                    namedQueryInfo,
                                    token)) {
                     token.ThrowIfCancellationRequested();
-                    if (!TrackCheckpointProgress(eventObject.Event)) {
+                    if (!TrackCheckpointProgress(eventObject.SourceEvent)) {
                         continue;
                     }
-                    object output = Expand
-                        ? GetExpandedObject(eventObject, eventObject.Event)
+                    object output = ExpandData
+                        ? GetExpandedObject(eventObject, eventObject.SourceEvent)
                         : eventObject;
-                    if (AsArray) {
-                        results!.Add(output);
-                    } else {
-                        WriteObject(output);
-                    }
+                    WriteObject(output);
                     _eventsOutput++;
                     if (OutputLimitReached) {
                         break;
@@ -530,7 +515,6 @@ public sealed partial class CmdletGetEVXEvent : AsyncPSCmdlet {
             ProcessNativeEvents(token, results);
         }
 
-        WriteArrayResult(results);
     }
 
     private void WriteNamedTargetFailures(
@@ -580,12 +564,8 @@ public sealed partial class CmdletGetEVXEvent : AsyncPSCmdlet {
             return;
         }
 
-        object output = Expand ? GetExpandedObject(eventObject) : eventObject;
-        if (AsArray) {
-            results!.Add(output);
-        } else {
-            WriteObject(output);
-        }
+        object output = ExpandData ? GetExpandedObject(eventObject) : eventObject;
+        WriteObject(output);
         _eventsOutput++;
     }
 

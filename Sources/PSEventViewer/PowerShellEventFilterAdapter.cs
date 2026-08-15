@@ -102,6 +102,75 @@ internal static class PowerShellEventFilterAdapter {
         return filter;
     }
 
+    internal static EventFilter CreateFilter(
+        IReadOnlyList<int>? eventIds,
+        IReadOnlyList<long>? recordIds,
+        IReadOnlyList<string>? providerNames,
+        IReadOnlyList<Level>? levels,
+        IReadOnlyList<long>? keywords,
+        DateTime? startTime,
+        DateTime? endTime,
+        TimePeriod? timePeriod,
+        IReadOnlyList<string>? userIds,
+        IReadOnlyList<string>? data,
+        Hashtable? namedData,
+        Hashtable? excludedNamedData,
+        IReadOnlyList<int>? excludedEventIds) {
+
+        (DateTime? resolvedStart, DateTime? resolvedEnd) =
+            EventTimeRange.Resolve(startTime, endTime, timePeriod);
+        return new EventFilter {
+            EventIds = eventIds,
+            RecordIds = recordIds,
+            ProviderNames = Normalize(providerNames),
+            Levels = levels?.Select(static value => (byte)value).ToArray(),
+            Keywords = keywords,
+            StartTime = resolvedStart,
+            EndTime = resolvedEnd,
+            UserIds = Normalize(userIds),
+            Data = data,
+            NamedData = ConvertNamedData(namedData),
+            ExcludedNamedData = ConvertNamedData(excludedNamedData),
+            ExcludedEventIds = excludedEventIds
+        };
+    }
+
+    internal static IReadOnlyDictionary<string, IReadOnlyList<string>>?
+        ConvertNamedData(Hashtable? table) {
+
+        if (table == null || table.Count == 0) {
+            return null;
+        }
+        var output = new Dictionary<string, IReadOnlyList<string>>(
+            StringComparer.Ordinal);
+        foreach (DictionaryEntry entry in table) {
+            string key = EventFilterValueConverter
+                .ToInvariantString(Unwrap(entry.Key))
+                .Trim();
+            if (key.Length == 0) {
+                throw new PSArgumentException(
+                    "Named-data filter keys cannot be empty.");
+            }
+            output[key] = entry.Value == null
+                ? new[] { string.Empty }
+                : Enumerate(entry.Value)
+                    .Select(EventFilterValueConverter.ToInvariantString)
+                    .ToArray();
+        }
+        return output;
+    }
+
+    private static IReadOnlyList<string>? Normalize(
+        IReadOnlyList<string>? values) {
+
+        string[] normalized = values?
+            .Select(static value => value?.Trim() ?? string.Empty)
+            .Where(static value => value.Length > 0)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray() ?? Array.Empty<string>();
+        return normalized.Length == 0 ? null : normalized;
+    }
+
     private static IReadOnlyList<T>? ReadValues<T>(
         Hashtable source,
         string key) {

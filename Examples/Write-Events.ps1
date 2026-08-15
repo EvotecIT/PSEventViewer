@@ -1,10 +1,10 @@
 Import-Module PSEventViewer -Force
 
 # Classic Event Log source. Registering a missing source is explicit.
-Write-EVXEntry `
+Write-EVXEvent `
     -LogName Application `
     -ProviderName Contoso-App `
-    -EventId 1000 `
+    -Id 1000 `
     -Message 'Service started' `
     -CreateSource `
     -Confirm:$false

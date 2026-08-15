@@ -1,6 +1,6 @@
-﻿using EventViewerX.Examples;
+using EventViewerX.Examples;
 
-//Examples.EventWatchingBasic();
+//Examples.SourceEventWatchingBasic();
 //Examples.QueryBasic();
 //Examples.QueryBasicWithOutput();
 //Examples.QueryParallelSpeed();

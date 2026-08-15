@@ -33,19 +33,19 @@ public class LogsClearedSecurity : EventRuleBase {
 
     /// <summary>Initialises a log-cleared Security event wrapper.</summary>
     public LogsClearedSecurity(EventObject eventObject) : base(eventObject) {
-        Event = eventObject;
+        SourceEvent = eventObject;
 
-        Type = "LogsClearedSecurity";
-        Computer = Event.ComputerName;
-        Action = Event.MessageSubject;
-        BackupPath = Event.GetValueFromDataDictionary("BackupPath");
-        LogType = ConvertFromOperationType(Event.GetDataValueOrEmpty("Channel"));
+        NamedEventName = "LogsClearedSecurity";
+        Computer = SourceEvent.ComputerName;
+        Action = SourceEvent.MessageSubject;
+        BackupPath = SourceEvent.GetValueFromDataDictionary("BackupPath");
+        LogType = ConvertFromOperationType(SourceEvent.GetDataValueOrEmpty("Channel"));
 
         // common fields
-        Who = Event.GetSubjectAccountOrEmpty();
-        When = Event.TimeCreated;
+        Who = SourceEvent.GetSubjectAccountOrEmpty();
+        When = SourceEvent.TimeCreated;
 
-        if (Event.Id == 1105) {
+        if (SourceEvent.Id == 1105) {
             Who = "Automatic Backup";
         }
         if (BackupPath == "") {

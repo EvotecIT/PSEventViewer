@@ -79,13 +79,31 @@ public static class CollectorSubscriptionXml {
             root.Elements()
                 .FirstOrDefault(static element => element.Name.LocalName.Equals("Description", StringComparison.OrdinalIgnoreCase))
                 ?.Value);
-        queries = root
+        var queryValues = new List<string>();
+        queryValues.AddRange(root
             .Descendants()
             .Where(static element => element.Name.LocalName.Equals("Select", StringComparison.OrdinalIgnoreCase))
             .Select(static element => NormalizeOptional(element.Value))
             .Where(static value => !string.IsNullOrWhiteSpace(value))
-            .Cast<string>()
-            .ToArray();
+            .Cast<string>());
+        foreach (XElement queryElement in root.Elements()
+                     .Where(static element => element.Name.LocalName.Equals("Query", StringComparison.OrdinalIgnoreCase))) {
+            string embedded = queryElement.Value.Trim();
+            if (embedded.Length == 0 || !embedded.StartsWith("<", StringComparison.Ordinal)) {
+                continue;
+            }
+            using var embeddedReader = XmlReader.Create(
+                new StringReader(embedded),
+                CreateReaderSettings());
+            XDocument queryDocument = XDocument.Load(embeddedReader, LoadOptions.None);
+            queryValues.AddRange(queryDocument
+                .Descendants()
+                .Where(static element => element.Name.LocalName.Equals("Select", StringComparison.OrdinalIgnoreCase))
+                .Select(static element => NormalizeOptional(element.Value))
+                .Where(static value => !string.IsNullOrWhiteSpace(value))
+                .Cast<string>());
+        }
+        queries = queryValues.ToArray();
         return true;
     }
 
@@ -112,12 +130,49 @@ public static class CollectorSubscriptionXml {
             return null;
         }
 
-        if (TryNormalize(trimmed, out var details, out _)
-            && details != null) {
-            return details.NormalizedXml;
+        try {
+            using var reader = XmlReader.Create(
+                new StringReader(trimmed),
+                CreateReaderSettings());
+            XDocument document = XDocument.Load(reader, LoadOptions.None);
+            CanonicalizeSubscription(document);
+            return NormalizeXml(document);
+        } catch (XmlException) {
+            return trimmed;
         }
+    }
 
-        return trimmed;
+    private static void CanonicalizeSubscription(XDocument document) {
+        XElement? root = document.Root;
+        if (root == null) {
+            return;
+        }
+        string contentFormat = root.Elements()
+            .FirstOrDefault(static element => element.Name.LocalName.Equals("ContentFormat", StringComparison.OrdinalIgnoreCase))
+            ?.Value.Trim() ?? string.Empty;
+        if (contentFormat.Equals("Events", StringComparison.OrdinalIgnoreCase)) {
+            root.Elements()
+                .Where(static element => element.Name.LocalName.Equals("Locale", StringComparison.OrdinalIgnoreCase))
+                .Remove();
+        }
+        foreach (XElement query in root.Elements()
+                     .Where(static element => element.Name.LocalName.Equals("Query", StringComparison.OrdinalIgnoreCase))) {
+            string value = query.Value.Trim();
+            if (value.StartsWith("<", StringComparison.Ordinal)) {
+                query.ReplaceNodes(new XCData(CollectorSubscriptionDefinition.NormalizeQueryXml(value)));
+            }
+        }
+        XElement? sources = root.Elements()
+            .FirstOrDefault(static element => element.Name.LocalName.Equals("EventSources", StringComparison.OrdinalIgnoreCase));
+        if (sources != null) {
+            XElement[] ordered = sources.Elements()
+                .OrderBy(static source => source.Elements()
+                    .FirstOrDefault(static element => element.Name.LocalName.Equals("Address", StringComparison.OrdinalIgnoreCase))
+                    ?.Value, StringComparer.OrdinalIgnoreCase)
+                .Select(static source => new XElement(source))
+                .ToArray();
+            sources.ReplaceNodes(ordered);
+        }
     }
 
     private static string? NormalizeOptional(string? value) {

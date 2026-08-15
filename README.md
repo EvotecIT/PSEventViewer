@@ -92,8 +92,13 @@ Get-EVXEvent -LogName Security -MachineName DC01, DC02 `
     -EventId 4740 -MaxConcurrency 4 -ContinueOnError -MaxEvents 500
 
 # Query reusable scenario rules.
-Get-EVXEvent -Type ADUserLogonFailed, ADUserLockouts `
+Get-EVXEvent -NamedEvent ADUserLogonFailed, ADUserLockouts `
     -MachineName DC01, DC02 -TimePeriod Last24Hours -MaxEvents 500
+
+# Build a typed filter once and reuse it across query, export, watcher, and WEC.
+$failedLogon = New-EVXFilter -EventId 4625 -TimePeriod Last24Hours `
+    -NamedDataExcludeFilter @{ TargetUserName = 'svc_legacy' }
+Get-EVXEvent -LogName Security -Filter $failedLogon -ReadMode StructuredData
 ```
 
 See the focused scripts in [Examples](Examples/) for live, remote, offline,
@@ -110,7 +115,7 @@ explicit mode for automation and benchmarks.
 | --- | --- | --- |
 | `Metadata` | System fields only. No message, XML, payload dictionary, attachments, or bookmark unless requested. | Counts, timelines, filtering, record IDs, compact scans. |
 | `Message` | Metadata, provider display values, provider-formatted message, and lazy parsed message fields. | Human-readable triage and text search. |
-| `StructuredData` | Metadata, typed properties, raw XML, and named/unnamed payload data. No formatted message. | Field automation, `-Expand`, and schema-preserving analysis. |
+| `StructuredData` | Metadata, typed properties, raw XML, and named/unnamed payload data. No formatted message. | Field automation, `-ExpandData`, and schema-preserving analysis. |
 | `RawXml` | Metadata and raw event XML without provider formatting or typed payload projection. | Lowest-cost XML streaming and custom downstream parsers. |
 | `Full` | Message and structured data together, including decoded attachments when present. | Consumers that genuinely need every projection. |
 
@@ -143,7 +148,8 @@ silently treated as a valid empty message.
 - credentials and authentication for remote Windows Event Log sessions;
 - newest-first or `-Oldest`, `-MaxEvents` as a 64-bit count, and cancellation.
 
-PSEventViewer additionally provides `-NamedDataFilter`,
+PSEventViewer additionally provides reusable `EventFilter` objects,
+`-NamedDataFilter`,
 `-NamedDataExcludeFilter`, `-MessageRegex`, time-period shortcuts,
 multi-source concurrency, per-source failure continuation, output expansion,
 native bookmarks, and durable checkpoints.
@@ -151,8 +157,26 @@ native bookmarks, and durable checkpoints.
 Named-data exclusions are emitted as native QueryList `Suppress` clauses.
 This keeps events that do not contain the named field—something the Windows
 Event Log raw XPath subset cannot express safely with `!=`. Consequently,
-`Get-EVXFilter -NamedDataExcludeFilter` returns QueryList XML and rejects
-`-XPathOnly` rather than producing a subtly incorrect filter.
+`New-EVXFilter -NamedDataExcludeFilter -LogName ...` returns QueryList XML.
+The `-AsXPath` form rejects native suppressions rather than producing a
+subtly incorrect filter.
+
+The canonical filter workflow is typed first and text only when another tool
+requires it:
+
+```powershell
+$filter = New-EVXFilter -EventId 4624, 4625 -TimePeriod Last24Hours
+
+# Reuse the same object in PSEventViewer.
+Get-EVXEvent -LogName Security -Filter $filter
+Export-EVXEvent -LogName Security -Filter $filter `
+    -OutputPath C:\Exports\Security.jsonl -Format JsonLines
+
+# Compile it for a native consumer when needed.
+Get-WinEvent -LogName Security -FilterXPath (
+    New-EVXFilter -EventId 4624, 4625 -TimePeriod Last24Hours -AsXPath
+)
+```
 
 ```powershell
 $xml = @'
@@ -255,8 +279,15 @@ Clear-EVXLog -LogName Contoso-App -BackupPath C:\EventBackups
 Remove-EVXSource -LogName Application -SourceName Contoso-App
 Remove-EVXLog -LogName Contoso-App
 
-# Windows Event Collector inventory and local updates.
+# Windows Event Collector inventory, typed definitions, and local updates.
 Get-EVXCollectorSubscription -Name '*'
+New-EVXCollectorSubscription `
+    -Name 'Failed logons' `
+    -SourceComputer DC01, DC02 `
+    -LogName Security `
+    -Filter (New-EVXFilter -EventId 4625 -TimePeriod Last24Hours) `
+    -Description 'Security 4625 from domain controllers' |
+    Set-EVXCollectorSubscription -Confirm:$false
 Set-EVXCollectorSubscription -Name 'Domain Controllers' `
     -Enabled $true -Confirm:$false
 ```
@@ -272,8 +303,8 @@ contracts, so the module keeps them explicit.
 
 ```powershell
 # Classic log write. Source creation is an explicit administrative opt-in.
-Write-EVXEntry -LogName Application -ProviderName Contoso-App `
-    -EventId 1000 -Message 'Service started' -CreateSource
+Write-EVXEvent -LogName Application -ProviderName Contoso-App `
+    -Id 1000 -Message 'Service started' -CreateSource
 
 # Registered manifest provider write. Values are validated against the
 # provider template and converted to the declared native types.
@@ -293,9 +324,10 @@ decides whether a provider's target channel is enabled.
 ## Custom providers without SDK work on target machines
 
 Describe named, typed fields once in a PowerShell hashtable, JSON file, or C#
-model. Build one signed `.evxprovider` on a developer/CI host, then install and
-write by field name on ordinary Windows machines. Targets need no Windows SDK,
-Visual Studio, compiler, generated source, or package repository.
+model. Build one signed `.evxprovider` on any Windows host that has the module
+or library, then install and write by field name on ordinary Windows machines.
+Neither builder nor target needs the Windows SDK, Visual Studio, a native
+compiler, generated source, or a package repository.
 
 ```powershell
 $provider = @{
@@ -353,13 +385,17 @@ var filter = new EventFilter {
     }
 };
 
-var query = new EventLogChannelQuery("Security") {
-    XPath = EventFilterCompiler.BuildXPath(filter),
-    ReadMode = EventReadMode.StructuredData,
-    MaxEvents = 1_000
-};
+EventLogBatchQuery query = EventQueryPlanner.CreateBatch(
+    new EventQueryDefinition {
+        LogNames = new[] { "Security" },
+        Filter = filter,
+        Options = new EventLogQueryOptions {
+            ReadMode = EventReadMode.StructuredData,
+            MaxEvents = 1_000
+        }
+    });
 
-foreach (EventObject item in EventLogEngine.ReadChannel(query)) {
+await foreach (EventObject item in EventLogEngine.ReadBatchAsync(query)) {
     Console.WriteLine($"{item.RecordId}: {item.Id} {item.ProviderName}");
 }
 
@@ -392,10 +428,10 @@ var namedQuery = new NamedEventQuery(new[] {
     MaxEvents = 500
 };
 
-await foreach (EventObjectSlim item in
+await foreach (NamedEventRecord item in
                NamedEventEngine.ReadAsync(namedQuery)) {
     Console.WriteLine(
-        $"{item.Event.TimeCreated:u} {item.Type} {item.GatheredFrom}");
+        $"{item.TimeCreated:u} {item.NamedEventName} {item.MachineName}");
 }
 ```
 
@@ -423,17 +459,20 @@ Version 4 intentionally exposes one canonical command for each responsibility:
 
 | Area | Commands |
 | --- | --- |
-| Query and export | `Get-EVXEvent`, `Export-EVXEvent`, `Get-EVXFilter`, `Get-EVXEventStatistics` |
+| Query and export | `Get-EVXEvent`, `New-EVXFilter`, `Export-EVXEvent` |
 | Catalog and diagnostics | `Get-EVXLog`, `Get-EVXProvider`, `Test-EVXLog` |
 | Watchers and checkpoints | `Start-EVXWatcher`, `Get-EVXWatcher`, `Stop-EVXWatcher`, `Reset-EVXEventCheckpoint` |
 | Log and source administration | `New-EVXLog`, `Set-EVXLog`, `Clear-EVXLog`, `Remove-EVXLog`, `New-EVXSource`, `Remove-EVXSource`, `Update-EVXLogArchive` |
-| Event writing | `Write-EVXEntry`, `Write-EVXEvent` |
-| Custom providers | `ConvertTo-EVXProviderDefinition`, `Test-EVXProviderDefinition`, `New-EVXProviderPackage`, `Get-EVXProviderPackage`, `Install-EVXProviderPackage`, `Uninstall-EVXProviderPackage` |
-| Collector subscriptions | `Get-EVXCollectorSubscription`, `Set-EVXCollectorSubscription` |
-| PowerShell recovery | `Get-EVXPowerShellScript`, `Get-EVXPowerShellScriptExecution` |
+| Event writing | `Write-EVXEvent` |
+| Custom providers | `Test-EVXProviderDefinition`, `New-EVXProviderPackage`, `Get-EVXProvider`, `Install-EVXProviderPackage`, `Uninstall-EVXProviderPackage` |
+| Collector subscriptions | `New-EVXCollectorSubscription`, `Get-EVXCollectorSubscription`, `Set-EVXCollectorSubscription` |
+| PowerShell recovery | `Get-EVXPowerShellScript` (`-Execution` selects execution records) |
 
-`Find-WinEvent` is the only retained command alias and maps to
-`Get-EVXEvent`.
+Three migration aliases remain: `Find-WinEvent` maps to `Get-EVXEvent`,
+`Get-EVXFilter` maps to `New-EVXFilter`, and `Write-EVXEntry` maps to the
+classic parameter set of `Write-EVXEvent`. Existing classic calls such as
+`Write-EVXEntry -LogName Application -Source LegacyApp -EventId 1000 -Message 'Started'`
+continue to bind; `-Source` is an alias of `-ProviderName`.
 
 ## Version 4 migration
 
@@ -443,8 +482,14 @@ Version 4 is a deliberate API cleanup:
   `ClassicEventLogManager`, `EventLogCatalog`, `EventLogSubscription`,
   `EventLogExporter`, and `ManifestEventWriter`; the monolithic
   `SearchEvents` API is removed.
-- PowerShell uses the canonical commands above. Historical duplicate aliases
-  are removed except `Find-WinEvent`.
+- PowerShell uses the canonical commands above. Provider package inventory is
+  part of `Get-EVXProvider`; script and execution recovery share
+  `Get-EVXPowerShellScript`; classic and manifest writes share
+  `Write-EVXEvent`.
+- Named scenario results are `NamedEventRecord` objects with a stable
+  `SourceEvent`, `NamedEventName`, `EventId`, `RecordId`, `MachineName`, and
+  `SourceLogName` envelope. These detached records can be selected, serialized,
+  or handed to future mail and Teams adapters without adding either dependency.
 - General queries default to `ReadMode Message`, not eager `Full`.
 - Bookmarks are opt-in. Durable polling uses explicit checkpoint files/keys.
 - `MaxEvents` and counters are 64-bit.

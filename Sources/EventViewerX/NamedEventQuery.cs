@@ -126,7 +126,7 @@ public sealed class NamedEventQuery {
     }
 
     /// <summary>Optional predicate applied after named-event projection.</summary>
-    public Func<EventObjectSlim, bool>? ResultPredicate {
+    public Func<NamedEventRecord, bool>? ResultPredicate {
         get;
         set;
     }

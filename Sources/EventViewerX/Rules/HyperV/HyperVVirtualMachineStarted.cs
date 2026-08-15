@@ -28,11 +28,11 @@ public class HyperVVirtualMachineStarted : EventRuleBase {
 
     /// <summary>Initialises a Hyper-V VM start wrapper from an event record.</summary>
     public HyperVVirtualMachineStarted(EventObject eventObject) : base(eventObject) {
-        Event = eventObject;
-        Type = "HyperVVirtualMachineStarted";
-        Computer = Event.ComputerName;
-        VirtualMachine = Event.GetValueFromDataDictionary("Name", "VMName");
-        VirtualMachineId = Event.GetValueFromDataDictionary("VMId", "VirtualMachineId");
-        When = Event.TimeCreated;
+        SourceEvent = eventObject;
+        NamedEventName = "HyperVVirtualMachineStarted";
+        Computer = SourceEvent.ComputerName;
+        VirtualMachine = SourceEvent.GetValueFromDataDictionary("Name", "VMName");
+        VirtualMachineId = SourceEvent.GetValueFromDataDictionary("VMId", "VirtualMachineId");
+        When = SourceEvent.TimeCreated;
     }
 }

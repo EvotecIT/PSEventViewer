@@ -26,6 +26,11 @@ Start-EVXWatcher [-LogName] <string> [-NamedEvent] <NamedEvents[]> [-Action] <sc
 Start-EVXWatcher [-LogName] <string> [-FilterHashtable] <hashtable> [-Action] <scriptblock> [-MachineName <string>] [-Credential <pscredential>] [-Authentication <EventLogAuthentication>] [-Start <EventLogSubscriptionStart>] [-BookmarkXml <string>] [-IgnoreStaleBookmark] [-TolerateQueryErrors] [-ReadMode <EventReadMode>] [-MessageCulture <cultureinfo>] [-FallbackMessageCulture <cultureinfo>] [-BufferCapacity <int>] [-SessionTimeoutMs <int>] [-Name <string>] [-ActionIdentity <string>] [-TimeOut <TimeSpan>] [-StopOnMatch] [-StopAfter <int>] [<CommonParameters>]
 ```
 
+### Filter
+```powershell
+Start-EVXWatcher [-LogName] <string> [-Filter] <EventFilter> [-Action] <scriptblock> [-MachineName <string>] [-Credential <pscredential>] [-Authentication <EventLogAuthentication>] [-Start <EventLogSubscriptionStart>] [-BookmarkXml <string>] [-IgnoreStaleBookmark] [-TolerateQueryErrors] [-ReadMode <EventReadMode>] [-MessageCulture <cultureinfo>] [-FallbackMessageCulture <cultureinfo>] [-BufferCapacity <int>] [-SessionTimeoutMs <int>] [-Name <string>] [-ActionIdentity <string>] [-TimeOut <TimeSpan>] [-StopOnMatch] [-StopAfter <int>] [<CommonParameters>]
+```
+
 ### FilterXPath
 ```powershell
 Start-EVXWatcher [-LogName] <string> [-FilterXPath] <string> [-Action] <scriptblock> [-MachineName <string>] [-Credential <pscredential>] [-Authentication <EventLogAuthentication>] [-Start <EventLogSubscriptionStart>] [-BookmarkXml <string>] [-IgnoreStaleBookmark] [-TolerateQueryErrors] [-ReadMode <EventReadMode>] [-MessageCulture <cultureinfo>] [-FallbackMessageCulture <cultureinfo>] [-BufferCapacity <int>] [-SessionTimeoutMs <int>] [-Name <string>] [-ActionIdentity <string>] [-TimeOut <TimeSpan>] [-StopOnMatch] [-StopAfter <int>] [<CommonParameters>]
@@ -73,7 +78,7 @@ Script block executed when matching events are detected.
 
 ```yaml
 Type: ScriptBlock
-Parameter Sets: EventId, NamedEvent, FilterHashtable, FilterXPath
+Parameter Sets: EventId, NamedEvent, FilterHashtable, Filter, FilterXPath
 Aliases: None
 Possible values:
 
@@ -90,7 +95,7 @@ Omit this parameter to reject reuse when the action delegate is not the same ins
 
 ```yaml
 Type: String
-Parameter Sets: EventId, NamedEvent, FilterHashtable, FilterXPath
+Parameter Sets: EventId, NamedEvent, FilterHashtable, Filter, FilterXPath
 Aliases: None
 Possible values:
 
@@ -106,7 +111,7 @@ Authentication package used for a remote subscription.
 
 ```yaml
 Type: EventLogAuthentication
-Parameter Sets: EventId, NamedEvent, FilterHashtable, FilterXPath
+Parameter Sets: EventId, NamedEvent, FilterHashtable, Filter, FilterXPath
 Aliases: None
 Possible values: Default, Negotiate, Kerberos, Ntlm
 
@@ -122,7 +127,7 @@ Native bookmark XML used with Start=AfterBookmark.
 
 ```yaml
 Type: String
-Parameter Sets: EventId, NamedEvent, FilterHashtable, FilterXPath
+Parameter Sets: EventId, NamedEvent, FilterHashtable, Filter, FilterXPath
 Aliases: None
 Possible values:
 
@@ -138,7 +143,7 @@ Maximum detached snapshots buffered before delivery stops rather than dropping d
 
 ```yaml
 Type: Int32
-Parameter Sets: EventId, NamedEvent, FilterHashtable, FilterXPath
+Parameter Sets: EventId, NamedEvent, FilterHashtable, Filter, FilterXPath
 Aliases: None
 Possible values:
 
@@ -154,7 +159,7 @@ Credentials used for a remote native subscription.
 
 ```yaml
 Type: PSCredential
-Parameter Sets: EventId, NamedEvent, FilterHashtable, FilterXPath
+Parameter Sets: EventId, NamedEvent, FilterHashtable, Filter, FilterXPath
 Aliases: None
 Possible values:
 
@@ -186,12 +191,28 @@ Fallback culture when the primary provider resources are unavailable.
 
 ```yaml
 Type: CultureInfo
-Parameter Sets: EventId, NamedEvent, FilterHashtable, FilterXPath
+Parameter Sets: EventId, NamedEvent, FilterHashtable, Filter, FilterXPath
 Aliases: None
 Possible values:
 
 Required: False
 Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -Filter
+Reusable typed filter produced by New-EVXFilter or EventViewerX.
+
+```yaml
+Type: EventFilter
+Parameter Sets: Filter
+Aliases: None
+Possible values:
+
+Required: True
+Position: 1
 Default value: None
 Accept pipeline input: False
 Accept wildcard characters: False
@@ -235,7 +256,7 @@ Allows a stale bookmark to resume from the closest available record.
 
 ```yaml
 Type: SwitchParameter
-Parameter Sets: EventId, NamedEvent, FilterHashtable, FilterXPath
+Parameter Sets: EventId, NamedEvent, FilterHashtable, Filter, FilterXPath
 Aliases: None
 Possible values:
 
@@ -251,7 +272,7 @@ Name of the log to watch on the specified machine.
 
 ```yaml
 Type: String
-Parameter Sets: EventId, NamedEvent, FilterHashtable, FilterXPath
+Parameter Sets: EventId, NamedEvent, FilterHashtable, Filter, FilterXPath
 Aliases: None
 Possible values:
 
@@ -267,7 +288,7 @@ Optional computer to monitor. The local computer is used by default.
 
 ```yaml
 Type: String
-Parameter Sets: EventId, NamedEvent, FilterHashtable, FilterXPath
+Parameter Sets: EventId, NamedEvent, FilterHashtable, Filter, FilterXPath
 Aliases: None
 Possible values:
 
@@ -283,7 +304,7 @@ Primary culture for message and provider-label rendering.
 
 ```yaml
 Type: CultureInfo
-Parameter Sets: EventId, NamedEvent, FilterHashtable, FilterXPath
+Parameter Sets: EventId, NamedEvent, FilterHashtable, Filter, FilterXPath
 Aliases: None
 Possible values:
 
@@ -299,7 +320,7 @@ Optional name for the watcher instance.
 
 ```yaml
 Type: String
-Parameter Sets: EventId, NamedEvent, FilterHashtable, FilterXPath
+Parameter Sets: EventId, NamedEvent, FilterHashtable, Filter, FilterXPath
 Aliases: None
 Possible values:
 
@@ -331,7 +352,7 @@ Amount of event data projected for every delivered event.
 
 ```yaml
 Type: EventReadMode
-Parameter Sets: EventId, NamedEvent, FilterHashtable, FilterXPath
+Parameter Sets: EventId, NamedEvent, FilterHashtable, Filter, FilterXPath
 Aliases: None
 Possible values: Metadata, Message, StructuredData, RawXml, Full
 
@@ -347,7 +368,7 @@ Remote native session connection timeout in milliseconds.
 
 ```yaml
 Type: Int32
-Parameter Sets: EventId, NamedEvent, FilterHashtable, FilterXPath
+Parameter Sets: EventId, NamedEvent, FilterHashtable, Filter, FilterXPath
 Aliases: None
 Possible values:
 
@@ -379,7 +400,7 @@ Future, Oldest, or AfterBookmark subscription starting position.
 
 ```yaml
 Type: EventLogSubscriptionStart
-Parameter Sets: EventId, NamedEvent, FilterHashtable, FilterXPath
+Parameter Sets: EventId, NamedEvent, FilterHashtable, Filter, FilterXPath
 Aliases: None
 Possible values: Future, Oldest, AfterBookmark
 
@@ -395,7 +416,7 @@ Stops watching after processing the specified number of events.
 
 ```yaml
 Type: Int32
-Parameter Sets: EventId, NamedEvent, FilterHashtable, FilterXPath
+Parameter Sets: EventId, NamedEvent, FilterHashtable, Filter, FilterXPath
 Aliases: None
 Possible values:
 
@@ -411,7 +432,7 @@ When set, the watcher stops after the first matching event.
 
 ```yaml
 Type: SwitchParameter
-Parameter Sets: EventId, NamedEvent, FilterHashtable, FilterXPath
+Parameter Sets: EventId, NamedEvent, FilterHashtable, Filter, FilterXPath
 Aliases: None
 Possible values:
 
@@ -427,7 +448,7 @@ Duration after which the watcher stops automatically.
 
 ```yaml
 Type: TimeSpan
-Parameter Sets: EventId, NamedEvent, FilterHashtable, FilterXPath
+Parameter Sets: EventId, NamedEvent, FilterHashtable, Filter, FilterXPath
 Aliases: None
 Possible values:
 
@@ -443,7 +464,7 @@ Allows Windows to tolerate query errors where the native API supports it.
 
 ```yaml
 Type: SwitchParameter
-Parameter Sets: EventId, NamedEvent, FilterHashtable, FilterXPath
+Parameter Sets: EventId, NamedEvent, FilterHashtable, Filter, FilterXPath
 Aliases: None
 Possible values:
 

@@ -79,26 +79,26 @@ public class ADUserLogon : EventRuleBase {
 
     /// <summary>Initialises a successful logon wrapper from an event record.</summary>
     public ADUserLogon(EventObject eventObject) : base(eventObject) {
-        Event = eventObject;
-        Type = "ADUserLogon";
+        SourceEvent = eventObject;
+        NamedEventName = "ADUserLogon";
 
-        Computer = Event.ComputerName;
-        Action = Event.MessageSubject;
+        Computer = SourceEvent.ComputerName;
+        Action = SourceEvent.MessageSubject;
 
-        IpAddress = Event.GetDataValueOrEmpty(KnownEventField.IpAddress);
-        IpPort = Event.GetDataValueOrEmpty(KnownEventField.IpPort);
-        LogonProcessName = Event.GetDataValueOrEmpty(KnownEventField.LogonProcessName);
-        ImpersonationLevel = EventsHelper.GetImpersonationLevel(Event.GetDataValueOrEmpty("ImpersonationLevel"));
-        VirtualAccount = EventsHelper.GetVirtualAccount(Event.GetDataValueOrEmpty("VirtualAccount"));
-        ElevatedToken = EventsHelper.GetElevatedToken(Event.GetDataValueOrEmpty("ElevatedToken"));
-        LogonType = Event.TryGetDataEnum(KnownEventField.LogonType, out EventViewerX.LogonType parsedLogonType, EventFieldNumericBase.Decimal)
+        IpAddress = SourceEvent.GetDataValueOrEmpty(KnownEventField.IpAddress);
+        IpPort = SourceEvent.GetDataValueOrEmpty(KnownEventField.IpPort);
+        LogonProcessName = SourceEvent.GetDataValueOrEmpty(KnownEventField.LogonProcessName);
+        ImpersonationLevel = EventsHelper.GetImpersonationLevel(SourceEvent.GetDataValueOrEmpty("ImpersonationLevel"));
+        VirtualAccount = EventsHelper.GetVirtualAccount(SourceEvent.GetDataValueOrEmpty("VirtualAccount"));
+        ElevatedToken = EventsHelper.GetElevatedToken(SourceEvent.GetDataValueOrEmpty("ElevatedToken"));
+        LogonType = SourceEvent.TryGetDataEnum(KnownEventField.LogonType, out EventViewerX.LogonType parsedLogonType, EventFieldNumericBase.Decimal)
             ? parsedLogonType
-            : EventsHelper.GetLogonType(Event.GetDataValueOrEmpty(KnownEventField.LogonType));
+            : EventsHelper.GetLogonType(SourceEvent.GetDataValueOrEmpty(KnownEventField.LogonType));
 
-        ObjectAffected = Event.GetTargetAccountOrEmpty();
+        ObjectAffected = SourceEvent.GetTargetAccountOrEmpty();
 
-        Who = Event.GetSubjectAccountOrEmpty();
-        When = Event.TimeCreated;
+        Who = SourceEvent.GetSubjectAccountOrEmpty();
+        When = SourceEvent.TimeCreated;
     }
 }
 

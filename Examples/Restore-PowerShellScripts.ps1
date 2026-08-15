@@ -1,9 +1,9 @@
 Import-Module PSEventViewer -Force
 
 $Query = @{
-    Type = 'WindowsPowerShell'
+    Edition = 'WindowsPowerShell'
     MachineName = 'DC01', 'DC02'
-    Path = 'C:\RecoveredScripts'
+    OutputPath = 'C:\RecoveredScripts'
     MaxScripts = 100
     MaxEventsScanned = 50000
     MaxPendingScripts = 512
@@ -12,8 +12,9 @@ $Query = @{
 }
 Get-EVXPowerShellScript @Query
 
-Get-EVXPowerShellScriptExecution `
-    -Type WindowsPowerShell `
+Get-EVXPowerShellScript `
+    -Execution `
+    -Edition WindowsPowerShell `
     -MachineName DC01 `
     -MaxEvents 100 `
     -MaxEventsScanned 50000

@@ -93,6 +93,9 @@ public static class EventLogQueryFactory {
                                 snapshot.FallbackMessageCulture,
                             IncludeBookmark =
                                 snapshot.IncludeBookmark,
+                            BookmarkXml = snapshot.BookmarkXml,
+                            BookmarkOffset = snapshot.BookmarkOffset,
+                            StrictBookmark = snapshot.StrictBookmark,
                             RemoteConnectionTimeoutMilliseconds =
                                 snapshot.RemoteConnectionTimeoutMilliseconds,
                             RemoteReadTimeoutMilliseconds =
@@ -184,7 +187,10 @@ public static class EventLogQueryFactory {
                         FallbackMessageCulture =
                             snapshot.FallbackMessageCulture,
                         IncludeBookmark =
-                            snapshot.IncludeBookmark
+                            snapshot.IncludeBookmark,
+                        BookmarkXml = snapshot.BookmarkXml,
+                        BookmarkOffset = snapshot.BookmarkOffset,
+                        StrictBookmark = snapshot.StrictBookmark
                     });
             }
         }
@@ -223,6 +229,9 @@ public static class EventLogQueryFactory {
                 options.FallbackMessageCulture,
             IncludeBookmark =
                 options.IncludeBookmark,
+            BookmarkXml = options.BookmarkXml,
+            BookmarkOffset = options.BookmarkOffset,
+            StrictBookmark = options.StrictBookmark,
             RemoteConnectionTimeoutMilliseconds =
                 options.RemoteConnectionTimeoutMilliseconds,
             RemoteReadTimeoutMilliseconds =
@@ -353,6 +362,12 @@ public static class EventLogQueryFactory {
                 nameof(options),
                 "The remote authentication value is not supported.");
         }
+        if (string.IsNullOrWhiteSpace(options.BookmarkXml) &&
+            options.BookmarkOffset != 1) {
+            throw new ArgumentException(
+                "BookmarkOffset requires BookmarkXml.",
+                nameof(options));
+        }
 
         return new EventLogQueryOptions {
             Oldest = options.Oldest,
@@ -364,6 +379,9 @@ public static class EventLogQueryFactory {
             MaxEvents = options.MaxEvents,
             IncludeBookmark =
                 options.IncludeBookmark,
+            BookmarkXml = options.BookmarkXml,
+            BookmarkOffset = options.BookmarkOffset,
+            StrictBookmark = options.StrictBookmark,
             Credential =
                 EventLogCredentialIdentity.Copy(
                     options.Credential),

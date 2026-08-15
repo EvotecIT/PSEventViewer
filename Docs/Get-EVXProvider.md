@@ -6,20 +6,30 @@ schema: 2.0.0
 ---
 # Get-EVXProvider
 ## SYNOPSIS
-Returns detached Windows Event Log provider metadata.
+Returns registered provider metadata or EventViewerX provider packages.
 
-Supports local and remote provider discovery, wildcard names, deterministic culture, linked channels, levels, tasks, opcodes, keywords, and optional event definitions.
+The default set supports local and remote provider discovery. Package sets inspect a portable .evxprovider file or list machine-wide EventViewerX-managed installations.
 
 ## SYNTAX
-### __AllParameterSets
+### Registered (Default)
 ```powershell
 Get-EVXProvider [[-Name] <string[]>] [-MachineName <string>] [-Credential <pscredential>] [-Authentication <EventLogAuthentication>] [-TimeoutMs <int>] [-Culture <cultureinfo>] [-IncludeEvents] [-NameOnly] [-AsResult] [<CommonParameters>]
 ```
 
-## DESCRIPTION
-Returns detached Windows Event Log provider metadata.
+### Package
+```powershell
+Get-EVXProvider [-Path] <string> [<CommonParameters>]
+```
 
-Supports local and remote provider discovery, wildcard names, deterministic culture, linked channels, levels, tasks, opcodes, keywords, and optional event definitions.
+### InstalledPackage
+```powershell
+Get-EVXProvider -InstalledPackage [<CommonParameters>]
+```
+
+## DESCRIPTION
+Returns registered provider metadata or EventViewerX provider packages.
+
+The default set supports local and remote provider discovery. Package sets inspect a portable .evxprovider file or list machine-wide EventViewerX-managed installations.
 
 ## EXAMPLES
 
@@ -37,6 +47,20 @@ Get-EVXProvider -Name '*IIS*' -NameOnly
 
 Outputs only provider names for scripts that need strings.
 
+### EXAMPLE 3
+```powershell
+Get-EVXProvider -Path .\Contoso.Scanner-1.0.0.evxprovider
+```
+
+Verifies the package and returns its typed schema and trust metadata.
+
+### EXAMPLE 4
+```powershell
+Get-EVXProvider -InstalledPackage | Select-Object ProviderName, PackageVersion, IsActive, IsRegistered
+```
+
+Uses the package inventory parameter set of the same provider catalog command.
+
 ## PARAMETERS
 
 ### -AsResult
@@ -44,7 +68,7 @@ Returns one success/failure result for every matching provider.
 
 ```yaml
 Type: SwitchParameter
-Parameter Sets: __AllParameterSets
+Parameter Sets: Registered
 Aliases: None
 Possible values:
 
@@ -60,7 +84,7 @@ Authentication package for the remote session.
 
 ```yaml
 Type: EventLogAuthentication
-Parameter Sets: __AllParameterSets
+Parameter Sets: Registered
 Aliases: None
 Possible values: Default, Negotiate, Kerberos, Ntlm
 
@@ -76,7 +100,7 @@ Credentials for a remote provider catalog.
 
 ```yaml
 Type: PSCredential
-Parameter Sets: __AllParameterSets
+Parameter Sets: Registered
 Aliases: None
 Possible values:
 
@@ -92,7 +116,7 @@ Culture used for provider display metadata.
 
 ```yaml
 Type: CultureInfo
-Parameter Sets: __AllParameterSets
+Parameter Sets: Registered
 Aliases: None
 Possible values:
 
@@ -108,11 +132,27 @@ Includes all provider event definitions and templates.
 
 ```yaml
 Type: SwitchParameter
-Parameter Sets: __AllParameterSets
+Parameter Sets: Registered
 Aliases: None
 Possible values:
 
 Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -InstalledPackage
+Lists providers installed through EventViewerX packages.
+
+```yaml
+Type: SwitchParameter
+Parameter Sets: InstalledPackage
+Aliases: None
+Possible values:
+
+Required: True
 Position: named
 Default value: None
 Accept pipeline input: False
@@ -124,7 +164,7 @@ Remote computer name. Omit for the local computer.
 
 ```yaml
 Type: String
-Parameter Sets: __AllParameterSets
+Parameter Sets: Registered
 Aliases: ComputerName, ServerName
 Possible values:
 
@@ -140,7 +180,7 @@ Provider names or wildcard patterns.
 
 ```yaml
 Type: String[]
-Parameter Sets: __AllParameterSets
+Parameter Sets: Registered
 Aliases: None
 Possible values:
 
@@ -156,7 +196,7 @@ Returns provider names instead of metadata snapshots.
 
 ```yaml
 Type: SwitchParameter
-Parameter Sets: __AllParameterSets
+Parameter Sets: Registered
 Aliases: None
 Possible values:
 
@@ -167,12 +207,28 @@ Accept pipeline input: False
 Accept wildcard characters: False
 ```
 
+### -Path
+Portable .evxprovider package to verify and inspect.
+
+```yaml
+Type: String
+Parameter Sets: Package
+Aliases: FullName, OutputPath, PackagePath
+Possible values:
+
+Required: True
+Position: 0
+Default value: None
+Accept pipeline input: True (ByValue, ByPropertyName)
+Accept wildcard characters: False
+```
+
 ### -TimeoutMs
 Maximum time for remote RPC preflight and session establishment.
 
 ```yaml
 Type: Int32
-Parameter Sets: __AllParameterSets
+Parameter Sets: Registered
 Aliases: None
 Possible values:
 
@@ -188,12 +244,14 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 
 ## INPUTS
 
-- `None`
+- `System.String`
 
 ## OUTPUTS
 
 - `EventViewerX.EventProviderMetadataSnapshot`
 - `EventViewerX.EventProviderCatalogResult`
+- `EventViewerX.Providers.EventProviderPackage`
+- `EventViewerX.Providers.InstalledEventProviderPackage`
 - `System.String`
 
 ## RELATED LINKS

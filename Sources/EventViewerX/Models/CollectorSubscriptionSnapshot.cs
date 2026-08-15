@@ -59,7 +59,7 @@ public sealed record CollectorSubscriptionSnapshot {
             ContentFormat = NormalizeOptional(subscription.ContentFormat),
             DeliveryMode = NormalizeOptional(subscription.DeliveryMode),
             RawXml = NormalizeOptional(subscription.RawXml),
-            HasXml = !string.IsNullOrWhiteSpace(subscription.RawXml),
+            HasXml = !string.IsNullOrWhiteSpace(subscription.RawXml) || queries.Length > 0,
             QueryCount = queries.Length,
             Queries = queries
         };

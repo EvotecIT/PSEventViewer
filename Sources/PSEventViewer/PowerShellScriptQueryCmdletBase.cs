@@ -9,7 +9,8 @@ namespace PSEventViewer;
 public abstract class PowerShellScriptQueryCmdletBase : AsyncPSCmdlet {
     /// <summary>PowerShell edition whose operational log should be queried.</summary>
     [Parameter(Mandatory = true, Position = 0)]
-    public PowerShellEdition Type { get; set; }
+    [Alias("Type")]
+    public PowerShellEdition Edition { get; set; }
 
     /// <summary>
     /// Computer names to query. When omitted, the local machine is used.
@@ -27,12 +28,18 @@ public abstract class PowerShellScriptQueryCmdletBase : AsyncPSCmdlet {
     public string? EventLogPath { get; set; }
 
     /// <summary>Only reads events logged after this date.</summary>
+    [Alias("DateFrom")]
     [Parameter]
-    public DateTime? DateFrom { get; set; }
+    public DateTime? StartTime { get; set; }
 
     /// <summary>Only reads events logged before this date.</summary>
+    [Alias("DateTo")]
     [Parameter]
-    public DateTime? DateTo { get; set; }
+    public DateTime? EndTime { get; set; }
+
+    /// <summary>Reusable relative time window. This cannot be combined with StartTime or EndTime.</summary>
+    [Parameter]
+    public TimePeriod? TimePeriod { get; set; }
 
     /// <summary>Maximum native records to scan per computer. Zero scans the complete query.</summary>
     [Parameter]
@@ -48,6 +55,10 @@ public abstract class PowerShellScriptQueryCmdletBase : AsyncPSCmdlet {
     /// validating that mutually exclusive source models were not combined.
     /// </summary>
     protected string?[] GetQueryTargets() {
+        (StartTime, EndTime) = EventTimeRange.Resolve(
+            StartTime,
+            EndTime,
+            TimePeriod);
         if (!string.IsNullOrWhiteSpace(
                 EventLogPath)) {
             if (MachineName is { Length: > 0 }) {

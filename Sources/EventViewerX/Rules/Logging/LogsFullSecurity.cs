@@ -30,16 +30,16 @@ public class LogsFullSecurity : EventRuleBase {
 
     /// <summary>Initialises a wrapper for security log full events.</summary>
     public LogsFullSecurity(EventObject eventObject) : base(eventObject) {
-        Event = eventObject;
+        SourceEvent = eventObject;
 
-        Type = "LogsFullSecurity";
-        Computer = Event.ComputerName;
-        Action = Event.MessageSubject;
-        LogType = ConvertFromOperationType(Event.GetDataValueOrEmpty("Channel"));
+        NamedEventName = "LogsFullSecurity";
+        Computer = SourceEvent.ComputerName;
+        Action = SourceEvent.MessageSubject;
+        LogType = ConvertFromOperationType(SourceEvent.GetDataValueOrEmpty("Channel"));
 
         // common fields
-        Who = Event.GetSubjectAccountOrEmpty();
-        When = Event.TimeCreated;
+        Who = SourceEvent.GetSubjectAccountOrEmpty();
+        When = SourceEvent.TimeCreated;
     }
 }
 

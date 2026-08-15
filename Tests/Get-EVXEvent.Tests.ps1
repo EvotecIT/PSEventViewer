@@ -75,11 +75,11 @@ Describe 'Get-EVXEvent provider-only binding' {
     It 'preserves positional LogName binding' {
         $Command = Get-Command Get-EVXEvent
         $Generic = $Command.ParameterSets |
-            Where-Object Name -EQ 'GenericEvents'
+            Where-Object Name -EQ 'Channel'
         $LogName = $Generic.Parameters |
             Where-Object Name -EQ 'LogName'
         $Provider = $Command.ParameterSets |
-            Where-Object Name -EQ 'ProviderEvents' |
+            Where-Object Name -EQ 'Provider' |
             ForEach-Object Parameters |
             Where-Object Name -EQ 'ProviderName'
 
@@ -140,7 +140,7 @@ Describe 'Get-EVXEvent - Read events from path (oldest / newest)' {
 
     It 'Should read 1 newest event' {
 
-        $EventsNewest = Get-EVXEvent -Path $FilePath -MaxEvents 1 -ReadMode StructuredData -Expand
+        $EventsNewest = Get-EVXEvent -Path $FilePath -MaxEvents 1 -ReadMode StructuredData -ExpandData
         $EventsNewest.Count | Should -Be 1
         $EventsNewest[0].Id | Should -Be 1200
         $EventsNewest[0].GatheredFrom | Should -Be $FilePath
@@ -164,7 +164,7 @@ Describe 'Get-EVXEvent - Read events with NamedDataFilter' {
     }
 
     It 'named exclude filter' {
-        $ret = Get-EVXEvent -Path $FilePath -Id 7040 -NamedDataExcludeFilter @{ param4 = ('BITS', 'TrustedInstaller') } -MaxEvents 1 -ReadMode StructuredData -AsArray -Expand
+        $ret = @(Get-EVXEvent -Path $FilePath -Id 7040 -NamedDataExcludeFilter @{ param4 = ('BITS', 'TrustedInstaller') } -MaxEvents 1 -ReadMode StructuredData -ExpandData)
         $ret | Should -HaveCount 1
         ( [datetime] $ret.TimeCreated ) | Should -Be ( [datetime] "2019-08-30T06:57:44.037957100Z" )
         $ret.param4 | Should -Be 'NgcCtnrSvc'
@@ -180,7 +180,7 @@ Describe 'Get-EVXEvent - Read events with NamedDataFilter' {
         $Actual.RecordId | Should -Be $Expected.RecordId
     }
     It 'named include filter' {
-        $ret = Get-EVXEvent -Path $FilePath -Id 7040 -NamedDataFilter @{ param4 = ('BITS', 'TrustedInstaller') } -oldest -MaxEvents 1 -ReadMode StructuredData -AsArray -Expand
+        $ret = @(Get-EVXEvent -Path $FilePath -Id 7040 -NamedDataFilter @{ param4 = ('BITS', 'TrustedInstaller') } -oldest -MaxEvents 1 -ReadMode StructuredData -ExpandData)
         $ret | Should -HaveCount 1
         ( [datetime] $ret.TimeCreated ) | Should -Be ( [datetime] "2019-08-30T06:50:13.213617700Z" )
         $ret.param4 | Should -Be 'BITS'
@@ -234,12 +234,12 @@ Describe 'Get-EVXEvent - Parameter validation' {
 
         $Parameter | Should -Not -BeNullOrEmpty
         $Parameter.Aliases | Should -Contain 'NumberOfThreads'
-        $Parameter.ParameterSets.Keys | Should -Contain 'GenericEvents'
-        $Parameter.ParameterSets.Keys | Should -Contain 'NamedEvents'
-        $Parameter.ParameterSets.Keys | Should -Contain 'PathEvents'
-        $Parameter.ParameterSets.Keys | Should -Contain 'FilterHashtableEvents'
-        $Parameter.ParameterSets.Keys | Should -Contain 'FilterXmlEvents'
-        $Parameter.ParameterSets.Keys | Should -Contain 'ProviderEvents'
+        $Parameter.ParameterSets.Keys | Should -Contain 'Channel'
+        $Parameter.ParameterSets.Keys | Should -Contain 'NamedEvent'
+        $Parameter.ParameterSets.Keys | Should -Contain 'Path'
+        $Parameter.ParameterSets.Keys | Should -Contain 'Hashtable'
+        $Parameter.ParameterSets.Keys | Should -Contain 'Xml'
+        $Parameter.ParameterSets.Keys | Should -Contain 'Provider'
     }
 
     It 'applies DisableParallel to offline native queries' {
@@ -252,7 +252,7 @@ Describe 'Get-EVXEvent - Parameter validation' {
 
     It 'exposes named-event source and projection controls' {
         $NamedSet = (Get-Command Get-EVXEvent).ParameterSets |
-            Where-Object Name -EQ 'NamedEvents'
+            Where-Object Name -EQ 'NamedEvent'
 
         $NamedSet.Parameters.Name | Should -Contain 'LogName'
         $NamedSet.Parameters.Name | Should -Contain 'EventId'
@@ -714,7 +714,7 @@ Describe 'Get-EVXEvent - pipeline parity' {
                 -BookmarkXml '<BookmarkList />' `
                 -ReadMode Metadata `
                 -ErrorAction Stop
-        } | Should -Throw '*exactly one independent query source*'
+        } | Should -Throw '*exactly one native query source*'
     }
 
     It 'converts a direct FilterXml string to XmlDocument' {
@@ -743,9 +743,9 @@ Describe 'Get-EVXEvent - Force parity' {
         $command = Get-Command Get-EVXEvent
 
         foreach ($setName in @(
-            'GenericEvents',
-            'ProviderEvents',
-            'FilterHashtableEvents')) {
+            'Channel',
+            'Provider',
+            'Hashtable')) {
             $set = $command.ParameterSets |
                 Where-Object Name -EQ $setName
 

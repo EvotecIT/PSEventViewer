@@ -7,7 +7,7 @@ namespace PSEventViewer;
 /// <example>
 ///   <summary>Register a source for an application log</summary>
 ///   <code>New-EVXSource -SourceName MyApp -LogName Application</code>
-///   <para>Registers MyApp explicitly so later Write-EVXEntry calls do not need administrative configuration behavior.</para>
+///   <para>Registers MyApp explicitly so later Write-EVXEvent calls do not need administrative configuration behavior.</para>
 /// </example>
 [Cmdlet(VerbsCommon.New, "EVXSource", SupportsShouldProcess = true)]
 [OutputType(typeof(bool))]

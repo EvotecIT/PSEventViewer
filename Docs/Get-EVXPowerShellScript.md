@@ -6,24 +6,37 @@ schema: 2.0.0
 ---
 # Get-EVXPowerShellScript
 ## SYNOPSIS
-Retrieves PowerShell scripts from event logs and optionally saves them.
+Retrieves reconstructed PowerShell scripts or execution-context records from event logs.
 
 ## SYNTAX
-### __AllParameterSets
+### Script (Default)
 ```powershell
-Get-EVXPowerShellScript [-Type] <PowerShellEdition> [-Path <string>] [-Format] [-ContainsText <string[]>] [-MaxScripts <int>] [-MaxPendingScripts <int>] [-MaxCachedEvents <int>] [-MachineName <string[]>] [-EventLogPath <string>] [-DateFrom <DateTime>] [-DateTo <DateTime>] [-MaxEventsScanned <int>] [-IncludeQueryInfo] [<CommonParameters>]
+Get-EVXPowerShellScript [-Edition] <PowerShellEdition> [-OutputPath <string>] [-Format] [-ContainsText <string[]>] [-MaxScripts <int>] [-MaxPendingScripts <int>] [-MaxCachedEvents <int>] [-MachineName <string[]>] [-EventLogPath <string>] [-StartTime <DateTime>] [-EndTime <DateTime>] [-TimePeriod <TimePeriod>] [-MaxEventsScanned <int>] [-IncludeQueryInfo] [<CommonParameters>]
+```
+
+### Execution
+```powershell
+Get-EVXPowerShellScript [-Edition] <PowerShellEdition> -Execution [-MaxEvents <int>] [-MachineName <string[]>] [-EventLogPath <string>] [-StartTime <DateTime>] [-EndTime <DateTime>] [-TimePeriod <TimePeriod>] [-MaxEventsScanned <int>] [-IncludeQueryInfo] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
-Retrieves PowerShell scripts from event logs and optionally saves them.
+Retrieves reconstructed PowerShell scripts or execution-context records from event logs.
 
 ## EXAMPLES
 
 ### EXAMPLE 1
 ```powershell
-Get-EVXPowerShellScript -Path 'C:\Path'
+Get-EVXPowerShellScript -Edition WindowsPowerShell -MachineName DC01,DC02 -OutputPath C:\RecoveredScripts -MaxScripts 100
 ```
 
+Reconstructs scripts and streams the saved paths.
+
+### EXAMPLE 2
+```powershell
+Get-EVXPowerShellScript -Execution -Edition WindowsPowerShell -MachineName DC01 -MaxEvents 100
+```
+
+Selects the execution parameter set without introducing another cmdlet.
 
 ## PARAMETERS
 
@@ -32,7 +45,7 @@ Filters scripts to those containing the specified text.
 
 ```yaml
 Type: String[]
-Parameter Sets: __AllParameterSets
+Parameter Sets: Script
 Aliases: None
 Possible values:
 
@@ -43,29 +56,29 @@ Accept pipeline input: False
 Accept wildcard characters: False
 ```
 
-### -DateFrom
-Only reads events logged after this date.
+### -Edition
+PowerShell edition whose operational log should be queried.
 
 ```yaml
-Type: DateTime
-Parameter Sets: __AllParameterSets
-Aliases: None
-Possible values:
+Type: PowerShellEdition
+Parameter Sets: Script, Execution
+Aliases: Type
+Possible values: PowerShell, WindowsPowerShell
 
-Required: False
-Position: named
+Required: True
+Position: 0
 Default value: None
 Accept pipeline input: False
 Accept wildcard characters: False
 ```
 
-### -DateTo
+### -EndTime
 Only reads events logged before this date.
 
 ```yaml
 Type: DateTime
-Parameter Sets: __AllParameterSets
-Aliases: None
+Parameter Sets: Script, Execution
+Aliases: DateTo
 Possible values:
 
 Required: False
@@ -81,11 +94,27 @@ This cannot be combined with MachineName.
 
 ```yaml
 Type: String
-Parameter Sets: __AllParameterSets
+Parameter Sets: Script, Execution
 Aliases: None
 Possible values:
 
 Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -Execution
+Returns execution-context records instead of reconstructed script text.
+
+```yaml
+Type: SwitchParameter
+Parameter Sets: Execution
+Aliases: None
+Possible values:
+
+Required: True
 Position: named
 Default value: None
 Accept pipeline input: False
@@ -97,7 +126,7 @@ When set, converts scripts back to their original formatting.
 
 ```yaml
 Type: SwitchParameter
-Parameter Sets: __AllParameterSets
+Parameter Sets: Script
 Aliases: None
 Possible values:
 
@@ -113,7 +142,7 @@ Emits a machine-readable completion record after each computer.
 
 ```yaml
 Type: SwitchParameter
-Parameter Sets: __AllParameterSets
+Parameter Sets: Script, Execution
 Aliases: None
 Possible values:
 
@@ -130,7 +159,7 @@ This cannot be combined with EventLogPath.
 
 ```yaml
 Type: String[]
-Parameter Sets: __AllParameterSets
+Parameter Sets: Script, Execution
 Aliases: ComputerName
 Possible values:
 
@@ -146,7 +175,23 @@ Maximum event snapshots retained across incomplete script groups.
 
 ```yaml
 Type: Int32
-Parameter Sets: __AllParameterSets
+Parameter Sets: Script
+Aliases: None
+Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -MaxEvents
+Maximum execution-context records to return per computer. Zero returns every match.
+
+```yaml
+Type: Int32
+Parameter Sets: Execution
 Aliases: None
 Possible values:
 
@@ -162,7 +207,7 @@ Maximum native records to scan per computer. Zero scans the complete query.
 
 ```yaml
 Type: Int32
-Parameter Sets: __AllParameterSets
+Parameter Sets: Script, Execution
 Aliases: None
 Possible values:
 
@@ -178,7 +223,7 @@ Maximum incomplete script groups retained while scanning.
 
 ```yaml
 Type: Int32
-Parameter Sets: __AllParameterSets
+Parameter Sets: Script
 Aliases: None
 Possible values:
 
@@ -194,8 +239,8 @@ Maximum reconstructed scripts to return per computer. Zero returns every matchin
 
 ```yaml
 Type: Int32
-Parameter Sets: __AllParameterSets
-Aliases: MaxEvents
+Parameter Sets: Script
+Aliases: None
 Possible values:
 
 Required: False
@@ -205,13 +250,13 @@ Accept pipeline input: False
 Accept wildcard characters: False
 ```
 
-### -Path
+### -OutputPath
 Destination directory where retrieved scripts should be saved.
 
 ```yaml
 Type: String
-Parameter Sets: __AllParameterSets
-Aliases: None
+Parameter Sets: Script
+Aliases: Path
 Possible values:
 
 Required: False
@@ -221,17 +266,33 @@ Accept pipeline input: False
 Accept wildcard characters: False
 ```
 
-### -Type
-PowerShell edition whose operational log should be queried.
+### -StartTime
+Only reads events logged after this date.
 
 ```yaml
-Type: PowerShellEdition
-Parameter Sets: __AllParameterSets
-Aliases: None
-Possible values: PowerShell, WindowsPowerShell
+Type: DateTime
+Parameter Sets: Script, Execution
+Aliases: DateFrom
+Possible values:
 
-Required: True
-Position: 0
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -TimePeriod
+Reusable relative time window. This cannot be combined with StartTime or EndTime.
+
+```yaml
+Type: TimePeriod
+Parameter Sets: Script, Execution
+Aliases: None
+Possible values: PastHour, CurrentHour, PastDay, CurrentDay, PastMonth, CurrentMonth, PastQuarter, CurrentQuarter, Last3Days, Last7Days, Last14Days, Last1Hour, Last2Hours, Last3Hours, Last6Hours, Last12Hours, Last16Hours, Last24Hours, Today, Yesterday, Everything, TillLastMonday, TillLastTuesday, TillLastWednesday, TillLastThursday, TillLastFriday, TillLastSaturday, TillLastSunday
+
+Required: False
+Position: named
 Default value: None
 Accept pipeline input: False
 Accept wildcard characters: False
@@ -247,6 +308,7 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 ## OUTPUTS
 
 - `EventViewerX.RestoredPowerShellScript`
+- `EventViewerX.PowerShellScriptExecutionInfo`
 - `EventViewerX.PowerShellScriptQueryExecutionInfo`
 - `System.String`
 

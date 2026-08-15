@@ -28,15 +28,15 @@ public class SqlDatabaseCreated : EventRuleBase {
 
     /// <summary>Initialises a SQL database creation wrapper from an event record.</summary>
     public SqlDatabaseCreated(EventObject eventObject) : base(eventObject) {
-        Event = eventObject;
-        Type = "SqlDatabaseCreated";
-        Computer = Event.ComputerName;
-        DatabaseName = Event.GetValueFromDataDictionary("Database", "Database Name");
+        SourceEvent = eventObject;
+        NamedEventName = "SqlDatabaseCreated";
+        Computer = SourceEvent.ComputerName;
+        DatabaseName = SourceEvent.GetValueFromDataDictionary("Database", "Database Name");
         if (string.IsNullOrEmpty(DatabaseName)) {
-            var match = System.Text.RegularExpressions.Regex.Match(Event.Message ?? string.Empty,
+            var match = System.Text.RegularExpressions.Regex.Match(SourceEvent.Message ?? string.Empty,
                 "database ['\"]?(?<db>[^'\"]+)['\"]?", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
             DatabaseName = match.Success ? match.Groups["db"].Value : string.Empty;
         }
-        When = Event.TimeCreated;
+        When = SourceEvent.TimeCreated;
     }
 }

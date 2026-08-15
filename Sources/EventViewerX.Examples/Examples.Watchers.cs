@@ -27,7 +27,7 @@ namespace EventViewerX.Examples {
                 "named",
                 Environment.MachineName,
                 "System",
-                EventObjectSlim.GetEventInfoForNamedEvents(new List<NamedEvents> { NamedEvents.OSCrash })["System"].ToList(),
+                NamedEventCatalog.GetEventInfoForNamedEvents(new List<NamedEvents> { NamedEvents.OSCrash })["System"].ToList(),
                 new List<NamedEvents> { NamedEvents.OSCrash },
                 e => Console.WriteLine($"Named event {e.Id}"),
                 false,

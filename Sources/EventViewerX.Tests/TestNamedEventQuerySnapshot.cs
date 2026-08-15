@@ -28,6 +28,7 @@ public sealed class TestNamedEventQuerySnapshot {
         var query = new NamedEventQuery(
             new[] { namedEvent }) {
             SourceEventIds = Array.Empty<int>(),
+            MachineNames = new[] { "remote.contoso.test" },
             Credential = credential,
             MaxConcurrency = 1,
             Enrichment =
@@ -37,7 +38,7 @@ public sealed class TestNamedEventQuerySnapshot {
                 }
         };
 
-        IAsyncEnumerable<EventObjectSlim> stream =
+        IAsyncEnumerable<NamedEventRecord> stream =
             NamedEventEngine.ReadAsync(query);
         query.MaxConcurrency = 0;
         query.SourceEventIds = new[] { -1 };
@@ -45,7 +46,7 @@ public sealed class TestNamedEventQuerySnapshot {
         query.Enrichment.DnsMaxConcurrency = 0;
 
         int count = 0;
-        await foreach (EventObjectSlim _ in stream) {
+        await foreach (NamedEventRecord _ in stream) {
             count++;
         }
 

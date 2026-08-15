@@ -1,4 +1,43 @@
 Describe 'Get-EVXEvent checkpoint compatibility' {
+    It 'keeps a stricter typed record boundary when the checkpoint is empty or lower' {
+        $Fixture = Join-Path $PSScriptRoot 'Logs\NamedFilterExamples.evtx'
+        $CheckpointPath = Join-Path $TestDrive 'typed-filter-boundary.json'
+        $First = Get-EVXEvent `
+            -Path $Fixture `
+            -Oldest `
+            -MaxEvents 1 `
+            -ReadMode Metadata
+        if (-not $First -or -not $First.RecordId) {
+            Set-ItResult -Skipped -Because 'The fixture had no checkpointable event.'
+            return
+        }
+        $Filter = New-EVXFilter
+        $Filter.MinimumRecordIdExclusive = [long]::MaxValue
+
+        $WithoutSavedCheckpoint = @(
+            Get-EVXEvent `
+                -Path $Fixture `
+                -Filter $Filter `
+                -RecordIdFile $CheckpointPath `
+                -RecordIdKey 'typed-boundary' `
+                -ReadMode Metadata
+        )
+        @{ 'typed-boundary' = [long] $First.RecordId } |
+            ConvertTo-Json -Compress |
+            Set-Content -LiteralPath $CheckpointPath -Encoding UTF8
+        $WithLowerSavedCheckpoint = @(
+            Get-EVXEvent `
+                -Path $Fixture `
+                -Filter $Filter `
+                -RecordIdFile $CheckpointPath `
+                -RecordIdKey 'typed-boundary' `
+                -ReadMode Metadata
+        )
+
+        $WithoutSavedCheckpoint | Should -BeNullOrEmpty
+        $WithLowerSavedCheckpoint | Should -BeNullOrEmpty
+    }
+
     It 'preserves SuppressHashFilter for checkpointed channel queries' {
         $CheckpointPath = Join-Path $TestDrive 'suppressed-checkpoint.json'
         $Latest = Get-EVXEvent `
@@ -180,7 +219,7 @@ Describe 'Get-EVXEvent checkpoint compatibility' {
     }
 
     It 'does not fan out an aggregate legacy checkpoint across named-event sources' {
-        $Baseline = @(Get-EVXEvent -Type OSStartup -MaxEvents 1)
+        $Baseline = @(Get-EVXEvent -NamedEvent OSStartup -MaxEvents 1)
         if ($Baseline.Count -eq 0) {
             Set-ItResult -Skipped -Because 'The local logs contained no OSStartup named event.'
             return
@@ -190,7 +229,7 @@ Describe 'Get-EVXEvent checkpoint compatibility' {
         @{ aggregate = [long]::MaxValue } | ConvertTo-Json -Compress |
             Set-Content -LiteralPath $CheckpointPath -Encoding UTF8
 
-        $Events = @(Get-EVXEvent -Type OSStartup -RecordIdFile $CheckpointPath -RecordIdKey aggregate -MaxEvents 1)
+        $Events = @(Get-EVXEvent -NamedEvent OSStartup -RecordIdFile $CheckpointPath -RecordIdKey aggregate -MaxEvents 1)
 
         $Events.Count | Should -Be 1
     }

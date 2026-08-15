@@ -46,7 +46,7 @@ public sealed class CmdletGetEVXLog : AsyncPSCmdlet {
     [Parameter(
         Mandatory = true,
         Position = 0,
-        ParameterSetName = "File")]
+        ParameterSetName = "Path")]
     [Alias("FilePath")]
     public string[] Path { get; set; } = Array.Empty<string>();
 
@@ -93,7 +93,7 @@ public sealed class CmdletGetEVXLog : AsyncPSCmdlet {
     /// Queries the log information.
     /// </summary>
     protected override Task ProcessRecordAsync() {
-        if (ParameterSetName == "File") {
+        if (ParameterSetName == "Path") {
             foreach (string path in Path
                          .Select(static value => value?.Trim() ?? string.Empty)
                          .Where(static value => value.Length > 0)

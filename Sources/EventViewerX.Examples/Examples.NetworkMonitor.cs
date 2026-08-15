@@ -11,10 +11,10 @@ namespace EventViewerX.Examples {
                 var computer = evt switch {
                     NetworkMonitorDriverLoaded driver => driver.Computer,
                     NetworkPromiscuousMode promiscuous => promiscuous.Computer,
-                    _ => evt.GatheredFrom
+                    _ => evt.MachineName
                 };
 
-                Console.WriteLine($"Event: {evt.Type} {evt.EventID} on {computer}");
+                Console.WriteLine($"Event: {evt.NamedEventName} {evt.EventId} on {computer}");
             }
         }
     }

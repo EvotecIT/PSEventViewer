@@ -33,3 +33,14 @@ Get-EVXEvent -FilterHashtable @{
     StartTime = (Get-Date).AddHours(-1)
     TargetUserName = 'alice'
 } -MaxEvents 50
+
+# Prefer a typed filter when several EVX workflows share the same selection.
+$FailedLogons = New-EVXFilter `
+    -EventId 4625 `
+    -TimePeriod Last24Hours `
+    -NamedDataExcludeFilter @{ TargetUserName = 'svc_legacy' }
+Get-EVXEvent `
+    -LogName Security `
+    -Filter $FailedLogons `
+    -ReadMode StructuredData `
+    -MaxEvents 100

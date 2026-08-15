@@ -1,4 +1,4 @@
-﻿using EventViewerX.Rules.ActiveDirectory;
+using EventViewerX.Rules.ActiveDirectory;
 using EventViewerX.Rules.Logging;
 using EventViewerX.Rules.Windows;
 using EventViewerX.Rules.Kerberos;
@@ -19,21 +19,21 @@ namespace EventViewerX {
     /// <param name="typeEventsList">List of target event types.</param>
     /// <returns>Concrete event rule instance or null.</returns>
     /// <exception cref="ArgumentException"></exception>
-        private static EventObjectSlim? BuildTargetEvents(EventObject eventObject, IReadOnlyList<NamedEvents> typeEventsList) {
+        private static NamedEventRecord? BuildTargetEvents(EventObject eventObject, IReadOnlyList<NamedEvents> typeEventsList) {
             // Use the new reflection-based system - let each rule decide if it can handle the event
-            return EventObjectSlim.CreateEventRule(eventObject, typeEventsList.ToList());
+            return NamedEventCatalog.CreateEventRule(eventObject, typeEventsList.ToList());
         }
 
         /// <summary>
         /// Projects and enriches an event before it becomes eligible for checkpoint observation.
         /// </summary>
-        private static async Task<EventObjectSlim?> BuildAndEnrichTargetAsync(
+        private static async Task<NamedEventRecord?> BuildAndEnrichTargetAsync(
             EventObject eventObject,
             IReadOnlyList<NamedEvents> typeEventsList,
             NamedEventEnricher? enricher,
             CancellationToken cancellationToken) {
 
-            EventObjectSlim? targetEvent = BuildTargetEvents(eventObject, typeEventsList);
+            NamedEventRecord? targetEvent = BuildTargetEvents(eventObject, typeEventsList);
             if (targetEvent != null && enricher != null) {
                 await enricher.EnrichAsync(targetEvent, cancellationToken).ConfigureAwait(false);
             }
@@ -74,11 +74,11 @@ namespace EventViewerX {
                     yield break;
                 }
 
-                var targetTasks = new Task<EventObjectSlim?>[batch.Count];
+                var targetTasks = new Task<NamedEventRecord?>[batch.Count];
                 for (int index = 0; index < batch.Count; index++) {
                     targetTasks[index] = batch[index].TargetTask;
                 }
-                EventObjectSlim?[] targets = await Task.WhenAll(targetTasks).ConfigureAwait(false);
+                NamedEventRecord?[] targets = await Task.WhenAll(targetTasks).ConfigureAwait(false);
                 cancellationToken.ThrowIfCancellationRequested();
                 for (int index = 0; index < batch.Count; index++) {
                     cancellationToken.ThrowIfCancellationRequested();
@@ -93,23 +93,23 @@ namespace EventViewerX {
         }
 
         private sealed class PendingNamedEventProjection {
-            internal PendingNamedEventProjection(EventObject source, Task<EventObjectSlim?> targetTask) {
+            internal PendingNamedEventProjection(EventObject source, Task<NamedEventRecord?> targetTask) {
                 Source = source;
                 TargetTask = targetTask;
             }
 
             internal EventObject Source { get; }
-            internal Task<EventObjectSlim?> TargetTask { get; }
+            internal Task<NamedEventRecord?> TargetTask { get; }
         }
 
         internal readonly struct NamedEventProjection {
-            internal NamedEventProjection(EventObject source, EventObjectSlim? target) {
+            internal NamedEventProjection(EventObject source, NamedEventRecord? target) {
                 Source = source;
                 Target = target;
             }
 
             internal EventObject Source { get; }
-            internal EventObjectSlim? Target { get; }
+            internal NamedEventRecord? Target { get; }
         }
     }
 }

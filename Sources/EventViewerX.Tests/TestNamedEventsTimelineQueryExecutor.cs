@@ -209,7 +209,7 @@ public class TestNamedEventsTimelineQueryExecutor {
         Assert.Equal(EventLogRemoteQueryFailureKind.HostUnavailable, failure.Kind);
     }
 
-    private sealed class PayloadTestSlim : EventObjectSlim {
+    private sealed class PayloadTestSlim : NamedEventRecord {
         private PayloadTestSlim(EventObject eventObject) : base(eventObject) {
         }
 

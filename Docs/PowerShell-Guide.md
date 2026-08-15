@@ -33,24 +33,27 @@ Get-EVXEvent `
     -MaxEvents 10
 ```
 
-`Get-EVXFilter` produces native QueryList XML by default. Add `-XPathOnly`
-when every requested condition can be represented safely as raw Windows Event
-Log XPath.
+`New-EVXFilter` creates a reusable `EventViewerX.EventFilter` by default. The
+same object can be passed to query, export, watcher, and collector commands.
+Use `-AsXPath`, `-LogName`, or `-Path` only when another Windows tool needs
+native query text.
 
 ```powershell
-Get-EVXFilter `
-    -ID 4624, 4625 `
+$filter = New-EVXFilter `
+    -EventId 4624, 4625 `
     -StartTime (Get-Date).AddHours(-1) `
     -Level Error, Warning
+
+Get-EVXEvent -LogName Security -Filter $filter -ReadMode Metadata
 ```
 
 Named-data exclusion uses a native `Suppress` clause so events without the
 named field remain in the result:
 
 ```powershell
-$queryXml = Get-EVXFilter `
+$queryXml = New-EVXFilter `
     -LogName Security `
-    -ID 4624, 4625 `
+    -EventId 4624, 4625 `
     -NamedDataExcludeFilter @{
         TargetUserName = 'svc-noisy'
     }
@@ -58,7 +61,7 @@ $queryXml = Get-EVXFilter `
 Get-EVXEvent -FilterXml $queryXml -ReadMode StructuredData
 ```
 
-Do not combine `-NamedDataExcludeFilter` with `-XPathOnly`. The Windows Event
+Do not combine `-NamedDataExcludeFilter` with `-AsXPath`. The Windows Event
 Log XPath subset cannot safely express “exclude this value but keep events
 where the field is absent,” so the command fails explicitly instead.
 
@@ -188,18 +191,18 @@ Named scenarios turn common event families into useful typed objects.
 
 ```powershell
 Get-EVXEvent `
-    -Type ADUserLogonFailed, ADUserLockouts `
+    -NamedEvent ADUserLogonFailed, ADUserLockouts `
     -MachineName DC01, DC02 `
     -TimePeriod Last24Hours `
     -MaxEvents 500 |
-    Select-Object When, Type, Computer, UserName, IpAddress
+    Select-Object TimeCreated, NamedEventName, MachineName, UserName, IpAddress
 ```
 
 DNS enrichment is opt-in and bounded:
 
 ```powershell
 Get-EVXEvent `
-    -Type ADSMBServerAuditV1 `
+    -NamedEvent ADSMBServerAuditV1 `
     -MachineName DC01, DC02 `
     -TimePeriod Last3Days `
     -ResolveDns `
@@ -256,14 +259,17 @@ Get-EVXEvent `
     }
 ```
 
-For aggregation without materializing event objects into a PowerShell array,
-use the compiled statistics path:
+For a custom aggregation, keep only the state you need rather than retaining
+event objects:
 
 ```powershell
-Get-EVXEventStatistics `
-    -LogName Security `
-    -MaxEvents 100000 `
-    -Top 20
+$counts = @{}
+Get-EVXEvent -LogName Security -ReadMode Metadata -MaxEvents 100000 |
+    ForEach-Object {
+        $key = '{0}/{1}' -f $_.ProviderName, $_.Id
+        $counts[$key] = 1 + [int] $counts[$key]
+    }
+$counts.GetEnumerator() | Sort-Object Value -Descending | Select-Object -First 20
 ```
 
 ### Export directly
@@ -460,6 +466,14 @@ normally requires elevation. See [`Manage-Logs.ps1`](../Examples/Manage-Logs.ps1
 Get-EVXCollectorSubscription -Name '*' |
     Select-Object Name, Enabled, ConfigurationMode, DeliveryMode, Query
 
+New-EVXCollectorSubscription `
+    -Name 'Failed logons' `
+    -SourceComputer DC01, DC02 `
+    -LogName Security `
+    -Filter (New-EVXFilter -EventId 4625 -TimePeriod Last24Hours) `
+    -Description 'Security 4625 from domain controllers' |
+    Set-EVXCollectorSubscription -Confirm:$false
+
 Set-EVXCollectorSubscription `
     -Name 'Domain Controllers' `
     -Enabled $true `
@@ -477,9 +491,9 @@ operational events:
 
 ```powershell
 Get-EVXPowerShellScript `
-    -Type WindowsPowerShell `
+    -Edition WindowsPowerShell `
     -MachineName DC01, DC02 `
-    -Path C:\RecoveredScripts `
+    -OutputPath C:\RecoveredScripts `
     -MaxScripts 100 `
     -MaxEventsScanned 50000 `
     -MaxPendingScripts 512 `
@@ -487,12 +501,13 @@ Get-EVXPowerShellScript `
     -IncludeQueryInfo
 ```
 
-Use `Get-EVXPowerShellScriptExecution` when execution context and event
-sequence are needed rather than reconstructed source files:
+Use the `Execution` parameter set when execution context and event sequence are
+needed rather than reconstructed source files:
 
 ```powershell
-Get-EVXPowerShellScriptExecution `
-    -Type WindowsPowerShell `
+Get-EVXPowerShellScript `
+    -Execution `
+    -Edition WindowsPowerShell `
     -MachineName DC01 `
     -MaxEvents 100 `
     -MaxEventsScanned 50000
@@ -503,9 +518,9 @@ operational log. The file is queried exactly once:
 
 ```powershell
 Get-EVXPowerShellScript `
-    -Type WindowsPowerShell `
+    -Edition WindowsPowerShell `
     -EventLogPath C:\Logs\WindowsPowerShell-Operational.evtx `
-    -Path C:\RecoveredScripts `
+    -OutputPath C:\RecoveredScripts `
     -MaxScripts 100
 ```
 
@@ -519,10 +534,10 @@ when another matching record actually exists. See
 ### Classic Event Log
 
 ```powershell
-Write-EVXEntry `
+Write-EVXEvent `
     -LogName Application `
     -ProviderName Contoso-App `
-    -EventId 1000 `
+    -Id 1000 `
     -Message 'Service started' `
     -CreateSource `
     -Confirm:$false
@@ -567,18 +582,17 @@ limits. See [Custom providers](Custom-Providers.md) and
 
 | Job | Commands |
 | --- | --- |
-| Query/filter | `Get-EVXEvent`, `Get-EVXFilter` |
-| Aggregate | `Get-EVXEventStatistics` |
+| Query/filter | `Get-EVXEvent`, `New-EVXFilter` |
 | Direct export | `Export-EVXEvent` |
 | Durable progress | `Reset-EVXEventCheckpoint` plus checkpoint parameters on `Get-EVXEvent` |
 | Real-time events | `Start-EVXWatcher`, `Get-EVXWatcher`, `Stop-EVXWatcher` |
 | Provider/channel catalog | `Get-EVXProvider`, `Get-EVXLog`, `Test-EVXLog` |
 | Channel/archive administration | `Set-EVXLog`, `Clear-EVXLog`, `Update-EVXLogArchive` |
 | Classic log/source lifecycle | `New-EVXLog`, `Remove-EVXLog`, `New-EVXSource`, `Remove-EVXSource` |
-| Collector subscriptions | `Get-EVXCollectorSubscription`, `Set-EVXCollectorSubscription` |
-| PowerShell recovery | `Get-EVXPowerShellScript`, `Get-EVXPowerShellScriptExecution` |
-| Event writes | `Write-EVXEntry`, `Write-EVXEvent` |
-| Provider definitions/packages | `ConvertTo-EVXProviderDefinition`, `Test-EVXProviderDefinition`, `New-EVXProviderPackage`, `Get-EVXProviderPackage`, `Install-EVXProviderPackage`, `Uninstall-EVXProviderPackage` |
+| Collector subscriptions | `New-EVXCollectorSubscription`, `Get-EVXCollectorSubscription`, `Set-EVXCollectorSubscription` |
+| PowerShell recovery | `Get-EVXPowerShellScript` |
+| Event writes | `Write-EVXEvent` |
+| Provider definitions/packages | `Test-EVXProviderDefinition`, `New-EVXProviderPackage`, `Get-EVXProvider`, `Install-EVXProviderPackage`, `Uninstall-EVXProviderPackage` |
 
 Use `Get-Help <command> -Full` for the parameter-level reference generated from
 the compiled cmdlet XML documentation.

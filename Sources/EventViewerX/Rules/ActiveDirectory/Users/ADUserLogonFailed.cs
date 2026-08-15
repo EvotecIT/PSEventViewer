@@ -129,37 +129,37 @@ public class ADUserLogonFailed : EventRuleBase {
 
     /// <summary>Initialises a failed logon wrapper from an event record.</summary>
     public ADUserLogonFailed(EventObject eventObject) : base(eventObject) {
-        Event = eventObject;
-        Type = "ADUserLogonFailed";
-        Computer = Event.ComputerName;
-        Action = Event.MessageSubject;
-        //Who = Event.GetSubjectAccountOrEmpty();
-        Who = Event.GetDataValueOrEmpty(KnownEventField.WorkstationName);
-        ObjectAffected = Event.GetTargetAccountOrEmpty();
-        IpAddress = Event.GetDataValueOrEmpty(KnownEventField.IpAddress);
-        IpPort = Event.GetDataValueOrEmpty(KnownEventField.IpPort);
-        //WorkstationName = Event.GetDataValueOrEmpty(KnownEventField.WorkstationName);
-        LogonProcessName = Event.GetDataValueOrEmpty(KnownEventField.LogonProcessName);
-        LogonType = Event.TryGetDataEnum(KnownEventField.LogonType, out EventViewerX.LogonType parsedLogonType, EventFieldNumericBase.Decimal)
+        SourceEvent = eventObject;
+        NamedEventName = "ADUserLogonFailed";
+        Computer = SourceEvent.ComputerName;
+        Action = SourceEvent.MessageSubject;
+        //Who = SourceEvent.GetSubjectAccountOrEmpty();
+        Who = SourceEvent.GetDataValueOrEmpty(KnownEventField.WorkstationName);
+        ObjectAffected = SourceEvent.GetTargetAccountOrEmpty();
+        IpAddress = SourceEvent.GetDataValueOrEmpty(KnownEventField.IpAddress);
+        IpPort = SourceEvent.GetDataValueOrEmpty(KnownEventField.IpPort);
+        //WorkstationName = SourceEvent.GetDataValueOrEmpty(KnownEventField.WorkstationName);
+        LogonProcessName = SourceEvent.GetDataValueOrEmpty(KnownEventField.LogonProcessName);
+        LogonType = SourceEvent.TryGetDataEnum(KnownEventField.LogonType, out EventViewerX.LogonType parsedLogonType, EventFieldNumericBase.Decimal)
             ? parsedLogonType
             : null;
-        Status = Event.TryGetDataEnum(KnownEventField.Status, out StatusCode parsedStatus, EventFieldNumericBase.Hexadecimal)
+        Status = SourceEvent.TryGetDataEnum(KnownEventField.Status, out StatusCode parsedStatus, EventFieldNumericBase.Hexadecimal)
             ? parsedStatus
             : null;
-        SubStatus = Event.TryGetDataEnum(KnownEventField.SubStatus, out SubStatusCode parsedSubStatus, EventFieldNumericBase.Hexadecimal)
+        SubStatus = SourceEvent.TryGetDataEnum(KnownEventField.SubStatus, out SubStatusCode parsedSubStatus, EventFieldNumericBase.Hexadecimal)
             ? parsedSubStatus
             : null;
-        FailureReason = Event.TryGetDataEnum(KnownEventField.FailureReason, out EventViewerX.FailureReason parsedFailureReason, EventFieldNumericBase.Decimal, "%%")
+        FailureReason = SourceEvent.TryGetDataEnum(KnownEventField.FailureReason, out EventViewerX.FailureReason parsedFailureReason, EventFieldNumericBase.Decimal, "%%")
             ? parsedFailureReason
             : null;
 
-        LmPackageName = Event.GetDataValueOrEmpty(KnownEventField.LmPackageName);
-        KeyLength = Event.GetDataValueOrEmpty(KnownEventField.KeyLength);
-        ProcessId = Event.GetDataValueOrEmpty(KnownEventField.ProcessId);
-        ProcessName = Event.GetDataValueOrEmpty(KnownEventField.ProcessName);
-        TransmittedServices = Event.GetDataValueOrEmpty(KnownEventField.TransmittedServices);
-        PackageName = Event.GetDataValueOrEmpty(KnownEventField.AuthenticationPackageName);
-        When = Event.TimeCreated;
+        LmPackageName = SourceEvent.GetDataValueOrEmpty(KnownEventField.LmPackageName);
+        KeyLength = SourceEvent.GetDataValueOrEmpty(KnownEventField.KeyLength);
+        ProcessId = SourceEvent.GetDataValueOrEmpty(KnownEventField.ProcessId);
+        ProcessName = SourceEvent.GetDataValueOrEmpty(KnownEventField.ProcessName);
+        TransmittedServices = SourceEvent.GetDataValueOrEmpty(KnownEventField.TransmittedServices);
+        PackageName = SourceEvent.GetDataValueOrEmpty(KnownEventField.AuthenticationPackageName);
+        When = SourceEvent.TimeCreated;
     }
 
     /// <summary>

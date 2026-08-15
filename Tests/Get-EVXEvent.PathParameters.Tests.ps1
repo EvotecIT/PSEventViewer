@@ -1,7 +1,7 @@
 Describe 'Get-EVXEvent -Path parameter contract' {
     BeforeAll {
         $PathParameters = (Get-Command Get-EVXEvent).ParameterSets |
-            Where-Object Name -EQ 'PathEvents' |
+            Where-Object Name -EQ 'Path' |
             Select-Object -ExpandProperty Parameters |
             Select-Object -ExpandProperty Name
     }
@@ -35,15 +35,37 @@ Describe 'Get-EVXEvent -Path parameter contract' {
         } | Should -Throw '*always read locally*'
     }
 
+    It 'rejects a remote target for file paths embedded in FilterXml' {
+        [xml] $Query = @'
+<QueryList>
+  <Query Id="0" Path="System">
+    <Select Path="System">*</Select>
+  </Query>
+  <Query Id="1" Path="file:///C:/events.evtx">
+    <Select Path="file:///C:/events.evtx">*</Select>
+  </Query>
+</QueryList>
+'@
+
+        {
+            Get-EVXEvent `
+                -FilterXml $Query `
+                -MachineName 'remote.contoso.test' `
+                -ContinueOnError `
+                -ErrorAction Stop
+        } | Should -Throw '*cannot be combined with MachineName*'
+    }
+
+
     It 'supports explicit provider-message culture for offline, live, and named queries' {
         $PathParameters | Should -Contain 'MessageCulture'
         $GenericParameters = (Get-Command Get-EVXEvent).ParameterSets |
-            Where-Object Name -EQ 'GenericEvents' |
+            Where-Object Name -EQ 'Channel' |
             Select-Object -ExpandProperty Parameters |
             Select-Object -ExpandProperty Name
         $GenericParameters | Should -Contain 'MessageCulture'
         $NamedParameters = (Get-Command Get-EVXEvent).ParameterSets |
-            Where-Object Name -EQ 'NamedEvents' |
+            Where-Object Name -EQ 'NamedEvent' |
             Select-Object -ExpandProperty Parameters |
             Select-Object -ExpandProperty Name
         $NamedParameters | Should -Contain 'MessageCulture'
@@ -57,7 +79,7 @@ Describe 'Get-EVXEvent -Path parameter contract' {
         $Event.MessageRenderStatus.ToString() | Should -Not -Be 'NotRequested'
 
         $NamedEvent = Get-EVXEvent `
-            -Type OSStartup `
+            -NamedEvent OSStartup `
             -MaxEvents 1 `
             -MessageCulture en-US `
             -ErrorAction Stop |
@@ -65,8 +87,8 @@ Describe 'Get-EVXEvent -Path parameter contract' {
         if ($null -eq $NamedEvent) {
             Set-ItResult -Skipped -Because 'No OSStartup event was available.'
         } else {
-            $NamedEvent.Event.MessageCulture | Should -Be 'en-US'
-            $NamedEvent.Event.MessageRenderStatus.ToString() | Should -Not -Be 'NotRequested'
+            $NamedEvent.SourceEvent.MessageCulture | Should -Be 'en-US'
+            $NamedEvent.SourceEvent.MessageRenderStatus.ToString() | Should -Not -Be 'NotRequested'
         }
     }
 }

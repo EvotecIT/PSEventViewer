@@ -11,7 +11,7 @@ describe 'Remove-EVXSource cmdlet' {
                 -LogName 'Application' `
                 -SourceName $script:source |
                 Out-Null
-            Write-EVXEntry -LogName 'Application' -ProviderName $script:source -EventId 1 -Message 'test'
+            Write-EVXEvent -LogName 'Application' -ProviderName $script:source -Id 1 -Message 'test'
         }
     }
 

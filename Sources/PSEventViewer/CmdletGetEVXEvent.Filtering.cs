@@ -20,25 +20,40 @@ public sealed partial class CmdletGetEVXEvent {
     }
 
     private EventFilter CreateCommandFilter() {
+        if (Filter != null) {
+            string[] conflicting = new[] {
+                    nameof(EventId),
+                    nameof(EventRecordId),
+                    nameof(Keywords),
+                    nameof(Level),
+                    nameof(StartTime),
+                    nameof(EndTime),
+                    nameof(TimePeriod),
+                    nameof(UserId),
+                    nameof(NamedDataFilter),
+                    nameof(NamedDataExcludeFilter)
+                }
+                .Where(MyInvocation.BoundParameters.ContainsKey)
+                .ToArray();
+            if (conflicting.Length > 0) {
+                throw new PSArgumentException(
+                    "Filter cannot be combined with individual filter parameters: " +
+                    string.Join(", ", conflicting) + ".");
+            }
+            if (ParameterSetName == "Provider" &&
+                (Filter.ProviderNames?.Count ?? 0) > 0) {
+                throw new PSArgumentException(
+                    "ProviderName already defines the provider source in the Provider parameter set; Filter.ProviderNames must be empty.");
+            }
+            return Filter;
+        }
         (DateTime? resolvedStart, DateTime? resolvedEnd) =
             EventTimeRange.Resolve(StartTime, EndTime, TimePeriod);
-        byte[]? levels = Level?
-            .Select(value => {
-                if (value < byte.MinValue || value > byte.MaxValue) {
-                    throw new PSArgumentOutOfRangeException(
-                        nameof(Level),
-                        value,
-                        "Event levels must be between 0 and 255.");
-                }
-                return (byte)value;
-            })
-            .ToArray();
-
         return new EventFilter {
             EventIds = EventId,
             RecordIds = EventRecordId,
             ProviderNames = ProviderName,
-            Levels = levels,
+            Levels = Level?.Select(static value => (byte)value).ToArray(),
             Keywords = Keywords,
             StartTime = resolvedStart,
             EndTime = resolvedEnd,
@@ -54,48 +69,21 @@ public sealed partial class CmdletGetEVXEvent {
         string sourceName,
         bool sourceIsFile = false) {
 
-        return new EventFilter {
-            EventIds = source.EventIds,
-            RecordIds = source.RecordIds,
-            MinimumRecordIdExclusive =
-                GetCheckpointLowerBound(
-                    machineName,
-                    sourceName,
-                    sourceIsFile),
-            MaximumRecordIdExclusive = source.MaximumRecordIdExclusive,
-            ProviderNames = source.ProviderNames,
-            Levels = source.Levels,
-            Keywords = source.Keywords,
-            StartTime = source.StartTime,
-            EndTime = source.EndTime,
-            UserIds = source.UserIds,
-            Data = source.Data,
-            NamedData = source.NamedData,
-            ExcludedNamedData = source.ExcludedNamedData,
-            ExcludedEventIds = source.ExcludedEventIds
-        };
+        long? checkpointMinimum = GetCheckpointLowerBound(
+            machineName,
+            sourceName,
+            sourceIsFile);
+        return source.WithMinimumRecordIdExclusive(
+            checkpointMinimum);
     }
 
     private static EventFilter WithProviders(
         EventFilter source,
         IReadOnlyList<string> providerNames) {
 
-        return new EventFilter {
-            EventIds = source.EventIds,
-            RecordIds = source.RecordIds,
-            MinimumRecordIdExclusive = source.MinimumRecordIdExclusive,
-            MaximumRecordIdExclusive = source.MaximumRecordIdExclusive,
-            ProviderNames = providerNames,
-            Levels = source.Levels,
-            Keywords = source.Keywords,
-            StartTime = source.StartTime,
-            EndTime = source.EndTime,
-            UserIds = source.UserIds,
-            Data = source.Data,
-            NamedData = source.NamedData,
-            ExcludedNamedData = source.ExcludedNamedData,
-            ExcludedEventIds = source.ExcludedEventIds
-        };
+        EventFilter copy = source.Clone();
+        copy.ProviderNames = providerNames.ToArray();
+        return copy;
     }
 
     private static IReadOnlyDictionary<string, IReadOnlyList<string>>?
@@ -283,4 +271,5 @@ public sealed partial class CmdletGetEVXEvent {
             return MaxEventsScanned;
         }
         return HasManagedPostReadFilter ? 0 : MaxEvents;
-    }}
+    }
+}

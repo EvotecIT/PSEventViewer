@@ -4,7 +4,7 @@ namespace EventViewerX.Rules.Windows;
 /// OS Time Change
 /// 4616: The system time was changed
 /// </summary>
-/// <seealso cref="EventViewerX.EventObjectSlim" />
+/// <seealso cref="EventViewerX.NamedEventRecord" />
 public class OSTimeChange : EventRuleBase {
     /// <inheritdoc />
     public override List<int> EventIds => new() { 4616 };
@@ -34,17 +34,17 @@ public class OSTimeChange : EventRuleBase {
 
     /// <summary>Initialises a time-change wrapper from an event record.</summary>
     public OSTimeChange(EventObject eventObject) : base(eventObject) {
-        Event = eventObject;
+        SourceEvent = eventObject;
 
-        Type = "OSTimeChange";
-        Computer = Event.ComputerName;
-        Action = Event.MessageSubject;
-        ObjectAffected = Event.MachineName;
-        PreviousTime = Event.GetValueFromDataDictionary("PreviousTime");
-        NewTime = Event.GetValueFromDataDictionary("NewTime");
+        NamedEventName = "OSTimeChange";
+        Computer = SourceEvent.ComputerName;
+        Action = SourceEvent.MessageSubject;
+        ObjectAffected = SourceEvent.MachineName;
+        PreviousTime = SourceEvent.GetValueFromDataDictionary("PreviousTime");
+        NewTime = SourceEvent.GetValueFromDataDictionary("NewTime");
 
-        Who = Event.GetSubjectAccountOrEmpty();
-        When = Event.TimeCreated;
+        Who = SourceEvent.GetSubjectAccountOrEmpty();
+        When = SourceEvent.TimeCreated;
     }
 }
 

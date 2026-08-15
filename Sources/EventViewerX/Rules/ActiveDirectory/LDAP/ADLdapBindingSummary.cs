@@ -34,14 +34,14 @@ public class ADLdapBindingSummary : EventRuleBase {
 
     /// <summary>Initialises the LDAP binding summary wrapper from an event record.</summary>
     public ADLdapBindingSummary(EventObject eventObject) : base(eventObject) {
-        Event = eventObject;
+        SourceEvent = eventObject;
 
-        Type = "ADLdapBindingSummary";
-        Computer = Event.ComputerName;
-        Action = Event.MessageSubject;
-        SimpleBindsWithoutTls = RuleHelpers.GetInt(Event, "NoNameA0");
-        NegotiateBindsWithoutSigning = RuleHelpers.GetInt(Event, "NoNameA1");
-        When = Event.TimeCreated;
+        NamedEventName = "ADLdapBindingSummary";
+        Computer = SourceEvent.ComputerName;
+        Action = SourceEvent.MessageSubject;
+        SimpleBindsWithoutTls = RuleHelpers.GetInt(SourceEvent, "NoNameA0");
+        NegotiateBindsWithoutSigning = RuleHelpers.GetInt(SourceEvent, "NoNameA1");
+        When = SourceEvent.TimeCreated;
         LevelDisplayName = eventObject.LevelDisplayName;
         TaskDisplayName = eventObject.TaskDisplayName;
     }

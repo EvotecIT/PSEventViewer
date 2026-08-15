@@ -6,11 +6,9 @@ schema: 2.0.0
 ---
 # Write-EVXEvent
 ## SYNOPSIS
-Writes a registered manifest/ETW event using positional, named, or typed schema values.
+Writes classic Event Log entries or registered manifest/ETW events.
 
-Resolves and caches the exact registered event schema, validates every value, converts values according to native Windows types, and writes through the dependency-free EventViewerX engine. Named hashtable order does not matter.
-
-EventName is available for providers installed through an EventViewerX .evxprovider package. ProviderName plus Id works with any registered manifest provider. Use Write-EVXEntry for classic Event Log sources.
+The Classic parameter set writes through a registered classic source. Manifest parameter sets resolve the registered event schema, validate native values, and write positional, named, or typed payloads.
 
 ## SYNTAX
 ### ByIdPayload (Default)
@@ -28,12 +26,15 @@ Write-EVXEvent [-ProviderName] <string> [-Id] <int> [-Data] <IDictionary> [-Vers
 Write-EVXEvent [-ProviderName] <string> [-EventName] <string> [-Data] <IDictionary> [-Version <Byte>] [-WhatIf] [-Confirm] [<CommonParameters>]
 ```
 
+### Classic
+```powershell
+Write-EVXEvent [-LogName] <string> [-ProviderName] <string> [-Id] <int> [-Message] <string> [-MachineName <string>] [-EventLogEntryType <EventLogEntryType>] [-Category <int>] [-AdditionalFields <string[]>] [-CreateSource] [-WhatIf] [-Confirm] [<CommonParameters>]
+```
+
 ## DESCRIPTION
-Writes a registered manifest/ETW event using positional, named, or typed schema values.
+Writes classic Event Log entries or registered manifest/ETW events.
 
-Resolves and caches the exact registered event schema, validates every value, converts values according to native Windows types, and writes through the dependency-free EventViewerX engine. Named hashtable order does not matter.
-
-EventName is available for providers installed through an EventViewerX .evxprovider package. ProviderName plus Id works with any registered manifest provider. Use Write-EVXEntry for classic Event Log sources.
+The Classic parameter set writes through a registered classic source. Manifest parameter sets resolve the registered event schema, validate native values, and write positional, named, or typed payloads.
 
 ## EXAMPLES
 
@@ -53,6 +54,54 @@ Uses the positional compatibility surface for an existing Windows provider.
 
 ## PARAMETERS
 
+### -AdditionalFields
+Additional replacement strings stored with the classic entry.
+
+```yaml
+Type: String[]
+Parameter Sets: Classic
+Aliases: None
+Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -Category
+Classic event category.
+
+```yaml
+Type: Int32
+Parameter Sets: Classic
+Aliases: None
+Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -CreateSource
+Registers a missing classic source before writing. Registration normally requires elevation.
+
+```yaml
+Type: SwitchParameter
+Parameter Sets: Classic
+Aliases: None
+Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
 ### -Data
 Hashtable of values keyed by manifest field name. Key order is ignored. Accepts pipeline input for efficient repeated writes with one cached native registration.
 
@@ -66,6 +115,22 @@ Required: True
 Position: 2
 Default value: None
 Accept pipeline input: True (ByValue)
+Accept wildcard characters: False
+```
+
+### -EventLogEntryType
+Classic event entry severity.
+
+```yaml
+Type: EventLogEntryType
+Parameter Sets: Classic
+Aliases: EntryType
+Possible values: Error, Warning, Information, SuccessAudit, FailureAudit
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
 Accept wildcard characters: False
 ```
 
@@ -90,12 +155,60 @@ Event identifier declared by the provider manifest.
 
 ```yaml
 Type: Int32
-Parameter Sets: ByIdPayload, ByIdData
+Parameter Sets: ByIdPayload, ByIdData, Classic
 Aliases: EventId
 Possible values:
 
 Required: True
 Position: 1
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -LogName
+Classic event log receiving the entry.
+
+```yaml
+Type: String
+Parameter Sets: Classic
+Aliases: None
+Possible values:
+
+Required: True
+Position: 0
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -MachineName
+Remote computer receiving the classic entry. Omit for the local computer.
+
+```yaml
+Type: String
+Parameter Sets: Classic
+Aliases: ComputerName, ServerName
+Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -Message
+Message written to the classic event source.
+
+```yaml
+Type: String
+Parameter Sets: Classic
+Aliases: None
+Possible values:
+
+Required: True
+Position: 3
 Default value: None
 Accept pipeline input: False
 Accept wildcard characters: False
@@ -122,8 +235,8 @@ Name of a registered local manifest event provider.
 
 ```yaml
 Type: String
-Parameter Sets: ByIdPayload, ByIdData, ByNameData
-Aliases: None
+Parameter Sets: ByIdPayload, ByIdData, ByNameData, Classic
+Aliases: Source, Provider
 Possible values:
 
 Required: True

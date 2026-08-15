@@ -36,16 +36,16 @@ public class DeviceDisabled : EventRuleBase {
 
     /// <summary>Initialises a device-disabled wrapper from an event record.</summary>
     public DeviceDisabled(EventObject eventObject) : base(eventObject) {
-        Event = eventObject;
-        Type = "DeviceDisabled";
-        Computer = Event.ComputerName;
-        DeviceId = Event.GetValueFromDataDictionary("DeviceId");
-        DeviceName = Event.GetValueFromDataDictionary("DeviceDescription", "DeviceName");
-        ClassId = Event.GetValueFromDataDictionary("ClassId");
-        ClassName = Event.GetValueFromDataDictionary("ClassName");
-        Reason = Event.GetValueFromDataDictionary("Reason");
-        Who = Event.GetSubjectAccountOrEmpty();
-        When = Event.TimeCreated;
+        SourceEvent = eventObject;
+        NamedEventName = "DeviceDisabled";
+        Computer = SourceEvent.ComputerName;
+        DeviceId = SourceEvent.GetValueFromDataDictionary("DeviceId");
+        DeviceName = SourceEvent.GetValueFromDataDictionary("DeviceDescription", "DeviceName");
+        ClassId = SourceEvent.GetValueFromDataDictionary("ClassId");
+        ClassName = SourceEvent.GetValueFromDataDictionary("ClassName");
+        Reason = SourceEvent.GetValueFromDataDictionary("Reason");
+        Who = SourceEvent.GetSubjectAccountOrEmpty();
+        When = SourceEvent.TimeCreated;
     }
 }
 

@@ -71,34 +71,34 @@ public class ADComputerCreateChange : EventRuleBase {
     /// <summary>Initialises a computer create/change wrapper from an event record.</summary>
     public ADComputerCreateChange(EventObject eventObject) : base(eventObject) {
         // common fields
-        Event = eventObject;
-        Type = "ADComputerChange";
+        SourceEvent = eventObject;
+        NamedEventName = "ADComputerChange";
 
-        Computer = Event.ComputerName;
-        Action = Event.MessageSubject;
-        ComputerAffected = Event.GetTargetAccountOrEmpty();
-        SamAccountName = Event.GetValueFromDataDictionary("SamAccountName");
-        DisplayName = Event.GetValueFromDataDictionary("DisplayName");
-        UserPrincipalName = Event.GetValueFromDataDictionary("UserPrincipalName");
-        HomeDirectory = Event.GetValueFromDataDictionary("HomeDirectory");
-        HomePath = Event.GetValueFromDataDictionary("HomePath");
-        ScriptPath = Event.GetValueFromDataDictionary("ScriptPath");
-        ProfilePath = Event.GetValueFromDataDictionary("ProfilePath");
-        UserWorkstations = Event.GetValueFromDataDictionary("UserWorkstations");
-        PasswordLastSet = Event.GetValueFromDataDictionary("PasswordLastSet");
-        AccountExpires = Event.GetValueFromDataDictionary("AccountExpires");
-        PrimaryGroupId = Event.GetValueFromDataDictionary("PrimaryGroupId");
-        AllowedToDelegateTo = Event.GetValueFromDataDictionary("AllowedToDelegateTo");
-        OldUacValue = Event.GetValueFromDataDictionary("OldUacValue");
-        NewUacValue = Event.GetValueFromDataDictionary("NewUacValue");
-        UserAccountControl = Event.GetValueFromDataDictionary("UserAccountControl");
-        UserParameters = Event.GetValueFromDataDictionary("UserParameters");
-        SidHistory = Event.GetValueFromDataDictionary("SidHistory");
-        LogonHours = Event.GetValueFromDataDictionary("LogonHours");
-        DnsHostName = Event.GetValueFromDataDictionary("DnsHostName");
-        ServicePrincipalNames = Event.GetValueFromDataDictionary("ServicePrincipalNames");
-        Who = Event.GetSubjectAccountOrEmpty();
-        When = Event.TimeCreated;
+        Computer = SourceEvent.ComputerName;
+        Action = SourceEvent.MessageSubject;
+        ComputerAffected = SourceEvent.GetTargetAccountOrEmpty();
+        SamAccountName = SourceEvent.GetValueFromDataDictionary("SamAccountName");
+        DisplayName = SourceEvent.GetValueFromDataDictionary("DisplayName");
+        UserPrincipalName = SourceEvent.GetValueFromDataDictionary("UserPrincipalName");
+        HomeDirectory = SourceEvent.GetValueFromDataDictionary("HomeDirectory");
+        HomePath = SourceEvent.GetValueFromDataDictionary("HomePath");
+        ScriptPath = SourceEvent.GetValueFromDataDictionary("ScriptPath");
+        ProfilePath = SourceEvent.GetValueFromDataDictionary("ProfilePath");
+        UserWorkstations = SourceEvent.GetValueFromDataDictionary("UserWorkstations");
+        PasswordLastSet = SourceEvent.GetValueFromDataDictionary("PasswordLastSet");
+        AccountExpires = SourceEvent.GetValueFromDataDictionary("AccountExpires");
+        PrimaryGroupId = SourceEvent.GetValueFromDataDictionary("PrimaryGroupId");
+        AllowedToDelegateTo = SourceEvent.GetValueFromDataDictionary("AllowedToDelegateTo");
+        OldUacValue = SourceEvent.GetValueFromDataDictionary("OldUacValue");
+        NewUacValue = SourceEvent.GetValueFromDataDictionary("NewUacValue");
+        UserAccountControl = SourceEvent.GetValueFromDataDictionary("UserAccountControl");
+        UserParameters = SourceEvent.GetValueFromDataDictionary("UserParameters");
+        SidHistory = SourceEvent.GetValueFromDataDictionary("SidHistory");
+        LogonHours = SourceEvent.GetValueFromDataDictionary("LogonHours");
+        DnsHostName = SourceEvent.GetValueFromDataDictionary("DnsHostName");
+        ServicePrincipalNames = SourceEvent.GetValueFromDataDictionary("ServicePrincipalNames");
+        Who = SourceEvent.GetSubjectAccountOrEmpty();
+        When = SourceEvent.TimeCreated;
 
         // let's try to translate them
         OldUacValue = TranslateUacValue(OldUacValue);

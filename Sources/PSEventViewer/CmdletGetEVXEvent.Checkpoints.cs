@@ -68,20 +68,20 @@ public sealed partial class CmdletGetEVXEvent {
     private string BuildDefaultCheckpointKey() {
         IReadOnlyList<string?> checkpointMachines = GetEffectiveCheckpointMachines();
         string sourceIdentity = ParameterSetName switch {
-            "NamedEvents" => "Named:" +
-                             string.Join(",", Type.OrderBy(static value => value)) +
+            "NamedEvent" => "Named:" +
+                             string.Join(",", NamedEvent.OrderBy(static value => value)) +
                              "|Log:" +
                              string.Join(",", LogName
                                  .Select(static log => log.Trim().ToUpperInvariant())
                                  .OrderBy(static log => log, StringComparer.OrdinalIgnoreCase)),
-            "PathEvents" => "Path:" + string.Join(",", Path
+            "Path" => "Path:" + string.Join(",", Path
                 .Select(System.IO.Path.GetFullPath)
                 .Select(static path => path.TrimEnd(System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar).ToUpperInvariant())
                 .OrderBy(static path => path, StringComparer.OrdinalIgnoreCase)),
-            "FilterHashtableEvents" => "Hashtable",
-            "FilterXmlEvents" =>
+            "Hashtable" => "Hashtable",
+            "Xml" =>
                 "Xml:" + FilterXml?.OuterXml,
-            "ProviderEvents" => "Provider:" + string.Join(
+            "Provider" => "Provider:" + string.Join(
                 ",",
                 (ProviderName ?? Array.Empty<string>())
                     .Select(static provider => provider.Trim().ToUpperInvariant())
@@ -112,7 +112,8 @@ public sealed partial class CmdletGetEVXEvent {
                 .Distinct()
                 .OrderBy(static value => value)),
             "Level",
-            string.Join(",", (Level ?? Array.Empty<int>())
+            string.Join(",", (Level ?? Array.Empty<EventViewerX.Level>())
+                .Select(static value => (int)value)
                 .Distinct()
                 .OrderBy(static value => value)),
             "StartTimeUtc",
@@ -141,6 +142,7 @@ public sealed partial class CmdletGetEVXEvent {
         AddHashtableIdentity(identity, "NamedDataFilter", NamedDataFilter);
         AddHashtableIdentity(identity, "NamedDataExcludeFilter", NamedDataExcludeFilter);
         AddHashtableIdentity(identity, "FilterHashtable", FilterHashtable);
+        AddFilterIdentity(identity, Filter);
 
         using SHA256 sha256 = SHA256.Create();
         byte[] hash = sha256.ComputeHash(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(identity)));
@@ -154,6 +156,31 @@ public sealed partial class CmdletGetEVXEvent {
         object? table) {
         identity.Add(name);
         AddCheckpointIdentityValue(identity, table);
+    }
+
+    private static void AddFilterIdentity(
+        List<string> identity,
+        EventFilter? filter) {
+
+        identity.Add("TypedFilter");
+        if (filter == null) {
+            identity.Add("null");
+            return;
+        }
+        AddCheckpointIdentityValue(identity, filter.EventIds);
+        AddCheckpointIdentityValue(identity, filter.RecordIds);
+        AddCheckpointIdentityValue(identity, filter.MinimumRecordIdExclusive);
+        AddCheckpointIdentityValue(identity, filter.MaximumRecordIdExclusive);
+        AddCheckpointIdentityValue(identity, filter.ProviderNames);
+        AddCheckpointIdentityValue(identity, filter.Levels);
+        AddCheckpointIdentityValue(identity, filter.Keywords);
+        AddCheckpointIdentityValue(identity, filter.StartTime);
+        AddCheckpointIdentityValue(identity, filter.EndTime);
+        AddCheckpointIdentityValue(identity, filter.UserIds);
+        AddCheckpointIdentityValue(identity, filter.Data);
+        AddCheckpointIdentityValue(identity, filter.NamedData);
+        AddCheckpointIdentityValue(identity, filter.ExcludedNamedData);
+        AddCheckpointIdentityValue(identity, filter.ExcludedEventIds);
     }
 
     private static void AddCheckpointIdentityValue(
@@ -232,13 +259,13 @@ public sealed partial class CmdletGetEVXEvent {
     /// Executes the event query based on provided parameters.
     /// </summary>
     private void ValidateRecordOptions() {
-        if (ParameterSetName == "NamedEvents" &&
+        if (ParameterSetName == "NamedEvent" &&
             LogName.Length > 1) {
             throw new PSArgumentException(
                 "Named event queries support at most one -LogName source restriction.");
         }
-        if (Expand && ReadMode != EventReadMode.StructuredData && ReadMode != EventReadMode.Full) {
-            throw new PSArgumentException("-Expand requires -ReadMode StructuredData or Full.");
+        if (ExpandData && ReadMode != EventReadMode.StructuredData && ReadMode != EventReadMode.Full) {
+            throw new PSArgumentException("-ExpandData requires -ReadMode StructuredData or Full.");
         }
         if (MessageRegex != null && ReadMode != EventReadMode.Message && ReadMode != EventReadMode.Full) {
             throw new PSArgumentException("-MessageRegex requires -ReadMode Message or Full.");
@@ -247,12 +274,6 @@ public sealed partial class CmdletGetEVXEvent {
 
     private void PrepareRecordProcessing(CancellationToken token) {
         PrepareCheckpointBounds(token);
-    }
-
-    private void WriteArrayResult(List<object>? results) {
-        if (AsArray && results != null) {
-            WriteObject(results.ToArray(), false);
-        }
     }
 
     private bool TrackCheckpointProgress(EventObject eventObject) {
@@ -337,10 +358,10 @@ public sealed partial class CmdletGetEVXEvent {
     }
 
     private bool UsesDerivedCheckpointKeys() {
-        return ParameterSetName == "NamedEvents" ||
+        return ParameterSetName == "NamedEvent" ||
                GetCheckpointSourceCount() > 1 ||
                GetEffectiveCheckpointMachines().Count > 1 ||
-               (ParameterSetName == "GenericEvents" &&
+               (ParameterSetName == "Channel" &&
                 MyInvocation.ExpectingInput);
     }
 

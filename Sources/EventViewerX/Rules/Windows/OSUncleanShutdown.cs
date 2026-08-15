@@ -34,20 +34,20 @@ public class OSUncleanShutdown : EventRuleBase {
 
     /// <summary>Initialises an unclean shutdown wrapper from an event record.</summary>
     public OSUncleanShutdown(EventObject eventObject) : base(eventObject) {
-        Event = eventObject;
-        Type = "OSUncleanShutdown";
-        Computer = Event.ComputerName;
+        SourceEvent = eventObject;
+        NamedEventName = "OSUncleanShutdown";
+        Computer = SourceEvent.ComputerName;
         Action = "System Dirty Reboot";
-        ObjectAffected = Event.MachineName;
-        ActionDetails = Event.MessageSubject;
-        var rawStartText = Event.GetValueFromDataDictionary("StartTime") ??
-                           Event.GetValueFromDataDictionary("#text") ??
-                           Event.GetValueFromDataDictionary("ActionDetailsDateTime");
+        ObjectAffected = SourceEvent.MachineName;
+        ActionDetails = SourceEvent.MessageSubject;
+        var rawStartText = SourceEvent.GetValueFromDataDictionary("StartTime") ??
+                           SourceEvent.GetValueFromDataDictionary("#text") ??
+                           SourceEvent.GetValueFromDataDictionary("ActionDetailsDateTime");
 
-        ActionTimestampUtc = RuleHelpers.ParseUnlabeledOsTimestamp(Event)
+        ActionTimestampUtc = RuleHelpers.ParseUnlabeledOsTimestamp(SourceEvent)
                             ?? RuleHelpers.ParseDateTimeLoose(rawStartText)
-                            ?? Event.TimeCreated.ToUniversalTime();
+                            ?? SourceEvent.TimeCreated.ToUniversalTime();
 
-        When = ActionTimestampUtc ?? Event.TimeCreated;
+        When = ActionTimestampUtc ?? SourceEvent.TimeCreated;
     }
 }

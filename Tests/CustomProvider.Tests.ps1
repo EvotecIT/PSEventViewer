@@ -1,7 +1,5 @@
 Describe 'Custom manifest provider lifecycle' {
     BeforeDiscovery {
-        $ModuleManifestPath = Join-Path -Path (Split-Path -Parent $PSScriptRoot) -ChildPath 'PSEventViewer.psd1'
-        Import-Module -Name $ModuleManifestPath -Force -ErrorAction Stop
         $Identity = [Security.Principal.WindowsIdentity]::GetCurrent()
         $Principal = [Security.Principal.WindowsPrincipal]::new($Identity)
         $IsElevated = $Principal.IsInRole(
@@ -11,10 +9,9 @@ Describe 'Custom manifest provider lifecycle' {
 
     It 'exports the provider package workflow' {
         $Commands = @(
-            'ConvertTo-EVXProviderDefinition'
             'Test-EVXProviderDefinition'
             'New-EVXProviderPackage'
-            'Get-EVXProviderPackage'
+            'Get-EVXProvider'
             'Install-EVXProviderPackage'
             'Uninstall-EVXProviderPackage'
         )
@@ -27,7 +24,7 @@ Describe 'Custom manifest provider lifecycle' {
         $WriteCommand.Parameters.Keys | Should -Contain 'Data'
     }
 
-    It 'converts one friendly event hashtable into a typed definition' {
+    It 'validates one friendly event hashtable without a conversion cmdlet' {
         $Definition = @{
             ProviderName = 'Contoso.Pester'
             ProviderGuid = '0c47facd-a6c5-45bf-9e0d-035274510a28'
@@ -41,18 +38,9 @@ Describe 'Custom manifest provider lifecycle' {
                     FindingCount = 'UInt32'
                 }
             }
-        } | ConvertTo-EVXProviderDefinition -ErrorAction Stop
+        }
 
-        $Definition.GetType().FullName |
-            Should -Be 'EventViewerX.Providers.EventProviderDefinition'
-        $Definition.Channels.Count | Should -Be 1
-        $Definition.Channels[0].Name |
-            Should -Be 'Contoso.Pester/Operational'
-        $Definition.Events.Count | Should -Be 1
-        $Definition.Events[0].Fields.Name |
-            Should -Be @('ComputerName', 'FindingCount')
-        (Test-EVXProviderDefinition $Definition).IsValid |
-            Should -BeTrue
+        (Test-EVXProviderDefinition $Definition).IsValid | Should -BeTrue
     }
 
     It 'rejects misspelled hashtable properties instead of ignoring them' {
@@ -66,7 +54,7 @@ Describe 'Custom manifest provider lifecycle' {
                     Id   = 1000
                 }
                 Evnts        = @{}
-            } | ConvertTo-EVXProviderDefinition -ErrorAction Stop
+            } | Test-EVXProviderDefinition -ErrorAction Stop
         } | Should -Throw '*Evnts*'
     }
 
@@ -165,6 +153,10 @@ Describe 'Custom manifest provider lifecycle' {
 
             $WinEvent = $null
             $EVXEvent = $null
+            $EVXFilter = New-EVXFilter `
+                -ProviderName $ProviderName `
+                -EventId 1000 `
+                -StartTime $StartTime
             foreach ($Attempt in 1..20) {
                 $WinEvent = Get-WinEvent `
                     -FilterHashtable @{
@@ -179,9 +171,7 @@ Describe 'Custom manifest provider lifecycle' {
                     Select-Object -First 1
                 $EVXEvent = Get-EVXEvent `
                     -LogName "$ProviderName/Operational" `
-                    -ProviderName $ProviderName `
-                    -EventId 1000 `
-                    -StartTime $StartTime `
+                    -Filter $EVXFilter `
                     -ReadMode Full `
                     -MaxEvents 20 `
                     -ErrorAction SilentlyContinue |
@@ -201,7 +191,7 @@ Describe 'Custom manifest provider lifecycle' {
             $EVXEvent.Data.Values |
                 Should -Be $WinEvent.Properties.Value
             (
-                Get-EVXProviderPackage |
+                Get-EVXProvider -InstalledPackage |
                     Where-Object {
                         $_.ProviderName -eq $ProviderName -and
                         $_.IsRegistered
@@ -248,7 +238,7 @@ Describe 'Custom manifest provider lifecycle' {
             $Replacement.InstallPath |
                 Should -Not -Be $Install.InstallPath
             $Inventory = @(
-                Get-EVXProviderPackage |
+                Get-EVXProvider -InstalledPackage |
                     Where-Object ProviderName -EQ $ProviderName
             )
             @($Inventory | Where-Object IsActive).Count |
@@ -295,7 +285,7 @@ Describe 'Custom manifest provider lifecycle' {
                 um `
                 (Join-Path $TamperRepair.InstallPath 'provider.man')
             $LASTEXITCODE | Should -Be 0
-            $Inactive = Get-EVXProviderPackage |
+            $Inactive = Get-EVXProvider -InstalledPackage |
                 Where-Object {
                     $_.ProviderName -eq $ProviderName -and
                     $_.IsActive
@@ -311,7 +301,7 @@ Describe 'Custom manifest provider lifecycle' {
             $RegistrationRepair.InstallPath |
                 Should -Not -Be $TamperRepair.InstallPath
             (
-                Get-EVXProviderPackage |
+                Get-EVXProvider -InstalledPackage |
                     Where-Object {
                         $_.ProviderName -eq $ProviderName -and
                         $_.IsActive

@@ -54,20 +54,20 @@ public class ADGroupChange : EventRuleBase {
 
     /// <summary>Initialises an Active Directory group change wrapper from an event record.</summary>
     public ADGroupChange(EventObject eventObject) : base(eventObject) {
-        Event = eventObject;
-        Type = "ADGroupChange";
+        SourceEvent = eventObject;
+        NamedEventName = "ADGroupChange";
 
-        Computer = Event.ComputerName;
-        Action = Event.MessageSubject;
+        Computer = SourceEvent.ComputerName;
+        Action = SourceEvent.MessageSubject;
 
-        GroupName = Event.GetTargetAccountOrEmpty();
-        GroupTypeChange = Event.GetValueFromDataDictionary("GroupTypeChange");
-        SamAccountName = Event.GetValueFromDataDictionary("SamAccountName");
-        SidHistory = Event.GetValueFromDataDictionary("SidHistory");
+        GroupName = SourceEvent.GetTargetAccountOrEmpty();
+        GroupTypeChange = SourceEvent.GetValueFromDataDictionary("GroupTypeChange");
+        SamAccountName = SourceEvent.GetValueFromDataDictionary("SamAccountName");
+        SidHistory = SourceEvent.GetValueFromDataDictionary("SidHistory");
 
         // common fields
-        Who = Event.GetSubjectAccountOrEmpty();
-        When = Event.TimeCreated;
+        Who = SourceEvent.GetSubjectAccountOrEmpty();
+        When = SourceEvent.TimeCreated;
     }
 }
 

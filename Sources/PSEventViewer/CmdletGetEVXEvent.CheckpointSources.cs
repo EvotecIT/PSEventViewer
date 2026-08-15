@@ -11,12 +11,12 @@ public sealed partial class CmdletGetEVXEvent {
 
     private IReadOnlyList<CheckpointSource> ResolveCheckpointSources() {
         switch (ParameterSetName) {
-            case "PathEvents":
+            case "Path":
                 return ExpandFilePaths(Path, nameof(Path))
                     .Select(static path =>
                         new CheckpointSource(path, isFile: true))
                     .ToArray();
-            case "FilterHashtableEvents":
+            case "Hashtable":
                 Hashtable[] hashtables =
                     GetFilterHashtables();
                 PowerShellEventFilterBinding[] bindings =
@@ -68,7 +68,7 @@ public sealed partial class CmdletGetEVXEvent {
                     .Select(source =>
                         new CheckpointSource(source, filesOnly))
                     .ToArray();
-            case "FilterXmlEvents":
+            case "Xml":
                 EventLogStructuredQuerySource[] structuredSources =
                     new EventLogStructuredQuery(
                             FilterXml!.OuterXml)
@@ -85,9 +85,9 @@ public sealed partial class CmdletGetEVXEvent {
                             source.Kind ==
                             EventLogQuerySourceKind.File))
                     .ToArray();
-            case "NamedEvents":
-                IReadOnlyList<string> namedSources = EventObjectSlim
-                    .GetEventInfoForNamedEvents(Type.ToList())
+            case "NamedEvent":
+                IReadOnlyList<string> namedSources = NamedEventCatalog
+                    .GetEventInfoForNamedEvents(NamedEvent.ToList())
                     .Keys
                     .ToArray();
                 return (LogName.Length == 0
@@ -101,7 +101,7 @@ public sealed partial class CmdletGetEVXEvent {
                     .Select(static source =>
                         new CheckpointSource(source, isFile: false))
                     .ToArray();
-            case "GenericEvents":
+            case "Channel":
                 return ExpandCheckpointChannels(
                         NormalizeRequiredValues(
                             LogName,
@@ -109,7 +109,7 @@ public sealed partial class CmdletGetEVXEvent {
                     .Select(static source =>
                         new CheckpointSource(source, isFile: false))
                     .ToArray();
-            case "ProviderEvents":
+            case "Provider":
                 return ResolveCheckpointProviderChannels(
                         ProviderName ?? Array.Empty<string>())
                     .Select(static source =>

@@ -48,16 +48,16 @@ public class ADUserPrivilegeUse : EventRuleBase {
 
     /// <summary>Initialises a privilege-assignment wrapper from an event record.</summary>
     public ADUserPrivilegeUse(EventObject eventObject) : base(eventObject) {
-        Event = eventObject;
-        Type = "ADUserPrivilegeUse";
+        SourceEvent = eventObject;
+        NamedEventName = "ADUserPrivilegeUse";
 
-        Computer = Event.ComputerName;
-        Action = Event.MessageSubject;
+        Computer = SourceEvent.ComputerName;
+        Action = SourceEvent.MessageSubject;
 
-        Who = Event.GetSubjectAccountOrEmpty();
-        When = Event.TimeCreated;
+        Who = SourceEvent.GetSubjectAccountOrEmpty();
+        When = SourceEvent.TimeCreated;
 
-        var privilegeList = Event.GetDataValueOrEmpty(KnownEventField.PrivilegeList);
+        var privilegeList = SourceEvent.GetDataValueOrEmpty(KnownEventField.PrivilegeList);
         if (!string.IsNullOrEmpty(privilegeList)) {
             Privileges = privilegeList.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries).ToList();
             PrivilegesTranslated = Privileges.Select(EventsHelper.TranslatePrivilege).ToList();

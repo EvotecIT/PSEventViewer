@@ -8,7 +8,7 @@ namespace EventViewerX;
 /// </summary>
 public static partial class NamedEventEngine {
     /// <summary>Streams named-event projections with bounded memory and ordered checkpoint observation.</summary>
-    public static IAsyncEnumerable<EventObjectSlim> ReadAsync(
+    public static IAsyncEnumerable<NamedEventRecord> ReadAsync(
         NamedEventQuery query,
         NamedEventsQueryExecutionInfo? executionInfo = null,
         CancellationToken cancellationToken = default) {
@@ -22,7 +22,7 @@ public static partial class NamedEventEngine {
             cancellationToken);
     }
 
-    private static async IAsyncEnumerable<EventObjectSlim>
+    private static async IAsyncEnumerable<NamedEventRecord>
         ReadSnapshotAsync(
             NamedEventQuery query,
             NamedEventsQueryExecutionInfo? executionInfo,
@@ -35,7 +35,7 @@ public static partial class NamedEventEngine {
         info.Reset(query.MaxCandidates);
         Dictionary<string, HashSet<int>> eventInfo =
             RestrictSources(
-                EventObjectSlim.GetEventInfoForNamedEvents(
+                NamedEventCatalog.GetEventInfoForNamedEvents(
                     query.NamedEvents.ToList()),
                 query.SourceLogName,
                 query.SourceEventIds);
@@ -69,7 +69,7 @@ public static partial class NamedEventEngine {
                                 .TryRecordCandidate,
                            query.CandidateObserver,
                            cancellationToken)) {
-            EventObjectSlim? target = projection.Target;
+            NamedEventRecord? target = projection.Target;
             if (target == null ||
                 (query.ResultPredicate != null &&
                  !query.ResultPredicate(target))) {
@@ -314,6 +314,13 @@ public static partial class NamedEventEngine {
             throw new ArgumentOutOfRangeException(
                 nameof(query),
                 "Buffer capacity must be between 1 and 4096.");
+        }
+        if (query.Credential != null &&
+            NormalizeTargets(query.MachineNames)
+                .Any(EventLogTarget.IsLocalMachine)) {
+            throw new ArgumentException(
+                "Credential can only be used when every named-event target is a remote computer.",
+                nameof(query));
         }
         query.Enrichment?.Validate();
     }

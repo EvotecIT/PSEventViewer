@@ -13,7 +13,7 @@ The rule layer is a projection over the shared native engine:
 3. Sources are grouped and partitioned into bounded
    `EventLogChannelQuery` instances.
 4. `EventLogEngine.ReadBatchAsync` performs the native Windows queries.
-5. Matching `EventObject` records are projected to `EventObjectSlim` rule
+5. Matching `EventObject` records are projected to `NamedEventRecord` rule
    results in source order.
 6. Optional enrichment and checkpoint observation happen before a result is
    emitted.
@@ -81,7 +81,7 @@ projection that understands it.
 
 ## Discovery modes
 
-`EventObjectSlim` supports three discovery modes:
+`NamedEventRecord` supports three discovery modes:
 
 | Mode | Behavior | Use |
 | --- | --- | --- |
@@ -92,9 +92,9 @@ projection that understands it.
 Configure discovery once, before the first named-event query:
 
 ```csharp
-EventObjectSlim.Configure(EventRuleDiscoveryMode.ExplicitOnly);
+NamedEventCatalog.Configure(EventRuleDiscoveryMode.ExplicitOnly);
 
-EventObjectSlim.RegisterRuleFactory(
+NamedEventCatalog.RegisterRuleFactory(
     NamedEvents.ADUserLockouts,
     "Security",
     new[] { 4740 },
@@ -123,7 +123,7 @@ var query = new NamedEventQuery(new[] {
 
 var execution = new NamedEventsQueryExecutionInfo();
 
-await foreach (EventObjectSlim item in
+await foreach (NamedEventRecord item in
                NamedEventEngine.ReadAsync(query, execution)) {
     Console.WriteLine(
         $"{item.When:u} {item.Type} {item.Computer}");
@@ -141,12 +141,12 @@ source failures, and limit state without changing the returned object stream.
 
 ```powershell
 Get-EVXEvent `
-    -Type ADUserLogonFailed, ADUserLockouts `
+    -NamedEvent ADUserLogonFailed, ADUserLockouts `
     -MachineName DC01, DC02 `
     -TimePeriod Last24Hours `
     -MaxConcurrency 4 `
     -MaxEvents 500 |
-    Select-Object When, Type, Computer, UserName, IpAddress
+    Select-Object TimeCreated, NamedEventName, MachineName, UserName, IpAddress
 ```
 
 PowerShell is a thin adapter: it builds `NamedEventQuery`, supplies durable
@@ -180,7 +180,7 @@ the source of truth; enrichment is additional context.
 - `NamedEventQuery.cs` — public scenario query contract.
 - `NamedEventEngine.cs` and `NamedEventEngine.Projection.cs` — batching,
   ordered projection, and limits.
-- `EventObjectSlim.cs` — discovery, explicit registration, and rule creation.
+- `NamedEventRecord.cs` — discovery, explicit registration, and rule creation.
 - `IEventRule.cs` — `IEventRule` and `EventRuleBase` contracts.
 - `NamedEventEnricher.cs` and `Enrichment/` — optional ordered enrichment.
 - `Rules/` — provider/scenario projections.

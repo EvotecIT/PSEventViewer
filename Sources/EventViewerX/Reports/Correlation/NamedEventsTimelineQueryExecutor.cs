@@ -100,7 +100,7 @@ public static partial class NamedEventsTimelineQueryExecutor {
         var selectedRows = new Dictionary<EventObject, EventRowAccumulator>();
         int selectionLimit = maxEvents == int.MaxValue ? int.MaxValue : maxEvents + 1;
 
-        bool TrySelectTimelineEvent(EventObjectSlim item) {
+        bool TrySelectTimelineEvent(NamedEventRecord item) {
             var namedEventName = ResolveNamedEventName(item);
             var row = ToAccumulator(item, namedEventName, includePayload, normalizedPayloadKeys);
             var correlation = BuildCorrelationValues(row, normalizedCorrelationKeys);
@@ -120,7 +120,7 @@ public static partial class NamedEventsTimelineQueryExecutor {
                 }
             }
 
-            selectedRows[item.Event] = row;
+            selectedRows[item.SourceEvent] = row;
             perNamedEventCount[namedEventName] = perNamedEventCount.TryGetValue(namedEventName, out var existingCount)
                 ? existingCount + 1
                 : 1;
@@ -163,8 +163,8 @@ public static partial class NamedEventsTimelineQueryExecutor {
                     outputTruncated = true;
                     break;
                 }
-                if (selectedRows.TryGetValue(item.Event, out EventRowAccumulator? row)) {
-                    selectedRows.Remove(item.Event);
+                if (selectedRows.TryGetValue(item.SourceEvent, out EventRowAccumulator? row)) {
+                    selectedRows.Remove(item.SourceEvent);
                     rows.Add(row);
                 }
             }
@@ -542,7 +542,7 @@ public static partial class NamedEventsTimelineQueryExecutor {
     }
 
     private static EventRowAccumulator ToAccumulator(
-        EventObjectSlim item,
+        NamedEventRecord item,
         string namedEvent,
         bool includePayload,
         HashSet<string>? payloadKeySet) {
@@ -560,10 +560,10 @@ public static partial class NamedEventsTimelineQueryExecutor {
         return new EventRowAccumulator(
             namedEvent,
             item.GetType().Name,
-            item.EventID,
-            item.RecordID,
-            item.GatheredFrom,
-            item.GatheredLogName,
+            item.EventId,
+            item.RecordId,
+            item.MachineName,
+            item.SourceLogName,
             whenUtc,
             ParseUtc(whenUtc),
             ReadPayloadString(fullPayload, "who"),
@@ -573,10 +573,10 @@ public static partial class NamedEventsTimelineQueryExecutor {
             payload);
     }
 
-    private static string ResolveNamedEventName(EventObjectSlim item) {
-        return Enum.TryParse<NamedEvents>(item.Type, out var parsedNamedEvent)
+    private static string ResolveNamedEventName(NamedEventRecord item) {
+        return Enum.TryParse<NamedEvents>(item.NamedEventName, out var parsedNamedEvent)
             ? ToSnakeCase(parsedNamedEvent.ToString())
-            : ToSnakeCase(item.Type);
+            : ToSnakeCase(item.NamedEventName);
     }
 
     private static IReadOnlyDictionary<string, string> BuildCorrelationValues(

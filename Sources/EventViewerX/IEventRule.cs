@@ -33,7 +33,7 @@ public interface IEventRule {
 /// <summary>
 /// Base class for event rules with metadata
 /// </summary>
-public abstract class EventRuleBase : EventObjectSlim, IEventRule {
+public abstract class EventRuleBase : NamedEventRecord, IEventRule {
     /// <summary>Event identifiers this rule is responsible for.</summary>
     public abstract List<int> EventIds { get; }
     /// <summary>Windows log name (channel) where the events are emitted.</summary>
@@ -58,7 +58,7 @@ public abstract class EventRuleBase : EventObjectSlim, IEventRule {
     /// </summary>
     /// <param name="eventObject">The event object to process</param>
     /// <returns>An instance of the event rule or null if it cannot be processed</returns>
-    public static EventObjectSlim? TryCreate<T>(EventObject eventObject) where T : EventRuleBase, new() {
+    public static NamedEventRecord? TryCreate<T>(EventObject eventObject) where T : EventRuleBase, new() {
         var instance = new T();
         return instance.CanHandle(eventObject) ? Activator.CreateInstance(typeof(T), eventObject) as T : null;
     }

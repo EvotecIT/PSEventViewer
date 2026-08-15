@@ -39,11 +39,11 @@ public class DhcpLeaseCreated : EventRuleBase {
 
     /// <summary>Initialises a DHCP lease creation wrapper from an event record.</summary>
     public DhcpLeaseCreated(EventObject eventObject) : base(eventObject) {
-        Event = eventObject;
-        Type = "DhcpLeaseCreated";
-        Computer = Event.ComputerName;
-        IPAddress = Event.GetValueFromDataDictionary(KnownEventField.IpAddress, KnownEventField.ClientIp);
-        MacAddress = Event.GetValueFromDataDictionary(KnownEventField.HwAddress, KnownEventField.MacAddress);
-        When = Event.TimeCreated;
+        SourceEvent = eventObject;
+        NamedEventName = "DhcpLeaseCreated";
+        Computer = SourceEvent.ComputerName;
+        IPAddress = SourceEvent.GetValueFromDataDictionary(KnownEventField.IpAddress, KnownEventField.ClientIp);
+        MacAddress = SourceEvent.GetValueFromDataDictionary(KnownEventField.HwAddress, KnownEventField.MacAddress);
+        When = SourceEvent.TimeCreated;
     }
 }

@@ -43,17 +43,17 @@ public class KerberosServiceTicket : EventRuleBase
     /// <summary>Initialises a Kerberos service ticket wrapper from an event record.</summary>
     public KerberosServiceTicket(EventObject eventObject) : base(eventObject)
     {
-        Event = eventObject;
-        Type = "KerberosServiceTicket";
-        Computer = Event.ComputerName;
-        Action = Event.MessageSubject;
-        AccountName = Event.GetTargetAccountOrEmpty();
-        ServiceName = Event.GetDataValueOrEmpty("ServiceName");
-        IpAddress = Event.GetDataValueOrEmpty(KnownEventField.IpAddress);
-        IpPort = Event.GetDataValueOrEmpty(KnownEventField.IpPort);
-        TicketOptions = Event.GetDataValueOrEmpty(KnownEventField.TicketOptions);
-        EncryptionType = EventsHelper.GetTicketEncryptionType(Event.GetDataValueOrEmpty(KnownEventField.TicketEncryptionType));
-        When = Event.TimeCreated;
+        SourceEvent = eventObject;
+        NamedEventName = "KerberosServiceTicket";
+        Computer = SourceEvent.ComputerName;
+        Action = SourceEvent.MessageSubject;
+        AccountName = SourceEvent.GetTargetAccountOrEmpty();
+        ServiceName = SourceEvent.GetDataValueOrEmpty("ServiceName");
+        IpAddress = SourceEvent.GetDataValueOrEmpty(KnownEventField.IpAddress);
+        IpPort = SourceEvent.GetDataValueOrEmpty(KnownEventField.IpPort);
+        TicketOptions = SourceEvent.GetDataValueOrEmpty(KnownEventField.TicketOptions);
+        EncryptionType = EventsHelper.GetTicketEncryptionType(SourceEvent.GetDataValueOrEmpty(KnownEventField.TicketEncryptionType));
+        When = SourceEvent.TimeCreated;
 
         WeakEncryptionAlgorithm = EncryptionType is TicketEncryptionType.DES_CBC_CRC
             or TicketEncryptionType.DES_CBC_MD5
