@@ -291,6 +291,13 @@ public static partial class EventProviderDefinitionValidator {
                 "TaskNameInvalid",
                 $"Tasks[{taskIndex}].Name",
                 issues);
+            if (task.Value == 0) {
+                Error(
+                    "CustomTaskReserved",
+                    $"Tasks[{taskIndex}].Value",
+                    "Custom task values must be between 1 and 65535.",
+                    issues);
+            }
             Unique(
                 task.Opcodes,
                 static opcode => opcode.Name,

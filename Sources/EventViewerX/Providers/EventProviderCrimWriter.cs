@@ -515,7 +515,7 @@ internal static class EventProviderCrimWriter {
             levels.Add(new LevelMetadata(
                 name,
                 EventProviderStandardMetadata.Level(name),
-                messages.LevelMessageId(name)));
+                EventProviderStandardMetadata.LevelMessageId(name)));
         }
         return levels;
     }
@@ -554,7 +554,7 @@ internal static class EventProviderCrimWriter {
                 name,
                 0,
                 EventProviderStandardMetadata.Opcode(name),
-                messages.OpcodeMessageId(name)));
+                EventProviderStandardMetadata.OpcodeMessageId(name)));
         }
         return opcodes;
     }
@@ -578,7 +578,7 @@ internal static class EventProviderCrimWriter {
             keywords.Add(new KeywordMetadata(
                 name,
                 EventProviderStandardMetadata.Keyword(name),
-                messages.KeywordMessageId(name)));
+                EventProviderStandardMetadata.KeywordMessageId(name)));
         }
         return keywords;
     }

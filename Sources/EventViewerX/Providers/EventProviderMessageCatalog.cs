@@ -72,39 +72,6 @@ internal sealed class EventProviderMessageCatalog {
                 keyword.DisplayNames,
                 keyword.Name);
         }
-        foreach (string level in definition.Events
-                     .Select(static item => item.Level)
-                     .Where(static value => value.StartsWith(
-                         "win:",
-                         StringComparison.Ordinal))
-                     .Distinct(StringComparer.Ordinal)) {
-            catalog.Add(
-                LevelKey(level),
-                EmptyValues,
-                FriendlyStandardName(level));
-        }
-        foreach (string opcode in definition.Events
-                     .Select(static item => item.Opcode)
-                     .Where(static value => value.StartsWith(
-                         "win:",
-                         StringComparison.Ordinal))
-                     .Distinct(StringComparer.Ordinal)) {
-            catalog.Add(
-                OpcodeKey(opcode),
-                EmptyValues,
-                FriendlyStandardName(opcode));
-        }
-        foreach (string keyword in definition.Events
-                     .SelectMany(static item => item.Keywords)
-                     .Where(static value => value.StartsWith(
-                         "win:",
-                         StringComparison.Ordinal))
-                     .Distinct(StringComparer.Ordinal)) {
-            catalog.Add(
-                KeywordKey(keyword),
-                EmptyValues,
-                FriendlyStandardName(keyword));
-        }
         for (int mapIndex = 0;
              mapIndex < definition.Maps.Count;
              mapIndex++) {
@@ -188,15 +155,7 @@ internal sealed class EventProviderMessageCatalog {
         _entries.Add(new Entry(id, values, fallback));
     }
 
-    private static string FriendlyStandardName(string value) {
-        return value.StartsWith("win:", StringComparison.Ordinal)
-            ? value.Substring(4)
-            : value;
-    }
-
     private const string ProviderKey = "provider";
-    private static readonly IReadOnlyDictionary<string, string> EmptyValues =
-        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
     private static string ChannelKey(int index) => "channel:" + index;
     private static string LevelKey(string name) => "level:" + name;
     private static string TaskKey(string name) => "task:" + name;

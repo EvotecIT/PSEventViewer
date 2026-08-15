@@ -62,6 +62,25 @@ public sealed class TestEventProviderManifestMetadata {
         Assert.True(result.IsValid);
     }
 
+    [Fact]
+    public void RejectsReservedZeroTaskValue() {
+        EventProviderDefinition definition =
+            TestEventProviderPackages.CreateDefinition();
+        definition.Tasks.Add(new EventProviderTaskDefinition {
+            Name = "Scan",
+            Value = 0
+        });
+
+        EventProviderValidationResult result =
+            EventProviderDefinitionValidator.Validate(
+                definition);
+
+        EventProviderValidationIssue issue = Assert.Single(
+            result.Errors,
+            static item => item.Code == "CustomTaskReserved");
+        Assert.Equal("Tasks[0].Value", issue.Path);
+    }
+
     [Theory]
     [InlineData("win:WDIContext")]
     [InlineData("win:WDIDiag")]

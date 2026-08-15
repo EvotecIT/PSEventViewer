@@ -74,4 +74,32 @@ internal static class EventProviderStandardMetadata {
     internal static ulong Keyword(string name) {
         return Keywords[name];
     }
+
+    internal static uint LevelMessageId(string name) {
+        return 0x50000000U | Level(name);
+    }
+
+    internal static uint OpcodeMessageId(string name) {
+        byte value = Opcode(name);
+        return value >= 241
+            ? uint.MaxValue
+            : 0x30000000U | value;
+    }
+
+    internal static uint KeywordMessageId(string name) {
+        if (name.StartsWith(
+                "win:ReservedKeyword",
+                StringComparison.Ordinal)) {
+            return uint.MaxValue;
+        }
+        ulong mask = Keyword(name);
+        if (mask == 0) {
+            return 0x10000000U;
+        }
+        uint bit = 0;
+        while ((mask >>= 1) != 0) {
+            bit++;
+        }
+        return 0x10000001U + bit;
+    }
 }

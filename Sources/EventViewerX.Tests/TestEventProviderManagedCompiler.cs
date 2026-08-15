@@ -78,6 +78,41 @@ public sealed class TestEventProviderManagedCompiler {
     }
 
     [Fact]
+    public void UsesWinmetaMessageIdentifiersForStandardMetadata() {
+        EventProviderDefinition definition = CreateLocalizedDefinition();
+        definition.Events[0].Opcode = "win:Start";
+        definition.Events[0].Keywords.Add("win:AuditSuccess");
+        EventProviderMessageCatalog messages =
+            EventProviderMessageCatalog.Create(definition);
+        byte[] template = EventProviderCrimWriter.Write(
+            definition,
+            messages);
+
+        int opcodes = FindSignature(template, "OPCO");
+        int levels = FindSignature(template, "LEVL");
+        int keywords = FindSignature(template, "KEYW");
+        Assert.Equal(0x30000001U, ReadUInt32(template, opcodes + 16));
+        Assert.Equal(0x50000004U, ReadUInt32(template, levels + 16));
+        Assert.Equal(0x10000036U, ReadUInt32(template, keywords + 20));
+        Assert.Equal(
+            0x10000032U,
+            EventProviderStandardMetadata.KeywordMessageId(
+                "win:WDIContext"));
+        Assert.Equal(
+            0x10000038U,
+            EventProviderStandardMetadata.KeywordMessageId(
+                "win:EventlogClassic"));
+        Assert.Equal(
+            uint.MaxValue,
+            EventProviderStandardMetadata.OpcodeMessageId(
+                "win:ReservedOpcode241"));
+        Assert.Equal(
+            uint.MaxValue,
+            EventProviderStandardMetadata.KeywordMessageId(
+                "win:ReservedKeyword56"));
+    }
+
+    [Fact]
     public void CompilesMetadataMapsAndReferencedDimensions() {
         EventProviderDefinition definition = CreateRichDefinition();
         EventProviderMessageCatalog messages =
