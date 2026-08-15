@@ -275,6 +275,11 @@ public sealed class TestEventProviderManagedCompiler {
         Assert.Null(channelElement.Attribute("retention"));
         Assert.Null(channelElement.Attribute("autoBackup"));
         Assert.Null(channelElement.Attribute("maxSize"));
+        Assert.Equal(
+            ["autoBackup", "retention", "maxSize"],
+            logging.Elements()
+                .Select(static element => element.Name.LocalName)
+                .ToArray());
         Assert.Equal("true", logging.Element(ns + "retention")!.Value);
         Assert.Equal("false", logging.Element(ns + "autoBackup")!.Value);
         Assert.Equal("1048576", logging.Element(ns + "maxSize")!.Value);
