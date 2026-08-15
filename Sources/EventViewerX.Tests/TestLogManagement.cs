@@ -63,6 +63,76 @@ public class TestLogManagement {
     }
 
     [Fact]
+    public void LogRemovalRetriesTransientWindowsFailures() {
+        int attempts = 0;
+        int waits = 0;
+
+        ClassicEventLogManager.ExecuteLogRemovalWithRetry(
+            () => {
+                attempts++;
+                if (attempts < 3) {
+                    throw new InvalidOperationException(
+                        "The Event Log service has not refreshed yet.");
+                }
+            },
+            static () => true,
+            () => waits++);
+
+        Assert.Equal(3, attempts);
+        Assert.Equal(2, waits);
+    }
+
+    [Fact]
+    public void LogRemovalAcceptsCompletedTransientFailure() {
+        int waits = 0;
+
+        ClassicEventLogManager.ExecuteLogRemovalWithRetry(
+            static () => throw new InvalidOperationException(
+                "The delete completed before the API returned."),
+            static () => false,
+            () => waits++);
+
+        Assert.Equal(0, waits);
+    }
+
+    [Fact]
+    public void LogRemovalDoesNotRetryPermissionFailures() {
+        int existenceChecks = 0;
+        int waits = 0;
+
+        Assert.Throws<UnauthorizedAccessException>(() =>
+            ClassicEventLogManager.ExecuteLogRemovalWithRetry(
+                static () => throw new UnauthorizedAccessException(),
+                () => {
+                    existenceChecks++;
+                    return true;
+                },
+                () => waits++));
+
+        Assert.Equal(0, existenceChecks);
+        Assert.Equal(0, waits);
+    }
+
+    [Fact]
+    public void LogRemovalStopsAfterBoundedTransientFailures() {
+        int attempts = 0;
+        int waits = 0;
+
+        Assert.Throws<InvalidOperationException>(() =>
+            ClassicEventLogManager.ExecuteLogRemovalWithRetry(
+                () => {
+                    attempts++;
+                    throw new InvalidOperationException(
+                        "The Event Log service did not become ready.");
+                },
+                static () => true,
+                () => waits++));
+
+        Assert.Equal(20, attempts);
+        Assert.Equal(19, waits);
+    }
+
+    [Fact]
     public void RetentionDaysRequireOverwriteOlder() {
         Assert.Throws<ArgumentException>(() =>
             ClassicEventLogManager.EnsureLog(

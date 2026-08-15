@@ -9,6 +9,9 @@ namespace EventViewerX;
 /// Querying modern Windows Event Log channels remains the responsibility of <see cref="EventLogEngine"/>.
 /// </summary>
 public static class ClassicEventLogManager {
+    private const int LogRemovalAttemptCount = 20;
+    private const int LogRemovalDelayMilliseconds = 100;
+
     /// <summary>Returns whether a classic log exists. Operational failures are not converted to false.</summary>
     public static bool LogExists(
         string logName,
@@ -219,16 +222,46 @@ public static class ClassicEventLogManager {
         if (!LogExists(logName, machineName)) {
             return false;
         }
-        if (string.IsNullOrWhiteSpace(machineName)) {
-            EventLog.Delete(logName);
-        } else {
-            EventLog.Delete(logName, machineName);
-        }
+        ExecuteLogRemovalWithRetry(
+            () => {
+                if (string.IsNullOrWhiteSpace(machineName)) {
+                    EventLog.Delete(logName);
+                } else {
+                    EventLog.Delete(logName, machineName);
+                }
+            },
+            () => LogExists(logName, machineName),
+            static () => Thread.Sleep(
+                LogRemovalDelayMilliseconds));
         if (LogExists(logName, machineName)) {
             throw new InvalidOperationException(
                 $"Windows reported that classic log '{logName}' was deleted, but it remains present.");
         }
         return true;
+    }
+
+    internal static void ExecuteLogRemovalWithRetry(
+        Action remove,
+        Func<bool> logExists,
+        Action wait) {
+
+        for (int attempt = 0;
+             attempt < LogRemovalAttemptCount;
+             attempt++) {
+            try {
+                remove();
+                return;
+            } catch (Exception exception) when (
+                exception is InvalidOperationException or Win32Exception) {
+                if (!logExists()) {
+                    return;
+                }
+                if (attempt + 1 >= LogRemovalAttemptCount) {
+                    throw;
+                }
+                wait();
+            }
+        }
     }
 
     /// <summary>Deletes a classic source. Returns false only when it is absent.</summary>
