@@ -10,7 +10,7 @@ namespace EventViewerX.Reports.Inventory;
 /// <summary>
 /// Executes typed event catalog queries (channels/providers).
 /// </summary>
-public static class EventCatalogQueryExecutor {
+internal static class EventCatalogQueryExecutor {
     /// <summary>
     /// Lists event log channels from local or remote machine.
     /// </summary>

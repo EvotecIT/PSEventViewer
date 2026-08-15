@@ -6,7 +6,7 @@ namespace EventViewerX.Reports.Evtx;
 /// <summary>
 /// Query contract for reading events from an EVTX file.
 /// </summary>
-public sealed class EvtxQueryRequest {
+internal sealed class EvtxQueryRequest {
     /// <summary>
     /// Gets or sets the EVTX file path (absolute or relative).
     /// </summary>

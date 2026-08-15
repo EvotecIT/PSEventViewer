@@ -100,33 +100,6 @@ Describe 'Get-EVXEvent - Named Event' {
         ($ActualKeys -join "`n") | Should -Be ($ExpectedKeys -join "`n")
     }
 
-    It 'applies an unlimited timeline scan to a globally merged output cap' {
-        $Types = @(
-            [EventViewerX.NamedEvents]::OSStartup,
-            [EventViewerX.NamedEvents]::OSShutdown,
-            [EventViewerX.NamedEvents]::OSStartupSecurity
-        )
-        $Expected = @(Get-EVXEvent -NamedEvent $Types -MaxEvents 5 -ErrorAction SilentlyContinue)
-        if ($Expected.Count -lt 2 -or @($Expected.SourceEvent.ContainerLog | Sort-Object -Unique).Count -lt 2) {
-            Set-ItResult -Skipped -Because 'Two named-event logs were not available for a global timeline comparison.'
-            return
-        }
-
-        $Request = [EventViewerX.Reports.Correlation.NamedEventsTimelineQueryRequest]::new()
-        $Request.NamedEvents = [EventViewerX.NamedEvents[]] $Types
-        $Request.MaxEvents = 5
-        $Request.MaxEventsScanned = 0
-        $Request.IncludeUncorrelated = $true
-        $Response = [EventViewerX.Reports.Correlation.NamedEventsTimelineQueryExecutor]::TryBuildAsync(
-            $Request,
-            [Threading.CancellationToken]::None).GetAwaiter().GetResult()
-
-        $Response.Item2 | Should -BeNullOrEmpty
-        $ExpectedKeys = @($Expected | ForEach-Object { '{0}|{1}|{2}' -f $_.SourceEvent.QueriedMachine, $_.SourceEvent.ContainerLog, $_.SourceEvent.RecordId } | Sort-Object)
-        $ActualKeys = @($Response.Item1.Timeline | ForEach-Object { '{0}|{1}|{2}' -f $_.GatheredFrom, $_.GatheredLogName, $_.RecordId } | Sort-Object)
-        ($ActualKeys -join "`n") | Should -Be ($ExpectedKeys -join "`n")
-    }
-
     It 'reports an isolated remote named-event failure instead of silently returning partial results' {
         $Errors = @()
         $null = @(

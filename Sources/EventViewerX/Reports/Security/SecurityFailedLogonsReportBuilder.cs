@@ -9,7 +9,7 @@ namespace EventViewerX.Reports.Security;
 /// <summary>
 /// Report builder for Windows Security failed logons (4625).
 /// </summary>
-public sealed class SecurityFailedLogonsReportBuilder {
+internal sealed class SecurityFailedLogonsReportBuilder {
     private readonly bool _includeSamples;
     private readonly int _sampleSize;
 

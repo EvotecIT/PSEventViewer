@@ -7,7 +7,7 @@ namespace EventViewerX.Reports.Security;
 /// <summary>
 /// Executes EVTX security report queries using typed contracts.
 /// </summary>
-public static class SecurityEvtxQueryExecutor {
+internal static class SecurityEvtxQueryExecutor {
     private const string SecurityProviderName = "Microsoft-Windows-Security-Auditing";
     private const int EventIdFailedLogon = 4625;
     private const int EventIdAccountLockout = 4740;

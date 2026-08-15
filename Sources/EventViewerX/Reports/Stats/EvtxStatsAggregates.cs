@@ -6,7 +6,7 @@ namespace EventViewerX.Reports.Stats;
 /// <summary>
 /// Shared aggregation helpers for EVTX statistics reports.
 /// </summary>
-public static class EvtxStatsAggregates {
+internal static class EvtxStatsAggregates {
     /// <summary>
     /// Adds/increments a computer-name count when <paramref name="computerName"/> is not empty.
     /// </summary>

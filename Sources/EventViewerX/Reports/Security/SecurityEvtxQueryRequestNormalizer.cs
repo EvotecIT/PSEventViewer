@@ -5,7 +5,7 @@ namespace EventViewerX.Reports.Security;
 /// <summary>
 /// Normalizes and validates <see cref="SecurityEvtxQueryRequest"/> inputs with shared defaults/caps.
 /// </summary>
-public static class SecurityEvtxQueryRequestNormalizer {
+internal static class SecurityEvtxQueryRequestNormalizer {
     /// <summary>
     /// Default scanned-events cap used when caller does not provide one.
     /// </summary>

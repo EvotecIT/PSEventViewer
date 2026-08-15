@@ -6,7 +6,7 @@ namespace EventViewerX.Reports.Stats;
 /// <summary>
 /// Snapshot report of basic EVTX statistics.
 /// </summary>
-public sealed class EvtxStatsReport {
+internal sealed class EvtxStatsReport {
     /// <summary>
     /// Number of scanned events passed into the builder.
     /// </summary>

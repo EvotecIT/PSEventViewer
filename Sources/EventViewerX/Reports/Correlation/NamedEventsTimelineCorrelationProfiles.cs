@@ -5,7 +5,7 @@ namespace EventViewerX.Reports.Correlation;
 /// <summary>
 /// Reusable correlation profile presets for named-events timeline queries.
 /// </summary>
-public static class NamedEventsTimelineCorrelationProfiles {
+internal static class NamedEventsTimelineCorrelationProfiles {
     private sealed class CorrelationProfile {
         public CorrelationProfile(string name, IReadOnlyList<string> keys) {
             Name = name;

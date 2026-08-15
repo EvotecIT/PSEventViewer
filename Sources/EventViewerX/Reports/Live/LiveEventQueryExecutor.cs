@@ -10,7 +10,7 @@ namespace EventViewerX.Reports.Live;
 /// <summary>
 /// Executes live event channel queries using typed contracts.
 /// </summary>
-public static class LiveEventQueryExecutor {
+internal static class LiveEventQueryExecutor {
     /// <summary>
     /// Reads events from a live event log channel.
     /// </summary>

@@ -7,7 +7,7 @@ namespace EventViewerX.Reports.Security;
 /// <summary>
 /// Small aggregation helpers for security report builders.
 /// </summary>
-public static class SecurityAggregates {
+internal static class SecurityAggregates {
     internal static DateTime? NormalizeUtc(
         DateTime value) {
 

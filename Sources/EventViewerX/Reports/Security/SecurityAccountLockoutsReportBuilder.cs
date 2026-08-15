@@ -9,7 +9,7 @@ namespace EventViewerX.Reports.Security;
 /// <summary>
 /// Report builder for Windows Security account lockouts (4740).
 /// </summary>
-public sealed class SecurityAccountLockoutsReportBuilder {
+internal sealed class SecurityAccountLockoutsReportBuilder {
     private readonly bool _includeSamples;
     private readonly int _sampleSize;
 

@@ -6,7 +6,7 @@ namespace EventViewerX.Reports.Live;
 /// <summary>
 /// Query contract for reading events from a live event log channel.
 /// </summary>
-public sealed class LiveEventQueryRequest {
+internal sealed class LiveEventQueryRequest {
     /// <summary>
     /// Log name (for example <c>Security</c>, <c>System</c>, <c>Application</c>).
     /// </summary>
@@ -52,7 +52,7 @@ public sealed class LiveEventQueryRequest {
 /// <summary>
 /// Canonical failure kinds produced by live event queries.
 /// </summary>
-public enum LiveEventQueryFailureKind {
+internal enum LiveEventQueryFailureKind {
     /// <summary>
     /// Invalid request arguments.
     /// </summary>
@@ -86,7 +86,7 @@ public enum LiveEventQueryFailureKind {
 /// <summary>
 /// Failure payload produced by live event queries.
 /// </summary>
-public sealed class LiveEventQueryFailure {
+internal sealed class LiveEventQueryFailure {
     /// <summary>
     /// Gets or sets failure kind.
     /// </summary>
@@ -101,7 +101,7 @@ public sealed class LiveEventQueryFailure {
 /// <summary>
 /// Single event row returned by live event queries.
 /// </summary>
-public sealed class LiveEventRow {
+internal sealed class LiveEventRow {
     /// <summary>
     /// Event creation time in UTC (ISO-8601), or <see langword="null"/> when the source record has no timestamp.
     /// </summary>
@@ -175,7 +175,7 @@ public sealed class LiveEventRow {
 /// <summary>
 /// Query result for live event reads.
 /// </summary>
-public sealed class LiveEventQueryResult {
+internal sealed class LiveEventQueryResult {
     /// <summary>
     /// Effective machine queried. The local machine name is used when no remote target was supplied.
     /// </summary>

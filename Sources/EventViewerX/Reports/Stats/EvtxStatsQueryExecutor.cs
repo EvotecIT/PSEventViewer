@@ -9,7 +9,7 @@ namespace EventViewerX.Reports.Stats;
 /// <summary>
 /// Executes EVTX statistics queries using typed contracts.
 /// </summary>
-public static class EvtxStatsQueryExecutor {
+internal static class EvtxStatsQueryExecutor {
     /// <summary>
     /// Reads an EVTX file and produces aggregate statistics.
     /// </summary>
