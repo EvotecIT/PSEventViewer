@@ -8,6 +8,10 @@ using Xunit;
 
 namespace EventViewerX.Tests {
     public class TestQuickProbe {
+        private static readonly string DeterministicUnavailableHost =
+            new string('x', 256);
+        private const int DeterministicUnavailablePort = 1;
+
         [Fact]
         public void LocalSessionCreationReturnsBeforeTheStalledFactoryCompletes() {
             if (!OperatingSystem.IsWindows()) return;
@@ -541,7 +545,7 @@ namespace EventViewerX.Tests {
         public void ProbeLatestEvent_DoesNotWriteBoundaryDiagnostics() {
             if (!OperatingSystem.IsWindows()) return;
 
-            const string host = "[";
+            string host = DeterministicUnavailableHost;
             InternalLogger previous = Settings._logger;
             var logger = new InternalLogger();
             var warnings = new List<string>();
@@ -570,7 +574,7 @@ namespace EventViewerX.Tests {
         public void NegativeCacheExpiresAndIsReevaluated() {
             if (!OperatingSystem.IsWindows()) return;
 
-            const string host = "["; // Invalid endpoint keeps this cache-lifetime test independent of network timing.
+            string host = DeterministicUnavailableHost;
             var originalTtl = Settings.NegativeCacheTtlSeconds;
             var originalRpcTimeout = Settings.RpcProbeTimeoutMs;
             var originalSessionTimeout = Settings.SessionTimeoutMs;
@@ -610,11 +614,11 @@ namespace EventViewerX.Tests {
             var originalRpcTimeout = Settings.RpcProbeTimeoutMs;
 
             try {
-                Settings.RpcProbePort = 1; // closed port should fail fast
+                Settings.RpcProbePort = DeterministicUnavailablePort;
                 Settings.RpcProbeTimeoutMs = 200;
                 EventLogSessionManager.ClearAllHostCache();
 
-                var result = EventLogProbe.ProbeLatestEvent("Application", machineName: "[", timeout: TimeSpan.FromMilliseconds(500), maxEventsToScan: 2);
+                var result = EventLogProbe.ProbeLatestEvent("Application", machineName: DeterministicUnavailableHost, timeout: TimeSpan.FromMilliseconds(500), maxEventsToScan: 2);
 
                 Assert.Equal(EventLogProbeStatus.HostUnavailable, result.Status);
                 Assert.Contains("RPC preflight", result.Message, StringComparison.OrdinalIgnoreCase);
