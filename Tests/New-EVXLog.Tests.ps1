@@ -6,15 +6,13 @@ Describe 'New-EVXLog cmdlet' {
         $script:isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltinRole]::Administrator)
         $script:skip = -not $script:isAdmin
 
-        if (-not $script:skip) {
-            Remove-EVXSource -SourceName $script:provider -LogName $script:log -ErrorAction SilentlyContinue
-            Remove-EVXLog -LogName $script:log -ErrorAction SilentlyContinue
+        if (-not $script:skip -and [EventViewerX.ClassicEventLogManager]::LogExists($script:log)) {
+            [EventViewerX.ClassicEventLogManager]::RemoveLog($script:log) | Out-Null
         }
     }
     AfterAll {
-        if (-not $script:skip) {
-            Remove-EVXSource -SourceName $script:provider -LogName $script:log -ErrorAction SilentlyContinue
-            Remove-EVXLog -LogName $script:log -ErrorAction SilentlyContinue
+        if (-not $script:skip -and [EventViewerX.ClassicEventLogManager]::LogExists($script:log)) {
+            [EventViewerX.ClassicEventLogManager]::RemoveLog($script:log) | Out-Null
         }
     }
     It 'creates new log with provider' -Skip:$script:skip {
