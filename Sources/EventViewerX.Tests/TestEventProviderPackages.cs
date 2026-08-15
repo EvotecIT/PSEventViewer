@@ -5,6 +5,7 @@ using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Xunit;
 using ProviderEventDefinition =
     EventViewerX.Providers.EventProviderEventDefinition;
@@ -146,35 +147,107 @@ public sealed class TestEventProviderPackages {
         }
     }
 
-    [Theory]
-    [InlineData(0)]
-    [InlineData(-1)]
-    public void RejectsNonPositiveBuildToolTimeoutBeforeDiscovery(
-        int timeoutMilliseconds) {
-
+    [Fact]
+    public void PackageBuildUsesTheManagedCompiler() {
         string root = Path.Combine(
             Path.GetTempPath(),
             "EventViewerX.Tests",
             Guid.NewGuid().ToString("N"));
         string packagePath = Path.Combine(
             root,
-            "timeout-validation.evxprovider");
-        var options =
-            new EventProviderPackageBuildOptions {
-                ToolTimeout =
-                    TimeSpan.FromMilliseconds(
-                        timeoutMilliseconds)
-            };
-
-        ArgumentOutOfRangeException exception =
-            Assert.Throws<ArgumentOutOfRangeException>(() =>
+            "managed-compiler.evxprovider");
+        try {
+            EventProviderPackageBuildResult result =
                 EventProviderPackageBuilder.Build(
                     CreateDefinition(),
-                    packagePath,
-                    options));
+                    packagePath);
+            using EventProviderPackage package =
+                EventProviderPackageReader.Open(packagePath);
 
-        Assert.Equal("ToolTimeout", exception.ParamName);
-        Assert.False(Directory.Exists(root));
+            Assert.Equal(
+                EventProviderManagedCompiler.Name,
+                result.Compiler);
+            Assert.Equal(2, package.Manifest.FormatVersion);
+            Assert.Equal(
+                EventProviderManagedCompiler.Name,
+                package.Manifest.Compiler);
+            Assert.Equal(
+                EventProviderManagedCompiler.Version,
+                package.Manifest.CompilerVersion);
+        } finally {
+            if (Directory.Exists(root)) {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public void OpensAndVerifiesSignedLegacyFormatOnePackages() {
+        string root = Path.Combine(
+            Path.GetTempPath(),
+            "EventViewerX.Tests",
+            Guid.NewGuid().ToString("N"));
+        string packagePath = Path.Combine(
+            root,
+            "legacy-format-one.evxprovider");
+        using RSA rsa = RSA.Create(2048);
+        var request = new CertificateRequest(
+            "CN=EventViewerX Legacy Package Test",
+            rsa,
+            HashAlgorithmName.SHA256,
+            RSASignaturePadding.Pkcs1);
+        using X509Certificate2 certificate =
+            request.CreateSelfSigned(
+                DateTimeOffset.UtcNow.AddMinutes(-1),
+                DateTimeOffset.UtcNow.AddDays(1));
+        try {
+            EventProviderPackageBuilder.Build(
+                CreateDefinition(),
+                packagePath);
+            using (ZipArchive archive = ZipFile.Open(
+                       packagePath,
+                       ZipArchiveMode.Update)) {
+                ZipArchiveEntry entry = archive.GetEntry(
+                    EventProviderPackageLayout
+                        .PackageManifestFileName)!;
+                JsonObject manifest;
+                using (Stream stream = entry.Open()) {
+                    manifest = JsonNode.Parse(stream)!.AsObject();
+                }
+                manifest["formatVersion"] = 1;
+                manifest.Remove("compiler");
+                manifest.Remove("compilerVersion");
+                manifest["windowsSdkVersion"] = "10.0.26100.0";
+                manifest["msvcVersion"] = "14.42.34433";
+                EventProviderPackageManifest legacyManifest =
+                    JsonSerializer.Deserialize<EventProviderPackageManifest>(
+                        manifest.ToJsonString(),
+                        EventProviderDefinitionJson.SerializerOptions)!;
+                EventProviderPackageSignature.Sign(
+                    legacyManifest,
+                    certificate);
+                ReplaceEntry(
+                    entry,
+                    JsonSerializer.SerializeToUtf8Bytes(
+                        legacyManifest,
+                        EventProviderDefinitionJson.SerializerOptions));
+            }
+
+            using EventProviderPackage package =
+                EventProviderPackageReader.Open(packagePath);
+            Assert.Equal(1, package.Manifest.FormatVersion);
+            Assert.True(package.IsSigned);
+            Assert.Equal(
+                certificate.Thumbprint,
+                package.SignerCertificate?.Thumbprint);
+            Assert.Equal(
+                "Evotec-EventViewerX-PackageTest",
+                package.Manifest.ProviderName);
+        } finally {
+            if (Directory.Exists(root)) {
+                Directory.Delete(root, recursive: true);
+            }
+        }
     }
 
     [Fact]
@@ -244,7 +317,7 @@ public sealed class TestEventProviderPackages {
                         entry.Open(),
                         new UTF8Encoding(false));
                 writer.Write(
-                    "{\"formatVersion\":1,\"files\":null}");
+                    "{\"formatVersion\":2,\"files\":null}");
             }
 
             InvalidDataException exception =

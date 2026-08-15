@@ -1,26 +1,29 @@
 # Custom Windows Event providers
 
 EventViewerX makes a real manifest-based Windows Event provider a build-once,
-deploy-many artifact.
+deploy-many artifact without requiring a Windows development toolchain.
 
 You define named and typed fields in a PowerShell hashtable, JSON, or C# model.
-A developer or CI machine compiles one `.evxprovider` package. Target machines
-install that package without the Windows SDK, Visual Studio, a C# compiler,
-generated source, or a package repository.
+Any Windows machine running EventViewerX or PSEventViewer can compile one
+`.evxprovider` package in-process. The build and target machines do not need
+the Windows SDK, Visual Studio, MSVC, a C# compiler, generated source, or a
+package repository.
 
 ## The workflow
 
 1. Define provider identity, channels, events, messages, and payload fields.
 2. Validate the definition.
-3. Build and optionally sign an `.evxprovider` on a controlled build host.
+3. Build and optionally sign an `.evxprovider` wherever the module or library
+   is available.
 4. Distribute the single package through normal software deployment.
 5. Install it elevated on each target.
 6. Write events by event name and field name.
 7. Build upgrades against the released package as a compatibility baseline.
 8. Retain old resources so historical EVTX messages remain renderable.
 
-The Windows SDK/MSVC resource tools are needed only for step 3. Runtime event
-writes use the registered manifest and native Windows Eventing API.
+EventViewerX writes the Windows message table, event metadata, and resource-only
+PE directly in managed code. Runtime event writes use the registered manifest
+and native Windows Eventing API.
 
 ## PowerShell: hashtable to working provider
 
@@ -62,11 +65,12 @@ The runnable version is
 [`CustomProvider.definition.json`](../Examples/CustomProvider.definition.json)
 is a source-controlled JSON equivalent.
 
-## Build-host requirements
+## Build requirements
 
-The builder discovers `mc.exe`, `rc.exe`, and `link.exe` from an installed
-Windows SDK and Visual C++ build tools. Build in a developer workstation image
-or CI worker that contains those tools:
+The builder is part of EventViewerX. It does not launch `mc.exe`, `rc.exe`,
+`link.exe`, Roslyn, or another compiler, and it does not generate or execute
+source code. The same command works on a clean Windows host with only the
+module or library and its normal runtime dependencies:
 
 ```powershell
 New-EVXProviderPackage `
@@ -75,9 +79,10 @@ New-EVXProviderPackage `
     -Force
 ```
 
-Explicit tool paths and a tool timeout are available for controlled build
-images. The completed package records toolchain provenance and hashes every
-payload file.
+The completed package records the managed compiler identity and version and
+hashes every payload file. Building does not register the provider or require
+elevation; installation and removal are the machine-wide operations that must
+run elevated.
 
 ## Package signing
 
@@ -414,7 +419,8 @@ An `.evxprovider` is a constrained ZIP:
 - `provider.man`: generated Windows instrumentation manifest;
 - `provider.resources.dll`: message/schema resources, with no code entry point;
 - `schema-lock.json`: compatibility-critical identity snapshot;
-- `package.json`: identity, build provenance, and SHA-256 of every payload file.
+- `package.json`: identity, managed-compiler provenance, and SHA-256 of every
+  payload file.
 
 Every activation is extracted from verified package bytes into a fresh,
 restricted directory. `SYSTEM` and Administrators receive full control; Local
@@ -431,7 +437,8 @@ the managed ACL throughout the tree.
 - Store the definition and last released `.evxprovider` baseline in controlled
   release inputs.
 - Validate on every change.
-- Build once on a Windows worker with pinned SDK/MSVC tooling.
+- Build once on a Windows worker with the pinned EventViewerX/PSEventViewer
+  package version.
 - Sign the package and publish its SHA-256.
 - Test install, named write, read-back, upgrade, repair, rollback-on-failure,
   and uninstall on a disposable Windows machine.

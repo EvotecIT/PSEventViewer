@@ -292,7 +292,7 @@ public static class EventProviderPackageReader {
                 EventProviderDefinitionJson.SerializerOptions) ??
             throw new InvalidDataException(
                 "Provider package manifest is invalid.");
-        if (manifest.FormatVersion != 1) {
+        if (manifest.FormatVersion is not 1 and not 2) {
             throw new InvalidDataException(
                 $"Provider package format {manifest.FormatVersion} is not supported.");
         }
@@ -315,7 +315,7 @@ public static class EventProviderPackageReader {
             requiredFiles.Any(fileName =>
                 !manifest.Files.ContainsKey(fileName))) {
             throw new InvalidDataException(
-                "Provider package format 1 must declare exactly its definition, manifest, resources, and schema lock.");
+                $"Provider package format {manifest.FormatVersion} must declare exactly its definition, manifest, resources, and schema lock.");
         }
 
         var files = new Dictionary<string, byte[]>(

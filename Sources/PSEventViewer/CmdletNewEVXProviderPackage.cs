@@ -1,12 +1,12 @@
-using System.Security.Cryptography.X509Certificates;
 using EventViewerX.Providers;
+using System.Security.Cryptography.X509Certificates;
 
 namespace PSEventViewer;
 
 /// <summary>
 /// <para type="synopsis">Compiles a portable custom Windows event provider package.</para>
-/// <para type="description">Validates the schema, optionally compares a compatibility baseline, discovers the local Windows SDK and MSVC resource tools, compiles the manifest resources, hashes every file, optionally signs package identity and hashes, and emits one portable .evxprovider file.</para>
-/// <para type="description">Only the build machine requires the Windows SDK and MSVC tools. Target machines install the completed package without an SDK, compiler, generated source, or EventViewerX build dependency.</para>
+/// <para type="description">Validates the schema, optionally compares a compatibility baseline, compiles the Windows event metadata and localized messages in-process, hashes every file, optionally signs package identity and hashes, and emits one portable .evxprovider file.</para>
+/// <para type="description">No Windows SDK, Visual Studio, native compiler, generated source, or external build tool is required.</para>
 /// </summary>
 [Cmdlet(
     VerbsCommon.New,
