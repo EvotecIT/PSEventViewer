@@ -17,7 +17,7 @@ public sealed class EventProviderLevelDefinition {
 public sealed class EventProviderTaskDefinition {
     /// <summary>Provider-local task name.</summary>
     public string Name { get; set; } = string.Empty;
-    /// <summary>Task descriptor value.</summary>
+    /// <summary>Task descriptor value from 1 through 65535.</summary>
     public ushort Value { get; set; }
     /// <summary>Optional classic task event GUID.</summary>
     public Guid? EventGuid { get; set; }

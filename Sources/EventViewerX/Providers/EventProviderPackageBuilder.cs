@@ -26,11 +26,6 @@ public static class EventProviderPackageBuilder {
                 nameof(outputPath));
         }
         options ??= new EventProviderPackageBuildOptions();
-        if (options.ToolTimeout <= TimeSpan.Zero) {
-            throw new ArgumentOutOfRangeException(
-                nameof(options.ToolTimeout),
-                "Provider build tool timeout must be greater than zero.");
-        }
         EventProviderValidationResult validation =
             EventProviderDefinitionValidator.ValidateOrThrow(definition);
         if (!string.IsNullOrWhiteSpace(options.BaselinePath)) {
@@ -41,9 +36,6 @@ public static class EventProviderPackageBuilder {
                 definition);
         }
 
-        EventProviderToolchain toolchain =
-            EventProviderToolchainDiscovery.Find(
-                options.Toolchain);
         string finalPath = Path.GetFullPath(outputPath);
         string? outputDirectory = Path.GetDirectoryName(finalPath);
         if (!string.IsNullOrWhiteSpace(outputDirectory)) {
@@ -59,23 +51,18 @@ public static class EventProviderPackageBuilder {
             "EventViewerX",
             "ProviderBuild",
             Guid.NewGuid().ToString("N"));
-        string nativeRoot = Path.Combine(buildRoot, "native");
-        Directory.CreateDirectory(nativeRoot);
+        Directory.CreateDirectory(buildRoot);
         string temporaryPackage = finalPath + "." +
                                   Guid.NewGuid().ToString("N") +
                                   ".tmp";
         try {
             BuildContents(
                 definition,
-                buildRoot,
-                nativeRoot,
-                toolchain,
-                options.ToolTimeout);
+                buildRoot);
             EventProviderPackageManifest packageManifest =
                 CreatePackageManifest(
                     definition,
-                    buildRoot,
-                    toolchain);
+                    buildRoot);
             if (options.SigningCertificate != null) {
                 EventProviderPackageSignature.Sign(
                     packageManifest,
@@ -109,7 +96,7 @@ public static class EventProviderPackageBuilder {
                     packageManifest.Files[
                         EventProviderPackageLayout
                             .ResourceFileName],
-                Toolchain = toolchain,
+                Compiler = EventProviderManagedCompiler.Name,
                 Warnings = validation.Warnings,
                 IsSigned = options.SigningCertificate != null,
                 SignerThumbprint =
@@ -153,10 +140,7 @@ public static class EventProviderPackageBuilder {
 
     private static void BuildContents(
         EventProviderDefinition definition,
-        string buildRoot,
-        string nativeRoot,
-        EventProviderToolchain toolchain,
-        TimeSpan timeout) {
+        string buildRoot) {
 
         string definitionPath = Path.Combine(
             buildRoot,
@@ -186,65 +170,7 @@ public static class EventProviderPackageBuilder {
                 EventProviderPackageLayout.ResourceFileName),
             new UTF8Encoding(false));
 
-        EventProviderProcessResult messageCompiler =
-            EventProviderProcessRunner.Run(
-                toolchain.MessageCompilerPath,
-                new[] {
-                    "-um",
-                    "-h",
-                    nativeRoot,
-                    "-r",
-                    nativeRoot,
-                    manifestPath
-                },
-                buildRoot,
-                timeout);
-        EventProviderProcessRunner.EnsureSuccess(
-            messageCompiler,
-            "Windows Message Compiler");
-
-        string resourceScript = Path.Combine(
-            nativeRoot,
-            "provider.rc");
-        if (!File.Exists(resourceScript)) {
-            throw new InvalidDataException(
-                "Message Compiler completed without producing provider.rc.");
-        }
-        string compiledResource = Path.Combine(
-            nativeRoot,
-            "provider.res");
-        EventProviderProcessResult resourceCompiler =
-            EventProviderProcessRunner.Run(
-                toolchain.ResourceCompilerPath,
-                new[] {
-                    "/nologo",
-                    "/fo",
-                    compiledResource,
-                    resourceScript
-                },
-                buildRoot,
-                timeout);
-        EventProviderProcessRunner.EnsureSuccess(
-            resourceCompiler,
-            "Windows Resource Compiler");
-
-        EventProviderProcessResult linker =
-            EventProviderProcessRunner.Run(
-                toolchain.LinkerPath,
-                new[] {
-                    "/nologo",
-                    "/dll",
-                    "/noentry",
-                    "/Brepro",
-                    "/machine:x64",
-                    "/out:" + resourcePath,
-                    compiledResource
-                },
-                buildRoot,
-                timeout);
-        EventProviderProcessRunner.EnsureSuccess(
-            linker,
-            "Microsoft Linker");
+        EventProviderManagedCompiler.Compile(definition, resourcePath);
         if (!File.Exists(resourcePath) ||
             new FileInfo(resourcePath).Length == 0) {
             throw new InvalidDataException(
@@ -254,8 +180,7 @@ public static class EventProviderPackageBuilder {
 
     private static EventProviderPackageManifest CreatePackageManifest(
         EventProviderDefinition definition,
-        string buildRoot,
-        EventProviderToolchain toolchain) {
+        string buildRoot) {
 
         var files = new SortedDictionary<string, string>(
             StringComparer.Ordinal);
@@ -269,12 +194,12 @@ public static class EventProviderPackageBuilder {
                 Path.Combine(buildRoot, fileName));
         }
         return new EventProviderPackageManifest {
-            FormatVersion = 1,
+            FormatVersion = 2,
             ProviderName = definition.Name,
             ProviderId = definition.Id,
             PackageVersion = definition.PackageVersion,
-            WindowsSdkVersion = toolchain.WindowsSdkVersion,
-            MsvcVersion = toolchain.MsvcVersion,
+            Compiler = EventProviderManagedCompiler.Name,
+            CompilerVersion = EventProviderManagedCompiler.Version,
             Files = files
         };
     }

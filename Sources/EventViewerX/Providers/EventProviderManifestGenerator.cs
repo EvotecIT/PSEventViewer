@@ -136,28 +136,39 @@ public static class EventProviderManifestGenerator {
                             ? "true"
                             : "false"),
                     new XAttribute("message", Reference(stringId)));
-                AddOptionalBoolean(
-                    element,
-                    "retention",
-                    channel.Retention);
-                AddOptionalBoolean(
-                    element,
-                    "autoBackup",
-                    channel.AutoBackup);
-                if (channel.MaximumSizeBytes.HasValue) {
-                    element.Add(
-                        new XAttribute(
-                            "maxSize",
-                            channel.MaximumSizeBytes.Value));
-                }
                 if (!string.IsNullOrWhiteSpace(channel.Access)) {
                     element.Add(
                         new XAttribute(
                             "access",
                             channel.Access.Trim()));
                 }
+                XElement? logging = CreateChannelLogging(channel);
+                if (logging != null) {
+                    element.Add(logging);
+                }
                 return element;
             }));
+    }
+
+    private static XElement? CreateChannelLogging(
+        EventProviderChannelDefinition channel) {
+
+        var logging = new XElement(ManifestNamespace + "logging");
+        AddOptionalElement(
+            logging,
+            "autoBackup",
+            channel.AutoBackup);
+        AddOptionalElement(
+            logging,
+            "retention",
+            channel.Retention);
+        if (channel.MaximumSizeBytes.HasValue) {
+            logging.Add(
+                new XElement(
+                    ManifestNamespace + "maxSize",
+                    channel.MaximumSizeBytes.Value));
+        }
+        return logging.HasElements ? logging : null;
     }
 
     private static XElement CreateLevels(
@@ -519,15 +530,15 @@ public static class EventProviderManifestGenerator {
         }
     }
 
-    private static void AddOptionalBoolean(
+    private static void AddOptionalElement(
         XElement element,
         string name,
         bool? value) {
 
         if (value.HasValue) {
             element.Add(
-                new XAttribute(
-                    name,
+                new XElement(
+                    ManifestNamespace + name,
                     value.Value
                         ? "true"
                         : "false"));

@@ -86,9 +86,9 @@ Applies explicit desired state through ClassicEventLogManager and reports exactl
 ### [New-EVXProviderPackage](New-EVXProviderPackage.md)
 Compiles a portable custom Windows event provider package.
 
-Validates the schema, optionally compares a compatibility baseline, discovers the local Windows SDK and MSVC resource tools, compiles the manifest resources, hashes every file, optionally signs package identity and hashes, and emits one portable .evxprovider file.
+Validates the schema, optionally compares a compatibility baseline, compiles the Windows event metadata and localized messages in-process, hashes every file, optionally signs package identity and hashes, and emits one portable .evxprovider file.
 
-Only the build machine requires the Windows SDK and MSVC tools. Target machines install the completed package without an SDK, compiler, generated source, or EventViewerX build dependency.
+No Windows SDK, Visual Studio, native compiler, generated source, or external build tool is required.
 
 ### [New-EVXSource](New-EVXSource.md)
 Registers a classic Windows Event Log source explicitly.

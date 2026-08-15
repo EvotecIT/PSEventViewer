@@ -7,12 +7,6 @@ Describe 'Custom manifest provider lifecycle' {
         $IsElevated = $Principal.IsInRole(
             [Security.Principal.WindowsBuiltInRole]::Administrator
         )
-        try {
-            [void] [EventViewerX.Providers.EventProviderToolchainDiscovery]::Find()
-            $HasToolchain = $true
-        } catch {
-            $HasToolchain = $false
-        }
     }
 
     It 'exports the provider package workflow' {
@@ -91,7 +85,7 @@ Describe 'Custom manifest provider lifecycle' {
         $Result.Errors.Code | Should -Contain 'ProviderNameRequired'
     }
 
-    It 'builds, installs, writes, reads, and removes a provider package' -Skip:(-not ($IsElevated -and $HasToolchain)) {
+    It 'builds, installs, writes, reads, and removes a provider package' -Skip:(-not $IsElevated) {
         $Suffix = [guid]::NewGuid().ToString('N')
         $ProviderName = "Evotec-EventViewerX-Pester-$Suffix"
         $ProviderGuid = [guid]::NewGuid()

@@ -1,12 +1,10 @@
 namespace EventViewerX.Providers;
 
 using System.Security.Cryptography.X509Certificates;
+using System.Text.Json.Serialization;
 
 /// <summary>Options controlling one provider package build.</summary>
 public sealed class EventProviderPackageBuildOptions {
-    /// <summary>Optional explicit build-tool paths.</summary>
-    public EventProviderToolchainOptions Toolchain { get; set; } = new();
-
     /// <summary>
     /// Optional earlier package or definition JSON used as a compatibility
     /// baseline.
@@ -15,9 +13,6 @@ public sealed class EventProviderPackageBuildOptions {
 
     /// <summary>Whether an existing output package may be replaced.</summary>
     public bool Overwrite { get; set; }
-
-    /// <summary>Maximum time allowed for each native build tool.</summary>
-    public TimeSpan ToolTimeout { get; set; } = TimeSpan.FromMinutes(2);
 
     /// <summary>
     /// Optional RSA certificate used to sign package identity and every
@@ -40,8 +35,8 @@ public sealed class EventProviderPackageBuildResult {
     public string PackageSha256 { get; internal set; } = string.Empty;
     /// <summary>SHA-256 hash of the compiled resource DLL.</summary>
     public string ResourceSha256 { get; internal set; } = string.Empty;
-    /// <summary>Build tools used to create the package.</summary>
-    public EventProviderToolchain Toolchain { get; internal set; } = new();
+    /// <summary>Managed compiler used to create the package.</summary>
+    public string Compiler { get; internal set; } = string.Empty;
     /// <summary>Non-blocking validation warnings.</summary>
     public IReadOnlyList<EventProviderValidationIssue> Warnings {
         get;
@@ -58,17 +53,31 @@ public sealed class EventProviderPackageBuildResult {
 /// <summary>Metadata and file hashes stored inside a provider package.</summary>
 public sealed class EventProviderPackageManifest {
     /// <summary>Package container format version.</summary>
-    public int FormatVersion { get; set; } = 1;
+    public int FormatVersion { get; set; } = 2;
     /// <summary>Provider name.</summary>
     public string ProviderName { get; set; } = string.Empty;
     /// <summary>Provider GUID.</summary>
     public Guid ProviderId { get; set; }
     /// <summary>Provider package version.</summary>
     public string PackageVersion { get; set; } = string.Empty;
-    /// <summary>Windows SDK version used for compilation.</summary>
-    public string WindowsSdkVersion { get; set; } = string.Empty;
-    /// <summary>MSVC tools version used for resource linking.</summary>
-    public string MsvcVersion { get; set; } = string.Empty;
+    /// <summary>
+    /// Windows SDK version recorded by legacy format-1 packages.
+    /// </summary>
+    [Obsolete("Format-2 packages use Compiler and CompilerVersion.")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? WindowsSdkVersion { get; set; }
+    /// <summary>
+    /// MSVC version recorded by legacy format-1 packages.
+    /// </summary>
+    [Obsolete("Format-2 packages use Compiler and CompilerVersion.")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? MsvcVersion { get; set; }
+    /// <summary>Compiler implementation used to produce native resources.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Compiler { get; set; }
+    /// <summary>Compiler assembly version.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? CompilerVersion { get; set; }
     /// <summary>Expected root files and lowercase SHA-256 hashes.</summary>
     public SortedDictionary<string, string> Files { get; set; } =
         new(StringComparer.Ordinal);

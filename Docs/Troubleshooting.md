@@ -121,14 +121,17 @@ Choose the start contract deliberately:
 - A native EVTX export is local-only; remote CSV/JSONL/XML are written on the
   caller through bounded streaming.
 
-## Provider package build tools are not found
+## Provider package build fails
 
-Package building requires a Windows SDK and Visual C++ resource linker on the
-build host. Target machines do not need either.
+Package building runs entirely inside EventViewerX and does not require the
+Windows SDK, Visual Studio, MSVC, or an external compiler. Check the structured
+validation errors first: invalid identities, unresolved metadata references,
+incompatible field output types, oversized dimensions, and breaking baseline
+changes are rejected before an artifact is emitted.
 
-Verify `mc.exe`, `rc.exe`, and `link.exe` are installed for a compatible
-architecture. In controlled build images, pass explicit tool paths rather than
-copying SDK binaries into the provider project or compiling on every endpoint.
+Also confirm that the output directory is writable and that an existing
+package is replaced only with `-Force` (PowerShell) or `Overwrite = true`
+(C#). A build failure should not be worked around by installing SDK tools.
 
 ## Provider package installation fails
 

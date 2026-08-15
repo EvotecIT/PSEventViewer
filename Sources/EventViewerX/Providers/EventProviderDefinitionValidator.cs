@@ -6,18 +6,13 @@ namespace EventViewerX.Providers;
 /// Validates provider definitions before manifest generation or installation.
 /// </summary>
 public static partial class EventProviderDefinitionValidator {
-    private static readonly HashSet<EventProviderFieldType> NumericTypes =
+    private static readonly HashSet<EventProviderFieldType>
+        DimensionReferenceTypes =
         new() {
-            EventProviderFieldType.Int8,
             EventProviderFieldType.UInt8,
-            EventProviderFieldType.Int16,
             EventProviderFieldType.UInt16,
-            EventProviderFieldType.Int32,
             EventProviderFieldType.UInt32,
-            EventProviderFieldType.Int64,
-            EventProviderFieldType.UInt64,
-            EventProviderFieldType.HexInt32,
-            EventProviderFieldType.HexInt64
+            EventProviderFieldType.HexInt32
         };
     /// <summary>Validates all schema, reference, and Windows limit rules.</summary>
     public static EventProviderValidationResult Validate(
@@ -135,6 +130,13 @@ public static partial class EventProviderDefinitionValidator {
         EventProviderDefinition definition,
         List<EventProviderValidationIssue> issues) {
 
+        if (definition.Channels.Count > 16) {
+            Error(
+                "ChannelLimitExceeded",
+                "Channels",
+                "Windows event providers support at most 16 manifest channels.",
+                issues);
+        }
         Unique(
             definition.Channels,
             static channel => channel.Id,
@@ -289,6 +291,13 @@ public static partial class EventProviderDefinitionValidator {
                 "TaskNameInvalid",
                 $"Tasks[{taskIndex}].Name",
                 issues);
+            if (task.Value == 0) {
+                Error(
+                    "CustomTaskReserved",
+                    $"Tasks[{taskIndex}].Value",
+                    "Custom task values must be between 1 and 65535.",
+                    issues);
+            }
             Unique(
                 task.Opcodes,
                 static opcode => opcode.Name,
@@ -417,6 +426,13 @@ public static partial class EventProviderDefinitionValidator {
                     "MapKindInvalid",
                     $"Maps[{mapIndex}].Kind",
                     $"Map kind '{map.Kind}' is not supported.",
+                    issues);
+            }
+            if (map.Entries.Count == 0) {
+                Error(
+                    "MapEntryRequired",
+                    $"Maps[{mapIndex}].Entries",
+                    "At least one map entry is required.",
                     issues);
             }
             var values = new HashSet<long>();
@@ -735,6 +751,28 @@ public static partial class EventProviderDefinitionValidator {
                     $"Map '{field.Map}' is not declared.",
                     issues);
             }
+            if (!string.IsNullOrWhiteSpace(field.Map) &&
+                field.Type is not EventProviderFieldType.UInt8 and
+                    not EventProviderFieldType.UInt16 and
+                    not EventProviderFieldType.UInt32 and
+                    not EventProviderFieldType.HexInt32) {
+                Error(
+                    "FieldMapTypeIncompatible",
+                    fieldPath + ".Map",
+                    "Mapped fields must use UInt8, UInt16, UInt32, or HexInt32 input type.",
+                    issues);
+            }
+            if (!string.IsNullOrWhiteSpace(field.Length) &&
+                field.Type is not EventProviderFieldType.UnicodeString and
+                    not EventProviderFieldType.AnsiString and
+                    not EventProviderFieldType.Binary and
+                    not EventProviderFieldType.Sid) {
+                Error(
+                    "FieldLengthTypeIncompatible",
+                    fieldPath + ".Length",
+                    "Length is supported only for UnicodeString, AnsiString, Binary, or Sid input types.",
+                    issues);
+            }
             ValidateDimension(
                 field.Length,
                 "Length",
@@ -782,6 +820,12 @@ public static partial class EventProviderDefinitionValidator {
                     path + "." + name,
                     $"{name} cannot be negative.",
                     issues);
+            } else if (constant > ushort.MaxValue) {
+                Error(
+                    $"Field{name}OutOfRange",
+                    path + "." + name,
+                    $"{name} cannot exceed {ushort.MaxValue}.",
+                    issues);
             }
             return;
         }
@@ -804,11 +848,12 @@ public static partial class EventProviderDefinitionValidator {
                 issues);
             return;
         }
-        if (!NumericTypes.Contains(fields[referenceIndex].Type)) {
+        if (!DimensionReferenceTypes.Contains(
+                fields[referenceIndex].Type)) {
             Error(
                 $"Field{name}ReferenceNotNumeric",
                 path + "." + name,
-                $"{name} reference '{expression}' must be an integer field.",
+                $"{name} reference '{expression}' must be a UInt8, UInt16, UInt32, or HexInt32 field.",
                 issues);
         }
     }

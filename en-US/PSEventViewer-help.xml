@@ -7351,14 +7351,14 @@ This cannot be combined with EventLogPath.</maml:para>
       <command:noun>EVXProviderPackage</command:noun>
       <maml:description>
         <maml:para>Compiles a portable custom Windows event provider package.</maml:para>
-        <maml:para>Validates the schema, optionally compares a compatibility baseline, discovers the local Windows SDK and MSVC resource tools, compiles the manifest resources, hashes every file, optionally signs package identity and hashes, and emits one portable .evxprovider file.</maml:para>
-        <maml:para>Only the build machine requires the Windows SDK and MSVC tools. Target machines install the completed package without an SDK, compiler, generated source, or EventViewerX build dependency.</maml:para>
+        <maml:para>Validates the schema, optionally compares a compatibility baseline, compiles the Windows event metadata and localized messages in-process, hashes every file, optionally signs package identity and hashes, and emits one portable .evxprovider file.</maml:para>
+        <maml:para>No Windows SDK, Visual Studio, native compiler, generated source, or external build tool is required.</maml:para>
       </maml:description>
     </command:details>
     <maml:description>
       <maml:para>Compiles a portable custom Windows event provider package.</maml:para>
-      <maml:para>Validates the schema, optionally compares a compatibility baseline, discovers the local Windows SDK and MSVC resource tools, compiles the manifest resources, hashes every file, optionally signs package identity and hashes, and emits one portable .evxprovider file.</maml:para>
-      <maml:para>Only the build machine requires the Windows SDK and MSVC tools. Target machines install the completed package without an SDK, compiler, generated source, or EventViewerX build dependency.</maml:para>
+      <maml:para>Validates the schema, optionally compares a compatibility baseline, compiles the Windows event metadata and localized messages in-process, hashes every file, optionally signs package identity and hashes, and emits one portable .evxprovider file.</maml:para>
+      <maml:para>No Windows SDK, Visual Studio, native compiler, generated source, or external build tool is required.</maml:para>
     </maml:description>
     <command:syntax>
       <command:syntaxItem parameterSetName="Definition">
