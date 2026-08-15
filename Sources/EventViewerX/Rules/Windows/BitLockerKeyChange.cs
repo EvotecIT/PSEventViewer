@@ -38,19 +38,19 @@ public class BitLockerKeyChange : EventRuleBase {
 
     /// <summary>Initialises a BitLocker key change wrapper from an event record.</summary>
     public BitLockerKeyChange(EventObject eventObject) : base(eventObject) {
-        Event = eventObject;
-        Type = "BitLockerKeyChange";
-        Computer = Event.ComputerName;
-        Action = Event.MessageSubject;
+        SourceEvent = eventObject;
+        NamedEventName = "BitLockerKeyChange";
+        Computer = SourceEvent.ComputerName;
+        Action = SourceEvent.MessageSubject;
         Volume = EventsHelper.GetBitLockerVolumeType(
-            Event.GetValueFromDataDictionary("VolumeName", "Volume"));
+            SourceEvent.GetValueFromDataDictionary("VolumeName", "Volume"));
         ProtectorType = EventsHelper.GetBitLockerProtectorType(
-            Event.GetValueFromDataDictionary("ProtectorType", "KeyProtection"));
-        MasterKeyId = Event.GetValueFromDataDictionary("MasterKeyId");
-        RecoveryKeyId = Event.GetValueFromDataDictionary("RecoveryKeyId");
-        RecoveryServer = Event.GetValueFromDataDictionary("RecoveryServer");
-        Who = Event.GetSubjectAccountOrEmpty();
-        When = Event.TimeCreated;
+            SourceEvent.GetValueFromDataDictionary("ProtectorType", "KeyProtection"));
+        MasterKeyId = SourceEvent.GetValueFromDataDictionary("MasterKeyId");
+        RecoveryKeyId = SourceEvent.GetValueFromDataDictionary("RecoveryKeyId");
+        RecoveryServer = SourceEvent.GetValueFromDataDictionary("RecoveryServer");
+        Who = SourceEvent.GetSubjectAccountOrEmpty();
+        When = SourceEvent.TimeCreated;
     }
 }
 

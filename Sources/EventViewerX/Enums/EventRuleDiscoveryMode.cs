@@ -1,7 +1,7 @@
 namespace EventViewerX;
 
 /// <summary>
-/// Controls how <see cref="EventObjectSlim"/> discovers and routes event rule types.
+/// Controls how <see cref="NamedEventRecord"/> discovers and routes event rule types.
 /// </summary>
 public enum EventRuleDiscoveryMode {
     /// <summary>

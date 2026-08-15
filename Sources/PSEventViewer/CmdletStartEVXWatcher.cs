@@ -1,4 +1,4 @@
-﻿using EventViewerX;
+using EventViewerX;
 using System.Management.Automation;
 using System.Threading.Tasks;
 using System.Linq;
@@ -72,6 +72,13 @@ namespace PSEventViewer {
             Position = 1,
             ParameterSetName = "FilterHashtable")]
         public Hashtable? FilterHashtable { get; set; }
+
+        /// <summary>Reusable typed filter produced by New-EVXFilter or EventViewerX.</summary>
+        [Parameter(
+            Mandatory = true,
+            Position = 1,
+            ParameterSetName = "Filter")]
+        public EventFilter? Filter { get; set; }
 
         /// <summary>Native Windows Event Log XPath applied by the subscription.</summary>
         [Parameter(
@@ -183,7 +190,7 @@ namespace PSEventViewer {
             if (ParameterSetName == "EventId" && EventId != null) {
                 ids.AddRange(EventId);
             } else if (ParameterSetName == "NamedEvent" && NamedEvent != null) {
-                var dict = EventObjectSlim.GetEventInfoForNamedEvents(NamedEvent.ToList());
+                var dict = NamedEventCatalog.GetEventInfoForNamedEvents(NamedEvent.ToList());
                 if (dict.TryGetValue(LogName, out var set)) {
                     ids.AddRange(set);
                 } else {
@@ -216,106 +223,31 @@ namespace PSEventViewer {
                 "FilterHashtable" =>
                     PowerShellEventFilterAdapter.BindWatcherFilter(
                         FilterHashtable!),
+                "Filter" => Filter,
                 _ => null
             };
-            if (filter?.ProviderNames?.Any(static provider =>
-                    provider.IndexOf('*') >= 0 ||
-                    provider.IndexOf('?') >= 0) == true) {
-                var catalogQuery = new EventLogCatalogQuery {
-                    MachineName = MachineName,
-                    Credential = Credential?.GetNetworkCredential(),
-                    Authentication = Authentication,
-                    ConnectionTimeoutMilliseconds =
-                        SessionTimeoutMs
-                };
-                string[] providerNames = EventLogCatalog
-                    .GetProviderNames(
-                        catalogQuery,
-                        filter.ProviderNames,
-                        CancelToken)
-                    .ToArray();
-                if (providerNames.Length == 0) {
-                    throw new PSArgumentException(
-                        "The watcher provider patterns did not match any registered provider.");
-                }
-                filter.ProviderNames = providerNames;
-            }
-            EventFilterCompiler
-                .SplitNamedDataExclusions(
-                    filter,
-                    out EventFilter? selectFilter,
-                    out EventFilter?
-                        namedDataSuppression);
-            filter = selectFilter;
-            string[] xpaths;
-            if (ParameterSetName == "FilterXPath") {
-                xpaths = new[] {
-                    FilterXPath!.Trim()
-                };
-            } else {
-                IReadOnlyList<EventFilter> partitions =
-                    EventFilterPartitioner.Partition(
-                        filter!);
-                IReadOnlyList<EventFilter>
-                    suppressionPartitions =
-                        EventFilterPartitioner
-                            .PartitionNamedDataSuppression(
-                                namedDataSuppression);
-                xpaths =
-                    partitions.Count == 1 &&
-                    suppressionPartitions.Count == 0
-                        ? new[] {
-                            EventFilterCompiler.BuildXPath(
-                                partitions[0])
-                        }
-                        : new[] {
-                            EventFilterCompiler
-                                .BuildChannelUnionQueryXml(
-                                    new[] { LogName },
-                                    partitions,
-                                    suppressionPartitions)
-                        };
-            }
-            if (xpaths.Any(string.IsNullOrWhiteSpace)) {
-                throw new PSArgumentException(
-                    "FilterXPath cannot be empty or whitespace.");
-            }
-            if (Start == EventLogSubscriptionStart.AfterBookmark &&
-                string.IsNullOrWhiteSpace(BookmarkXml)) {
-                throw new PSArgumentException(
-                    "Start=AfterBookmark requires BookmarkXml.");
-            }
-            if (Start != EventLogSubscriptionStart.AfterBookmark &&
-                !string.IsNullOrWhiteSpace(BookmarkXml)) {
-                throw new PSArgumentException(
-                    "BookmarkXml requires Start=AfterBookmark.");
-            }
-            if (EventLogTarget.IsLocalMachine(MachineName) &&
-                Credential != null) {
-                throw new PSArgumentException(
-                    "Credential can only be used with a remote MachineName.");
-            }
-            EventLogSubscriptionQuery[] queries = xpaths
-                .Select(xpath =>
-                    new EventLogSubscriptionQuery(LogName) {
+            EventLogSubscriptionQuery[] queries =
+                EventSubscriptionPlanner.CreateQueries(
+                    new EventSubscriptionDefinition {
+                        LogName = LogName,
                         MachineName = MachineName,
-                        Credential = Credential?
-                            .GetNetworkCredential(),
+                        Credential = Credential?.GetNetworkCredential(),
                         Authentication = Authentication,
-                        XPath = xpath,
+                        Filter = filter,
+                        FilterXPath = ParameterSetName == "FilterXPath"
+                            ? FilterXPath
+                            : null,
                         Start = Start,
                         BookmarkXml = BookmarkXml,
                         StrictBookmark = !IgnoreStaleBookmark,
-                        TolerateQueryErrors =
-                            TolerateQueryErrors,
+                        TolerateQueryErrors = TolerateQueryErrors.IsPresent,
                         ReadMode = ReadMode,
                         MessageCulture = MessageCulture,
-                        FallbackMessageCulture =
-                            FallbackMessageCulture,
+                        FallbackMessageCulture = FallbackMessageCulture,
                         BufferCapacity = BufferCapacity,
-                        RemoteConnectionTimeoutMilliseconds =
-                            SessionTimeoutMs
-                    })
+                        RemoteConnectionTimeoutMilliseconds = SessionTimeoutMs
+                    },
+                    CancelToken)
                 .ToArray();
 
             var bridge = new PowerShellWatcherEventBridge();

@@ -54,31 +54,31 @@ public class ADUserLogonNTLMv1 : EventRuleBase {
 
     /// <summary>Initialises an NTLMv1 logon wrapper from an event record.</summary>
     public ADUserLogonNTLMv1(EventObject eventObject) : base(eventObject) {
-        Event = eventObject;
-        Type = "ADUserLogonNTLMv1";
+        SourceEvent = eventObject;
+        NamedEventName = "ADUserLogonNTLMv1";
 
         // Copy all the base ADUserLogon fields
-        Computer = Event.ComputerName;
-        Action = Event.MessageSubject;
-        IpAddress = Event.GetDataValueOrEmpty(KnownEventField.IpAddress);
-        IpPort = Event.GetDataValueOrEmpty(KnownEventField.IpPort);
-        LogonProcessName = Event.GetDataValueOrEmpty(KnownEventField.LogonProcessName);
-        ImpersonationLevel = EventsHelper.GetImpersonationLevel(Event.GetDataValueOrEmpty("ImpersonationLevel"));
-        VirtualAccount = EventsHelper.GetVirtualAccount(Event.GetDataValueOrEmpty("VirtualAccount"));
-        ElevatedToken = EventsHelper.GetElevatedToken(Event.GetDataValueOrEmpty("ElevatedToken"));
-        LogonType = Event.TryGetDataEnum(KnownEventField.LogonType, out EventViewerX.LogonType parsedLogonType, EventFieldNumericBase.Decimal)
+        Computer = SourceEvent.ComputerName;
+        Action = SourceEvent.MessageSubject;
+        IpAddress = SourceEvent.GetDataValueOrEmpty(KnownEventField.IpAddress);
+        IpPort = SourceEvent.GetDataValueOrEmpty(KnownEventField.IpPort);
+        LogonProcessName = SourceEvent.GetDataValueOrEmpty(KnownEventField.LogonProcessName);
+        ImpersonationLevel = EventsHelper.GetImpersonationLevel(SourceEvent.GetDataValueOrEmpty("ImpersonationLevel"));
+        VirtualAccount = EventsHelper.GetVirtualAccount(SourceEvent.GetDataValueOrEmpty("VirtualAccount"));
+        ElevatedToken = EventsHelper.GetElevatedToken(SourceEvent.GetDataValueOrEmpty("ElevatedToken"));
+        LogonType = SourceEvent.TryGetDataEnum(KnownEventField.LogonType, out EventViewerX.LogonType parsedLogonType, EventFieldNumericBase.Decimal)
             ? parsedLogonType
-            : EventsHelper.GetLogonType(Event.GetDataValueOrEmpty(KnownEventField.LogonType));
-        ObjectAffected = Event.GetTargetAccountOrEmpty();
-        Who = Event.GetSubjectAccountOrEmpty();
-        When = Event.TimeCreated;
+            : EventsHelper.GetLogonType(SourceEvent.GetDataValueOrEmpty(KnownEventField.LogonType));
+        ObjectAffected = SourceEvent.GetTargetAccountOrEmpty();
+        Who = SourceEvent.GetSubjectAccountOrEmpty();
+        When = SourceEvent.TimeCreated;
 
         // Additional NTLMv1-specific fields
-        LmPackageName = Event.GetDataValueOrEmpty(KnownEventField.LmPackageName);
-        PackageName = Event.GetDataValueOrEmpty(KnownEventField.AuthenticationPackageName);
-        KeyLength = Event.GetDataValueOrEmpty(KnownEventField.KeyLength);
-        ProcessId = Event.GetDataValueOrEmpty(KnownEventField.ProcessId);
-        ProcessName = Event.GetDataValueOrEmpty(KnownEventField.ProcessName);
+        LmPackageName = SourceEvent.GetDataValueOrEmpty(KnownEventField.LmPackageName);
+        PackageName = SourceEvent.GetDataValueOrEmpty(KnownEventField.AuthenticationPackageName);
+        KeyLength = SourceEvent.GetDataValueOrEmpty(KnownEventField.KeyLength);
+        ProcessId = SourceEvent.GetDataValueOrEmpty(KnownEventField.ProcessId);
+        ProcessName = SourceEvent.GetDataValueOrEmpty(KnownEventField.ProcessName);
     }
 }
 

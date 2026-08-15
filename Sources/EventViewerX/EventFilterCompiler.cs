@@ -117,6 +117,34 @@ public static class EventFilterCompiler {
         IEnumerable<EventFilter> selects,
         IEnumerable<EventFilter>? suppressions = null) {
 
+        return BuildUnionQueryXml(
+            logNames,
+            filePaths: false,
+            selects,
+            suppressions);
+    }
+
+    /// <summary>
+    /// Builds one structured offline-file query whose Select clauses are a native union.
+    /// </summary>
+    public static string BuildFileUnionQueryXml(
+        IEnumerable<string> paths,
+        IEnumerable<EventFilter> selects,
+        IEnumerable<EventFilter>? suppressions = null) {
+
+        return BuildUnionQueryXml(
+            paths,
+            filePaths: true,
+            selects,
+            suppressions);
+    }
+
+    private static string BuildUnionQueryXml(
+        IEnumerable<string> sources,
+        bool filePaths,
+        IEnumerable<EventFilter> selects,
+        IEnumerable<EventFilter>? suppressions) {
+
         if (selects == null) {
             throw new ArgumentNullException(
                 nameof(selects));
@@ -151,8 +179,8 @@ public static class EventFilterCompiler {
         }
         return BuildQueryXmlCore(
             NormalizeSources(
-                logNames),
-            filePaths: false,
+                sources),
+            filePaths,
             normalizedSelects
                 .Select(BuildXPath)
                 .Distinct(StringComparer.Ordinal)

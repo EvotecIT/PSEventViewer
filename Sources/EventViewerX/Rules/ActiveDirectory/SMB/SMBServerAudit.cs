@@ -49,12 +49,12 @@ public class SMBServerAudit : EventRuleBase {
     public SMBServerAudit(EventObject eventObject) : base(eventObject) {
         //EventObject = eventObject;
 
-        Event = eventObject;
-        Type = "ADSMBServerAuditV1";
-        Computer = Event.ComputerName;
-        Action = Event.MessageSubject;
-        ClientAddress = Event.GetValueFromDataDictionary("ClientName");
-        When = Event.TimeCreated;
+        SourceEvent = eventObject;
+        NamedEventName = "ADSMBServerAuditV1";
+        Computer = SourceEvent.ComputerName;
+        Action = SourceEvent.MessageSubject;
+        ClientAddress = SourceEvent.GetValueFromDataDictionary("ClientName");
+        When = SourceEvent.TimeCreated;
     }
 
     /// <summary>

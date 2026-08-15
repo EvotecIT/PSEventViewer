@@ -7,29 +7,30 @@ Describe 'Get-EVXPowerShellScript bounded query contract' {
         $parameters.ContainsKey('MaxPendingScripts') | Should -BeTrue
         $parameters.ContainsKey('MaxCachedEvents') | Should -BeTrue
         $parameters.ContainsKey('IncludeQueryInfo') | Should -BeTrue
-        $parameters['MaxScripts'].Aliases | Should -Contain 'MaxEvents'
+        $parameters['MaxScripts'].Aliases | Should -BeNullOrEmpty
     }
 
     It 'Rejects an unbounded incomplete-script cache configuration' {
-        { Get-EVXPowerShellScript -Type WindowsPowerShell -MaxPendingScripts 0 } | Should -Throw
+        { Get-EVXPowerShellScript -Edition WindowsPowerShell -MaxPendingScripts 0 } | Should -Throw
     }
 
     It 'Rejects machine fan-out for a local offline event log' {
         $EventLogPath = Join-Path $PSScriptRoot 'Logs\NamedFilterExamples.evtx'
 
         {
-            Get-EVXPowerShellScript -Type WindowsPowerShell -EventLogPath $EventLogPath -MachineName 'server-1', 'server-2'
+            Get-EVXPowerShellScript -Edition WindowsPowerShell -EventLogPath $EventLogPath -MachineName 'server-1', 'server-2'
         } | Should -Throw '*EventLogPath*cannot be combined with MachineName*'
         {
-            Get-EVXPowerShellScriptExecution -Type WindowsPowerShell -EventLogPath $EventLogPath -MachineName 'server-1'
+            Get-EVXPowerShellScript -Execution -Edition WindowsPowerShell -EventLogPath $EventLogPath -MachineName 'server-1'
         } | Should -Throw '*EventLogPath*cannot be combined with MachineName*'
     }
 
-    It 'exposes execution records through a dedicated canonical cmdlet' {
-        $command = Get-Command -Name Get-EVXPowerShellScriptExecution -ErrorAction Stop
+    It 'exposes execution records through one explicit parameter set' {
+        $command = Get-Command -Name Get-EVXPowerShellScript -ErrorAction Stop
 
         $command.Parameters.ContainsKey('MaxEvents') | Should -BeTrue
         $command.Parameters.ContainsKey('MaxEventsScanned') | Should -BeTrue
         $command.Parameters.ContainsKey('IncludeQueryInfo') | Should -BeTrue
+        $command.ParameterSets.Name | Should -Contain 'Execution'
     }
 }

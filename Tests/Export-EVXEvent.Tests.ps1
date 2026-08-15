@@ -158,7 +158,7 @@ Describe 'Export-EVXEvent direct streaming contract' {
         $Result.EventCount | Should -BeGreaterThan 0
         $Errors | Should -HaveCount 1
         $Errors[0].FullyQualifiedErrorId |
-            Should -BeLike 'EVXStructuredExportPathFailed*'
+            Should -BeLike 'EVXExportQuerySourceFailed*'
         [System.IO.File]::Exists($OutputPath) | Should -BeTrue
     }
 

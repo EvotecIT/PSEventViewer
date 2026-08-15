@@ -29,6 +29,15 @@ public sealed class EventLogQueryOptions {
     /// <summary>Materializes a native bookmark for every result.</summary>
     public bool IncludeBookmark { get; set; }
 
+    /// <summary>Native bookmark XML used as the seek origin.</summary>
+    public string? BookmarkXml { get; set; }
+
+    /// <summary>Record offset relative to BookmarkXml.</summary>
+    public long BookmarkOffset { get; set; } = 1;
+
+    /// <summary>Requires the bookmark to identify a record present in the result set.</summary>
+    public bool StrictBookmark { get; set; } = true;
+
     /// <summary>Credentials shared by remote channel targets.</summary>
     public NetworkCredential? Credential { get; set; }
 

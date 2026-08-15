@@ -31,17 +31,17 @@ public class LogsClearedOther : EventRuleBase {
 
     /// <summary>Initialises a log-cleared (non-Security) event wrapper.</summary>
     public LogsClearedOther(EventObject eventObject) : base(eventObject) {
-        Event = eventObject;
+        SourceEvent = eventObject;
 
-        Type = "LogsClearedOther";
-        Computer = Event.ComputerName;
-        Action = Event.MessageSubject;
-        BackupPath = Event.GetValueFromDataDictionary("BackupPath");
-        LogType = ConvertFromOperationType(Event.GetDataValueOrEmpty("Channel"));
+        NamedEventName = "LogsClearedOther";
+        Computer = SourceEvent.ComputerName;
+        Action = SourceEvent.MessageSubject;
+        BackupPath = SourceEvent.GetValueFromDataDictionary("BackupPath");
+        LogType = ConvertFromOperationType(SourceEvent.GetDataValueOrEmpty("Channel"));
 
         // common fields
-        Who = Event.GetSubjectAccountOrEmpty();
-        When = Event.TimeCreated;
+        Who = SourceEvent.GetSubjectAccountOrEmpty();
+        When = SourceEvent.TimeCreated;
 
 
         if (BackupPath == "") {

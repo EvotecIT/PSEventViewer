@@ -30,13 +30,13 @@ public class GpoDeleted : EventRuleBase {
 
     /// <summary>Initialises a GPO deletion wrapper from an event record.</summary>
     public GpoDeleted(EventObject eventObject) : base(eventObject) {
-        Event = eventObject;
-        Type = "GpoDeleted";
-        Computer = Event.ComputerName;
-        Action = Event.MessageSubject;
-        GpoName = Event.GetValueFromDataDictionary("ObjectDN");
-        Who = Event.GetSubjectAccountOrEmpty();
-        When = Event.TimeCreated;
+        SourceEvent = eventObject;
+        NamedEventName = "GpoDeleted";
+        Computer = SourceEvent.ComputerName;
+        Action = SourceEvent.MessageSubject;
+        GpoName = SourceEvent.GetValueFromDataDictionary("ObjectDN");
+        Who = SourceEvent.GetSubjectAccountOrEmpty();
+        When = SourceEvent.TimeCreated;
     }
 }
 

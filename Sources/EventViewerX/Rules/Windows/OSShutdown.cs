@@ -34,18 +34,18 @@ public class OSShutdown : EventRuleBase {
 
     /// <summary>Initialises an OS shutdown wrapper from an event record.</summary>
     public OSShutdown(EventObject eventObject) : base(eventObject) {
-        Event = eventObject;
-        Type = "OSShutdown";
-        Computer = Event.ComputerName;
+        SourceEvent = eventObject;
+        NamedEventName = "OSShutdown";
+        Computer = SourceEvent.ComputerName;
         Action = "System Shutdown";
-        ObjectAffected = Event.MachineName;
-        ActionDetails = Event.MessageSubject;
-        var rawStartText = Event.GetValueFromDataDictionary("StartTime") ??
-                           Event.GetValueFromDataDictionary("#text") ??
-                           Event.GetValueFromDataDictionary("ActionDetailsDateTime");
-        ActionTimestampUtc = RuleHelpers.ParseUnlabeledOsTimestamp(Event)
+        ObjectAffected = SourceEvent.MachineName;
+        ActionDetails = SourceEvent.MessageSubject;
+        var rawStartText = SourceEvent.GetValueFromDataDictionary("StartTime") ??
+                           SourceEvent.GetValueFromDataDictionary("#text") ??
+                           SourceEvent.GetValueFromDataDictionary("ActionDetailsDateTime");
+        ActionTimestampUtc = RuleHelpers.ParseUnlabeledOsTimestamp(SourceEvent)
                             ?? RuleHelpers.ParseDateTimeLoose(rawStartText)
-                            ?? Event.TimeCreated.ToUniversalTime();
-        When = ActionTimestampUtc ?? Event.TimeCreated;
+                            ?? SourceEvent.TimeCreated.ToUniversalTime();
+        When = ActionTimestampUtc ?? SourceEvent.TimeCreated;
     }
 }

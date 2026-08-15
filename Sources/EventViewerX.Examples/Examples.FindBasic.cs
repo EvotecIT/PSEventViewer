@@ -1,4 +1,4 @@
-﻿using EventViewerX.Rules.ActiveDirectory;
+using EventViewerX.Rules.ActiveDirectory;
 using EventViewerX.Rules.Windows;
 
 namespace EventViewerX.Examples {
@@ -15,8 +15,8 @@ namespace EventViewerX.Examples {
                 NamedEvents.OSBugCheck]);
             await foreach (var foundObject in NamedEventEngine.ReadAsync(query)) {
 
-                Console.WriteLine("Event ID: {0}", foundObject.EventID + ", " + foundObject.Type + " " + foundObject.GatheredFrom);
-                Console.WriteLine("Type: " + foundObject.Type + ", " + foundObject.EventID + " " + foundObject.EventID + " " + foundObject.GatheredFrom);
+                Console.WriteLine("Event ID: {0}", foundObject.EventId + ", " + foundObject.NamedEventName + " " + foundObject.MachineName);
+                Console.WriteLine("Type: " + foundObject.NamedEventName + ", " + foundObject.EventId + " " + foundObject.EventId + " " + foundObject.MachineName);
 
                 if (foundObject is OSCrash osCrash) {
                     //Display the properties of the ADComputerChangeDetailed object
@@ -67,8 +67,8 @@ namespace EventViewerX.Examples {
             await foreach (var foundObject in NamedEventEngine.ReadAsync(query)) {
                 // Check if the foundObject is of type ADComputerChangeDetailed
 
-                // Console.WriteLine("Event ID: {0}", foundObject.EventID + ", " + foundObject.Type + " " + foundObject.GatheredFrom);
-                Console.WriteLine("Type: " + foundObject.Type + ", " + foundObject.EventID + " " + foundObject.EventID + " " + foundObject.GatheredFrom);
+                // Console.WriteLine("Event ID: {0}", foundObject.EventId + ", " + foundObject.NamedEventName + " " + foundObject.MachineName);
+                Console.WriteLine("Type: " + foundObject.NamedEventName + ", " + foundObject.EventId + " " + foundObject.EventId + " " + foundObject.MachineName);
 
                 if (foundObject is ADComputerChangeDetailed adComputerChange) {
                     // Display the properties of the ADComputerChangeDetailed object

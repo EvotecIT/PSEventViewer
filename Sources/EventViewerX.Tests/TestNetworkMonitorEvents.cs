@@ -5,7 +5,7 @@ namespace EventViewerX.Tests {
     public class TestNetworkMonitorEvents {
         [Fact]
         public void EventInfoContainsNetworkMonitorEvents() {
-            var info = EventObjectSlim.GetEventInfoForNamedEvents(new List<NamedEvents> {
+            var info = NamedEventCatalog.GetEventInfoForNamedEvents(new List<NamedEvents> {
                 NamedEvents.NetworkMonitorDriverLoaded,
                 NamedEvents.NetworkPromiscuousMode
             });

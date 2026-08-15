@@ -45,7 +45,7 @@ internal sealed class NamedEventEnricher : IDisposable {
     /// <summary>
     /// Enriches a projected event without converting lookup failures into missing event records.
     /// </summary>
-    internal async Task EnrichAsync(EventObjectSlim eventObject, CancellationToken cancellationToken) {
+    internal async Task EnrichAsync(NamedEventRecord eventObject, CancellationToken cancellationToken) {
         if (!_options.ResolveDns || _dnsConcurrency == null) {
             cancellationToken.ThrowIfCancellationRequested();
             return;

@@ -38,16 +38,16 @@ public class OSBugCheck : EventRuleBase {
 
     /// <summary>Initialises a bugcheck wrapper from an event record.</summary>
     public OSBugCheck(EventObject eventObject) : base(eventObject) {
-        Event = eventObject;
-        Type = "OSBugCheck";
-        Computer = Event.ComputerName;
-        BugCheckCode = Event.GetValueFromDataDictionary("BugcheckCode", "param1");
-        Parameter1 = Event.GetValueFromDataDictionary("BugcheckParameter1", "param2");
-        Parameter2 = Event.GetValueFromDataDictionary("BugcheckParameter2", "param3");
-        Parameter3 = Event.GetValueFromDataDictionary("BugcheckParameter3", "param4");
-        Parameter4 = Event.GetValueFromDataDictionary("BugcheckParameter4", "param5");
-        DumpFile = Event.GetValueFromDataDictionary("DumpFile");
-        ReportId = Event.GetValueFromDataDictionary("ReportId");
-        When = Event.TimeCreated;
+        SourceEvent = eventObject;
+        NamedEventName = "OSBugCheck";
+        Computer = SourceEvent.ComputerName;
+        BugCheckCode = SourceEvent.GetValueFromDataDictionary("BugcheckCode", "param1");
+        Parameter1 = SourceEvent.GetValueFromDataDictionary("BugcheckParameter1", "param2");
+        Parameter2 = SourceEvent.GetValueFromDataDictionary("BugcheckParameter2", "param3");
+        Parameter3 = SourceEvent.GetValueFromDataDictionary("BugcheckParameter3", "param4");
+        Parameter4 = SourceEvent.GetValueFromDataDictionary("BugcheckParameter4", "param5");
+        DumpFile = SourceEvent.GetValueFromDataDictionary("DumpFile");
+        ReportId = SourceEvent.GetValueFromDataDictionary("ReportId");
+        When = SourceEvent.TimeCreated;
     }
 }

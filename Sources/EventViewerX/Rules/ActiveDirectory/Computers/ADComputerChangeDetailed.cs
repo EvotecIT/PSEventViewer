@@ -47,7 +47,7 @@ public class ADComputerChangeDetailed : EventRuleBase {
     /// <summary>
     /// Creates a detailed computer change wrapper when the event matches, otherwise returns <c>null</c>.
     /// </summary>
-    public static EventObjectSlim? Create(EventObject eventObject) {
+    public static NamedEventRecord? Create(EventObject eventObject) {
         var rule = new ADComputerChangeDetailed(eventObject);
         return rule.CanHandle(eventObject) ? rule : null;
     }
@@ -58,21 +58,21 @@ public class ADComputerChangeDetailed : EventRuleBase {
     /// <param name="eventObject">Underlying event record.</param>
     public ADComputerChangeDetailed(EventObject eventObject) : base(eventObject) {
         // common fields
-        Event = eventObject;
-        Type = "ADComputerChangeDetailed";
-        Computer = Event.ComputerName;
-        ObjectClass = Event.GetValueFromDataDictionary("ObjectClass");
-        Action = Event.MessageSubject;
-        Who = Event.GetSubjectAccountOrEmpty();
-        When = Event.TimeCreated;
+        SourceEvent = eventObject;
+        NamedEventName = "ADComputerChangeDetailed";
+        Computer = SourceEvent.ComputerName;
+        ObjectClass = SourceEvent.GetValueFromDataDictionary("ObjectClass");
+        Action = SourceEvent.MessageSubject;
+        Who = SourceEvent.GetSubjectAccountOrEmpty();
+        When = SourceEvent.TimeCreated;
         //
-        OperationType = ConvertFromOperationType(Event.GetDataValueOrEmpty("OperationType"));
-        ComputerObject = Event.GetValueFromDataDictionary("ObjectDN");
-        FieldChanged = Event.GetValueFromDataDictionary("AttributeLDAPDisplayName");
-        FieldValue = Event.GetValueFromDataDictionary("AttributeValue");
+        OperationType = ConvertFromOperationType(SourceEvent.GetDataValueOrEmpty("OperationType"));
+        ComputerObject = SourceEvent.GetValueFromDataDictionary("ObjectDN");
+        FieldChanged = SourceEvent.GetValueFromDataDictionary("AttributeLDAPDisplayName");
+        FieldValue = SourceEvent.GetValueFromDataDictionary("AttributeValue");
         // OverwriteByField logic
-        ComputerObject = OverwriteByField(Action, "A directory service object was moved.", ComputerObject, Event.GetValueFromDataDictionary("OldObjectDN"));
-        FieldValue = OverwriteByField(Action, "A directory service object was moved.", FieldValue, Event.GetValueFromDataDictionary("NewObjectDN"));
+        ComputerObject = OverwriteByField(Action, "A directory service object was moved.", ComputerObject, SourceEvent.GetValueFromDataDictionary("OldObjectDN"));
+        FieldValue = OverwriteByField(Action, "A directory service object was moved.", FieldValue, SourceEvent.GetValueFromDataDictionary("NewObjectDN"));
     }
 }
 

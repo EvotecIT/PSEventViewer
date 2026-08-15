@@ -64,45 +64,45 @@ public class KerberosTGTRequest : EventRuleBase
     /// <summary>Initialises a TGT request wrapper from an event record.</summary>
     public KerberosTGTRequest(EventObject eventObject) : base(eventObject)
     {
-        Event = eventObject;
-        Type = "KerberosTGTRequest";
-        Computer = Event.ComputerName;
-        Action = Event.MessageSubject;
-        AccountName = Event.GetTargetAccountOrEmpty();
-        IpAddress = Rules.RuleHelpers.NormalizeIp(Event.GetDataValueOrEmpty(KnownEventField.IpAddress));
-        IpPort = Event.GetDataValueOrEmpty(KnownEventField.IpPort);
-        var rawTicketOptions = Event.GetDataValueOrEmpty(KnownEventField.TicketOptions);
+        SourceEvent = eventObject;
+        NamedEventName = "KerberosTGTRequest";
+        Computer = SourceEvent.ComputerName;
+        Action = SourceEvent.MessageSubject;
+        AccountName = SourceEvent.GetTargetAccountOrEmpty();
+        IpAddress = Rules.RuleHelpers.NormalizeIp(SourceEvent.GetDataValueOrEmpty(KnownEventField.IpAddress));
+        IpPort = SourceEvent.GetDataValueOrEmpty(KnownEventField.IpPort);
+        var rawTicketOptions = SourceEvent.GetDataValueOrEmpty(KnownEventField.TicketOptions);
         var ticketOptions = EventsHelper.GetTicketOptions(rawTicketOptions);
         TicketOptionsText = EventsHelper.DescribeTicketOptions(ticketOptions, rawTicketOptions);
 
-        var rawStatus = Event.GetDataValueOrEmpty(KnownEventField.Status);
+        var rawStatus = SourceEvent.GetDataValueOrEmpty(KnownEventField.Status);
         var status = EventsHelper.GetStatusCode(rawStatus);
         StatusText = EventsHelper.DescribeStatus(status, rawStatus);
 
-        var rawTicketEtype = Event.GetDataValueOrEmpty(KnownEventField.TicketEncryptionType);
+        var rawTicketEtype = SourceEvent.GetDataValueOrEmpty(KnownEventField.TicketEncryptionType);
         var encryptionType = EventsHelper.GetTicketEncryptionType(rawTicketEtype);
         EncryptionTypeText = EventsHelper.DescribeEncryption(encryptionType, rawTicketEtype);
 
-        var rawPreAuth = Event.GetDataValueOrEmpty(KnownEventField.PreAuthType);
+        var rawPreAuth = SourceEvent.GetDataValueOrEmpty(KnownEventField.PreAuthType);
         var preAuthType = EventsHelper.GetPreAuthType(rawPreAuth);
         PreAuthTypeText = EventsHelper.DescribePreAuthType(preAuthType, rawPreAuth);
 
-        var rawSessionEtype = Event.GetDataValueOrEmpty("SessionKeyEncryptionType");
+        var rawSessionEtype = SourceEvent.GetDataValueOrEmpty("SessionKeyEncryptionType");
         var sessionKeyEncryptionType = EventsHelper.GetTicketEncryptionType(rawSessionEtype);
         SessionKeyEncryptionTypeText = EventsHelper.DescribeEncryption(sessionKeyEncryptionType, rawSessionEtype);
 
-        var rawPreAuthEtype = Event.GetDataValueOrEmpty("PreAuthEncryptionType");
+        var rawPreAuthEtype = SourceEvent.GetDataValueOrEmpty("PreAuthEncryptionType");
         var preAuthEncryptionType = EventsHelper.GetTicketEncryptionType(rawPreAuthEtype);
         PreAuthEncryptionTypeText = EventsHelper.DescribeEncryption(preAuthEncryptionType, rawPreAuthEtype);
-        ClientAdvertizedEncryptionTypes = Event.GetDataValueOrEmpty("ClientAdvertizedEncryptionTypes");
-        AccountSupportedEncryptionTypes = Event.GetDataValueOrEmpty("AccountSupportedEncryptionTypes");
-        AccountAvailableKeys = Event.GetDataValueOrEmpty("AccountAvailableKeys");
-        ServiceSupportedEncryptionTypes = Event.GetDataValueOrEmpty("ServiceSupportedEncryptionTypes");
-        ServiceAvailableKeys = Event.GetDataValueOrEmpty("ServiceAvailableKeys");
-        DCSupportedEncryptionTypes = Event.GetDataValueOrEmpty("DCSupportedEncryptionTypes");
-        DCAvailableKeys = Event.GetDataValueOrEmpty("DCAvailableKeys");
-        ResponseTicket = Event.GetDataValueOrEmpty("ResponseTicket");
-        When = Event.TimeCreated;
+        ClientAdvertizedEncryptionTypes = SourceEvent.GetDataValueOrEmpty("ClientAdvertizedEncryptionTypes");
+        AccountSupportedEncryptionTypes = SourceEvent.GetDataValueOrEmpty("AccountSupportedEncryptionTypes");
+        AccountAvailableKeys = SourceEvent.GetDataValueOrEmpty("AccountAvailableKeys");
+        ServiceSupportedEncryptionTypes = SourceEvent.GetDataValueOrEmpty("ServiceSupportedEncryptionTypes");
+        ServiceAvailableKeys = SourceEvent.GetDataValueOrEmpty("ServiceAvailableKeys");
+        DCSupportedEncryptionTypes = SourceEvent.GetDataValueOrEmpty("DCSupportedEncryptionTypes");
+        DCAvailableKeys = SourceEvent.GetDataValueOrEmpty("DCAvailableKeys");
+        ResponseTicket = SourceEvent.GetDataValueOrEmpty("ResponseTicket");
+        When = SourceEvent.TimeCreated;
 
         WeakEncryptionAlgorithm = encryptionType is TicketEncryptionType.DES_CBC_CRC
             or TicketEncryptionType.DES_CBC_MD5

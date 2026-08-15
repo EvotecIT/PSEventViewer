@@ -31,10 +31,10 @@ public class AADConnectRunProfile : EventRuleBase {
 
     /// <summary>Initialises a run profile completion wrapper from an event record.</summary>
     public AADConnectRunProfile(EventObject eventObject) : base(eventObject) {
-        Event = eventObject;
-        Type = "AADConnectRunProfile";
-        Connector = Event.GetValueFromDataDictionary("Connector", "Connector Name");
-        RunProfile = Event.GetValueFromDataDictionary("RunProfileName", "Run Profile Name", "", false);
-        When = Event.TimeCreated;
+        SourceEvent = eventObject;
+        NamedEventName = "AADConnectRunProfile";
+        Connector = SourceEvent.GetValueFromDataDictionary("Connector", "Connector Name");
+        RunProfile = SourceEvent.GetValueFromDataDictionary("RunProfileName", "Run Profile Name", "", false);
+        When = SourceEvent.TimeCreated;
     }
 }

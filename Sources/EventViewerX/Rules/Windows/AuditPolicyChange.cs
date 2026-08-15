@@ -33,15 +33,15 @@ public class AuditPolicyChange : EventRuleBase {
 
     /// <summary>Initialises an audit policy change wrapper from an event record.</summary>
     public AuditPolicyChange(EventObject eventObject) : base(eventObject) {
-        Event = eventObject;
-        Type = "AuditPolicyChange";
-        Computer = Event.ComputerName;
-        CategoryId = Event.GetValueFromDataDictionary("CategoryId");
-        SubcategoryId = Event.GetValueFromDataDictionary("SubcategoryId");
-        SubcategoryGuid = Event.GetValueFromDataDictionary("SubcategoryGuid");
-        AuditPolicyChanges = Event.GetValueFromDataDictionary("AuditPolicyChanges");
-        Who = Event.GetSubjectAccountOrEmpty();
-        When = Event.TimeCreated;
+        SourceEvent = eventObject;
+        NamedEventName = "AuditPolicyChange";
+        Computer = SourceEvent.ComputerName;
+        CategoryId = SourceEvent.GetValueFromDataDictionary("CategoryId");
+        SubcategoryId = SourceEvent.GetValueFromDataDictionary("SubcategoryId");
+        SubcategoryGuid = SourceEvent.GetValueFromDataDictionary("SubcategoryGuid");
+        AuditPolicyChanges = SourceEvent.GetValueFromDataDictionary("AuditPolicyChanges");
+        Who = SourceEvent.GetSubjectAccountOrEmpty();
+        When = SourceEvent.TimeCreated;
     }
 }
 

@@ -37,20 +37,20 @@ public class ADUserLockouts : EventRuleBase {
 
     /// <summary>Initialises an account lockout wrapper from an event record.</summary>
     public ADUserLockouts(EventObject eventObject) : base(eventObject) {
-        Event = eventObject;
-        Type = "ADUserLockouts";
+        SourceEvent = eventObject;
+        NamedEventName = "ADUserLockouts";
 
-        Computer = Event.ComputerName;
-        Action = Event.MessageSubject;
+        Computer = SourceEvent.ComputerName;
+        Action = SourceEvent.MessageSubject;
 
-        var caller = Event.GetValueFromDataDictionary("CallerComputerName");
+        var caller = SourceEvent.GetValueFromDataDictionary("CallerComputerName");
         CallerComputerName = string.IsNullOrWhiteSpace(caller) ? string.Empty : caller.Trim();
         ComputerLockoutOn = CallerComputerName;
 
-        UserAffected = Event.GetTargetAccountOrEmpty();
+        UserAffected = SourceEvent.GetTargetAccountOrEmpty();
 
-        Who = Event.GetSubjectAccountOrEmpty();
-        When = Event.TimeCreated;
+        Who = SourceEvent.GetSubjectAccountOrEmpty();
+        When = SourceEvent.TimeCreated;
     }
 }
 

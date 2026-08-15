@@ -37,15 +37,15 @@ public class CertificateIssued : EventRuleBase
     /// <summary>Initialises a certificate issuance wrapper from an event record.</summary>
     public CertificateIssued(EventObject eventObject) : base(eventObject)
     {
-        Event = eventObject;
-        Type = "CertificateIssued";
-        Computer = Event.ComputerName;
-        Action = Event.MessageSubject;
-        CertificateTemplate = DecodeHex(Event.GetValueFromDataDictionary("CertificateTemplate", "CertificateTemplateOid"));
-        Requester = DecodeHex(Event.GetValueFromDataDictionary("Requester", "RequestSubjectName"));
-        SerialNumber = DecodeHex(Event.GetValueFromDataDictionary("SerialNumber"));
-        Who = Event.GetSubjectAccountOrEmpty();
-        When = Event.TimeCreated;
+        SourceEvent = eventObject;
+        NamedEventName = "CertificateIssued";
+        Computer = SourceEvent.ComputerName;
+        Action = SourceEvent.MessageSubject;
+        CertificateTemplate = DecodeHex(SourceEvent.GetValueFromDataDictionary("CertificateTemplate", "CertificateTemplateOid"));
+        Requester = DecodeHex(SourceEvent.GetValueFromDataDictionary("Requester", "RequestSubjectName"));
+        SerialNumber = DecodeHex(SourceEvent.GetValueFromDataDictionary("SerialNumber"));
+        Who = SourceEvent.GetSubjectAccountOrEmpty();
+        When = SourceEvent.TimeCreated;
     }
 
     private static string DecodeHex(string value)

@@ -266,9 +266,9 @@ var query = new NamedEventQuery(new[] {
     MachineNames = new string?[] { "DC01", "DC02" }
 };
 
-await foreach (EventObjectSlim item in NamedEventEngine.ReadAsync(query)) {
+await foreach (NamedEventRecord item in NamedEventEngine.ReadAsync(query)) {
     Console.WriteLine(
-        $"{item.Type} {item.EventID} {item.GatheredFrom}");
+        $"{item.NamedEventName} {item.EventId} {item.MachineName}");
 }
 ```
 

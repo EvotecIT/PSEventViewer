@@ -42,12 +42,12 @@ public class NetworkMonitorDriverLoaded : EventRuleBase {
 
     /// <summary>Initialises a network monitor driver detection wrapper from an event record.</summary>
     public NetworkMonitorDriverLoaded(EventObject eventObject) : base(eventObject) {
-        Event = eventObject;
-        Type = "NetworkMonitorDriverLoaded";
-        Computer = Event.ComputerName;
-        DriverName = Event.GetValueFromDataDictionary("DriverName", "FilterName", "ImageName") ??
-                     _driverNames.FirstOrDefault(n => (Event.MessageSubject ?? string.Empty)
+        SourceEvent = eventObject;
+        NamedEventName = "NetworkMonitorDriverLoaded";
+        Computer = SourceEvent.ComputerName;
+        DriverName = SourceEvent.GetValueFromDataDictionary("DriverName", "FilterName", "ImageName") ??
+                     _driverNames.FirstOrDefault(n => (SourceEvent.MessageSubject ?? string.Empty)
                          .IndexOf(n, StringComparison.OrdinalIgnoreCase) >= 0) ?? string.Empty;
-        When = Event.TimeCreated;
+        When = SourceEvent.TimeCreated;
     }
 }

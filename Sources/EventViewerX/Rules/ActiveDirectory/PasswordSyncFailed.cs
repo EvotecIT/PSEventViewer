@@ -36,14 +36,14 @@ public class PasswordSyncFailed : EventRuleBase {
 
     /// <summary>Initialises a password sync failure wrapper from an event record.</summary>
     public PasswordSyncFailed(EventObject eventObject) : base(eventObject) {
-        Event = eventObject;
-        Type = "AADConnectPasswordSyncFailed";
-        Computer = Event.ComputerName;
-        User = Event.GetValueFromDataDictionary("User", "AccountName");
-        Error = Event.GetValueFromDataDictionary("ErrorCode", "FailureCode");
-        When = Event.TimeCreated;
+        SourceEvent = eventObject;
+        NamedEventName = "AADConnectPasswordSyncFailed";
+        Computer = SourceEvent.ComputerName;
+        User = SourceEvent.GetValueFromDataDictionary("User", "AccountName");
+        Error = SourceEvent.GetValueFromDataDictionary("ErrorCode", "FailureCode");
+        When = SourceEvent.TimeCreated;
         if (string.IsNullOrEmpty(User)) {
-            ParseMessage(Event.Message);
+            ParseMessage(SourceEvent.Message);
         }
     }
 

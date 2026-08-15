@@ -37,18 +37,18 @@ public class OSStartupSecurity : EventRuleBase {
     /// <summary>Creates a wrapper for Security log startup events (4608).</summary>
     /// <param name="eventObject">Event carrying startup details.</param>
     public OSStartupSecurity(EventObject eventObject) : base(eventObject) {
-        Event = eventObject;
-        Type = "OSStartupSecurity";
-        Computer = Event.ComputerName;
+        SourceEvent = eventObject;
+        NamedEventName = "OSStartupSecurity";
+        Computer = SourceEvent.ComputerName;
         Action = "Windows is starting up";
-        ObjectAffected = Event.MachineName;
-        ActionDetails = Event.MessageSubject;
-        var rawStartText = Event.GetValueFromDataDictionary("StartTime") ??
-                           Event.GetValueFromDataDictionary("#text") ??
-                           Event.GetValueFromDataDictionary("ActionDetailsDateTime");
-        ActionTimestampUtc = RuleHelpers.ParseUnlabeledOsTimestamp(Event)
+        ObjectAffected = SourceEvent.MachineName;
+        ActionDetails = SourceEvent.MessageSubject;
+        var rawStartText = SourceEvent.GetValueFromDataDictionary("StartTime") ??
+                           SourceEvent.GetValueFromDataDictionary("#text") ??
+                           SourceEvent.GetValueFromDataDictionary("ActionDetailsDateTime");
+        ActionTimestampUtc = RuleHelpers.ParseUnlabeledOsTimestamp(SourceEvent)
                             ?? RuleHelpers.ParseDateTimeLoose(rawStartText)
-                            ?? Event.TimeCreated.ToUniversalTime();
-        When = ActionTimestampUtc ?? Event.TimeCreated;
+                            ?? SourceEvent.TimeCreated.ToUniversalTime();
+        When = ActionTimestampUtc ?? SourceEvent.TimeCreated;
     }
 }

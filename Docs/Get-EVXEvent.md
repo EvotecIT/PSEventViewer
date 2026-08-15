@@ -11,34 +11,34 @@ Enhanced event querying cmdlet that replaces and extends Get-WinEvent functional
 Supports local/remote logs, named event shortcuts, record ID resumes, parallel queries, and rich filtering (IDs, providers, keywords, levels, time windows, named data).
 
 ## SYNTAX
-### ProviderEvents (Default)
+### Channel (Default)
 ```powershell
-Get-EVXEvent [[-EventId] <int[]>] -ProviderName <string[]> [-EventRecordId <long[]>] [-RecordIdFile <string>] [-RecordIdKey <string>] [-MachineName <List[string]>] [-Keywords <long[]>] [-Level <int[]>] [-StartTime <DateTime>] [-EndTime <DateTime>] [-TimePeriod <TimePeriod>] [-UserId <string[]>] [-MessageRegex <regex>] [-MaxConcurrency <int>] [-MaxEvents <long>] [-MaxEventsScanned <long>] [-ReadMode <EventReadMode>] [-MessageCulture <cultureinfo>] [-SessionTimeoutMs <int>] [-BufferCapacity <int>] [-Expand] [-Oldest] [-NamedDataFilter <hashtable>] [-NamedDataExcludeFilter <hashtable>] [-DisableParallel] [-AsArray] [-FallbackMessageCulture <cultureinfo>] [-Credential <pscredential>] [-Authentication <EventLogAuthentication>] [-BookmarkXml <string>] [-BookmarkOffset <long>] [-IgnoreStaleBookmark] [-ContinueOnError] [-Force] [-IncludeBookmark] [<CommonParameters>]
+Get-EVXEvent [-LogName] <string[]> [[-EventId] <int[]>] [-EventRecordId <long[]>] [-RecordIdFile <string>] [-RecordIdKey <string>] [-MachineName <List[string]>] [-Keywords <long[]>] [-Level <Level[]>] [-StartTime <DateTime>] [-EndTime <DateTime>] [-TimePeriod <TimePeriod>] [-UserId <string[]>] [-MessageRegex <regex>] [-MaxConcurrency <int>] [-MaxEvents <long>] [-MaxEventsScanned <long>] [-ReadMode <EventReadMode>] [-MessageCulture <cultureinfo>] [-SessionTimeoutMs <int>] [-BufferCapacity <int>] [-ExpandData] [-Oldest] [-NamedDataFilter <hashtable>] [-NamedDataExcludeFilter <hashtable>] [-DisableParallel] [-FallbackMessageCulture <cultureinfo>] [-FilterXPath <string>] [-Filter <EventFilter>] [-Credential <pscredential>] [-Authentication <EventLogAuthentication>] [-BookmarkXml <string>] [-BookmarkOffset <long>] [-IgnoreStaleBookmark] [-ContinueOnError] [-Force] [-IncludeBookmark] [<CommonParameters>]
 ```
 
-### GenericEvents
+### NamedEvent
 ```powershell
-Get-EVXEvent [-LogName] <string[]> [[-EventId] <int[]>] [-EventRecordId <long[]>] [-RecordIdFile <string>] [-RecordIdKey <string>] [-MachineName <List[string]>] [-ProviderName <string[]>] [-Keywords <long[]>] [-Level <int[]>] [-StartTime <DateTime>] [-EndTime <DateTime>] [-TimePeriod <TimePeriod>] [-UserId <string[]>] [-MessageRegex <regex>] [-MaxConcurrency <int>] [-MaxEvents <long>] [-MaxEventsScanned <long>] [-ReadMode <EventReadMode>] [-MessageCulture <cultureinfo>] [-SessionTimeoutMs <int>] [-BufferCapacity <int>] [-Expand] [-Oldest] [-NamedDataFilter <hashtable>] [-NamedDataExcludeFilter <hashtable>] [-DisableParallel] [-AsArray] [-FallbackMessageCulture <cultureinfo>] [-FilterXPath <string>] [-Credential <pscredential>] [-Authentication <EventLogAuthentication>] [-BookmarkXml <string>] [-BookmarkOffset <long>] [-IgnoreStaleBookmark] [-ContinueOnError] [-Force] [-IncludeBookmark] [<CommonParameters>]
+Get-EVXEvent -NamedEvent <NamedEvents[]> [-LogName <string[]>] [-EventId <int[]>] [-RecordIdFile <string>] [-RecordIdKey <string>] [-MachineName <List[string]>] [-StartTime <DateTime>] [-EndTime <DateTime>] [-TimePeriod <TimePeriod>] [-MessageRegex <regex>] [-MaxConcurrency <int>] [-MaxEvents <long>] [-MaxEventsScanned <long>] [-ResolveDns] [-DnsTimeoutMs <int>] [-DnsMaxConcurrency <int>] [-ReadMode <EventReadMode>] [-MessageCulture <cultureinfo>] [-SessionTimeoutMs <int>] [-BufferCapacity <int>] [-ExpandData] [-Oldest] [-DisableParallel] [-FallbackMessageCulture <cultureinfo>] [-Credential <pscredential>] [-Authentication <EventLogAuthentication>] [-ContinueOnError] [-IncludeBookmark] [<CommonParameters>]
 ```
 
-### NamedEvents
+### Path
 ```powershell
-Get-EVXEvent -Type <NamedEvents[]> [-LogName <string[]>] [-EventId <int[]>] [-RecordIdFile <string>] [-RecordIdKey <string>] [-MachineName <List[string]>] [-StartTime <DateTime>] [-EndTime <DateTime>] [-TimePeriod <TimePeriod>] [-MessageRegex <regex>] [-MaxConcurrency <int>] [-MaxEvents <long>] [-MaxEventsScanned <long>] [-ResolveDns] [-DnsTimeoutMs <int>] [-DnsMaxConcurrency <int>] [-ReadMode <EventReadMode>] [-MessageCulture <cultureinfo>] [-SessionTimeoutMs <int>] [-BufferCapacity <int>] [-Expand] [-Oldest] [-DisableParallel] [-AsArray] [-FallbackMessageCulture <cultureinfo>] [-Credential <pscredential>] [-Authentication <EventLogAuthentication>] [-ContinueOnError] [-IncludeBookmark] [<CommonParameters>]
+Get-EVXEvent -Path <string[]> [-EventId <int[]>] [-EventRecordId <long[]>] [-RecordIdFile <string>] [-RecordIdKey <string>] [-ProviderName <string[]>] [-Keywords <long[]>] [-Level <Level[]>] [-StartTime <DateTime>] [-EndTime <DateTime>] [-TimePeriod <TimePeriod>] [-UserId <string[]>] [-MessageRegex <regex>] [-MaxConcurrency <int>] [-MaxEvents <long>] [-MaxEventsScanned <long>] [-ReadMode <EventReadMode>] [-MessageCulture <cultureinfo>] [-BufferCapacity <int>] [-ExpandData] [-Oldest] [-NamedDataFilter <hashtable>] [-NamedDataExcludeFilter <hashtable>] [-DisableParallel] [-FallbackMessageCulture <cultureinfo>] [-FilterXPath <string>] [-Filter <EventFilter>] [-BookmarkXml <string>] [-BookmarkOffset <long>] [-IgnoreStaleBookmark] [-ContinueOnError] [-IncludeBookmark] [<CommonParameters>]
 ```
 
-### PathEvents
+### Provider
 ```powershell
-Get-EVXEvent -Path <string[]> [-EventId <int[]>] [-EventRecordId <long[]>] [-RecordIdFile <string>] [-RecordIdKey <string>] [-ProviderName <string[]>] [-Keywords <long[]>] [-Level <int[]>] [-StartTime <DateTime>] [-EndTime <DateTime>] [-TimePeriod <TimePeriod>] [-UserId <string[]>] [-MessageRegex <regex>] [-MaxConcurrency <int>] [-MaxEvents <long>] [-MaxEventsScanned <long>] [-ReadMode <EventReadMode>] [-MessageCulture <cultureinfo>] [-BufferCapacity <int>] [-Expand] [-Oldest] [-NamedDataFilter <hashtable>] [-NamedDataExcludeFilter <hashtable>] [-DisableParallel] [-AsArray] [-FallbackMessageCulture <cultureinfo>] [-FilterXPath <string>] [-BookmarkXml <string>] [-BookmarkOffset <long>] [-IgnoreStaleBookmark] [-ContinueOnError] [-IncludeBookmark] [<CommonParameters>]
+Get-EVXEvent [[-EventId] <int[]>] -ProviderName <string[]> [-EventRecordId <long[]>] [-RecordIdFile <string>] [-RecordIdKey <string>] [-MachineName <List[string]>] [-Keywords <long[]>] [-Level <Level[]>] [-StartTime <DateTime>] [-EndTime <DateTime>] [-TimePeriod <TimePeriod>] [-UserId <string[]>] [-MessageRegex <regex>] [-MaxConcurrency <int>] [-MaxEvents <long>] [-MaxEventsScanned <long>] [-ReadMode <EventReadMode>] [-MessageCulture <cultureinfo>] [-SessionTimeoutMs <int>] [-BufferCapacity <int>] [-ExpandData] [-Oldest] [-NamedDataFilter <hashtable>] [-NamedDataExcludeFilter <hashtable>] [-DisableParallel] [-FallbackMessageCulture <cultureinfo>] [-Filter <EventFilter>] [-Credential <pscredential>] [-Authentication <EventLogAuthentication>] [-BookmarkXml <string>] [-BookmarkOffset <long>] [-IgnoreStaleBookmark] [-ContinueOnError] [-Force] [-IncludeBookmark] [<CommonParameters>]
 ```
 
-### FilterHashtableEvents
+### Hashtable
 ```powershell
-Get-EVXEvent [-FilterHashtable] <hashtable[]> [-RecordIdFile <string>] [-RecordIdKey <string>] [-MachineName <List[string]>] [-MessageRegex <regex>] [-MaxConcurrency <int>] [-MaxEvents <long>] [-MaxEventsScanned <long>] [-ReadMode <EventReadMode>] [-MessageCulture <cultureinfo>] [-SessionTimeoutMs <int>] [-BufferCapacity <int>] [-Expand] [-Oldest] [-NamedDataFilter <hashtable>] [-NamedDataExcludeFilter <hashtable>] [-DisableParallel] [-AsArray] [-FallbackMessageCulture <cultureinfo>] [-Credential <pscredential>] [-Authentication <EventLogAuthentication>] [-BookmarkXml <string>] [-BookmarkOffset <long>] [-IgnoreStaleBookmark] [-ContinueOnError] [-TolerateQueryErrors] [-Force] [-IncludeBookmark] [<CommonParameters>]
+Get-EVXEvent [-FilterHashtable] <hashtable[]> [-RecordIdFile <string>] [-RecordIdKey <string>] [-MachineName <List[string]>] [-MessageRegex <regex>] [-MaxConcurrency <int>] [-MaxEvents <long>] [-MaxEventsScanned <long>] [-ReadMode <EventReadMode>] [-MessageCulture <cultureinfo>] [-SessionTimeoutMs <int>] [-BufferCapacity <int>] [-ExpandData] [-Oldest] [-NamedDataFilter <hashtable>] [-NamedDataExcludeFilter <hashtable>] [-DisableParallel] [-FallbackMessageCulture <cultureinfo>] [-Credential <pscredential>] [-Authentication <EventLogAuthentication>] [-BookmarkXml <string>] [-BookmarkOffset <long>] [-IgnoreStaleBookmark] [-ContinueOnError] [-TolerateQueryErrors] [-Force] [-IncludeBookmark] [<CommonParameters>]
 ```
 
-### FilterXmlEvents
+### Xml
 ```powershell
-Get-EVXEvent [-FilterXml] <xml> [-RecordIdFile <string>] [-RecordIdKey <string>] [-MachineName <List[string]>] [-MessageRegex <regex>] [-MaxConcurrency <int>] [-MaxEvents <long>] [-MaxEventsScanned <long>] [-ReadMode <EventReadMode>] [-MessageCulture <cultureinfo>] [-SessionTimeoutMs <int>] [-BufferCapacity <int>] [-Expand] [-Oldest] [-DisableParallel] [-AsArray] [-FallbackMessageCulture <cultureinfo>] [-Credential <pscredential>] [-Authentication <EventLogAuthentication>] [-BookmarkXml <string>] [-BookmarkOffset <long>] [-IgnoreStaleBookmark] [-ContinueOnError] [-TolerateQueryErrors] [-IncludeBookmark] [<CommonParameters>]
+Get-EVXEvent [-FilterXml] <xml> [-RecordIdFile <string>] [-RecordIdKey <string>] [-MachineName <List[string]>] [-MessageRegex <regex>] [-MaxConcurrency <int>] [-MaxEvents <long>] [-MaxEventsScanned <long>] [-ReadMode <EventReadMode>] [-MessageCulture <cultureinfo>] [-SessionTimeoutMs <int>] [-BufferCapacity <int>] [-ExpandData] [-Oldest] [-DisableParallel] [-FallbackMessageCulture <cultureinfo>] [-Credential <pscredential>] [-Authentication <EventLogAuthentication>] [-BookmarkXml <string>] [-BookmarkOffset <long>] [-IgnoreStaleBookmark] [-ContinueOnError] [-TolerateQueryErrors] [-IncludeBookmark] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -71,7 +71,7 @@ Continues from the last processed record and updates the checkpoint file.
 
 ### EXAMPLE 4
 ```powershell
-Get-EVXEvent -NamedEvents ADUserLogonFailed -StartTime (Get-Date).AddDays(-1)
+Get-EVXEvent -NamedEvent ADUserLogonFailed -StartTime (Get-Date).AddDays(-1)
 ```
 
 Expands the named event definition to fetch all related logon failure IDs.
@@ -92,28 +92,12 @@ Skips provider message formatting, XML parsing, attachments, and bookmarks while
 
 ## PARAMETERS
 
-### -AsArray
-Returns results as an array instead of streaming them.
-
-```yaml
-Type: SwitchParameter
-Parameter Sets: ProviderEvents, GenericEvents, NamedEvents, PathEvents, FilterHashtableEvents, FilterXmlEvents
-Aliases: None
-Possible values:
-
-Required: False
-Position: named
-Default value: None
-Accept pipeline input: False
-Accept wildcard characters: False
-```
-
 ### -Authentication
 Authentication package used for remote Windows Event Log sessions.
 
 ```yaml
 Type: EventLogAuthentication
-Parameter Sets: ProviderEvents, GenericEvents, NamedEvents, FilterHashtableEvents, FilterXmlEvents
+Parameter Sets: Channel, NamedEvent, Provider, Hashtable, Xml
 Aliases: None
 Possible values: Default, Negotiate, Kerberos, Ntlm
 
@@ -129,7 +113,7 @@ Record offset relative to BookmarkXml. The default of one resumes after the book
 
 ```yaml
 Type: Int64
-Parameter Sets: ProviderEvents, GenericEvents, PathEvents, FilterHashtableEvents, FilterXmlEvents
+Parameter Sets: Channel, Path, Provider, Hashtable, Xml
 Aliases: None
 Possible values:
 
@@ -146,7 +130,7 @@ structured QueryList session and cannot be fanned out across several independent
 
 ```yaml
 Type: String
-Parameter Sets: ProviderEvents, GenericEvents, PathEvents, FilterHashtableEvents, FilterXmlEvents
+Parameter Sets: Channel, Path, Provider, Hashtable, Xml
 Aliases: None
 Possible values:
 
@@ -162,7 +146,7 @@ Maximum number of projected events buffered between parallel readers and the Pow
 
 ```yaml
 Type: Int32
-Parameter Sets: ProviderEvents, GenericEvents, NamedEvents, PathEvents, FilterHashtableEvents, FilterXmlEvents
+Parameter Sets: Channel, NamedEvent, Path, Provider, Hashtable, Xml
 Aliases: None
 Possible values:
 
@@ -179,7 +163,7 @@ Each isolated failure is emitted as a non-terminating PowerShell error.
 
 ```yaml
 Type: SwitchParameter
-Parameter Sets: ProviderEvents, GenericEvents, NamedEvents, PathEvents, FilterHashtableEvents, FilterXmlEvents
+Parameter Sets: Channel, NamedEvent, Path, Provider, Hashtable, Xml
 Aliases: None
 Possible values:
 
@@ -195,7 +179,7 @@ Credentials used for remote channel or structured queries.
 
 ```yaml
 Type: PSCredential
-Parameter Sets: ProviderEvents, GenericEvents, NamedEvents, FilterHashtableEvents, FilterXmlEvents
+Parameter Sets: Channel, NamedEvent, Provider, Hashtable, Xml
 Aliases: None
 Possible values:
 
@@ -211,7 +195,7 @@ Disables parallel processing of queries.
 
 ```yaml
 Type: SwitchParameter
-Parameter Sets: ProviderEvents, GenericEvents, NamedEvents, PathEvents, FilterHashtableEvents, FilterXmlEvents
+Parameter Sets: Channel, NamedEvent, Path, Provider, Hashtable, Xml
 Aliases: None
 Possible values:
 
@@ -227,7 +211,7 @@ Maximum number of reverse-DNS requests that may overlap. Results and checkpoints
 
 ```yaml
 Type: Int32
-Parameter Sets: NamedEvents
+Parameter Sets: NamedEvent
 Aliases: None
 Possible values:
 
@@ -243,7 +227,7 @@ Whole-request timeout in milliseconds for each optional reverse-DNS request, inc
 
 ```yaml
 Type: Int32
-Parameter Sets: NamedEvents
+Parameter Sets: NamedEvent
 Aliases: None
 Possible values:
 
@@ -259,7 +243,7 @@ End time for the event query.
 
 ```yaml
 Type: DateTime
-Parameter Sets: ProviderEvents, GenericEvents, NamedEvents, PathEvents
+Parameter Sets: Channel, NamedEvent, Path, Provider
 Aliases: DateTo
 Possible values:
 
@@ -275,7 +259,7 @@ Event identifiers used to filter results.
 
 ```yaml
 Type: Int32[]
-Parameter Sets: ProviderEvents, GenericEvents, NamedEvents, PathEvents
+Parameter Sets: Channel, NamedEvent, Path, Provider
 Aliases: Id
 Possible values:
 
@@ -291,7 +275,7 @@ Specific event record identifiers to retrieve.
 
 ```yaml
 Type: Int64[]
-Parameter Sets: ProviderEvents, GenericEvents, PathEvents
+Parameter Sets: Channel, Path, Provider
 Aliases: RecordId
 Possible values:
 
@@ -302,13 +286,13 @@ Accept pipeline input: False
 Accept wildcard characters: False
 ```
 
-### -Expand
+### -ExpandData
 Expands event data into individual properties.
 
 ```yaml
 Type: SwitchParameter
-Parameter Sets: ProviderEvents, GenericEvents, NamedEvents, PathEvents, FilterHashtableEvents, FilterXmlEvents
-Aliases: None
+Parameter Sets: Channel, NamedEvent, Path, Provider, Hashtable, Xml
+Aliases: Expand
 Possible values:
 
 Required: False
@@ -325,7 +309,23 @@ so deterministic English is preferred without discarding locally available messa
 
 ```yaml
 Type: CultureInfo
-Parameter Sets: ProviderEvents, GenericEvents, NamedEvents, PathEvents, FilterHashtableEvents, FilterXmlEvents
+Parameter Sets: Channel, NamedEvent, Path, Provider, Hashtable, Xml
+Aliases: None
+Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -Filter
+Reusable typed filter produced by New-EVXFilter or EventViewerX.
+
+```yaml
+Type: EventFilter
+Parameter Sets: Channel, Path, Provider
 Aliases: None
 Possible values:
 
@@ -342,7 +342,7 @@ Arbitrary keys target named EventData fields. SuppressHashFilter adds native exc
 
 ```yaml
 Type: Hashtable[]
-Parameter Sets: FilterHashtableEvents
+Parameter Sets: Hashtable
 Aliases: None
 Possible values:
 
@@ -359,7 +359,7 @@ and Suppress expressions without translating or weakening the supplied query.
 
 ```yaml
 Type: XmlDocument
-Parameter Sets: FilterXmlEvents
+Parameter Sets: Xml
 Aliases: None
 Possible values:
 
@@ -376,7 +376,7 @@ This cannot be combined with the high-level filter parameters.
 
 ```yaml
 Type: String
-Parameter Sets: GenericEvents, PathEvents
+Parameter Sets: Channel, Path
 Aliases: None
 Possible values:
 
@@ -393,7 +393,7 @@ An explicitly named analytic or debug channel never requires Force.
 
 ```yaml
 Type: SwitchParameter
-Parameter Sets: ProviderEvents, GenericEvents, FilterHashtableEvents
+Parameter Sets: Channel, Provider, Hashtable
 Aliases: None
 Possible values:
 
@@ -409,7 +409,7 @@ Allows bookmark seek to continue when the exact bookmarked record is not in the 
 
 ```yaml
 Type: SwitchParameter
-Parameter Sets: ProviderEvents, GenericEvents, PathEvents, FilterHashtableEvents, FilterXmlEvents
+Parameter Sets: Channel, Path, Provider, Hashtable, Xml
 Aliases: None
 Possible values:
 
@@ -426,7 +426,7 @@ default because bookmark creation adds native handle and render work per record.
 
 ```yaml
 Type: SwitchParameter
-Parameter Sets: ProviderEvents, GenericEvents, NamedEvents, PathEvents, FilterHashtableEvents, FilterXmlEvents
+Parameter Sets: Channel, NamedEvent, Path, Provider, Hashtable, Xml
 Aliases: None
 Possible values:
 
@@ -442,7 +442,7 @@ Keywords used to filter events.
 
 ```yaml
 Type: Int64[]
-Parameter Sets: ProviderEvents, GenericEvents, PathEvents
+Parameter Sets: Channel, Path, Provider
 Aliases: None
 Possible values:
 
@@ -457,10 +457,10 @@ Accept wildcard characters: False
 Event level (e.g. Error, Warning) used for filtering.
 
 ```yaml
-Type: Int32[]
-Parameter Sets: ProviderEvents, GenericEvents, PathEvents
+Type: Level[]
+Parameter Sets: Channel, Path, Provider
 Aliases: None
-Possible values:
+Possible values: LogAlways, Critical, Error, Warning, Informational, Verbose
 
 Required: False
 Position: named
@@ -474,7 +474,7 @@ Name of the log to query.
 
 ```yaml
 Type: String[]
-Parameter Sets: GenericEvents, NamedEvents
+Parameter Sets: Channel, NamedEvent
 Aliases: None
 Possible values:
 
@@ -490,7 +490,7 @@ Computer names against which to run the query.
 
 ```yaml
 Type: List`1
-Parameter Sets: ProviderEvents, GenericEvents, NamedEvents, FilterHashtableEvents, FilterXmlEvents
+Parameter Sets: Channel, NamedEvent, Provider, Hashtable, Xml
 Aliases: ComputerName, ServerName
 Possible values:
 
@@ -506,7 +506,7 @@ Maximum number of independent event sources opened concurrently.
 
 ```yaml
 Type: Int32
-Parameter Sets: ProviderEvents, GenericEvents, NamedEvents, PathEvents, FilterHashtableEvents, FilterXmlEvents
+Parameter Sets: Channel, NamedEvent, Path, Provider, Hashtable, Xml
 Aliases: NumberOfThreads
 Possible values:
 
@@ -522,7 +522,7 @@ Maximum number of events to return.
 
 ```yaml
 Type: Int64
-Parameter Sets: ProviderEvents, GenericEvents, NamedEvents, PathEvents, FilterHashtableEvents, FilterXmlEvents
+Parameter Sets: Channel, NamedEvent, Path, Provider, Hashtable, Xml
 Aliases: None
 Possible values:
 
@@ -540,7 +540,7 @@ one initial lookahead per machine/XPath chunk plus bounded page prefetch; those 
 
 ```yaml
 Type: Int64
-Parameter Sets: ProviderEvents, GenericEvents, NamedEvents, PathEvents, FilterHashtableEvents, FilterXmlEvents
+Parameter Sets: Channel, NamedEvent, Path, Provider, Hashtable, Xml
 Aliases: None
 Possible values:
 
@@ -557,7 +557,7 @@ For example, use en-US for deterministic English output.
 
 ```yaml
 Type: CultureInfo
-Parameter Sets: ProviderEvents, GenericEvents, NamedEvents, PathEvents, FilterHashtableEvents, FilterXmlEvents
+Parameter Sets: Channel, NamedEvent, Path, Provider, Hashtable, Xml
 Aliases: None
 Possible values:
 
@@ -573,7 +573,7 @@ Filters events by matching their formatted message against the provided regular 
 
 ```yaml
 Type: Regex
-Parameter Sets: ProviderEvents, GenericEvents, NamedEvents, PathEvents, FilterHashtableEvents, FilterXmlEvents
+Parameter Sets: Channel, NamedEvent, Path, Provider, Hashtable, Xml
 Aliases: None
 Possible values:
 
@@ -589,7 +589,7 @@ Hashtable filter to exclude named event data when querying files.
 
 ```yaml
 Type: Hashtable
-Parameter Sets: ProviderEvents, GenericEvents, PathEvents, FilterHashtableEvents
+Parameter Sets: Channel, Path, Provider, Hashtable
 Aliases: None
 Possible values:
 
@@ -605,11 +605,27 @@ Hashtable filter for named event data when querying files.
 
 ```yaml
 Type: Hashtable
-Parameter Sets: ProviderEvents, GenericEvents, PathEvents, FilterHashtableEvents
+Parameter Sets: Channel, Path, Provider, Hashtable
 Aliases: None
 Possible values:
 
 Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -NamedEvent
+Predefined named events to query.
+
+```yaml
+Type: NamedEvents[]
+Parameter Sets: NamedEvent
+Aliases: NamedEvents, Type
+Possible values: ADComputerCreateChange, ADComputerDeleted, ADComputerChangeDetailed, ADGroupMembershipChange, ADGroupEnumeration, ADGroupChange, ADGroupCreateDelete, ADGroupChangeDetailed, ADGroupPolicyChanges, ADGroupPolicyEdits, ADGroupPolicyLinks, ADGroupPolicyChangesDetailed, GpoCreated, GpoDeleted, GpoModified, ADLdapBindingSummary, ADLdapBindingDetails, ADUserCreateChange, ADUserStatus, ADUserChangeDetailed, ADUserLockouts, ADUserLogon, ADUserLogonNTLMv1, ADUserLogonFailed, ADUserUnlocked, ADUserPrivilegeUse, ADUserRightsAssignment, KerberosTGTRequest, KerberosServiceTicket, KerberosTicketFailure, KerberosPolicyChange, ADOrganizationalUnitChangeDetailed, ADOtherChangeDetailed, ADSMBServerAuditV1, LogsClearedSecurity, LogsClearedOther, LogsFullSecurity, NetworkAccessAuthenticationPolicy, CertificateIssued, AuditPolicyChange, FirewallRuleChange, DhcpLeaseCreated, BitLockerKeyChange, BitLockerSuspended, DeviceRecognized, DeviceDisabled, ObjectDeletion, ScheduledTaskDeleted, ScheduledTaskCreated, OSCrash, OSBugCheck, OSStartup, OSShutdown, OSUncleanShutdown, OSStartupSecurity, OSCrashOnAuditFailRecovery, OSTimeChange, WindowsUpdateFailure, ClientGroupPoliciesApplication, ClientGroupPoliciesSystem, HyperVVirtualMachineShutdown, HyperVVirtualMachineStarted, IISSiteBindingFailure, HyperVCheckpointCreated, IISSiteStopped, ExchangeDatabaseMounted, DfsReplicationError, SqlDatabaseCreated, SyncCompleted, AADConnectStagingEnabled, AADConnectStagingDisabled, AADConnectPasswordSyncFailed, AADConnectRunProfile, AADSyncCycleStage, AADSyncProvisionCredentialsPing, AADSyncPasswordHashSyncStatus, AADSyncImportStatus, AADSyncFilterStatus, NetworkMonitorDriverLoaded, NetworkPromiscuousMode
+
+Required: True
 Position: named
 Default value: None
 Accept pipeline input: False
@@ -621,7 +637,7 @@ Reads events from oldest to newest when querying files.
 
 ```yaml
 Type: SwitchParameter
-Parameter Sets: ProviderEvents, GenericEvents, NamedEvents, PathEvents, FilterHashtableEvents, FilterXmlEvents
+Parameter Sets: Channel, NamedEvent, Path, Provider, Hashtable, Xml
 Aliases: None
 Possible values:
 
@@ -637,7 +653,7 @@ Path to an event log file for offline analysis.
 
 ```yaml
 Type: String[]
-Parameter Sets: PathEvents
+Parameter Sets: Path
 Aliases: PSPath
 Possible values:
 
@@ -653,7 +669,7 @@ Event provider name to filter results.
 
 ```yaml
 Type: String[]
-Parameter Sets: ProviderEvents, GenericEvents, PathEvents
+Parameter Sets: Path, Provider
 Aliases: Source, Provider
 Possible values:
 
@@ -671,7 +687,7 @@ Named-event queries default to Full so rule projections receive their structured
 
 ```yaml
 Type: EventReadMode
-Parameter Sets: ProviderEvents, GenericEvents, NamedEvents, PathEvents, FilterHashtableEvents, FilterXmlEvents
+Parameter Sets: Channel, NamedEvent, Path, Provider, Hashtable, Xml
 Aliases: None
 Possible values: Metadata, Message, StructuredData, RawXml, Full
 
@@ -687,7 +703,7 @@ Path to a file storing last processed record ID.
 
 ```yaml
 Type: String
-Parameter Sets: ProviderEvents, GenericEvents, NamedEvents, PathEvents, FilterHashtableEvents, FilterXmlEvents
+Parameter Sets: Channel, NamedEvent, Path, Provider, Hashtable, Xml
 Aliases: None
 Possible values:
 
@@ -703,7 +719,7 @@ Identifier used when persisting record IDs to allow multiple jobs to share a fil
 
 ```yaml
 Type: String
-Parameter Sets: ProviderEvents, GenericEvents, NamedEvents, PathEvents, FilterHashtableEvents, FilterXmlEvents
+Parameter Sets: Channel, NamedEvent, Path, Provider, Hashtable, Xml
 Aliases: None
 Possible values:
 
@@ -720,7 +736,7 @@ event and never remove the event from the pipeline.
 
 ```yaml
 Type: SwitchParameter
-Parameter Sets: NamedEvents
+Parameter Sets: NamedEvent
 Aliases: None
 Possible values:
 
@@ -738,7 +754,7 @@ Settings.QuerySessionTimeoutMs for reading.
 
 ```yaml
 Type: Int32
-Parameter Sets: ProviderEvents, GenericEvents, NamedEvents, FilterHashtableEvents, FilterXmlEvents
+Parameter Sets: Channel, NamedEvent, Provider, Hashtable, Xml
 Aliases: None
 Possible values:
 
@@ -754,7 +770,7 @@ Start time for the event query.
 
 ```yaml
 Type: DateTime
-Parameter Sets: ProviderEvents, GenericEvents, NamedEvents, PathEvents
+Parameter Sets: Channel, NamedEvent, Path, Provider
 Aliases: DateFrom
 Possible values:
 
@@ -770,7 +786,7 @@ Relative time period for filtering events.
 
 ```yaml
 Type: TimePeriod
-Parameter Sets: ProviderEvents, GenericEvents, NamedEvents, PathEvents
+Parameter Sets: Channel, NamedEvent, Path, Provider
 Aliases: None
 Possible values: PastHour, CurrentHour, PastDay, CurrentDay, PastMonth, CurrentMonth, PastQuarter, CurrentQuarter, Last3Days, Last7Days, Last14Days, Last1Hour, Last2Hours, Last3Hours, Last6Hours, Last12Hours, Last16Hours, Last24Hours, Today, Yesterday, Everything, TillLastMonday, TillLastTuesday, TillLastWednesday, TillLastThursday, TillLastFriday, TillLastSaturday, TillLastSunday
 
@@ -786,27 +802,11 @@ Allows a structured QueryList to continue when one path cannot be evaluated.
 
 ```yaml
 Type: SwitchParameter
-Parameter Sets: FilterHashtableEvents, FilterXmlEvents
+Parameter Sets: Hashtable, Xml
 Aliases: None
 Possible values:
 
 Required: False
-Position: named
-Default value: None
-Accept pipeline input: False
-Accept wildcard characters: False
-```
-
-### -Type
-Predefined named events to query.
-
-```yaml
-Type: NamedEvents[]
-Parameter Sets: NamedEvents
-Aliases: NamedEvents
-Possible values: ADComputerCreateChange, ADComputerDeleted, ADComputerChangeDetailed, ADGroupMembershipChange, ADGroupEnumeration, ADGroupChange, ADGroupCreateDelete, ADGroupChangeDetailed, ADGroupPolicyChanges, ADGroupPolicyEdits, ADGroupPolicyLinks, ADGroupPolicyChangesDetailed, GpoCreated, GpoDeleted, GpoModified, ADLdapBindingSummary, ADLdapBindingDetails, ADUserCreateChange, ADUserStatus, ADUserChangeDetailed, ADUserLockouts, ADUserLogon, ADUserLogonNTLMv1, ADUserLogonFailed, ADUserUnlocked, ADUserPrivilegeUse, ADUserRightsAssignment, KerberosTGTRequest, KerberosServiceTicket, KerberosTicketFailure, KerberosPolicyChange, ADOrganizationalUnitChangeDetailed, ADOtherChangeDetailed, ADSMBServerAuditV1, LogsClearedSecurity, LogsClearedOther, LogsFullSecurity, NetworkAccessAuthenticationPolicy, CertificateIssued, AuditPolicyChange, FirewallRuleChange, DhcpLeaseCreated, BitLockerKeyChange, BitLockerSuspended, DeviceRecognized, DeviceDisabled, ObjectDeletion, ScheduledTaskDeleted, ScheduledTaskCreated, OSCrash, OSBugCheck, OSStartup, OSShutdown, OSUncleanShutdown, OSStartupSecurity, OSCrashOnAuditFailRecovery, OSTimeChange, WindowsUpdateFailure, ClientGroupPoliciesApplication, ClientGroupPoliciesSystem, HyperVVirtualMachineShutdown, HyperVVirtualMachineStarted, IISSiteBindingFailure, HyperVCheckpointCreated, IISSiteStopped, ExchangeDatabaseMounted, DfsReplicationError, SqlDatabaseCreated, SyncCompleted, AADConnectStagingEnabled, AADConnectStagingDisabled, AADConnectPasswordSyncFailed, AADConnectRunProfile, AADSyncCycleStage, AADSyncProvisionCredentialsPing, AADSyncPasswordHashSyncStatus, AADSyncImportStatus, AADSyncFilterStatus, NetworkMonitorDriverLoaded, NetworkPromiscuousMode
-
-Required: True
 Position: named
 Default value: None
 Accept pipeline input: False
@@ -818,7 +818,7 @@ User identifier used to filter events.
 
 ```yaml
 Type: String[]
-Parameter Sets: ProviderEvents, GenericEvents, PathEvents
+Parameter Sets: Channel, Path, Provider
 Aliases: None
 Possible values:
 
@@ -841,7 +841,7 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 ## OUTPUTS
 
 - `EventViewerX.EventObject`
-- `EventViewerX.EventObjectSlim`
+- `EventViewerX.NamedEventRecord`
 
 ## RELATED LINKS
 

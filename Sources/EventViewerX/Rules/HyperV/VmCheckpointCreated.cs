@@ -30,37 +30,37 @@ public class VmCheckpointCreated : EventRuleBase {
 
     /// <summary>Initialises a Hyper-V checkpoint wrapper from an event record.</summary>
     public VmCheckpointCreated(EventObject eventObject) : base(eventObject) {
-        Event = eventObject;
-        Type = "VmCheckpointCreated";
-        Computer = Event.ComputerName;
-        VmName = Event.GetValueFromDataDictionary("VmName");
+        SourceEvent = eventObject;
+        NamedEventName = "VmCheckpointCreated";
+        Computer = SourceEvent.ComputerName;
+        VmName = SourceEvent.GetValueFromDataDictionary("VmName");
         if (string.IsNullOrEmpty(VmName)) {
-            VmName = Event.GetValueFromDataDictionary("Name");
+            VmName = SourceEvent.GetValueFromDataDictionary("Name");
         }
         if (string.IsNullOrEmpty(VmName)) {
-            VmName = Event.GetValueFromDataDictionary("VMName");
+            VmName = SourceEvent.GetValueFromDataDictionary("VMName");
         }
 
-        CheckpointName = Event.GetValueFromDataDictionary("CheckpointName");
+        CheckpointName = SourceEvent.GetValueFromDataDictionary("CheckpointName");
         if (string.IsNullOrEmpty(CheckpointName)) {
-            CheckpointName = Event.GetValueFromDataDictionary("SnapshotName");
+            CheckpointName = SourceEvent.GetValueFromDataDictionary("SnapshotName");
         }
         if (string.IsNullOrEmpty(CheckpointName)) {
-            CheckpointName = Event.GetValueFromDataDictionary("Name", "FriendlyName");
+            CheckpointName = SourceEvent.GetValueFromDataDictionary("Name", "FriendlyName");
         }
 
-        User = Event.GetValueFromDataDictionary("User");
+        User = SourceEvent.GetValueFromDataDictionary("User");
         if (string.IsNullOrEmpty(User)) {
-            User = Event.GetValueFromDataDictionary("UserName");
+            User = SourceEvent.GetValueFromDataDictionary("UserName");
         }
         if (string.IsNullOrEmpty(User)) {
-            User = Event.GetValueFromDataDictionary("AccountName");
+            User = SourceEvent.GetValueFromDataDictionary("AccountName");
         }
         if (string.IsNullOrEmpty(User)) {
-            User = Event.GetSubjectAccountOrEmpty();
+            User = SourceEvent.GetSubjectAccountOrEmpty();
         }
 
-        When = Event.TimeCreated;
+        When = SourceEvent.TimeCreated;
     }
 }
 

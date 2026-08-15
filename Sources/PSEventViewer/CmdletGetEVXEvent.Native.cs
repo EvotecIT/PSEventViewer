@@ -21,26 +21,29 @@ public sealed partial class CmdletGetEVXEvent {
     }
 
     private EventLogBatchQuery CreateNativeBatch() {
+        if (!RequiresSpecializedBatch()) {
+            return CreatePlannerBatch();
+        }
         switch (ParameterSetName) {
-            case "GenericEvents":
+            case "Channel":
                 return CreateChannelBatch(
                     NormalizeRequiredValues(LogName, nameof(LogName)),
                     CreateCommandFilter(),
                     suppress: null,
                     FilterXPath);
-            case "PathEvents":
+            case "Path":
                 return CreateFileBatch(
                     ExpandFilePaths(Path, nameof(Path)),
                     CreateCommandFilter(),
                     suppress: null,
                     FilterXPath);
-            case "ProviderEvents":
+            case "Provider":
                 return CreateProviderBatch(
                     CreateCommandFilter(),
                     suppress: null);
-            case "FilterHashtableEvents":
+            case "Hashtable":
                 return CreateFilterHashtableBatch();
-            case "FilterXmlEvents":
+            case "Xml":
                 return CreateStructuredBatch(
                     FilterXml!.OuterXml,
                     EventLogQuerySourceKind.Auto);
@@ -48,6 +51,75 @@ public sealed partial class CmdletGetEVXEvent {
                 throw new InvalidOperationException(
                     $"Parameter set '{ParameterSetName}' is not a native query parameter set.");
         }
+    }
+
+    private bool RequiresSpecializedBatch() {
+        return UsesCheckpoint ||
+               ParameterSetName == "Hashtable" ||
+               (ParameterSetName == "Path" &&
+                ContainsWildcard(
+                    Filter?.ProviderNames ?? ProviderName));
+    }
+
+    private EventLogBatchQuery CreatePlannerBatch() {
+        EventFilter? filter = ParameterSetName == "Xml"
+            ? null
+            : CreateCommandFilter();
+        var definition = new EventQueryDefinition {
+            LogNames = ParameterSetName == "Channel"
+                ? NormalizeRequiredValues(LogName, nameof(LogName))
+                : null,
+            ProviderNames = ParameterSetName == "Provider"
+                ? NormalizeRequiredValues(
+                    ProviderName ?? Array.Empty<string>(),
+                    nameof(ProviderName))
+                : null,
+            Paths = ParameterSetName == "Path"
+                ? ExpandFilePaths(Path, nameof(Path))
+                : null,
+            QueryXml = ParameterSetName == "Xml"
+                ? FilterXml!.OuterXml
+                : null,
+            MachineNames = ParameterSetName == "Path"
+                ? null
+                : MachineName,
+            Filter = filter,
+            FilterXPath = FilterXPath,
+            IncludeAnalyticAndDebugChannels = Force.IsPresent,
+            TolerateQueryErrors = TolerateQueryErrors.IsPresent,
+            Options = new EventLogQueryOptions {
+                Oldest = EffectiveOldest,
+                ReadMode = ReadMode,
+                MessageCulture = MessageCulture,
+                FallbackMessageCulture = FallbackMessageCulture,
+                MaxEvents = GetNativeCandidateLimit(),
+                IncludeBookmark = IncludeBookmark.IsPresent,
+                BookmarkXml = BookmarkXml,
+                BookmarkOffset = BookmarkOffset,
+                StrictBookmark = !IgnoreStaleBookmark,
+                Credential = Credential?.GetNetworkCredential(),
+                Authentication = Authentication,
+                RemoteConnectionTimeoutMilliseconds =
+                    EffectiveRemoteConnectionTimeoutMilliseconds,
+                RemoteReadTimeoutMilliseconds =
+                    EffectiveRemoteReadTimeoutMilliseconds,
+                BufferCapacity = BufferCapacity > 0
+                    ? BufferCapacity
+                    : 64,
+                MaxConcurrency = DisableParallel.IsPresent
+                    ? 1
+                    : MaxConcurrency,
+                ContinueOnError = ContinueOnError.IsPresent,
+                FailureHandler = failure => WriteError(new ErrorRecord(
+                    failure.Exception,
+                    "EVXEventQuerySourceFailed",
+                    ErrorCategory.ReadError,
+                    string.IsNullOrWhiteSpace(failure.MachineName)
+                        ? failure.Source
+                        : $"{failure.Source} on {failure.MachineName}"))
+            }
+        };
+        return EventQueryPlanner.CreateBatch(definition, CancelToken);
     }
 
     private EventLogBatchQuery CreateFilterHashtableBatch() {

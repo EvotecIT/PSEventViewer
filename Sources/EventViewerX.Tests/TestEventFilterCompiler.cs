@@ -4,6 +4,28 @@ using Xunit;
 namespace EventViewerX.Tests;
 
 public sealed class TestEventFilterCompiler {
+    [Theory]
+    [InlineData(100L, null, 100L)]
+    [InlineData(100L, 50L, 100L)]
+    [InlineData(100L, 100L, 100L)]
+    [InlineData(100L, 150L, 150L)]
+    public void MinimumRecordBoundaryCompositionKeepsTheStricterValue(
+        long existing,
+        long? checkpoint,
+        long expected) {
+
+        var source = new EventFilter {
+            MinimumRecordIdExclusive = existing
+        };
+
+        EventFilter combined =
+            source.WithMinimumRecordIdExclusive(checkpoint);
+
+        Assert.Equal(expected, combined.MinimumRecordIdExclusive);
+        Assert.Equal(existing, source.MinimumRecordIdExclusive);
+        Assert.NotSame(source, combined);
+    }
+
     [Fact]
     public void TypedFilterBuildsTheExpectedNativeDimensions() {
         var filter = new EventFilter {
@@ -581,5 +603,22 @@ public sealed class TestEventFilterCompiler {
             "require at least 24",
             exception.Message,
             StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void CloneCreatesIndependentCollections() {
+        var source = new EventFilter {
+            EventIds = new[] { 4625 },
+            NamedData = new Dictionary<string, IReadOnlyList<string>> {
+                ["TargetUserName"] = new[] { "alice" }
+            }
+        };
+
+        EventFilter clone = source.Clone();
+        ((int[])source.EventIds!)[0] = 4624;
+        ((string[])source.NamedData!["TargetUserName"])[0] = "bob";
+
+        Assert.Equal(4625, Assert.Single(clone.EventIds!));
+        Assert.Equal("alice", Assert.Single(clone.NamedData!["TargetUserName"]));
     }
 }

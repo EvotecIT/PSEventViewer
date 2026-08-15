@@ -31,17 +31,17 @@ public class AADConnectStagingEnabled : EventRuleBase {
 
     /// <summary>Initialises a staging-enabled wrapper from an event record.</summary>
     public AADConnectStagingEnabled(EventObject eventObject) : base(eventObject) {
-        Event = eventObject;
-        Type = "AADConnectStagingEnabled";
-        Computer = Event.ComputerName;
-        Operator = Event.GetValueFromDataDictionary("Operator");
+        SourceEvent = eventObject;
+        NamedEventName = "AADConnectStagingEnabled";
+        Computer = SourceEvent.ComputerName;
+        Operator = SourceEvent.GetValueFromDataDictionary("Operator");
         if (string.IsNullOrEmpty(Operator)) {
-            Operator = Event.GetValueFromDataDictionary(
+            Operator = SourceEvent.GetValueFromDataDictionary(
                 "SubjectUserName",
                 "SubjectDomainName",
                 "\\",
                 true);
         }
-        When = Event.TimeCreated;
+        When = SourceEvent.TimeCreated;
     }
 }

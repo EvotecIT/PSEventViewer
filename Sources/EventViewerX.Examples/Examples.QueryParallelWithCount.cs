@@ -1,4 +1,4 @@
-﻿namespace EventViewerX.Examples {
+namespace EventViewerX.Examples {
     internal partial class Examples {
 
         public static async Task QueryParallelWithCount() {

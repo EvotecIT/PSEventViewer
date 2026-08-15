@@ -27,12 +27,12 @@ public class ScheduledTaskDeleted : EventRuleBase {
 
     /// <summary>Initialises a scheduled-task-deleted wrapper from an event record.</summary>
     public ScheduledTaskDeleted(EventObject eventObject) : base(eventObject) {
-        Event = eventObject;
-        Type = "ScheduledTaskDeleted";
-        Computer = Event.ComputerName;
-        TaskName = Event.GetValueFromDataDictionary("TaskName");
-        Who = Event.GetSubjectAccountOrEmpty();
-        When = Event.TimeCreated;
+        SourceEvent = eventObject;
+        NamedEventName = "ScheduledTaskDeleted";
+        Computer = SourceEvent.ComputerName;
+        TaskName = SourceEvent.GetValueFromDataDictionary("TaskName");
+        Who = SourceEvent.GetSubjectAccountOrEmpty();
+        When = SourceEvent.TimeCreated;
     }
 }
 

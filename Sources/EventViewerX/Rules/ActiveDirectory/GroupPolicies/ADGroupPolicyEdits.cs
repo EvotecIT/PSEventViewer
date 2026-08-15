@@ -47,16 +47,16 @@ public class ADGroupPolicyEdits : EventRuleBase {
 
     /// <summary>Initialises a GPO edit wrapper from an event record.</summary>
     public ADGroupPolicyEdits(EventObject eventObject) : base(eventObject) {
-        Event = eventObject;
-        Type = "ADGroupPolicyEdits";
-        Computer = Event.ComputerName;
-        Action = Event.MessageSubject;
-        ObjectClass = Event.GetValueFromDataDictionary("ObjectClass");
-        OperationType = ConvertFromOperationType(Event.GetDataValueOrEmpty("OperationType"));
-        Who = Event.GetSubjectAccountOrEmpty();
-        When = Event.TimeCreated;
-        GroupPolicyDisplayName = Event.GetValueFromDataDictionary("ObjectDN");
-        var dn = Event.GetValueFromDataDictionary("ObjectDN");
+        SourceEvent = eventObject;
+        NamedEventName = "ADGroupPolicyEdits";
+        Computer = SourceEvent.ComputerName;
+        Action = SourceEvent.MessageSubject;
+        ObjectClass = SourceEvent.GetValueFromDataDictionary("ObjectClass");
+        OperationType = ConvertFromOperationType(SourceEvent.GetDataValueOrEmpty("OperationType"));
+        Who = SourceEvent.GetSubjectAccountOrEmpty();
+        When = SourceEvent.TimeCreated;
+        GroupPolicyDisplayName = SourceEvent.GetValueFromDataDictionary("ObjectDN");
+        var dn = SourceEvent.GetValueFromDataDictionary("ObjectDN");
         var guidPattern = @"\{(?<guid>[0-9A-Fa-f-]+)\}";
         var match = System.Text.RegularExpressions.Regex.Match(dn, guidPattern);
         if (match.Success) {
@@ -71,8 +71,8 @@ public class ADGroupPolicyEdits : EventRuleBase {
                 GroupPolicyDisplayName = foundGpo.GpoName;
             }
         }
-        AttributeLDAPDisplayName = Event.GetValueFromDataDictionary("AttributeLDAPDisplayName");
-        //AttributeValue = Event.GetValueFromDataDictionary("AttributeValue");
+        AttributeLDAPDisplayName = SourceEvent.GetValueFromDataDictionary("AttributeLDAPDisplayName");
+        //AttributeValue = SourceEvent.GetValueFromDataDictionary("AttributeValue");
     }
 }
 

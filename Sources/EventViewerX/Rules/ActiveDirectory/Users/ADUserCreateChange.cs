@@ -68,32 +68,32 @@ public class ADUserCreateChange : EventRuleBase {
     /// <summary>Initialises a user creation/change wrapper from an event record.</summary>
     public ADUserCreateChange(EventObject eventObject) : base(eventObject) {
         // main object initialization
-        Event = eventObject;
+        SourceEvent = eventObject;
         // dedicated properties initialization
-        Type = "ADUserChange";
-        Computer = Event.ComputerName;
-        Action = Event.MessageSubject;
-        UserAffected = Event.GetTargetAccountOrEmpty();
-        SamAccountName = Event.GetValueFromDataDictionary("SamAccountName");
-        DisplayName = Event.GetValueFromDataDictionary("DisplayName");
-        UserPrincipalName = Event.GetValueFromDataDictionary("UserPrincipalName");
-        HomeDirectory = Event.GetValueFromDataDictionary("HomeDirectory");
-        HomePath = Event.GetValueFromDataDictionary("HomePath");
-        ScriptPath = Event.GetValueFromDataDictionary("ScriptPath");
-        ProfilePath = Event.GetValueFromDataDictionary("ProfilePath");
-        UserWorkstations = Event.GetValueFromDataDictionary("UserWorkstations");
-        PasswordLastSet = Event.GetValueFromDataDictionary("PasswordLastSet");
-        AccountExpires = Event.GetValueFromDataDictionary("AccountExpires");
-        PrimaryGroupId = Event.GetValueFromDataDictionary("PrimaryGroupId");
-        AllowedToDelegateTo = Event.GetValueFromDataDictionary("AllowedToDelegateTo");
-        OldUacValue = Event.GetValueFromDataDictionary("OldUacValue");
-        NewUacValue = Event.GetValueFromDataDictionary("NewUacValue");
-        UserAccountControl = Event.GetValueFromDataDictionary("UserAccountControl");
-        UserParameters = Event.GetValueFromDataDictionary("UserParameters");
-        SidHistory = Event.GetValueFromDataDictionary("SidHistory");
-        LogonHours = Event.GetValueFromDataDictionary("LogonHours");
-        Who = Event.GetSubjectAccountOrEmpty();
-        When = Event.TimeCreated;
+        NamedEventName = "ADUserChange";
+        Computer = SourceEvent.ComputerName;
+        Action = SourceEvent.MessageSubject;
+        UserAffected = SourceEvent.GetTargetAccountOrEmpty();
+        SamAccountName = SourceEvent.GetValueFromDataDictionary("SamAccountName");
+        DisplayName = SourceEvent.GetValueFromDataDictionary("DisplayName");
+        UserPrincipalName = SourceEvent.GetValueFromDataDictionary("UserPrincipalName");
+        HomeDirectory = SourceEvent.GetValueFromDataDictionary("HomeDirectory");
+        HomePath = SourceEvent.GetValueFromDataDictionary("HomePath");
+        ScriptPath = SourceEvent.GetValueFromDataDictionary("ScriptPath");
+        ProfilePath = SourceEvent.GetValueFromDataDictionary("ProfilePath");
+        UserWorkstations = SourceEvent.GetValueFromDataDictionary("UserWorkstations");
+        PasswordLastSet = SourceEvent.GetValueFromDataDictionary("PasswordLastSet");
+        AccountExpires = SourceEvent.GetValueFromDataDictionary("AccountExpires");
+        PrimaryGroupId = SourceEvent.GetValueFromDataDictionary("PrimaryGroupId");
+        AllowedToDelegateTo = SourceEvent.GetValueFromDataDictionary("AllowedToDelegateTo");
+        OldUacValue = SourceEvent.GetValueFromDataDictionary("OldUacValue");
+        NewUacValue = SourceEvent.GetValueFromDataDictionary("NewUacValue");
+        UserAccountControl = SourceEvent.GetValueFromDataDictionary("UserAccountControl");
+        UserParameters = SourceEvent.GetValueFromDataDictionary("UserParameters");
+        SidHistory = SourceEvent.GetValueFromDataDictionary("SidHistory");
+        LogonHours = SourceEvent.GetValueFromDataDictionary("LogonHours");
+        Who = SourceEvent.GetSubjectAccountOrEmpty();
+        When = SourceEvent.TimeCreated;
 
         // let's try to translate them
         OldUacValue = TranslateUacValue(OldUacValue);

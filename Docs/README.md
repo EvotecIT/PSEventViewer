@@ -15,11 +15,6 @@ Clears Windows Event Log channels through the native engine.
 
 Supports local or remote channels, explicit credentials, and an optional native EVTX backup. Failures are terminating and retain their Windows error code.
 
-### [ConvertTo-EVXProviderDefinition](ConvertTo-EVXProviderDefinition.md)
-Converts a friendly hashtable or custom object into a validated provider definition.
-
-Accepts concise PowerShell aliases such as ProviderName, ProviderGuid, Version, Message, and ordered field hashtables while retaining the complete typed EventViewerX provider schema for advanced channels, levels, tasks, opcodes, keywords, maps, localization, and versioned events.
-
 ### [Export-EVXEvent](Export-EVXEvent.md)
 Streams Windows events directly to CSV, JSON Lines, XML, or native EVTX.
 
@@ -35,36 +30,18 @@ Enhanced event querying cmdlet that replaces and extends Get-WinEvent functional
 
 Supports local/remote logs, named event shortcuts, record ID resumes, parallel queries, and rich filtering (IDs, providers, keywords, levels, time windows, named data).
 
-### [Get-EVXEventStatistics](Get-EVXEventStatistics.md)
-Builds bounded statistics from a live Windows event log.
-
-Scans event metadata without formatting messages or parsing XML and reports top event IDs, providers, levels, computers, and the observed time range.
-
-### [Get-EVXFilter](Get-EVXFilter.md)
-Generates XPath filters for Windows Event Log queries.
-
-Produces filter strings compatible with Get-WinEvent -FilterXPath and Event Viewer Custom Views, supporting include/exclude IDs, time windows, providers, users, keywords, levels, and named data.
-
 ### [Get-EVXLog](Get-EVXLog.md)
 Retrieves event log details by name.
 
 Lists log metadata (size, record count, status) on local or remote machines; supports wildcards.
 
 ### [Get-EVXPowerShellScript](Get-EVXPowerShellScript.md)
-Retrieves PowerShell scripts from event logs and optionally saves them.
-
-### [Get-EVXPowerShellScriptExecution](Get-EVXPowerShellScriptExecution.md)
-Retrieves PowerShell execution-context events from live operational logs or exported EVTX files.
+Retrieves reconstructed PowerShell scripts or execution-context records from event logs.
 
 ### [Get-EVXProvider](Get-EVXProvider.md)
-Returns detached Windows Event Log provider metadata.
+Returns registered provider metadata or EventViewerX provider packages.
 
-Supports local and remote provider discovery, wildcard names, deterministic culture, linked channels, levels, tasks, opcodes, keywords, and optional event definitions.
-
-### [Get-EVXProviderPackage](Get-EVXProviderPackage.md)
-Inspects a portable provider package or lists EventViewerX-managed installations.
-
-Package inspection verifies declared hashes and any detached signature before returning its typed definition. Without Path, the command returns the active machine-wide EventViewerX provider catalog.
+The default set supports local and remote provider discovery. Package sets inspect a portable .evxprovider file or list machine-wide EventViewerX-managed installations.
 
 ### [Get-EVXWatcher](Get-EVXWatcher.md)
 Retrieves information about active EVX watchers.
@@ -77,6 +54,16 @@ Installs or upgrades a portable custom Windows event provider package.
 Verifies package hashes and signatures before changing machine state, enforces schema and version compatibility, stages resources under ProgramData, registers the manifest, verifies Windows metadata and channels, and rolls back to the previous provider if activation fails.
 
 The target machine does not require the Windows SDK, Visual Studio, a C# compiler, generated source, or package build tools.
+
+### [New-EVXCollectorSubscription](New-EVXCollectorSubscription.md)
+Creates a typed collector-initiated WEC subscription definition.
+
+Builds safe Windows Event Collector XML from a QueryList or common event filters. The command does not change the collector; pipe the definition to Set-EVXCollectorSubscription to apply it.
+
+### [New-EVXFilter](New-EVXFilter.md)
+Creates a reusable typed Windows Event Log filter or compiles it to native query text.
+
+The default output is EventViewerX.EventFilter for reuse by C# and cmdlets. Use AsXPath, LogName, or Path when native query text is required by Get-WinEvent, Event Viewer, or WEC.
 
 ### [New-EVXLog](New-EVXLog.md)
 Creates a new Windows event log with optional size and retention settings.
@@ -111,9 +98,9 @@ Resets persisted event-query checkpoint progress safely.
 Starts a new checkpoint generation under the shared file lock so an in-flight query from the previous generation cannot restore stale progress. Use this cmdlet instead of deleting only the RecordIdFile compatibility file because generation state is stored in a visible companion .state.json file.
 
 ### [Set-EVXCollectorSubscription](Set-EVXCollectorSubscription.md)
-Enables or disables an existing local Windows Event Collector subscription.
+Applies a typed local WEC subscription definition or changes its enabled state.
 
-Uses the supported Windows Event Collector service API, saves the subscription, and verifies the persisted value. Remote registry mutation and wholesale XML replacement are intentionally not exposed.
+Definition input creates or updates a subscription through the Windows inbox collector utility. The state set uses the supported WEC API. Both paths verify persisted state. Definition apply is cancellable and time-bounded; failed apply is rolled back and reports explicitly when rollback cannot establish a known persisted state.
 
 ### [Set-EVXLog](Set-EVXLog.md)
 Updates Windows Event Log channel policy.
@@ -150,14 +137,7 @@ Archives provider resources into exported EVTX files.
 
 Makes a Windows-native EVTX export self-contained for message rendering on computers that do not have the source provider installed.
 
-### [Write-EVXEntry](Write-EVXEntry.md)
-Writes custom events to Windows Event Logs for testing, debugging, or application logging.
-
-Writes through ClassicEventLogManager. A normal write never performs an implicit administrative source registration; use CreateSource explicitly when that behavior is intended.
-
 ### [Write-EVXEvent](Write-EVXEvent.md)
-Writes a registered manifest/ETW event using positional, named, or typed schema values.
+Writes classic Event Log entries or registered manifest/ETW events.
 
-Resolves and caches the exact registered event schema, validates every value, converts values according to native Windows types, and writes through the dependency-free EventViewerX engine. Named hashtable order does not matter.
-
-EventName is available for providers installed through an EventViewerX .evxprovider package. ProviderName plus Id works with any registered manifest provider. Use Write-EVXEntry for classic Event Log sources.
+The Classic parameter set writes through a registered classic source. Manifest parameter sets resolve the registered event schema, validate native values, and write positional, named, or typed payloads.

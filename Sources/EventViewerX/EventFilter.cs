@@ -62,4 +62,56 @@ public sealed class EventFilter {
         (NamedData?.Count ?? 0) > 0 ||
         (ExcludedNamedData?.Count ?? 0) > 0 ||
         (ExcludedEventIds?.Count ?? 0) > 0;
+
+    /// <summary>Creates an independent copy that can be safely specialized for one query.</summary>
+    public EventFilter Clone() {
+        return new EventFilter {
+            EventIds = EventIds?.ToArray(),
+            RecordIds = RecordIds?.ToArray(),
+            MinimumRecordIdExclusive = MinimumRecordIdExclusive,
+            MaximumRecordIdExclusive = MaximumRecordIdExclusive,
+            ProviderNames = ProviderNames?.ToArray(),
+            Levels = Levels?.ToArray(),
+            Keywords = Keywords?.ToArray(),
+            StartTime = StartTime,
+            EndTime = EndTime,
+            UserIds = UserIds?.ToArray(),
+            Data = Data?.ToArray(),
+            NamedData = CloneDictionary(NamedData),
+            ExcludedNamedData = CloneDictionary(ExcludedNamedData),
+            ExcludedEventIds = ExcludedEventIds?.ToArray()
+        };
+    }
+
+    /// <summary>
+    /// Creates an independent filter whose exclusive record lower bound is the
+    /// stricter of the current value and <paramref name="minimum"/>.
+    /// </summary>
+    public EventFilter WithMinimumRecordIdExclusive(long? minimum) {
+        if (minimum < 0) {
+            throw new ArgumentOutOfRangeException(
+                nameof(minimum),
+                "Minimum event record ID must be greater than or equal to zero.");
+        }
+        EventFilter copy = Clone();
+        if (minimum.HasValue &&
+            (!copy.MinimumRecordIdExclusive.HasValue ||
+             minimum.Value > copy.MinimumRecordIdExclusive.Value)) {
+            copy.MinimumRecordIdExclusive = minimum;
+        }
+        return copy;
+    }
+
+    private static IReadOnlyDictionary<string, IReadOnlyList<string>>?
+        CloneDictionary(
+            IReadOnlyDictionary<string, IReadOnlyList<string>>? source) {
+
+        if (source == null) {
+            return null;
+        }
+        return source.ToDictionary(
+            static entry => entry.Key,
+            static entry => (IReadOnlyList<string>)entry.Value.ToArray(),
+            StringComparer.Ordinal);
+    }
 }

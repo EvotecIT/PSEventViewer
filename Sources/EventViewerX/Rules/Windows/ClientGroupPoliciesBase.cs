@@ -30,17 +30,17 @@ public abstract class ClientGroupPoliciesBase : EventRuleBase {
     /// </summary>
     /// <param name="eventObject">Underlying event record.</param>
     protected ClientGroupPoliciesBase(EventObject eventObject) : base(eventObject) {
-        Event = eventObject;
-        Type = GetType().Name;
-        Computer = Event.ComputerName;
-        Action = Event.MessageSubject;
-        PolicyScope = Event.GetValueFromDataDictionary("NoNameA0");
-        ItemName = Event.GetValueFromDataDictionary("NoNameA1");
-        PolicyName = Event.GetValueFromDataDictionary("NoNameA2", "ExtensionName");
-        Error = Event.GetValueFromDataDictionary("NoNameA3", "ErrorDescription");
-        Who = Event.GetSubjectAccountOrEmpty();
-        ActionTimestampUtc = Event.TimeCreated.ToUniversalTime();
-        When = ActionTimestampUtc ?? Event.TimeCreated;
+        SourceEvent = eventObject;
+        NamedEventName = GetType().Name;
+        Computer = SourceEvent.ComputerName;
+        Action = SourceEvent.MessageSubject;
+        PolicyScope = SourceEvent.GetValueFromDataDictionary("NoNameA0");
+        ItemName = SourceEvent.GetValueFromDataDictionary("NoNameA1");
+        PolicyName = SourceEvent.GetValueFromDataDictionary("NoNameA2", "ExtensionName");
+        Error = SourceEvent.GetValueFromDataDictionary("NoNameA3", "ErrorDescription");
+        Who = SourceEvent.GetSubjectAccountOrEmpty();
+        ActionTimestampUtc = SourceEvent.TimeCreated.ToUniversalTime();
+        When = ActionTimestampUtc ?? SourceEvent.TimeCreated;
     }
 
     /// <summary>Accepts group policy operational events from the relevant providers.</summary>

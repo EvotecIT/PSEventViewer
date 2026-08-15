@@ -27,13 +27,13 @@ public class BitLockerSuspended : EventRuleBase {
 
     /// <summary>Initialises a BitLocker suspended wrapper from an event record.</summary>
     public BitLockerSuspended(EventObject eventObject) : base(eventObject) {
-        Event = eventObject;
-        Type = "BitLockerSuspended";
-        Computer = Event.ComputerName;
+        SourceEvent = eventObject;
+        NamedEventName = "BitLockerSuspended";
+        Computer = SourceEvent.ComputerName;
         Volume = EventsHelper.GetBitLockerVolumeType(
-            Event.GetValueFromDataDictionary("VolumeName", "Volume"));
-        Who = Event.GetSubjectAccountOrEmpty();
-        When = Event.TimeCreated;
+            SourceEvent.GetValueFromDataDictionary("VolumeName", "Volume"));
+        Who = SourceEvent.GetSubjectAccountOrEmpty();
+        When = SourceEvent.TimeCreated;
     }
 }
 

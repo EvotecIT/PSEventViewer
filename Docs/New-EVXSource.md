@@ -28,7 +28,7 @@ Creates only the requested source registration and supports provider message, pa
 New-EVXSource -SourceName MyApp -LogName Application
 ```
 
-Registers MyApp explicitly so later Write-EVXEntry calls do not need administrative configuration behavior.
+Registers MyApp explicitly so later Write-EVXEvent calls do not need administrative configuration behavior.
 
 ## PARAMETERS
 

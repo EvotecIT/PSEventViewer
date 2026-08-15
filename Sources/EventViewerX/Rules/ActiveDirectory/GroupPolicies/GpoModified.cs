@@ -34,15 +34,15 @@ public class GpoModified : EventRuleBase {
 
     /// <summary>Initialises a GPO modification wrapper from an event record.</summary>
     public GpoModified(EventObject eventObject) : base(eventObject) {
-        Event = eventObject;
-        Type = "GpoModified";
-        Computer = Event.ComputerName;
-        Action = Event.MessageSubject;
-        GpoName = Event.GetValueFromDataDictionary("ObjectDN");
-        AttributeLDAPDisplayName = Event.GetValueFromDataDictionary("AttributeLDAPDisplayName");
-        AttributeValue = Event.GetValueFromDataDictionary("AttributeValue");
-        Who = Event.GetSubjectAccountOrEmpty();
-        When = Event.TimeCreated;
+        SourceEvent = eventObject;
+        NamedEventName = "GpoModified";
+        Computer = SourceEvent.ComputerName;
+        Action = SourceEvent.MessageSubject;
+        GpoName = SourceEvent.GetValueFromDataDictionary("ObjectDN");
+        AttributeLDAPDisplayName = SourceEvent.GetValueFromDataDictionary("AttributeLDAPDisplayName");
+        AttributeValue = SourceEvent.GetValueFromDataDictionary("AttributeValue");
+        Who = SourceEvent.GetSubjectAccountOrEmpty();
+        When = SourceEvent.TimeCreated;
     }
 }
 

@@ -47,8 +47,7 @@ $provider = @{
     }
 }
 
-$definition = $provider | ConvertTo-EVXProviderDefinition
-$validation = $definition | Test-EVXProviderDefinition
+$validation = $provider | Test-EVXProviderDefinition
 if (-not $validation.IsValid) {
     $validation.Errors
     throw 'Provider definition is invalid.'
@@ -377,7 +376,7 @@ active package repairs missing registration or modified extracted files and
 reports `Repaired`.
 
 ```powershell
-Get-EVXProviderPackage |
+Get-EVXProvider -InstalledPackage |
     Where-Object ProviderName -eq Contoso.Scanner |
     Select-Object ProviderName, PackageVersion, IsActive, IsRegistered,
         IsSigned, SignerThumbprint, PackagePath

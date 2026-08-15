@@ -28,18 +28,18 @@ public class IISSiteStopped : EventRuleBase {
 
     /// <summary>Initialises an IIS site stopped wrapper from an event record.</summary>
     public IISSiteStopped(EventObject eventObject) : base(eventObject) {
-        Event = eventObject;
-        Type = "IISSiteStopped";
-        Computer = Event.ComputerName;
-        SiteName = Event.GetValueFromDataDictionary("SiteName", "Name");
+        SourceEvent = eventObject;
+        NamedEventName = "IISSiteStopped";
+        Computer = SourceEvent.ComputerName;
+        SiteName = SourceEvent.GetValueFromDataDictionary("SiteName", "Name");
         if (string.IsNullOrEmpty(SiteName)) {
-            SiteName = Event.MessageSubject;
+            SiteName = SourceEvent.MessageSubject;
         }
-        User = Event.GetValueFromDataDictionary("User", "UserName");
+        User = SourceEvent.GetValueFromDataDictionary("User", "UserName");
         if (string.IsNullOrEmpty(User)) {
-            User = Event.GetSubjectAccountOrEmpty();
+            User = SourceEvent.GetSubjectAccountOrEmpty();
         }
-        When = Event.TimeCreated;
+        When = SourceEvent.TimeCreated;
     }
 }
 

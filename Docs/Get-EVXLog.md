@@ -16,7 +16,7 @@ Lists log metadata (size, record count, status) on local or remote machines; sup
 Get-EVXLog [-LogName] <string[]> [-MachineName <string[]>] [-Credential <pscredential>] [-Authentication <EventLogAuthentication>] [-AsResult] [-TimeoutMs <int>] [-IncludeEventTimes] [-Force] [<CommonParameters>]
 ```
 
-### File
+### Path
 ```powershell
 Get-EVXLog [-Path] <string[]> [<CommonParameters>]
 ```
@@ -168,7 +168,7 @@ Offline EVTX files whose native archive metadata should be read.
 
 ```yaml
 Type: String[]
-Parameter Sets: File
+Parameter Sets: Path
 Aliases: FilePath
 Possible values:
 

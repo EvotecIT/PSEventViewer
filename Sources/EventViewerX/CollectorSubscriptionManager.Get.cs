@@ -101,6 +101,12 @@ public static partial class CollectorSubscriptionManager {
 
                 info.ContentFormat = subKey.GetValue("ContentFormat") as string;
                 info.DeliveryMode = subKey.GetValue("DeliveryMode") as string;
+                info.Description = subKey.GetValue("Description") as string;
+
+                string? queryXml = subKey.GetValue("Query") as string;
+                if (!string.IsNullOrWhiteSpace(queryXml)) {
+                    info.Queries = ReadSelectQueries(queryXml!);
+                }
 
                 // Try multiple well-known value names to find the XML
                 var xml = subKey.GetValue("Subscription") as string
@@ -142,6 +148,19 @@ public static partial class CollectorSubscriptionManager {
             hklm?.Dispose();
         }
         return results;
+    }
+
+    private static IReadOnlyList<string> ReadSelectQueries(string queryXml) {
+        string subscriptionXml =
+            "<Subscription><Query><![CDATA[" +
+            queryXml.Replace("]]>", "]]&gt;") +
+            "]]></Query></Subscription>";
+        return CollectorSubscriptionXml.TryNormalize(
+                subscriptionXml,
+                out CollectorSubscriptionXmlDetails? details,
+                out _)
+            ? details!.Queries
+            : Array.Empty<string>();
     }
 
     private static string ResolveCollectorTargetMachineName(string? machineName) {

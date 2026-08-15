@@ -4,6 +4,58 @@ namespace EventViewerX.Tests;
 
 public sealed class TestNamedEventEngine {
     [Fact]
+    public void RejectsCredentialForImplicitLocalTarget() {
+        var query = new NamedEventQuery(
+            new[] { NamedEvents.OSStartup }) {
+            Credential = new System.Net.NetworkCredential(
+                "reader",
+                "password")
+        };
+
+        ArgumentException exception = Assert.Throws<ArgumentException>(
+            () => NamedEventEngine.ReadAsync(query));
+
+        Assert.Contains(
+            "every named-event target is a remote computer",
+            exception.Message,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RejectsCredentialForMixedLocalAndRemoteTargets() {
+        var query = new NamedEventQuery(
+            new[] { NamedEvents.OSStartup }) {
+            MachineNames = new string?[] {
+                null,
+                "remote.contoso.test"
+            },
+            Credential = new System.Net.NetworkCredential(
+                "reader",
+                "password")
+        };
+
+        Assert.Throws<ArgumentException>(
+            () => NamedEventEngine.ReadAsync(query));
+    }
+
+    [Fact]
+    public void AllowsCredentialWhenEveryNamedEventTargetIsRemote() {
+        var query = new NamedEventQuery(
+            new[] { NamedEvents.OSStartup }) {
+            MachineNames = new[] { "remote.contoso.test" },
+            Credential = new System.Net.NetworkCredential(
+                "reader",
+                "password")
+        };
+
+        IAsyncEnumerable<NamedEventRecord> stream =
+            NamedEventEngine.ReadAsync(query);
+
+        Assert.NotNull(stream);
+    }
+
+
+    [Fact]
     public async Task EmptyRestrictedQueryResetsReusableExecutionInfo() {
         var executionInfo = new NamedEventsQueryExecutionInfo();
         executionInfo.Reset(maxEventsScanned: 1);
@@ -26,7 +78,7 @@ public sealed class TestNamedEventEngine {
             MaxCandidates = 7
         };
 
-        await foreach (EventObjectSlim _ in
+        await foreach (NamedEventRecord _ in
                        NamedEventEngine.ReadAsync(
                            query,
                            executionInfo)) {

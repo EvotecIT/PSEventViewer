@@ -5,7 +5,7 @@ namespace EventViewerX.Tests {
     public class TestOsEvents {
         [Fact]
         public void EventInfoContainsOsEvents() {
-            var info = EventObjectSlim.GetEventInfoForNamedEvents(new List<NamedEvents> {
+            var info = NamedEventCatalog.GetEventInfoForNamedEvents(new List<NamedEvents> {
                 NamedEvents.OSStartup,
                 NamedEvents.OSShutdown,
                 NamedEvents.OSUncleanShutdown,
