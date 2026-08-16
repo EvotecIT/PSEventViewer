@@ -9,7 +9,7 @@ public class ADUserLockouts : EventRuleBase {
     /// <inheritdoc />
     public override string LogName => "Security";
     /// <inheritdoc />
-    public override NamedEvents NamedEvent => NamedEvents.ADUserLockouts;
+    public override EventType Type => EventType.ADUserLockouts;
 
     /// <summary>Accepts account lockout events (4740).</summary>
     public override bool CanHandle(EventObject eventObject) {
@@ -38,7 +38,7 @@ public class ADUserLockouts : EventRuleBase {
     /// <summary>Initialises an account lockout wrapper from an event record.</summary>
     public ADUserLockouts(EventObject eventObject) : base(eventObject) {
         SourceEvent = eventObject;
-        NamedEventName = "ADUserLockouts";
+        TypeName = "ADUserLockouts";
 
         Computer = SourceEvent.ComputerName;
         Action = SourceEvent.MessageSubject;

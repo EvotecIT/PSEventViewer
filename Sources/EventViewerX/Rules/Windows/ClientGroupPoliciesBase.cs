@@ -31,7 +31,7 @@ public abstract class ClientGroupPoliciesBase : EventRuleBase {
     /// <param name="eventObject">Underlying event record.</param>
     protected ClientGroupPoliciesBase(EventObject eventObject) : base(eventObject) {
         SourceEvent = eventObject;
-        NamedEventName = GetType().Name;
+        TypeName = GetType().Name;
         Computer = SourceEvent.ComputerName;
         Action = SourceEvent.MessageSubject;
         PolicyScope = SourceEvent.GetValueFromDataDictionary("NoNameA0");

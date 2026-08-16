@@ -10,7 +10,7 @@ public class DfsReplicationError : EventRuleBase {
     /// <inheritdoc />
     public override string LogName => "DFS Replication";
     /// <inheritdoc />
-    public override NamedEvents NamedEvent => NamedEvents.DfsReplicationError;
+    public override EventType Type => EventType.DfsReplicationError;
 
     /// <summary>Accepts DFS Replication partner communication errors.</summary>
     public override bool CanHandle(EventObject eventObject) {
@@ -29,7 +29,7 @@ public class DfsReplicationError : EventRuleBase {
     /// <summary>Initialises a DFS replication error wrapper from an event record.</summary>
     public DfsReplicationError(EventObject eventObject) : base(eventObject) {
         SourceEvent = eventObject;
-        NamedEventName = "DfsReplicationError";
+        TypeName = "DfsReplicationError";
         ReplicationGroup = SourceEvent.GetValueFromDataDictionary("Replication Group");
         ErrorCode = SourceEvent.GetValueFromDataDictionary("Error Code", "Error");
         Partner = SourceEvent.GetValueFromDataDictionary("Partner Name");

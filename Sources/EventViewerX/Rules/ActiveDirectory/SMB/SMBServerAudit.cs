@@ -1,6 +1,8 @@
 using EventViewerX;
 using System.Net;
 
+using DnsClientX;
+
 namespace EventViewerX.Rules.ActiveDirectory;
 /// <summary>
 /// SMB Server Audit
@@ -34,7 +36,7 @@ public class SMBServerAudit : EventRuleBase {
     /// <inheritdoc />
     public override string LogName => "Microsoft-Windows-SMBServer/Audit";
     /// <inheritdoc />
-    public override NamedEvents NamedEvent => NamedEvents.ADSMBServerAuditV1;
+    public override EventType Type => EventType.ADSMBServerAuditV1;
 
     /// <summary>
     /// Accepts events emitted by the Microsoft-Windows-SMBServer provider.
@@ -50,7 +52,7 @@ public class SMBServerAudit : EventRuleBase {
         //EventObject = eventObject;
 
         SourceEvent = eventObject;
-        NamedEventName = "ADSMBServerAuditV1";
+        TypeName = "ADSMBServerAuditV1";
         Computer = SourceEvent.ComputerName;
         Action = SourceEvent.MessageSubject;
         ClientAddress = SourceEvent.GetValueFromDataDictionary("ClientName");
@@ -71,7 +73,7 @@ public class SMBServerAudit : EventRuleBase {
     /// <param name="cancellationToken">Cancellation token for the lookup.</param>
     /// <returns>The resolved DNS name, or an empty string when no result is available.</returns>
     public async Task<string> ResolveClientDnsNameAsync(CancellationToken cancellationToken) {
-        using var enricher = new NamedEventEnricher(new NamedEventEnrichmentOptions { ResolveDns = true });
+        using var enricher = new EventEnricher(new EventEnrichmentOptions { ResolveDns = true });
         await enricher.EnrichAsync(this, cancellationToken).ConfigureAwait(false);
         return ClientDNSName;
     }

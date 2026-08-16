@@ -80,7 +80,7 @@ internal static partial class NamedEventsTimelineQueryExecutor {
         var maxEventsPerNamedEvent = request.MaxEventsPerNamedEvent.HasValue && request.MaxEventsPerNamedEvent.Value > 0
             ? request.MaxEventsPerNamedEvent
             : null;
-        var effectiveNamedEvents = normalizedNamedEvents ?? new List<NamedEvents>();
+        var effectiveNamedEvents = normalizedNamedEvents ?? new List<EventType>();
         var includeUncorrelated = request.IncludeUncorrelated;
         var includePayload = request.IncludePayload;
         string? logName = null;
@@ -96,12 +96,12 @@ internal static partial class NamedEventsTimelineQueryExecutor {
         var filteredOut = 0;
         var filteredUncorrelated = 0;
         var outputTruncated = false;
-        var queryInfo = new NamedEventsQueryExecutionInfo();
+        var queryInfo = new EventTypeQueryExecutionInfo();
         var selectedRows = new Dictionary<EventObject, EventRowAccumulator>();
         int selectionLimit = maxEvents == int.MaxValue ? int.MaxValue : maxEvents + 1;
 
-        bool TrySelectTimelineEvent(NamedEventRecord item) {
-            var namedEventName = ResolveNamedEventName(item);
+        bool TrySelectTimelineEvent(EventTypeRecord item) {
+            var namedEventName = ResolveTypeName(item);
             var row = ToAccumulator(item, namedEventName, includePayload, normalizedPayloadKeys);
             var correlation = BuildCorrelationValues(row, normalizedCorrelationKeys);
             row.Correlation = correlation;
@@ -129,7 +129,7 @@ internal static partial class NamedEventsTimelineQueryExecutor {
 
         try {
             var namedQuery =
-                new NamedEventQuery(
+                new EventTypeQuery(
                     effectiveNamedEvents) {
                     MachineNames =
                         normalizedMachines.Count > 0
@@ -154,7 +154,7 @@ internal static partial class NamedEventsTimelineQueryExecutor {
                         normalizedEventIds
                 };
             await foreach (var item in
-                           NamedEventEngine.ReadAsync(
+                           EventTypeEngine.ReadAsync(
                                namedQuery,
                                queryInfo,
                                cancellationToken)) {
@@ -190,7 +190,7 @@ internal static partial class NamedEventsTimelineQueryExecutor {
         var orderedRows = rows
             .OrderBy(static row => row.WhenUtcDate ?? DateTime.MaxValue)
             .ThenBy(static row => row.RecordId ?? long.MaxValue)
-            .ThenBy(static row => row.NamedEvent, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(static row => row.EventType, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
         var timelineRows = new List<NamedEventsTimelineEventRow>(orderedRows.Count);
@@ -208,7 +208,7 @@ internal static partial class NamedEventsTimelineQueryExecutor {
                 Sequence = sequence,
                 CorrelationId = correlationId,
                 Correlation = row.Correlation,
-                NamedEvent = row.NamedEvent,
+                EventType = row.EventType,
                 RuleType = row.RuleType,
                 EventId = row.EventId,
                 RecordId = row.RecordId,
@@ -231,7 +231,7 @@ internal static partial class NamedEventsTimelineQueryExecutor {
             }
 
             group.EventCount++;
-            group.NamedEvents.Add(row.NamedEvent);
+            group.EventType.Add(row.EventType);
             group.EventIds.Add(row.EventId);
             if (!string.IsNullOrWhiteSpace(row.GatheredFrom)) {
                 group.Machines.Add(row.GatheredFrom);
@@ -280,7 +280,7 @@ internal static partial class NamedEventsTimelineQueryExecutor {
                 DurationMinutes = group.FirstSeenUtc.HasValue && group.LastSeenUtc.HasValue
                     ? Math.Round((group.LastSeenUtc.Value - group.FirstSeenUtc.Value).TotalMinutes, 3)
                     : null,
-                NamedEvents = group.NamedEvents.OrderBy(static value => value, StringComparer.OrdinalIgnoreCase).ToArray(),
+                EventType = group.EventType.OrderBy(static value => value, StringComparer.OrdinalIgnoreCase).ToArray(),
                 EventIds = group.EventIds.OrderBy(static value => value).ToArray(),
                 Machines = group.Machines.OrderBy(static value => value, StringComparer.OrdinalIgnoreCase).ToArray()
             })
@@ -334,7 +334,7 @@ internal static partial class NamedEventsTimelineQueryExecutor {
 
     internal static void ApplyTargetFailures(
         NamedEventsTimelineQueryResult result,
-        NamedEventsQueryExecutionInfo queryInfo) {
+        EventTypeQueryExecutionInfo queryInfo) {
         if (result is null) {
             throw new ArgumentNullException(nameof(result));
         }
@@ -350,13 +350,13 @@ internal static partial class NamedEventsTimelineQueryExecutor {
 
     private static bool TryValidateRequest(
         NamedEventsTimelineQueryRequest request,
-        out List<NamedEvents> normalizedNamedEvents,
+        out List<EventType> normalizedNamedEvents,
         out List<string> normalizedMachines,
         out List<string> normalizedCorrelationKeys,
         out HashSet<string>? normalizedPayloadKeys,
         out HashSet<int>? normalizedEventIds,
         out NamedEventsTimelineQueryFailure? failure) {
-        normalizedNamedEvents = new List<NamedEvents>();
+        normalizedNamedEvents = new List<EventType>();
         normalizedMachines = new List<string>();
         normalizedCorrelationKeys = new List<string>();
         normalizedPayloadKeys = null;
@@ -370,7 +370,7 @@ internal static partial class NamedEventsTimelineQueryExecutor {
             return false;
         }
 
-        if (request.NamedEvents is null || request.NamedEvents.Count == 0) {
+        if (request.EventType is null || request.EventType.Count == 0) {
             failure = new NamedEventsTimelineQueryFailure {
                 Kind = NamedEventsTimelineQueryFailureKind.InvalidArgument,
                 Message = "namedEvents must contain at least one value."
@@ -450,8 +450,8 @@ internal static partial class NamedEventsTimelineQueryExecutor {
             return false;
         }
 
-        normalizedNamedEvents = request.NamedEvents
-            .Distinct(EqualityComparer<NamedEvents>.Default)
+        normalizedNamedEvents = request.EventType
+            .Distinct(EqualityComparer<EventType>.Default)
             .ToList();
 
         if (request.MachineNames is not null) {
@@ -542,7 +542,7 @@ internal static partial class NamedEventsTimelineQueryExecutor {
     }
 
     private static EventRowAccumulator ToAccumulator(
-        NamedEventRecord item,
+        EventTypeRecord item,
         string namedEvent,
         bool includePayload,
         HashSet<string>? payloadKeySet) {
@@ -573,10 +573,10 @@ internal static partial class NamedEventsTimelineQueryExecutor {
             payload);
     }
 
-    private static string ResolveNamedEventName(NamedEventRecord item) {
-        return Enum.TryParse<NamedEvents>(item.NamedEventName, out var parsedNamedEvent)
+    private static string ResolveTypeName(EventTypeRecord item) {
+        return Enum.TryParse<EventType>(item.TypeName, out var parsedNamedEvent)
             ? ToSnakeCase(parsedNamedEvent.ToString())
-            : ToSnakeCase(item.NamedEventName);
+            : ToSnakeCase(item.TypeName);
     }
 
     private static IReadOnlyDictionary<string, string> BuildCorrelationValues(
@@ -597,7 +597,7 @@ internal static partial class NamedEventsTimelineQueryExecutor {
             "object_affected" => NormalizeCorrelationValue(row.ObjectAffected),
             "computer" => NormalizeCorrelationValue(row.Computer),
             "action" => NormalizeCorrelationValue(row.Action),
-            "named_event" => NormalizeCorrelationValue(row.NamedEvent),
+            "named_event" => NormalizeCorrelationValue(row.EventType),
             "event_id" => row.EventId.ToString(CultureInfo.InvariantCulture),
             "gathered_from" => NormalizeCorrelationValue(row.GatheredFrom),
             "gathered_log_name" => NormalizeCorrelationValue(row.GatheredLogName),
@@ -664,7 +664,7 @@ internal static partial class NamedEventsTimelineQueryExecutor {
             string? computer,
             string? action,
             Dictionary<string, object?> payload) {
-            NamedEvent = namedEvent;
+            EventType = namedEvent;
             RuleType = ruleType;
             EventId = eventId;
             RecordId = recordId;
@@ -679,7 +679,7 @@ internal static partial class NamedEventsTimelineQueryExecutor {
             Payload = payload;
         }
 
-        public string NamedEvent { get; }
+        public string EventType { get; }
         public string RuleType { get; }
         public int EventId { get; }
         public long? RecordId { get; }
@@ -701,7 +701,7 @@ internal static partial class NamedEventsTimelineQueryExecutor {
         public int EventCount { get; set; }
         public DateTime? FirstSeenUtc { get; set; }
         public DateTime? LastSeenUtc { get; set; }
-        public HashSet<string> NamedEvents { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public HashSet<string> EventType { get; } = new(StringComparer.OrdinalIgnoreCase);
         public HashSet<int> EventIds { get; } = new();
         public HashSet<string> Machines { get; } = new(StringComparer.OrdinalIgnoreCase);
     }

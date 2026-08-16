@@ -3,22 +3,28 @@ using System.Globalization;
 namespace EventViewerX;
 
 /// <summary>
-/// Freezes a named-event query before deferred asynchronous execution.
+/// Freezes an event-type query before deferred asynchronous execution.
 /// </summary>
-internal static class NamedEventQuerySnapshot {
-    internal static NamedEventQuery Copy(
-        NamedEventQuery source) {
+internal static class EventTypeQuerySnapshot {
+    internal static EventTypeQuery Copy(
+        EventTypeQuery source) {
 
         if (source == null) {
             throw new ArgumentNullException(nameof(source));
         }
-        return new NamedEventQuery(
-            source.NamedEvents.ToArray()) {
+        return new EventTypeQuery(
+            source.Types.ToArray()) {
+            Paths = source.Paths?.ToArray(),
             MachineNames =
                 source.MachineNames?.ToArray(),
+            CollectorLogName = string.IsNullOrWhiteSpace(source.CollectorLogName)
+                ? null
+                : source.CollectorLogName!.Trim(),
             SourceLogName = source.SourceLogName,
             SourceEventIds =
                 source.SourceEventIds?.ToArray(),
+            SourceRecordIds =
+                source.SourceRecordIds?.ToArray(),
             StartTime = source.StartTime,
             EndTime = source.EndTime,
             TimePeriod = source.TimePeriod,
@@ -60,12 +66,12 @@ internal static class NamedEventQuerySnapshot {
                 culture.Name);
     }
 
-    private static NamedEventEnrichmentOptions? CopyEnrichment(
-        NamedEventEnrichmentOptions? enrichment) {
+    private static EventEnrichmentOptions? CopyEnrichment(
+        EventEnrichmentOptions? enrichment) {
 
         return enrichment == null
             ? null
-            : new NamedEventEnrichmentOptions {
+            : new EventEnrichmentOptions {
                 ResolveDns = enrichment.ResolveDns,
                 DnsTimeoutMilliseconds =
                     enrichment.DnsTimeoutMilliseconds,

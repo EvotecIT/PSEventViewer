@@ -32,9 +32,9 @@ Build-Module -ModuleName 'PSEventViewer' {
         # Copyright statement for this module
         Copyright            = "(c) 2011 - $((Get-Date).Year) Przemyslaw Klys @ Evotec. All rights reserved."
         # Description of the functionality provided by this module
-        Description          = 'High-performance Windows Event Log queries, streaming exports, subscriptions, diagnostics, and administration for PowerShell.'
+        Description          = 'High-performance typed Windows Event Log queries, reports, exports, watchers, WEC, custom providers, diagnostics, and administration for PowerShell.'
         # Tags applied to this module. These help with module discovery in online galleries.
-        Tags                 = @('Events', 'Viewer', 'Windows', 'XML', 'XPATH', 'EVTX')
+        Tags                 = @('Events', 'Viewer', 'Windows', 'XML', 'XPATH', 'EVTX', 'WEC', 'Reporting')
 
         IconUri              = 'https://evotec.xyz/wp-content/uploads/2018/10/PSEventViewer.png'
 
@@ -94,6 +94,15 @@ Build-Module -ModuleName 'PSEventViewer' {
         NETFramework                      = 'net8.0-windows', 'net472'
         NETSearchClass                    = 'PSEventViewer.CmdletGetEVXEvent'
         NETHandleAssemblyWithSameName     = $true
+        NETIgnoreLibraryOnLoad            = @(
+            'HtmlForgeX.dll'
+            'HtmlForgeX.Email.dll'
+            'OfficeIMO.Core.dll'
+            'OfficeIMO.Excel.dll'
+            'DocumentFormat.OpenXml.dll'
+            'DocumentFormat.OpenXml.Framework.dll'
+            'System.IO.Packaging.dll'
+        )
         NETBinaryModuleDocumentation      = $true
         #NETMergeLibraryDebugging          = $true
         DotSourceLibraries                = $true

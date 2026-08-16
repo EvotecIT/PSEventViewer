@@ -13,7 +13,7 @@ public class AADSyncFilterStatus : EventRuleBase
     /// <inheritdoc />
     public override string LogName => "Application";
     /// <inheritdoc />
-    public override NamedEvents NamedEvent => NamedEvents.AADSyncFilterStatus;
+    public override EventType Type => EventType.AADSyncFilterStatus;
 
     /// <summary>Accepts ADSync provider filter status events.</summary>
     /// <param name="eventObject">Event to evaluate.</param>
@@ -39,7 +39,7 @@ public class AADSyncFilterStatus : EventRuleBase
     public AADSyncFilterStatus(EventObject eventObject) : base(eventObject)
     {
         SourceEvent = eventObject;
-        NamedEventName = "AADSyncFilterStatus";
+        TypeName = "AADSyncFilterStatus";
         Computer = SourceEvent.ComputerName;
         When = SourceEvent.TimeCreated;
 

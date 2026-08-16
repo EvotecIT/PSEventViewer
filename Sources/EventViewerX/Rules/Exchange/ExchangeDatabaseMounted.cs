@@ -10,7 +10,7 @@ public class ExchangeDatabaseMounted : EventRuleBase {
     /// <inheritdoc />
     public override string LogName => "Application";
     /// <inheritdoc />
-    public override NamedEvents NamedEvent => NamedEvents.ExchangeDatabaseMounted;
+    public override EventType Type => EventType.ExchangeDatabaseMounted;
 
     /// <summary>Accepts Exchange Information Store database mount success events.</summary>
     public override bool CanHandle(EventObject eventObject) {
@@ -27,7 +27,7 @@ public class ExchangeDatabaseMounted : EventRuleBase {
     /// <summary>Initialises an Exchange DB mounted wrapper from an event record.</summary>
     public ExchangeDatabaseMounted(EventObject eventObject) : base(eventObject) {
         SourceEvent = eventObject;
-        NamedEventName = "ExchangeDatabaseMounted";
+        TypeName = "ExchangeDatabaseMounted";
         Computer = SourceEvent.ComputerName;
         MailboxDatabase = SourceEvent.GetValueFromDataDictionary("Database", "Mailbox Database");
         if (string.IsNullOrEmpty(MailboxDatabase)) {

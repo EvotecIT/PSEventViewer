@@ -185,24 +185,28 @@ When selecting an explicit authentication package for catalog or administration
 commands, also provide `-Credential`; the managed Windows catalog API cannot
 enforce Kerberos, NTLM, or Negotiate while using its current-identity overload.
 
-### Named event scenarios
+### Typed event definitions
 
-Named scenarios turn common event families into useful typed objects.
+Built-in types turn common event families into useful typed objects. A type
+owns its source logs, providers, event IDs, filters, and projection, so do not
+combine `-Type` with `-LogName`. Use `-LogName` for generic queries. An offline
+`-Path` can be combined with `-Type` because the file supplies the container
+while the type still supplies the event semantics.
 
 ```powershell
 Get-EVXEvent `
-    -NamedEvent ADUserLogonFailed, ADUserLockouts `
+    -Type ADUserLogonFailed, ADUserLockouts `
     -MachineName DC01, DC02 `
     -TimePeriod Last24Hours `
     -MaxEvents 500 |
-    Select-Object TimeCreated, NamedEventName, MachineName, UserName, IpAddress
+    Select-Object TimeCreated, TypeName, MachineName, UserName, IpAddress
 ```
 
 DNS enrichment is opt-in and bounded:
 
 ```powershell
 Get-EVXEvent `
-    -NamedEvent ADSMBServerAuditV1 `
+    -Type ADSMBServerAuditV1 `
     -MachineName DC01, DC02 `
     -TimePeriod Last3Days `
     -ResolveDns `
@@ -210,7 +214,64 @@ Get-EVXEvent `
     -DnsMaxConcurrency 8
 ```
 
-See [`Query-NamedEvents.ps1`](../Examples/Query-NamedEvents.ps1).
+EventViewerX uses DnsClientX for this optional layer because reporting and
+multi-host automation need explicit request timeouts, bounded concurrency,
+retry classification, stable result status, and testable resolver behavior.
+`System.Net.Dns` remains appropriate for simple one-off lookups, but it does
+not provide that complete operational contract. DNS failure annotates the
+typed event and never removes it from the result stream.
+
+See [`Query-EventTypes.ps1`](../Examples/Query-EventTypes.ps1).
+
+Use `-Definition` when the desired type is not built in. The same JSON can be
+queried, reported, watched, or compiled into a WEC subscription without adding
+another command:
+
+```powershell
+Get-EVXEvent -Definition .\ServiceChanges.json `
+    -MachineName SRV01, SRV02 -TimePeriod Last24Hours
+
+Start-EVXWatcher -Definition .\ServiceChanges.json `
+    -Action { $_ | ConvertTo-Json -Depth 5 }
+```
+
+See [custom event definitions](Event-Definitions.md) and
+[`Query-CustomDefinition.ps1`](../Examples/Query-CustomDefinition.ps1).
+
+### Create HTML, Excel, and email output
+
+`Show-EVXEvent` is the one report command. It queries once and renders each
+selected output from the same normalized snapshot.
+
+```powershell
+Show-EVXEvent -Type ActiveDirectoryAuthentication `
+    -Collector WEC01 -TimePeriod Last24Hours `
+    -HtmlPath .\Authentication.html `
+    -ExcelPath .\Authentication.xlsx `
+    -EmailPackage -PassThru
+
+Get-EVXEvent -LogName System -EventId 41, 6008 -TimePeriod Last7Days |
+    Show-EVXEvent -HtmlPath .\Startup.html
+```
+
+With no explicit output and no `-PassThru`, the command creates and opens a
+temporary HTML report. `-EmailPackage` returns transport-neutral HTML, plain
+text, inline resources, and attachments for Mailozaurr, Graph, or Teams
+adapters; PSEventViewer itself does not send or own credentials.
+
+```powershell
+$email = Show-EVXEvent -Type ADUserLogonFailed `
+    -TimePeriod Last24Hours -EmailPackage
+
+Send-EmailMessage -Server 'smtp.contoso.com' -Port 587 `
+    -From 'events@contoso.com' -To 'operations@contoso.com' `
+    -Subject $email.Subject -HTML $email.Html -Text $email.PlainText `
+    -Credential $credential -SecureSocketOptions StartTls
+```
+
+`Send-EmailMessage` is supplied by Mailozaurr. Keeping it outside the module
+lets the same package work with SMTP, Microsoft Graph, or a future transport
+adapter without making any sender a PSEventViewer dependency.
 
 ## Choose a read mode
 
@@ -469,8 +530,7 @@ Get-EVXCollectorSubscription -Name '*' |
 New-EVXCollectorSubscription `
     -Name 'Failed logons' `
     -SourceComputer DC01, DC02 `
-    -LogName Security `
-    -Filter (New-EVXFilter -EventId 4625 -TimePeriod Last24Hours) `
+    -Type ADUserLogonFailed `
     -Description 'Security 4625 from domain controllers' |
     Set-EVXCollectorSubscription -Confirm:$false
 
@@ -478,6 +538,9 @@ Set-EVXCollectorSubscription `
     -Name 'Domain Controllers' `
     -Enabled $true `
     -Confirm:$false
+
+Set-EVXCollectorSubscription `
+    -Name 'Failed logons' -Remove -Confirm:$false
 ```
 
 Inventory can target a remote collector. Updates are intentionally local-only
@@ -582,7 +645,7 @@ limits. See [Custom providers](Custom-Providers.md) and
 
 | Job | Commands |
 | --- | --- |
-| Query/filter | `Get-EVXEvent`, `New-EVXFilter` |
+| Query/filter/report | `Get-EVXEvent`, `New-EVXFilter`, `Show-EVXEvent` |
 | Direct export | `Export-EVXEvent` |
 | Durable progress | `Reset-EVXEventCheckpoint` plus checkpoint parameters on `Get-EVXEvent` |
 | Real-time events | `Start-EVXWatcher`, `Get-EVXWatcher`, `Stop-EVXWatcher` |

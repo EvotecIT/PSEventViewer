@@ -7,7 +7,7 @@ Locale: en-US
 ---
 # PSEventViewer Module
 ## Description
-High-performance Windows Event Log queries, streaming exports, subscriptions, diagnostics, and administration for PowerShell.
+High-performance typed Windows Event Log queries, reports, exports, watchers, WEC, custom providers, diagnostics, and administration for PowerShell.
 
 ## PSEventViewer Cmdlets
 ### [Clear-EVXLog](Clear-EVXLog.md)
@@ -28,7 +28,7 @@ Reads local or remote WEC subscription inventory and returns detached snapshots 
 ### [Get-EVXEvent](Get-EVXEvent.md)
 Enhanced event querying cmdlet that replaces and extends Get-WinEvent functionality.
 
-Supports local/remote logs, named event shortcuts, record ID resumes, parallel queries, and rich filtering (IDs, providers, keywords, levels, time windows, named data).
+Supports local and remote logs, built-in event types, custom JSON definitions, record ID resumes, parallel queries, and rich filtering.
 
 ### [Get-EVXLog](Get-EVXLog.md)
 Retrieves event log details by name.
@@ -107,10 +107,15 @@ Updates Windows Event Log channel policy.
 
 Configures enabled state, maximum size, retention mode, file path, or security descriptor and returns a detailed per-log result.
 
+### [Show-EVXEvent](Show-EVXEvent.md)
+Queries or accepts EventViewerX events and creates polished HTML, Excel, or email output.
+
+Show-EVXEvent uses one normalized report snapshot for every selected output. A Type owns its source channels and event IDs; LogName is reserved for generic event queries.
+
 ### [Start-EVXWatcher](Start-EVXWatcher.md)
 Starts real-time monitoring of Windows Event Logs with customizable filters and actions.
 
-Supports explicit event IDs or NamedEvents, provider-side filtering, optional staging events, auto-stop conditions, and a callback for each match.
+Supports explicit event IDs or EventType, provider-side filtering, optional staging events, auto-stop conditions, and a callback for each match.
 
 ### [Stop-EVXWatcher](Stop-EVXWatcher.md)
 Stops running EVX watchers by identifier, name, or en masse.

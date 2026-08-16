@@ -10,7 +10,7 @@ public class OSCrashOnAuditFailRecovery : EventRuleBase {
     /// <inheritdoc />
     public override string LogName => "Security";
     /// <inheritdoc />
-    public override NamedEvents NamedEvent => NamedEvents.OSCrashOnAuditFailRecovery;
+    public override EventType Type => EventType.OSCrashOnAuditFailRecovery;
 
     /// <summary>Accepts security auditing provider events for CrashOnAuditFail recovery.</summary>
     /// <param name="eventObject">Event to evaluate.</param>
@@ -40,7 +40,7 @@ public class OSCrashOnAuditFailRecovery : EventRuleBase {
     /// <param name="eventObject">Event describing the recovery.</param>
     public OSCrashOnAuditFailRecovery(EventObject eventObject) : base(eventObject) {
         SourceEvent = eventObject;
-        NamedEventName = "OSCrashOnAuditFailRecovery";
+        TypeName = "OSCrashOnAuditFailRecovery";
         Computer = SourceEvent.ComputerName;
         Action = "Administrator recovered system from CrashOnAuditFail";
         ObjectAffected = SourceEvent.MachineName;

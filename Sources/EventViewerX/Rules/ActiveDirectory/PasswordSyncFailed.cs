@@ -15,7 +15,7 @@ public class PasswordSyncFailed : EventRuleBase {
     public override string LogName => "Application";
 
     /// <inheritdoc />
-    public override NamedEvents NamedEvent => NamedEvents.AADConnectPasswordSyncFailed;
+    public override EventType Type => EventType.AADConnectPasswordSyncFailed;
 
     /// <summary>Accepts all password sync failure events.</summary>
     public override bool CanHandle(EventObject eventObject) {
@@ -37,7 +37,7 @@ public class PasswordSyncFailed : EventRuleBase {
     /// <summary>Initialises a password sync failure wrapper from an event record.</summary>
     public PasswordSyncFailed(EventObject eventObject) : base(eventObject) {
         SourceEvent = eventObject;
-        NamedEventName = "AADConnectPasswordSyncFailed";
+        TypeName = "AADConnectPasswordSyncFailed";
         Computer = SourceEvent.ComputerName;
         User = SourceEvent.GetValueFromDataDictionary("User", "AccountName");
         Error = SourceEvent.GetValueFromDataDictionary("ErrorCode", "FailureCode");

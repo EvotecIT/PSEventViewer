@@ -155,6 +155,25 @@ public class TestEventObjectReadMode {
         Assert.Equal(new byte[] { 1, 2, 255 }, attachment);
     }
 
+    [Fact]
+    public void StructuredDataAndMessageModePreservesTypedInputsWithoutDecodingAttachments() {
+        var record = new TrackingEventRecord();
+
+        var snapshot = new EventObject(
+            record,
+            "testhost",
+            EventReadMode.StructuredDataAndMessage);
+
+        Assert.True(record.Disposed);
+        Assert.Equal(1, record.FormatDescriptionCalls);
+        Assert.Equal(1, record.ToXmlCalls);
+        Assert.Equal("Subject", snapshot.MessageSubject);
+        Assert.Equal("Value", snapshot.MessageData["Key"]);
+        Assert.Equal("StructuredValue", snapshot.Data["Field"]);
+        Assert.Empty(snapshot.Attachments);
+        Assert.Equal(EventReadMode.StructuredDataAndMessage, snapshot.ReadMode);
+    }
+
     private sealed class TrackingEventRecord : EventRecord {
         internal bool Disposed { get; private set; }
         internal int FormatDescriptionCalls { get; private set; }

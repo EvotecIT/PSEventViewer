@@ -10,7 +10,7 @@ public class LogsFullSecurity : EventRuleBase {
     /// <inheritdoc />
     public override string LogName => "Security";
     /// <inheritdoc />
-    public override NamedEvents NamedEvent => NamedEvents.LogsFullSecurity;
+    public override EventType Type => EventType.LogsFullSecurity;
 
     /// <summary>Accepts matching events indicating the security log reached capacity.</summary>
     public override bool CanHandle(EventObject eventObject) {
@@ -32,7 +32,7 @@ public class LogsFullSecurity : EventRuleBase {
     public LogsFullSecurity(EventObject eventObject) : base(eventObject) {
         SourceEvent = eventObject;
 
-        NamedEventName = "LogsFullSecurity";
+        TypeName = "LogsFullSecurity";
         Computer = SourceEvent.ComputerName;
         Action = SourceEvent.MessageSubject;
         LogType = ConvertFromOperationType(SourceEvent.GetDataValueOrEmpty("Channel"));

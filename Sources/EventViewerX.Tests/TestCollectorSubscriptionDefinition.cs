@@ -5,6 +5,81 @@ namespace EventViewerX.Tests;
 
 public class TestCollectorSubscriptionDefinition {
     [Fact]
+    public void RemoveIsIdempotentWhenSubscriptionIsAlreadyAbsent() {
+        bool runnerCalled = false;
+
+        CollectorSubscriptionRemovalResult result =
+            CollectorSubscriptionManager
+                .RemoveCollectorSubscription(
+                    "Missing",
+                    _ => null,
+                    (_, _) => {
+                        runnerCalled = true;
+                        return string.Empty;
+                    },
+                    1,
+                    TimeSpan.Zero,
+                    CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.False(result.Changed);
+        Assert.Null(result.Before);
+        Assert.Null(result.After);
+        Assert.False(runnerCalled);
+    }
+
+    [Fact]
+    public void RemoveDeletesAndVerifiesExistingSubscription() {
+        CollectorSubscriptionSnapshot snapshot =
+            CreateSnapshot("Existing");
+        bool exists = true;
+        int deleteCount = 0;
+
+        CollectorSubscriptionRemovalResult result =
+            CollectorSubscriptionManager
+                .RemoveCollectorSubscription(
+                    snapshot.SubscriptionName,
+                    _ => exists ? snapshot : null,
+                    (arguments, _) => {
+                        Assert.Equal("ds", arguments[0]);
+                        deleteCount++;
+                        exists = false;
+                        return string.Empty;
+                    },
+                    1,
+                    TimeSpan.Zero,
+                    CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.True(result.Changed);
+        Assert.Same(snapshot, result.Before);
+        Assert.Null(result.After);
+        Assert.Equal(1, deleteCount);
+    }
+
+    [Fact]
+    public void RemoveFailsWhenPersistedStateRemainsPresent() {
+        CollectorSubscriptionSnapshot snapshot =
+            CreateSnapshot("StillPresent");
+
+        InvalidOperationException exception =
+            Assert.Throws<InvalidOperationException>(() =>
+                CollectorSubscriptionManager
+                    .RemoveCollectorSubscription(
+                        snapshot.SubscriptionName,
+                        _ => snapshot,
+                        (_, _) => string.Empty,
+                        2,
+                        TimeSpan.Zero,
+                        CancellationToken.None));
+
+        Assert.Contains(
+            "still present",
+            exception.Message,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ProducesCollectorInitiatedSubscriptionWithTypedQuery() {
         var definition = new CollectorSubscriptionDefinition {
             SubscriptionId = "Security failures",

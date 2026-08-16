@@ -9,7 +9,7 @@ public class ADUserRightsAssignment : EventRuleBase {
     /// <inheritdoc />
     public override string LogName => "Security";
     /// <inheritdoc />
-    public override NamedEvents NamedEvent => NamedEvents.ADUserRightsAssignment;
+    public override EventType Type => EventType.ADUserRightsAssignment;
 
     /// <summary>Accepts matching user rights assignment events without extra filters.</summary>
     public override bool CanHandle(EventObject eventObject) {
@@ -34,7 +34,7 @@ public class ADUserRightsAssignment : EventRuleBase {
     /// <summary>Initialises a user rights assignment wrapper from an event record.</summary>
     public ADUserRightsAssignment(EventObject eventObject) : base(eventObject) {
         SourceEvent = eventObject;
-        NamedEventName = "ADUserRightsAssignment";
+        TypeName = "ADUserRightsAssignment";
 
         Computer = SourceEvent.ComputerName;
         Action = SourceEvent.MessageSubject;

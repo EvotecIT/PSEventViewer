@@ -1,15 +1,15 @@
 Import-Module PSEventViewer -Force
 
 Get-EVXEvent `
-    -NamedEvent ADUserLogonFailed, ADUserLockouts `
+    -Type ADUserLogonFailed, ADUserLockouts `
     -MachineName DC01, DC02 `
     -TimePeriod Last24Hours `
-    -ReadMode Full `
+    -ReadMode StructuredDataAndMessage `
     -MaxEvents 500 |
-    Select-Object TimeCreated, NamedEventName, MachineName, UserName, IpAddress
+    Select-Object TimeCreated, TypeName, MachineName, UserName, IpAddress
 
 Get-EVXEvent `
-    -NamedEvent ADSMBServerAuditV1 `
+    -Type ADSMBServerAuditV1 `
     -MachineName DC01, DC02 `
     -TimePeriod Last3Days `
     -ResolveDns `

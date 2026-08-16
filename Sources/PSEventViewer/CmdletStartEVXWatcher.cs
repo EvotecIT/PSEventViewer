@@ -9,7 +9,7 @@ using System.Globalization;
 namespace PSEventViewer {
     /// <summary>
     /// <para type="synopsis">Starts real-time monitoring of Windows Event Logs with customizable filters and actions.</para>
-    /// <para type="description">Supports explicit event IDs or NamedEvents, provider-side filtering, optional staging events, auto-stop conditions, and a callback for each match.</para>
+    /// <para type="description">Supports explicit event IDs or EventType, provider-side filtering, optional staging events, auto-stop conditions, and a callback for each match.</para>
     /// </summary>
     /// <example>
     ///   <summary>Watch security log for logon failures</summary>
@@ -17,8 +17,8 @@ namespace PSEventViewer {
     ///   <para>Streams failed logons and prints a summary.</para>
     /// </example>
     /// <example>
-    ///   <summary>Use NamedEvents for AD lockouts</summary>
-    ///   <code>Start-EVXWatcher -MachineName DC1 -LogName Security -NamedEvent ADUserLockouts -Action { Send-MailMessage ... }</code>
+    ///   <summary>Use EventType for AD lockouts</summary>
+    ///   <code>Start-EVXWatcher -MachineName DC1 -Type ADUserLockouts -Action { $_ | Write-Output }</code>
     ///   <para>Triggers an alert when any AD lockout occurs.</para>
     /// </example>
     /// <example>
@@ -47,7 +47,10 @@ namespace PSEventViewer {
         /// <summary>
         /// Name of the log to watch on the specified machine.
         /// </summary>
-        [Parameter(Mandatory = true, Position = 0)]
+        [Parameter(Mandatory = true, Position = 0, ParameterSetName = "EventId")]
+        [Parameter(Mandatory = true, Position = 0, ParameterSetName = "FilterHashtable")]
+        [Parameter(Mandatory = true, Position = 0, ParameterSetName = "Filter")]
+        [Parameter(Mandatory = true, Position = 0, ParameterSetName = "FilterXPath")]
         public string LogName { get; set; } = null!;
 
         /// <summary>
@@ -58,10 +61,20 @@ namespace PSEventViewer {
         public int[] EventId { get; set; } = Array.Empty<int>();
 
         /// <summary>
-        /// Array of predefined event groups to monitor.
+        /// One or more built-in typed event definitions to monitor.
         /// </summary>
-        [Parameter(Mandatory = true, Position = 1, ParameterSetName = "NamedEvent")]
-        public NamedEvents[] NamedEvent { get; set; } = Array.Empty<NamedEvents>();
+        [Alias("NamedEvent", "NamedEvents")]
+        [Parameter(Mandatory = true, Position = 1, ParameterSetName = "Type")]
+        public EventType[] Type { get; set; } = Array.Empty<EventType>();
+
+        /// <summary>Custom EventViewerX definition instance or JSON file path.</summary>
+        [Parameter(Mandatory = true, Position = 1, ParameterSetName = "Definition")]
+        public object? Definition { get; set; }
+
+        /// <summary>Windows Event Collector computer whose ForwardedEvents channel should be monitored.</summary>
+        [Parameter(ParameterSetName = "Type")]
+        [Parameter(ParameterSetName = "Definition")]
+        public string? Collector { get; set; }
 
         /// <summary>
         /// Event predicates using the same keys as Get-EVXEvent -FilterHashtable.
@@ -91,7 +104,6 @@ namespace PSEventViewer {
         /// Enables staging mode which also watches for event ID 350.
         /// </summary>
         [Parameter(Mandatory = false, ParameterSetName = "EventId")]
-        [Parameter(Mandatory = false, ParameterSetName = "NamedEvent")]
         public SwitchParameter Staging { get; set; }
 
         /// <summary>Credentials used for a remote native subscription.</summary>
@@ -186,21 +198,15 @@ namespace PSEventViewer {
         /// Starts the watcher based on provided filters and returns its information.
         /// </summary>
         protected override Task ProcessRecordAsync() {
+            if (ParameterSetName == "Type" || ParameterSetName == "Definition") {
+                return StartProjectedWatchersAsync();
+            }
             var ids = new System.Collections.Generic.List<int>();
             if (ParameterSetName == "EventId" && EventId != null) {
                 ids.AddRange(EventId);
-            } else if (ParameterSetName == "NamedEvent" && NamedEvent != null) {
-                var dict = NamedEventCatalog.GetEventInfoForNamedEvents(NamedEvent.ToList());
-                if (dict.TryGetValue(LogName, out var set)) {
-                    ids.AddRange(set);
-                } else {
-                    WriteWarning($"No events found for named events in log {LogName}.");
-                }
             }
 
-            if ((ParameterSetName == "EventId" ||
-                 ParameterSetName == "NamedEvent") &&
-                ids.Count == 0) {
+            if (ParameterSetName == "EventId" && ids.Count == 0) {
                 throw new PSArgumentException($"No event IDs were resolved for log '{LogName}'.");
             }
             if (TimeOut.HasValue && TimeOut.Value <= TimeSpan.Zero) {
@@ -208,7 +214,7 @@ namespace PSEventViewer {
             }
 
             EventFilter? filter = ParameterSetName switch {
-                "EventId" or "NamedEvent" => new EventFilter {
+                "EventId" => new EventFilter {
                     EventIds = Staging
                         ? ids
                             .Append(350)
@@ -290,9 +296,7 @@ namespace PSEventViewer {
                     TimeOut,
                     string.IsNullOrWhiteSpace(ActionIdentity) ? null : ActionIdentity!.Trim(),
                     reuseScopeIdentity: watcherOwnerId.ToString("N"),
-                    namedEvents: ParameterSetName == "NamedEvent"
-                        ? NamedEvent?.ToList()
-                        : null,
+                    namedEvents: null,
                     cancellationToken: CancelToken);
                 createdPowerShellWatcher = watcher.Action.Equals(publish);
                 using CancellationTokenRegistration startupCancellation =
@@ -328,6 +332,181 @@ namespace PSEventViewer {
                     PowerShellWatcherRegistry.Unregister(watcherOwnerId, watcher.Id);
                     WatcherManager.StopWatcher(watcher.Id);
                 }
+                throw;
+            }
+            return Task.CompletedTask;
+        }
+
+        private Task StartProjectedWatchersAsync() {
+            bool custom = ParameterSetName == "Definition";
+            if (!custom && (Type == null || Type.Length == 0)) {
+                throw new PSArgumentException("Type requires at least one event definition.");
+            }
+            if (!string.IsNullOrWhiteSpace(Collector) && !string.IsNullOrWhiteSpace(MachineName)) {
+                throw new PSArgumentException("Collector and MachineName are mutually exclusive.");
+            }
+            if (TimeOut.HasValue && TimeOut.Value <= TimeSpan.Zero) {
+                throw new PSArgumentOutOfRangeException(nameof(TimeOut), TimeOut, "TimeOut must be greater than zero when provided.");
+            }
+            EventDefinition? definition = null;
+            IReadOnlyList<EventType> leaves = Array.Empty<EventType>();
+            IReadOnlyList<(string LogName, IReadOnlyList<int> EventIds, IReadOnlyList<string> Providers)> sources;
+            if (custom) {
+                object? value = Definition;
+                while (value is PSObject wrapper && wrapper.BaseObject != value) {
+                    value = wrapper.BaseObject;
+                }
+                definition = value switch {
+                    EventDefinition typed => typed,
+                    string path => EventDefinition.Load(path),
+                    _ => throw new PSArgumentException(
+                        "Definition must be an EventDefinition instance or a JSON file path.",
+                        nameof(Definition))
+                };
+                definition.Validate();
+                sources = definition.Sources
+                    .Select(static source => (
+                        source.LogName,
+                        source.EventIds,
+                        (IReadOnlyList<string>)source.ProviderNames))
+                    .ToArray();
+            } else {
+                leaves = EventTypeCatalog.Expand(Type);
+                sources = EventTypeCatalog.GetSources(leaves)
+                    .Select(static source => (
+                        source.LogName,
+                        source.EventIds,
+                        (IReadOnlyList<string>)Array.Empty<string>()))
+                    .ToArray();
+            }
+            var bridge = new PowerShellWatcherEventBridge();
+            PSEventManager eventManager = Events;
+            string sourceIdentifier = $"PSEventViewer.Watcher.{Guid.NewGuid():N}";
+            PSEventSubscriber subscriber = eventManager.SubscribeEvent(
+                bridge,
+                nameof(PowerShellWatcherEventBridge.EventReceived),
+                sourceIdentifier,
+                PSObject.AsPSObject(Action),
+                PowerShellWatcherEventBridge.ActionScript,
+                supportEvent: false,
+                forwardEvent: false);
+            Guid ownerId = PowerShellResourceOwnerId;
+            var ownedWatchers = new List<WatcherInfo>();
+            int remaining = 0;
+            int delivered = 0;
+            int cleanup = 0;
+            int threshold = StopOnMatch.IsPresent ? 1 : StopAfter;
+            void RemoveSubscription() {
+                if (Interlocked.Exchange(ref cleanup, 1) == 0) {
+                    eventManager.UnsubscribeEvent(subscriber);
+                }
+            }
+            bridge.AttachCleanup(RemoveSubscription);
+            void Publish(EventObject source) {
+                object? target = definition == null
+                    ? EventTypeCatalog.CreateEventRule(source, leaves.ToList())
+                    : EventDefinitionEngine.CreateRecord(definition, source);
+                if (target == null) {
+                    return;
+                }
+                bridge.Publish(target);
+                int count = Interlocked.Increment(ref delivered);
+                if (threshold > 0 && count >= threshold) {
+                    WatcherInfo[] snapshot;
+                    lock (ownedWatchers) {
+                        snapshot = ownedWatchers.ToArray();
+                    }
+                    _ = Task.Run(() => {
+                        foreach (WatcherInfo watcher in snapshot) {
+                            WatcherManager.StopWatcher(watcher.Id);
+                        }
+                    });
+                }
+            }
+
+            try {
+                int sourceIndex = 0;
+                foreach ((string LogName, IReadOnlyList<int> EventIds, IReadOnlyList<string> Providers) source in sources) {
+                    if (threshold > 0 && Volatile.Read(ref delivered) >= threshold) {
+                        break;
+                    }
+                    bool collector = !string.IsNullOrWhiteSpace(Collector);
+                    string targetLog = collector ? "ForwardedEvents" : source.LogName;
+                    string? targetMachine = collector ? Collector : MachineName;
+                    string xpath = EventDefinitionCompiler.BuildSourceXPath(
+                        source.LogName,
+                        source.EventIds,
+                        source.Providers,
+                        collector);
+                    IReadOnlyList<EventLogSubscriptionQuery> queries = EventSubscriptionPlanner.CreateQueries(
+                        new EventSubscriptionDefinition {
+                            LogName = targetLog,
+                            MachineName = targetMachine,
+                            Credential = Credential?.GetNetworkCredential(),
+                            Authentication = Authentication,
+                            FilterXPath = xpath,
+                            Start = Start,
+                            BookmarkXml = BookmarkXml,
+                            StrictBookmark = !IgnoreStaleBookmark,
+                            TolerateQueryErrors = TolerateQueryErrors.IsPresent,
+                            ReadMode = MyInvocation.BoundParameters.ContainsKey(nameof(ReadMode))
+                                ? ReadMode
+                                : EventReadMode.StructuredDataAndMessage,
+                            MessageCulture = MessageCulture,
+                            FallbackMessageCulture = FallbackMessageCulture,
+                            BufferCapacity = BufferCapacity,
+                            RemoteConnectionTimeoutMilliseconds = SessionTimeoutMs
+                        }, CancelToken);
+                    string? watcherName = string.IsNullOrWhiteSpace(Name)
+                        ? null
+                        : sources.Count == 1 ? Name!.Trim() : $"{Name!.Trim()}:{source.LogName}:{sourceIndex}";
+                    WatcherInfo watcher = WatcherManager.StartWatcher(
+                        watcherName,
+                        queries,
+                        Publish,
+                        stopOnMatch: false,
+                        stopAfter: 0,
+                        TimeOut,
+                        string.IsNullOrWhiteSpace(ActionIdentity) ? null : $"{ActionIdentity!.Trim()}:{source.LogName}:{sourceIndex}",
+                        reuseScopeIdentity: ownerId.ToString("N"),
+                        namedEvents: custom ? null : leaves,
+                        cancellationToken: CancelToken);
+                    bool owned = watcher.Action.Equals((Action<EventObject>)Publish);
+                    if (owned) {
+                        lock (ownedWatchers) {
+                            ownedWatchers.Add(watcher);
+                        }
+                        Interlocked.Increment(ref remaining);
+                        PowerShellWatcherRegistry.Register(ownerId, watcher.Id);
+                        int watcherCompleted = 0;
+                        void CompleteWatcher() {
+                            if (Interlocked.Exchange(ref watcherCompleted, 1) != 0) {
+                                return;
+                            }
+                            PowerShellWatcherRegistry.Unregister(ownerId, watcher.Id);
+                            if (Interlocked.Decrement(ref remaining) == 0) {
+                                bridge.RequestCleanup(synchronousWhenIdle: true);
+                            }
+                        }
+                        watcher.Stopped += (_, _) => CompleteWatcher();
+                        if (watcher.IsStopped) {
+                            CompleteWatcher();
+                        } else if (threshold > 0 && Volatile.Read(ref delivered) >= threshold) {
+                            _ = Task.Run(() => WatcherManager.StopWatcher(watcher.Id));
+                        }
+                    }
+                    WriteObject(watcher);
+                    sourceIndex++;
+                }
+                if (Volatile.Read(ref remaining) == 0) {
+                    RemoveSubscription();
+                }
+            } catch {
+                foreach (WatcherInfo watcher in ownedWatchers) {
+                    PowerShellWatcherRegistry.Unregister(ownerId, watcher.Id);
+                    WatcherManager.StopWatcher(watcher.Id);
+                }
+                RemoveSubscription();
                 throw;
             }
             return Task.CompletedTask;

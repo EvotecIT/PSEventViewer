@@ -12,7 +12,7 @@ public class AADConnectRunProfile : EventRuleBase {
     public override string LogName => "Application";
 
     /// <inheritdoc />
-    public override NamedEvents NamedEvent => NamedEvents.AADConnectRunProfile;
+    public override EventType Type => EventType.AADConnectRunProfile;
 
     /// <summary>Accepts matching Azure AD Connect run profile completion events.</summary>
     public override bool CanHandle(EventObject eventObject) {
@@ -32,7 +32,7 @@ public class AADConnectRunProfile : EventRuleBase {
     /// <summary>Initialises a run profile completion wrapper from an event record.</summary>
     public AADConnectRunProfile(EventObject eventObject) : base(eventObject) {
         SourceEvent = eventObject;
-        NamedEventName = "AADConnectRunProfile";
+        TypeName = "AADConnectRunProfile";
         Connector = SourceEvent.GetValueFromDataDictionary("Connector", "Connector Name");
         RunProfile = SourceEvent.GetValueFromDataDictionary("RunProfileName", "Run Profile Name", "", false);
         When = SourceEvent.TimeCreated;

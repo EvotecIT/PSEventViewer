@@ -247,7 +247,7 @@ namespace EventViewerX {
         /// Parses structured event data and, when requested, binary attachments in one XML pass.
         /// </summary>
         /// <param name="xmlData">The XML data.</param>
-        /// <param name="data">Parsed named event data.</param>
+        /// <param name="data">Parsed named EventData fields.</param>
         /// <param name="attachments">Decoded binary attachments.</param>
         /// <param name="includeAttachments">Whether binary payloads should be decoded and retained.</param>
         private static void ParseXmlPayload(

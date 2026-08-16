@@ -32,7 +32,7 @@ Describe 'Find-WinEvent integration (local)' {
         $events[1].LogName | Should -Be 'System'
     }
 
-    It 'queries a named event type without throwing (OS startup)' {
+    It 'queries an event type without throwing (OS startup)' {
         { Find-WinEvent -Verbose -Type OSStartup -MachineName $localMachine -MaxEvents 1 | Select-Object -First 1 } | Should -Not -Throw
     }
 }

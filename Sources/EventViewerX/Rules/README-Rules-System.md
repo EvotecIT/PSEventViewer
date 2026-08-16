@@ -1,19 +1,19 @@
-# Named-event rule architecture
+# Event-type rule architecture
 
-Named events turn raw Windows records into scenario-specific objects such as
+Event types turn raw Windows records into scenario-specific objects such as
 failed logons, account lockouts, Group Policy changes, Kerberos failures, or
 AAD Connect health signals.
 
 The rule layer is a projection over the shared native engine:
 
-1. A `NamedEventQuery` selects rules, machines, time, limits, culture, and
+1. An `EventTypeQuery` selects rules, machines, time, limits, culture, and
    enrichment.
-2. `NamedEventEngine.ReadAsync` asks each rule for its source channel and event
+2. `EventTypeEngine.ReadAsync` asks each rule for its source channel and event
    IDs.
 3. Sources are grouped and partitioned into bounded
    `EventLogChannelQuery` instances.
 4. `EventLogEngine.ReadBatchAsync` performs the native Windows queries.
-5. Matching `EventObject` records are projected to `NamedEventRecord` rule
+5. Matching `EventObject` records are projected to `EventTypeRecord` rule
    results in source order.
 6. Optional enrichment and checkpoint observation happen before a result is
    emitted.
@@ -31,8 +31,7 @@ namespace EventViewerX.Rules.ActiveDirectory;
 public sealed class ADComputerCreateChange : EventRuleBase {
     public override List<int> EventIds => new() { 4741, 4742 };
     public override string LogName => "Security";
-    public override NamedEvents NamedEvent =>
-        NamedEvents.ADComputerCreateChange;
+    public override EventType Type => EventType.ADComputerCreateChange;
 
     public override bool CanHandle(EventObject eventObject) {
         return true;
@@ -67,7 +66,7 @@ session, cancellation, export, and checkpoint logic in the shared engines.
 
 ## Adding a rule
 
-1. Add the public scenario name to `NamedEvents`.
+1. Add the public scenario name to `EventType`.
 2. Add one focused `EventRuleBase` implementation under the appropriate
    `Rules/<Area>` folder.
 3. Declare the exact channel and positive event IDs.
@@ -81,7 +80,7 @@ projection that understands it.
 
 ## Discovery modes
 
-`NamedEventRecord` supports three discovery modes:
+`EventTypeRecord` supports three discovery modes:
 
 | Mode | Behavior | Use |
 | --- | --- | --- |
@@ -89,13 +88,13 @@ projection that understands it.
 | `Reflection` | Discovers concrete `EventRuleBase`/`IEventRule` types from EventViewerX. | Conventional runtime hosts. |
 | `ExplicitOnly` | Uses only delegate factories registered before first query. | AOT, trimming, or tightly controlled hosts. |
 
-Configure discovery once, before the first named-event query:
+Configure discovery once, before the first event-type query:
 
 ```csharp
-NamedEventCatalog.Configure(EventRuleDiscoveryMode.ExplicitOnly);
+EventTypeCatalog.Configure(EventRuleDiscoveryMode.ExplicitOnly);
 
-NamedEventCatalog.RegisterRuleFactory(
-    NamedEvents.ADUserLockouts,
+EventTypeCatalog.RegisterRuleFactory(
+    EventType.ADUserLockouts,
     "Security",
     new[] { 4740 },
     eventObject => new ADUserLockouts(eventObject),
@@ -109,9 +108,9 @@ the rule catalog while queries are active.
 ## Querying from C#
 
 ```csharp
-var query = new NamedEventQuery(new[] {
-    NamedEvents.ADUserLogonFailed,
-    NamedEvents.ADUserLockouts
+var query = new EventTypeQuery(new[] {
+    EventType.ADUserLogonFailed,
+    EventType.ADUserLockouts
 }) {
     MachineNames = new string?[] { "DC01", "DC02" },
     TimePeriod = TimePeriod.Last24Hours,
@@ -121,12 +120,12 @@ var query = new NamedEventQuery(new[] {
     ContinueOnRemoteFailure = true
 };
 
-var execution = new NamedEventsQueryExecutionInfo();
+var execution = new EventTypeQueryExecutionInfo();
 
-await foreach (NamedEventRecord item in
-               NamedEventEngine.ReadAsync(query, execution)) {
+await foreach (EventTypeRecord item in
+               EventTypeEngine.ReadAsync(query, execution)) {
     Console.WriteLine(
-        $"{item.When:u} {item.Type} {item.Computer}");
+        $"{item.TimeCreated:u} {item.TypeName} {item.MachineName}");
 }
 ```
 
@@ -134,24 +133,24 @@ await foreach (NamedEventRecord item in
 limits raw records evaluated by rules. This distinction prevents a selective
 rule from silently returning too few matches.
 
-`NamedEventsQueryExecutionInfo` reports candidates examined, results emitted,
+`EventTypeQueryExecutionInfo` reports candidates examined, results emitted,
 source failures, and limit state without changing the returned object stream.
 
 ## Querying from PowerShell
 
 ```powershell
 Get-EVXEvent `
-    -NamedEvent ADUserLogonFailed, ADUserLockouts `
+    -Type ADUserLogonFailed, ADUserLockouts `
     -MachineName DC01, DC02 `
     -TimePeriod Last24Hours `
     -MaxConcurrency 4 `
     -MaxEvents 500 |
-    Select-Object TimeCreated, NamedEventName, MachineName, UserName, IpAddress
+    Select-Object TimeCreated, TypeName, MachineName, UserName, IpAddress
 ```
 
-PowerShell is a thin adapter: it builds `NamedEventQuery`, supplies durable
+PowerShell is a thin adapter: it builds `EventTypeQuery`, supplies durable
 checkpoint callbacks and optional DNS enrichment, and streams
-`NamedEventEngine.ReadAsync`.
+`EventTypeEngine.ReadAsync`.
 
 ## Ordering, failures, and checkpoints
 
@@ -177,12 +176,13 @@ the source of truth; enrichment is additional context.
 
 ## Key files
 
-- `NamedEventQuery.cs` — public scenario query contract.
-- `NamedEventEngine.cs` and `NamedEventEngine.Projection.cs` — batching,
+- `EventTypeQuery.cs` — public scenario query contract.
+- `EventTypeEngine.cs` and `EventTypeEngine.Projection.cs` — batching,
   ordered projection, and limits.
-- `NamedEventRecord.cs` — discovery, explicit registration, and rule creation.
+- `EventTypeCatalog.cs` — discovery, explicit registration, and rule creation.
+- `EventTypeRecord.cs` — the stable typed-result envelope.
 - `IEventRule.cs` — `IEventRule` and `EventRuleBase` contracts.
-- `NamedEventEnricher.cs` and `Enrichment/` — optional ordered enrichment.
+- `EventEnricher.cs` and `Enrichment/` — optional ordered enrichment.
 - `Rules/` — provider/scenario projections.
 
 ## Design rules

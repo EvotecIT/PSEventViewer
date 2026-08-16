@@ -28,6 +28,11 @@ metadata CSV with EvtxECmd's forensic CSV compares different work and different 
 - `PropertySelector`: direct `EventLogPropertySelector` projection of eighteen core metadata fields.
 - `EventViewerX`: the reusable `EventLogEngine.ReadFile` projection engine.
 - `EventViewerXExport`: the reusable `EventLogExporter` path, which writes directly without a PowerShell object pipeline.
+- `EventViewerXTyped`: built-in typed projections over definition-owned event sources.
+- `EventViewerXReport`: one query and normalized snapshot rendered as HTML, Excel, email, or all three outputs.
+- `EventViewerXCli`: the framework-dependent `evx.exe` process used for command cold-start measurements.
+- `EventViewerXCliPortable`: the optional self-contained `evx.exe` artifact, measured separately because it carries
+  the .NET runtime with it.
 - `PSEventViewer`: the public `Get-EVXEvent` cmdlet consumed by a streaming PowerShell process block.
 - `GetWinEvent`: `Get-WinEvent` consumed by the same streaming process-block shape.
 - `EvtxECmd`: Eric Zimmerman's parser, run as an external process with its version and SHA-256 captured.
@@ -35,12 +40,14 @@ metadata CSV with EvtxECmd's forensic CSV compares different work and different 
 
 ## Common public work
 
-`Metadata`, `Message`, `StructuredData`, and `Full` are run through the same event window and streaming accumulator:
+`Metadata`, `Message`, `StructuredData`, `StructuredDataAndMessage`, and `Full` are run through the same event window and streaming accumulator:
 
 - `Metadata` touches core system fields without messages, XML, properties, attachments, or bookmarks.
 - `Message` touches core metadata, the provider-formatted message, and provider display names.
 - `StructuredData` touches metadata, properties, and raw XML. PSEventViewer also parses its named `Data` dictionary.
   It does not format the message or decode binary attachments.
+- `StructuredDataAndMessage` is the default typed/reporting fast path: it touches the formatted message, properties,
+  raw XML, and parsed `Data` dictionary without decoding binary attachments or the legacy message-field map.
 - `Full` requests message and structured data together. PSEventViewer additionally materializes its parsed
   `MessageData` fields and decodes binary attachments.
 - `MetadataCsv` writes the five fields shown in the public README. The three successful engines must produce the same
@@ -97,6 +104,14 @@ PowerForge records:
 Every generated public table requires at least three rotated iterations. A one-off diagnostic run remains useful while
 developing, but the wrapper refuses to publish it into the README.
 
+The scale matrix runs 1,000, 10,000, 100,000, and 1,000,000 event windows when the supplied fixture contains enough
+records. The cold-start matrix measures a fresh `evx.exe`, a fresh PowerShell process importing PSEventViewer, and a
+fresh PowerShell process running `Get-WinEvent`. Pass `-PSEventViewerPath` with the manifest from the unpacked module
+artifact when publishing that table so the PowerShell row includes the real bootstrap and dependency-loading behavior
+rather than importing only the raw cmdlet DLL. The matrix is deliberately reported separately because the CLI emits
+JSON while the PowerShell lanes consume objects in-process; it answers scheduled-task startup cost, not interchangeable
+output throughput.
+
 ## Run
 
 Inspect the resolved smoke matrix:
@@ -126,6 +141,39 @@ Generate the common-work table in the main README from an external large fixture
     -ExpensiveSampleCount 100000 `
     -IterationCount 3 `
     -ReadmeTable Common
+```
+
+Generate the scale table:
+
+```powershell
+.\Benchmarks\EventLogParsing\Invoke-EventLogParsingBenchmark.ps1 `
+    -LargeFixturePath C:\Temp\Security.evtx `
+    -ExpectedLargeCount 1000000 `
+    -ScaleSampleCount 1000, 10000, 100000, 1000000 `
+    -IterationCount 3 `
+    -ReadmeTable Scale
+```
+
+Generate the command cold-start table:
+
+```powershell
+.\Benchmarks\EventLogParsing\Invoke-EventLogParsingBenchmark.ps1 `
+    -IterationCount 5 `
+    -PSEventViewerPath .\Artefacts\Unpacked\Modules\PSEventViewer\PSEventViewer.psd1 `
+    -EventViewerXPortableCliPath .\Artefacts\Cli\Artifacts\DotNetPublish\EventViewerX.Cli\win-x64\net10.0-windows\PortableCompat\evx.exe `
+    -ReadmeTable ColdStart
+```
+
+Generate HTML, Excel, email, and combined report measurements from the same
+typed query and normalized snapshot:
+
+```powershell
+.\Benchmarks\EventLogParsing\Invoke-EventLogParsingBenchmark.ps1 `
+    -LargeFixturePath C:\Temp\Security.evtx `
+    -ExpectedLargeCount 1000000 `
+    -ExpensiveSampleCount 1000 `
+    -IterationCount 3 `
+    -ReadmeTable Reporting
 ```
 
 Generate the byte-identical metadata CSV and raw XML table:
@@ -167,3 +215,8 @@ wrapper calls PowerForge's document updater only after every measured sample suc
 diagnostic artifacts and leave the last validated table unchanged. Artifacts are written below
 `Ignore\Benchmarks\EventLogParsing\Runs` unless `-OutputRoot` is supplied. Keep the small summary and provenance needed
 for review, then delete large fixtures and generated CSV, JSON, and XML files.
+
+Use [the event-source benchmark](../EventSources/README.md) for same-boundary
+remote `EventViewerX`/`Get-EVXEvent`/`Get-WinEvent` comparisons and
+[the watcher burst benchmark](../EventWatcher/README.md) for persistent-host
+delivery, loss, duplication, and burst-throughput evidence.

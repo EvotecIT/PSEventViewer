@@ -70,7 +70,7 @@ public class ADUserLogon : EventRuleBase {
     /// <inheritdoc />
     public override string LogName => "Security";
     /// <inheritdoc />
-    public override NamedEvents NamedEvent => NamedEvents.ADUserLogon;
+    public override EventType Type => EventType.ADUserLogon;
 
     /// <summary>Accepts any 4624 events in the Security log.</summary>
     public override bool CanHandle(EventObject eventObject) {
@@ -80,7 +80,7 @@ public class ADUserLogon : EventRuleBase {
     /// <summary>Initialises a successful logon wrapper from an event record.</summary>
     public ADUserLogon(EventObject eventObject) : base(eventObject) {
         SourceEvent = eventObject;
-        NamedEventName = "ADUserLogon";
+        TypeName = "ADUserLogon";
 
         Computer = SourceEvent.ComputerName;
         Action = SourceEvent.MessageSubject;

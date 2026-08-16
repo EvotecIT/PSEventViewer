@@ -19,7 +19,7 @@ public class GpoCreated : EventRuleBase {
     /// <inheritdoc />
     public override string LogName => "Security";
     /// <inheritdoc />
-    public override NamedEvents NamedEvent => NamedEvents.GpoCreated;
+    public override EventType Type => EventType.GpoCreated;
 
     /// <summary>Processes only groupPolicyContainer object creations.</summary>
     public override bool CanHandle(EventObject eventObject) {
@@ -31,7 +31,7 @@ public class GpoCreated : EventRuleBase {
     /// <summary>Initialises a GPO creation wrapper from an event record.</summary>
     public GpoCreated(EventObject eventObject) : base(eventObject) {
         SourceEvent = eventObject;
-        NamedEventName = "GpoCreated";
+        TypeName = "GpoCreated";
         Computer = SourceEvent.ComputerName;
         Action = SourceEvent.MessageSubject;
         GpoName = SourceEvent.GetValueFromDataDictionary("ObjectDN");

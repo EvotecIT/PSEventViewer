@@ -10,7 +10,7 @@ public class SyncCompleted : EventRuleBase {
     /// <inheritdoc />
     public override string LogName => "Application";
     /// <inheritdoc />
-    public override NamedEvents NamedEvent => NamedEvents.SyncCompleted;
+    public override EventType Type => EventType.SyncCompleted;
 
     /// <summary>Accepts sync completion events.</summary>
     public override bool CanHandle(EventObject eventObject) => true;
@@ -25,7 +25,7 @@ public class SyncCompleted : EventRuleBase {
     /// <summary>Initialises a sync completion wrapper from an event record.</summary>
     public SyncCompleted(EventObject eventObject) : base(eventObject) {
         SourceEvent = eventObject;
-        NamedEventName = "SyncCompleted";
+        TypeName = "SyncCompleted";
         Computer = SourceEvent.ComputerName;
         When = SourceEvent.TimeCreated;
 

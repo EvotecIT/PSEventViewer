@@ -30,8 +30,11 @@ runtime, Rust engine, or provider-specific parsing dependency.
 - Use native bookmarks, durable record checkpoints, subscriptions, watchers,
   provider and channel catalogs, classic log management, WEC subscription
   management, and both classic and manifest event writing.
-- Query named scenarios such as failed logons, lockouts, group changes,
-  Kerberos failures, AAD Connect health, IIS failures, and OS crashes.
+- Query 80 built-in typed event definitions and 10 composite workflows such as
+  failed logons, lockouts, group changes, Kerberos failures, AAD Connect
+  health, IIS failures, and OS crashes.
+- Turn the same normalized result into responsive HTML, an Excel workbook, or
+  an email package without querying the event log again.
 
 ## Install
 
@@ -54,6 +57,8 @@ targets .NET Framework 4.7.2, .NET 8 for Windows, and .NET 10 for Windows.
 - [Custom provider guide](Docs/Custom-Providers.md): PowerShell hashtables,
   JSON, typed C#, build/install, signing/trust, named writes, upgrades, repair,
   rollback, and removal.
+- [Custom event definitions](Docs/Event-Definitions.md): one portable typed
+  schema shared by query, reports, watchers, WEC, C#, and `evx.exe`.
 - [Troubleshooting](Docs/Troubleshooting.md): performance, permissions,
   remoting, message resources, EVTX, checkpoints, and provider deployment.
 - [Documentation index](Docs/README.md) and
@@ -91,9 +96,15 @@ Get-EVXEvent -Path C:\Logs\Security.evtx -Oldest `
 Get-EVXEvent -LogName Security -MachineName DC01, DC02 `
     -EventId 4740 -MaxConcurrency 4 -ContinueOnError -MaxEvents 500
 
-# Query reusable scenario rules.
-Get-EVXEvent -NamedEvent ADUserLogonFailed, ADUserLockouts `
+# Query reusable event types. The type owns its logs, providers, IDs, and projection.
+Get-EVXEvent -Type ADUserLogonFailed, ADUserLockouts `
     -MachineName DC01, DC02 -TimePeriod Last24Hours -MaxEvents 500
+
+# One query, two polished files, and the same typed rows for downstream automation.
+$report = Show-EVXEvent -Type ActiveDirectoryAuthentication `
+    -Collector WEC01 -TimePeriod Last24Hours `
+    -HtmlPath .\Authentication.html -ExcelPath .\Authentication.xlsx `
+    -PassThru
 
 # Build a typed filter once and reuse it across query, export, watcher, and WEC.
 $failedLogon = New-EVXFilter -EventId 4625 -TimePeriod Last24Hours `
@@ -413,14 +424,14 @@ EventExportResult exported = EventLogExporter.ExportFile(
 ```
 
 Multi-source code uses `EventLogBatchQuery` with
-`EventLogEngine.ReadBatchAsync`. Scenario code uses `NamedEventQuery` with
-`NamedEventEngine.ReadAsync`. Both reuse the same query, native reader,
+`EventLogEngine.ReadBatchAsync`. Scenario code uses `EventTypeQuery` with
+`EventTypeEngine.ReadAsync`. Both reuse the same query, native reader,
 projection, cancellation, culture, and failure contracts.
 
 ```csharp
-var namedQuery = new NamedEventQuery(new[] {
-    NamedEvents.ADUserLogonFailed,
-    NamedEvents.ADUserLockouts
+var typedQuery = new EventTypeQuery(new[] {
+    EventType.ADUserLogonFailed,
+    EventType.ADUserLockouts
 }) {
     MachineNames = new string?[] { "DC01", "DC02" },
     TimePeriod = TimePeriod.Last24Hours,
@@ -428,12 +439,130 @@ var namedQuery = new NamedEventQuery(new[] {
     MaxEvents = 500
 };
 
-await foreach (NamedEventRecord item in
-               NamedEventEngine.ReadAsync(namedQuery)) {
+await foreach (EventTypeRecord item in
+               EventTypeEngine.ReadAsync(typedQuery)) {
     Console.WriteLine(
-        $"{item.TimeCreated:u} {item.NamedEventName} {item.MachineName}");
+        $"{item.TimeCreated:u} {item.TypeName} {item.MachineName}");
 }
 ```
+
+## Typed reports, Excel, HTML, and email
+
+`Show-EVXEvent` is the single report command. It can query a built-in `-Type`,
+a custom `-Definition`, a generic `-LogName`, an offline `-Path`, or consume
+existing pipeline objects. It performs the query once and creates every chosen
+format from one immutable report snapshot.
+
+```powershell
+# A built-in type owns its Security channel and event IDs.
+Show-EVXEvent -Type ADUserLogonFailed -TimePeriod Last24Hours
+
+# Generic log browsing remains available when typed semantics are not needed.
+Show-EVXEvent -LogName System -EventId 41, 6008 `
+    -StartTime (Get-Date).AddDays(-7) -HtmlPath .\Startup.html
+
+# Typed semantics can be applied to an offline file. -LogName is not required.
+Show-EVXEvent -Type ActiveDirectoryAuthentication `
+    -Path C:\Logs\ForwardedEvents.evtx `
+    -HtmlPath .\Authentication.html -ExcelPath .\Authentication.xlsx
+
+# Reuse an existing stream; Show-EVXEvent does not query again.
+Get-EVXEvent -LogName Application -Level 1, 2 -MaxEvents 500 |
+    Show-EVXEvent -HtmlPath .\Application.html -EmailPackage -PassThru
+```
+
+HTML uses typed HtmlForgeX components and is self-contained, searchable,
+responsive, theme-aware, and suitable for opening or attaching. Excel uses
+OfficeIMO with an overview, coverage, event data, filters, frozen headers,
+formatting, and useful column sizing. Very wide event payloads are collapsed
+into `Details` instead of producing an unreadable hundred-column table.
+
+`-EmailPackage` returns `Subject`, responsive `Html`, `PlainText`, inline
+resources, attachments, and estimated size. That transport-neutral object can
+be handed to Mailozaurr, Microsoft Graph, TeamsX/PSTeams, or another delivery
+adapter without making those modules dependencies of PSEventViewer. The
+portable `evx.exe` includes Mailozaurr and can deliver directly from a JSON
+SMTP profile whose password is read from an environment variable.
+
+```powershell
+# Mailozaurr stays optional for interactive PowerShell users.
+$email = Show-EVXEvent -Type ADUserLogonFailed `
+    -TimePeriod Last24Hours -EmailPackage
+
+Send-EmailMessage -Server 'smtp.contoso.com' -Port 587 `
+    -From 'events@contoso.com' -To 'operations@contoso.com' `
+    -Subject $email.Subject -HTML $email.Html -Text $email.PlainText `
+    -Credential $credential -SecureSocketOptions StartTls
+```
+
+```json
+{
+  "Server": "smtp.contoso.com",
+  "Port": 587,
+  "SecureSocketOptions": "StartTls",
+  "From": "events@contoso.com",
+  "To": [ "operations@contoso.com" ],
+  "UserName": "events@contoso.com",
+  "PasswordEnvironmentVariable": "EVX_SMTP_PASSWORD",
+  "Subject": "{Title}"
+}
+```
+
+```powershell
+$env:EVX_SMTP_PASSWORD = '<secret supplied by the scheduler or secret store>'
+evx report --type ActiveDirectoryAuthentication --collector WEC01 `
+    --since 1.00:00:00 --html .\Authentication.html `
+    --excel .\Authentication.xlsx --mail-profile .\smtp.json
+```
+
+For C#, reporting is a separate, intentional package boundary:
+
+```csharp
+using EventViewerX;
+using EventViewerX.Reporting;
+
+var request = EventReportRequest.ForTypes(
+    EventType.ADUserLogonFailed,
+    EventType.ADUserLockouts);
+request.TimePeriod = TimePeriod.Last24Hours;
+request.Collectors = new string?[] { "WEC01" };
+
+EventReport report = await EventReportEngine.QueryAsync(request);
+EventReportHtmlRenderer.Save(report, "Authentication.html");
+EventReportExcelRenderer.Save(report, "Authentication.xlsx");
+EventEmailPackage email = await EventReportEmailRenderer.RenderAsync(report);
+```
+
+## Portable host and event-triggered automation
+
+The optional `evx.exe` is the low-startup, no-module host for Task Scheduler,
+event-triggered tasks, services, containers, and portable automation. It ships
+as both a smaller framework-dependent build and a runtime-bundled
+`PortableCompat` build. Both provide `types`, `query`, `report`, `watch`,
+`collector`, and `provider` workflows over the same EventViewerX engines; they
+do not introduce a second query or reporting implementation.
+
+```powershell
+# Process the exact record that started a scheduled task.
+evx report --type ADUserLogonFailed --record-id 123456 `
+    --html C:\Reports\FailedLogon.html --mail-profile C:\EVX\smtp.json
+
+# Continuously batch matching events and create an outbox or send mail.
+evx watch --type ActiveDirectoryAuthentication --collector WEC01 `
+    --interval 00:05:00 --mail-profile C:\EVX\smtp.json `
+    --ready-file C:\EVX\ready --summary-file C:\EVX\last-run.json
+
+# Inspect or manage collector definitions without adding more PowerShell cmdlets.
+evx collector create --name FailedLogons --source DC01,DC02 `
+    --type ADUserLogonFailed --output .\FailedLogons.xml --apply
+evx collector remove --name FailedLogons
+```
+
+In the exact-artifact, five-launch cold-start matrix, the framework-dependent
+and portable hosts reached their command in 115 ms and 116 ms median. Importing
+the unpacked PSEventViewer module and a fresh `Get-WinEvent` process both took
+590 ms median. Use the module for interactive composition and the CLI—about
+5.1 times faster in this startup workload—where task-trigger latency matters.
 
 ## Native PowerShell parity
 
@@ -451,7 +580,7 @@ library and module, then a stronger reusable surface. A GUI clone of
 | `EventLogWatcher` / native subscription | Covered | Bounded backpressure, cancellation, bookmarks, watcher lifecycle and PowerShell actions. |
 | `wevtutil` channel/export work | Covered for query, policy, archive, and export | Atomic output, hashes, culture/projection choices, compiled streaming. |
 | Windows Event Collector subscriptions | Additional capability | Typed inventory and local mutation with truthful remote limits. |
-| Scenario interpretation | Additional capability | Reusable named-event rules and optional bounded DNS enrichment. |
+| Scenario interpretation | Additional capability | Reusable event-type rules and optional bounded DnsClientX enrichment. |
 
 ## PowerShell command surface
 
@@ -459,14 +588,21 @@ Version 4 intentionally exposes one canonical command for each responsibility:
 
 | Area | Commands |
 | --- | --- |
-| Query and export | `Get-EVXEvent`, `New-EVXFilter`, `Export-EVXEvent` |
+| Query, report, and export | `Get-EVXEvent`, `Show-EVXEvent`, `New-EVXFilter`, `Export-EVXEvent` |
 | Catalog and diagnostics | `Get-EVXLog`, `Get-EVXProvider`, `Test-EVXLog` |
 | Watchers and checkpoints | `Start-EVXWatcher`, `Get-EVXWatcher`, `Stop-EVXWatcher`, `Reset-EVXEventCheckpoint` |
+| Forensic script recovery | `Get-EVXPowerShellScript` |
 | Log and source administration | `New-EVXLog`, `Set-EVXLog`, `Clear-EVXLog`, `Remove-EVXLog`, `New-EVXSource`, `Remove-EVXSource`, `Update-EVXLogArchive` |
 | Event writing | `Write-EVXEvent` |
 | Custom providers | `Test-EVXProviderDefinition`, `New-EVXProviderPackage`, `Get-EVXProvider`, `Install-EVXProviderPackage`, `Uninstall-EVXProviderPackage` |
 | Collector subscriptions | `New-EVXCollectorSubscription`, `Get-EVXCollectorSubscription`, `Set-EVXCollectorSubscription` |
 | PowerShell recovery | `Get-EVXPowerShellScript` (`-Execution` selects execution records) |
+
+The 27 cmdlets and 80 leaf event types are intentionally different counts.
+Cmdlets are reusable workflows; event types are catalog values within those
+workflows. Adding a type does not add another query, report, watcher, or WEC
+cmdlet. Ten composite types select coherent groups of leaf types for common
+operational reports.
 
 Three migration aliases remain: `Find-WinEvent` maps to `Get-EVXEvent`,
 `Get-EVXFilter` maps to `New-EVXFilter`, and `Write-EVXEntry` maps to the
@@ -478,7 +614,7 @@ continue to bind; `-Source` is an alias of `-ProviderName`.
 
 Version 4 is a deliberate API cleanup:
 
-- C# callers use `EventLogEngine`, `NamedEventEngine`,
+- C# callers use `EventLogEngine`, `EventTypeEngine`,
   `ClassicEventLogManager`, `EventLogCatalog`, `EventLogSubscription`,
   `EventLogExporter`, and `ManifestEventWriter`; the monolithic
   `SearchEvents` API is removed.
@@ -486,10 +622,10 @@ Version 4 is a deliberate API cleanup:
   part of `Get-EVXProvider`; script and execution recovery share
   `Get-EVXPowerShellScript`; classic and manifest writes share
   `Write-EVXEvent`.
-- Named scenario results are `NamedEventRecord` objects with a stable
-  `SourceEvent`, `NamedEventName`, `EventId`, `RecordId`, `MachineName`, and
+- Typed results are `EventTypeRecord` objects with a stable
+  `SourceEvent`, `TypeName`, `EventId`, `RecordId`, `MachineName`, and
   `SourceLogName` envelope. These detached records can be selected, serialized,
-  or handed to future mail and Teams adapters without adding either dependency.
+  or handed to mail and Teams adapters without adding either dependency.
 - General queries default to `ReadMode Message`, not eager `Full`.
 - Bookmarks are opt-in. Durable polling uses explicit checkpoint files/keys.
 - `MaxEvents` and counters are 64-bit.
@@ -508,11 +644,17 @@ byte-identical comparisons from common public jobs and different-schema native
 exports. Every published table requires at least three rotated iterations plus
 event count, order, identity, output size, and hash validation.
 
-These tables used one 231,804,928-byte Security EVTX containing 190,645
-readable events
-(`FF2F428E0D7DD59EEEA3A5D87477AFFECD87C6541DF417261F21E4B144E7D6AD`).
-They ran on the same 32-logical-processor Windows host with .NET SDK 10.0.302
-and PowerShell 7.6.4. EvtxECmd was pinned to
+The current v4 scale, typed-report, and cold-start runs use a
+225,513,472-byte Security EVTX containing 201,672 readable events
+(`4F61E29AEAC9D3D7DDE4EE74CF8EE7AB9C5A4BF21FBE610E326A91566CC2A383`).
+The remote matrix pins a live AD0 record boundary so all three engines read
+the same records. Those runs used the same 32-logical-processor Windows host
+with .NET SDK 10.0.400 and PowerShell 7.6.4.
+
+The earlier common-work, byte-identical export, and EvtxECmd-native tables use
+a 231,804,928-byte Security EVTX containing 190,645 readable events
+(`FF2F428E0D7DD59EEEA3A5D87477AFFECD87C6541DF417261F21E4B144E7D6AD`)
+and .NET SDK 10.0.302. EvtxECmd was pinned to
 `2026.5.0+bfc7f47ccbf65ffc9a3777cde5498db2fdd94664`
 (`DE169B2AC7F6B1E54A684E0CDDDA30223651937B75941B21EA53A98F5A2502EE`);
 its 386-file maps manifest was also hashed. Generated payloads are deleted
@@ -531,6 +673,62 @@ provenance remain.
 Common-public-job rows keep the input window and materialization category
 equal, but the public APIs can return different object schemas. Exact-output
 rows below require identical bytes and SHA-256.
+
+### Scale and cold-start behavior
+
+The scale matrix uses one real Security EVTX and fixed 1,000, 10,000, and
+100,000-event windows. Every cell validates count, record identity, and order;
+the table compares public jobs with equivalent materialization categories, not
+byte-identical output schemas.
+
+<!-- event-log-scale-benchmark:start -->
+| Scenario | Host | Operation | PSEventViewer | DotNet | EventViewerX | GetWinEvent | Result |
+| --- | --- | --- | ---: | ---: | ---: | ---: | --- |
+| Large-Scale-1000-Full | Core-7.6.4 | Scan | 1.00x (669ms) | 0.88x (590ms) | 0.39x (261ms) | 1.70x (1.14s) | PSEventViewer slower than EventViewerX |
+| Large-Scale-1000-Metadata | Core-7.6.4 | Scan | 1.00x (498ms) | 0.23x (116ms) | 0.22x (109ms) | 1.59x (794ms) | PSEventViewer slower than EventViewerX |
+| Large-Scale-1000-StructuredDataAndMessage | Core-7.6.4 | Scan | 1.00x (680ms) | 0.90x (613ms) | 0.37x (252ms) | 1.68x (1.14s) | PSEventViewer slower than EventViewerX |
+| Large-Scale-10000-Full | Core-7.6.4 | Scan | 1.00x (2.49s) | 1.88x (4.69s) | 0.63x (1.56s) | 2.26x (5.63s) | PSEventViewer slower than EventViewerX |
+| Large-Scale-10000-Metadata | Core-7.6.4 | Scan | 1.00x (616ms) | 0.35x (218ms) | 0.30x (183ms) | 4.50x (2.77s) | PSEventViewer slower than EventViewerX |
+| Large-Scale-10000-StructuredDataAndMessage | Core-7.6.4 | Scan | 1.00x (2.46s) | 1.95x (4.79s) | 0.60x (1.49s) | 2.33x (5.72s) | PSEventViewer slower than EventViewerX |
+| Large-Scale-100000-Full | Core-7.6.4 | Scan | 1.00x (14.63s) | 2.97x (43.40s) | 0.75x (10.92s) | 3.32x (48.59s) | PSEventViewer slower than EventViewerX |
+| Large-Scale-100000-Metadata | Core-7.6.4 | Scan | 1.00x (1.80s) | 0.61x (1.09s) | 0.48x (859ms) | 10.85x (19.49s) | PSEventViewer slower than EventViewerX |
+| Large-Scale-100000-StructuredDataAndMessage | Core-7.6.4 | Scan | 1.00x (14.44s) | 3.00x (43.27s) | 0.73x (10.56s) | 3.37x (48.65s) | PSEventViewer slower than EventViewerX |
+<!-- event-log-scale-benchmark:end -->
+
+Remote evidence includes connection/session and network cost. The wrapper pins
+one latest record boundary before the rotated run, and every engine must return
+the same ordered record identities. These AD0 results describe this lab and
+time; the offline scale table remains the reproducible throughput evidence.
+
+<!-- event-log-remote-benchmark:start -->
+| Scenario | Variables | Host | Operation | PSEventViewer | EventViewerX | GetWinEvent | Result |
+| --- | --- | --- | --- | ---: | ---: | ---: | --- |
+| Remote-AD0-Security-Latest-100-Metadata | EventCount=100, LogName=Security, MachineName=AD0 | Core-7.6.4 | Query | 1.00x (69ms) | 0.70x (48ms) | 7.89x (546ms) | PSEventViewer slower than EventViewerX |
+| Remote-AD0-Security-Latest-1000-Metadata | EventCount=1000, LogName=Security, MachineName=AD0 | Core-7.6.4 | Query | 1.00x (377ms) | 0.93x (350ms) | 19.42x (7.32s) | PSEventViewer slower than EventViewerX |
+<!-- event-log-remote-benchmark:end -->
+
+Cold-start measurements launch a fresh process for every sample. They answer
+the Task Scheduler and event-triggered automation question separately from
+steady-state scan throughput.
+
+<!-- event-log-cold-start-benchmark:start -->
+| Scenario | Host | Operation | EventViewerXCli | EventViewerXCliPortable | GetWinEvent | PSEventViewer | Result |
+| --- | --- | --- | ---: | ---: | ---: | ---: | --- |
+| Smoke-Command-Cold-StructuredDataAndMessage | Core-7.6.4 | Scan | 1.00x (115ms) | 1.01x (116ms) | 5.15x (590ms) | 5.14x (590ms) | EventViewerXCli tied with EventViewerXCliPortable |
+<!-- event-log-cold-start-benchmark:end -->
+
+Reporting measurements include the typed query and the requested renderer.
+`All` creates the interactive HTML report, Excel workbook, and compact email
+body in one operation; individual formats avoid work the caller does not need.
+
+<!-- event-log-reporting-benchmark:start -->
+| Scenario | Host | Operation | EventViewerXReport | Result |
+| --- | --- | --- | ---: | --- |
+| Typed-Report-All | Core-7.6.4 | Scan | 1.00x (6.58s) | EventViewerXReport only successful |
+| Typed-Report-Email | Core-7.6.4 | Scan | 1.00x (510ms) | EventViewerXReport only successful |
+| Typed-Report-Excel | Core-7.6.4 | Scan | 1.00x (6.08s) | EventViewerXReport only successful |
+| Typed-Report-Html | Core-7.6.4 | Scan | 1.00x (689ms) | EventViewerXReport only successful |
+<!-- event-log-reporting-benchmark:end -->
 
 <!-- event-log-exact-output-benchmark:start -->
 | Scenario | Host | Operation | Metric | PSEventViewer | DotNet | EventViewerXExport | GetWinEvent | Result |
@@ -580,7 +778,8 @@ and generated multi-gigabyte outputs remain external and temporary.
 
 ## Runtime dependencies
 
-EventViewerX uses the Windows `wevtapi` contract and Microsoft/BCL packages:
+EventViewerX uses the Windows `wevtapi` contract, DnsClientX for optional
+bounded DNS enrichment, and Microsoft/BCL packages such as
 `System.Diagnostics.EventLog`, `System.DirectoryServices` for optional Group
 Policy enrichment, and compatibility packages required by the .NET Framework
 target. PSEventViewer ships the compiled engine and cmdlets; it has no
@@ -598,6 +797,6 @@ built and released from one version source and validated as packed artifacts.
 ```
 
 Browse [the benchmark contract](Benchmarks/EventLogParsing/README.md),
-[the named-rule architecture](Sources/EventViewerX/Rules/README-Rules-System.md),
+[the event-type architecture](Sources/EventViewerX/Rules/README-Rules-System.md),
 the PowerShell [examples](Examples/), and the C#
 [examples](Sources/EventViewerX.Examples/) for deeper integrations.

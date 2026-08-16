@@ -4,47 +4,60 @@ using System.Net;
 namespace EventViewerX;
 
 /// <summary>
-/// Defines a reusable named-event query over the native Windows Event Log engine.
+/// Defines a reusable event-type query over the native Windows Event Log engine.
 /// </summary>
-public sealed class NamedEventQuery {
-    /// <summary>Creates a query for one or more registered named-event rules.</summary>
-    public NamedEventQuery(
-        IEnumerable<NamedEvents> namedEvents) {
+public sealed class EventTypeQuery {
+    /// <summary>Creates a query for one or more registered event-type rules.</summary>
+    public EventTypeQuery(
+        IEnumerable<EventType> types) {
 
-        if (namedEvents == null) {
+        if (types == null) {
             throw new ArgumentNullException(
-                nameof(namedEvents));
+                nameof(types));
         }
-        NamedEvents = namedEvents
+        Types = types
             .Distinct()
             .ToArray();
-        if (NamedEvents.Count == 0) {
+        if (Types.Count == 0) {
             throw new ArgumentException(
-                "At least one named event is required.",
-                nameof(namedEvents));
+                "At least one event type is required.",
+                nameof(types));
         }
-        foreach (NamedEvents namedEvent in NamedEvents) {
+        foreach (EventType type in Types) {
             if (!Enum.IsDefined(
-                    typeof(NamedEvents),
-                    namedEvent)) {
+                    typeof(EventType),
+                    type)) {
                 throw new ArgumentOutOfRangeException(
-                    nameof(namedEvents),
-                    namedEvent,
-                    $"Named event value '{namedEvent}' is not registered.");
+                    nameof(types),
+                    type,
+                    $"Event type value '{type}' is not registered.");
             }
         }
     }
 
-    /// <summary>Named-event rules selected by this query.</summary>
-    public IReadOnlyList<NamedEvents> NamedEvents {
+    /// <summary>Event-type rules selected by this query.</summary>
+    public IReadOnlyList<EventType> Types {
         get;
     }
+
+    /// <summary>
+    /// Optional offline event-log files. The selected <see cref="Types"/> still own
+    /// source channels, event identifiers, projection, and enrichment; paths only
+    /// identify the containers to read.
+    /// </summary>
+    public IReadOnlyList<string>? Paths { get; set; }
 
     /// <summary>Local or remote machines. Null or empty targets the local machine.</summary>
     public IReadOnlyList<string?>? MachineNames {
         get;
         set;
     }
+
+    /// <summary>
+    /// Optional collector channel, normally ForwardedEvents. When set, <see cref="MachineNames"/> identifies
+    /// collector computers and built-in source channels are matched against each event's original Channel value.
+    /// </summary>
+    public string? CollectorLogName { get; set; }
 
     /// <summary>Optional exact source channel.</summary>
     public string? SourceLogName { get; set; }
@@ -55,6 +68,9 @@ public sealed class NamedEventQuery {
         set;
     }
 
+    /// <summary>Optional exact event record identifiers, useful for event-triggered task handoff.</summary>
+    public IReadOnlyCollection<long>? SourceRecordIds { get; set; }
+
     /// <summary>Earliest event time.</summary>
     public DateTime? StartTime { get; set; }
 
@@ -64,7 +80,7 @@ public sealed class NamedEventQuery {
     /// <summary>Relative time window.</summary>
     public TimePeriod? TimePeriod { get; set; }
 
-    /// <summary>Maximum matching named events. Zero streams every match.</summary>
+    /// <summary>Maximum matching typed events. Zero streams every match.</summary>
     public long MaxEvents { get; set; }
 
     /// <summary>Maximum raw candidates evaluated by rules. Zero is unlimited.</summary>
@@ -77,11 +93,11 @@ public sealed class NamedEventQuery {
     public bool Oldest { get; set; }
 
     /// <summary>
-    /// Amount of source event data materialized before named-event projection.
-    /// Full preserves every rule; StructuredData is faster when selected rules use only XML payload fields.
+    /// Amount of source event data materialized before event-type projection.
+    /// StructuredDataAndMessage preserves every built-in rule while avoiding binary attachment decoding.
     /// </summary>
     public EventReadMode ReadMode { get; set; } =
-        EventReadMode.Full;
+        EventReadMode.StructuredDataAndMessage;
 
     /// <summary>Materializes a native bookmark for every projected source event.</summary>
     public bool IncludeBookmark { get; set; }
@@ -120,13 +136,13 @@ public sealed class NamedEventQuery {
     }
 
     /// <summary>Optional ordered post-projection enrichment.</summary>
-    public NamedEventEnrichmentOptions? Enrichment {
+    public EventEnrichmentOptions? Enrichment {
         get;
         set;
     }
 
-    /// <summary>Optional predicate applied after named-event projection.</summary>
-    public Func<NamedEventRecord, bool>? ResultPredicate {
+    /// <summary>Optional predicate applied after event-type projection.</summary>
+    public Func<EventTypeRecord, bool>? ResultPredicate {
         get;
         set;
     }

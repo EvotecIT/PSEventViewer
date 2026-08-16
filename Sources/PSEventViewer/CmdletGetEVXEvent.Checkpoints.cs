@@ -68,12 +68,17 @@ public sealed partial class CmdletGetEVXEvent {
     private string BuildDefaultCheckpointKey() {
         IReadOnlyList<string?> checkpointMachines = GetEffectiveCheckpointMachines();
         string sourceIdentity = ParameterSetName switch {
-            "NamedEvent" => "Named:" +
-                             string.Join(",", NamedEvent.OrderBy(static value => value)) +
+            "Type" => "Named:" +
+                             string.Join(",", Type.OrderBy(static value => value)) +
                              "|Log:" +
                              string.Join(",", LogName
                                  .Select(static log => log.Trim().ToUpperInvariant())
                                  .OrderBy(static log => log, StringComparer.OrdinalIgnoreCase)),
+            "Definition" => "Definition:" + JsonSerializer.Serialize(ResolveEventDefinition()) +
+                            "|Path:" + string.Join(",", Path
+                                .Select(System.IO.Path.GetFullPath)
+                                .Select(static path => path.TrimEnd(System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar).ToUpperInvariant())
+                                .OrderBy(static path => path, StringComparer.OrdinalIgnoreCase)),
             "Path" => "Path:" + string.Join(",", Path
                 .Select(System.IO.Path.GetFullPath)
                 .Select(static path => path.TrimEnd(System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar).ToUpperInvariant())
@@ -250,8 +255,10 @@ public sealed partial class CmdletGetEVXEvent {
             ? string.Join(",", LogName)
             : Path.Length > 0
                 ? string.Join(",", Path)
-                : "unknown";
-        string machines = string.Join(",", MachineName ?? new List<string?>());
+                : ParameterSetName == "Definition"
+                    ? ResolveEventDefinition().Name
+                    : "unknown";
+        string machines = string.Join(",", Collector ?? MachineName ?? new List<string?>());
         return $"{queryIdentity}|{machines}";
     }
 
@@ -259,16 +266,21 @@ public sealed partial class CmdletGetEVXEvent {
     /// Executes the event query based on provided parameters.
     /// </summary>
     private void ValidateRecordOptions() {
-        if (ParameterSetName == "NamedEvent" &&
-            LogName.Length > 1) {
+        if ((ParameterSetName == "Type" || ParameterSetName == "Definition") &&
+            Collector != null &&
+            MachineName != null) {
             throw new PSArgumentException(
-                "Named event queries support at most one -LogName source restriction.");
+                "-Collector and -MachineName cannot be used together. Use -Collector for ForwardedEvents or -MachineName for direct source queries.");
         }
-        if (ExpandData && ReadMode != EventReadMode.StructuredData && ReadMode != EventReadMode.Full) {
-            throw new PSArgumentException("-ExpandData requires -ReadMode StructuredData or Full.");
+        if (ExpandData && ReadMode != EventReadMode.StructuredData &&
+            ReadMode != EventReadMode.Full &&
+            ReadMode != EventReadMode.StructuredDataAndMessage) {
+            throw new PSArgumentException("-ExpandData requires -ReadMode StructuredData, StructuredDataAndMessage, or Full.");
         }
-        if (MessageRegex != null && ReadMode != EventReadMode.Message && ReadMode != EventReadMode.Full) {
-            throw new PSArgumentException("-MessageRegex requires -ReadMode Message or Full.");
+        if (MessageRegex != null && ReadMode != EventReadMode.Message &&
+            ReadMode != EventReadMode.Full &&
+            ReadMode != EventReadMode.StructuredDataAndMessage) {
+            throw new PSArgumentException("-MessageRegex requires -ReadMode Message, StructuredDataAndMessage, or Full.");
         }
     }
 
@@ -358,7 +370,8 @@ public sealed partial class CmdletGetEVXEvent {
     }
 
     private bool UsesDerivedCheckpointKeys() {
-        return ParameterSetName == "NamedEvent" ||
+        return ParameterSetName == "Type" ||
+               ParameterSetName == "Definition" ||
                GetCheckpointSourceCount() > 1 ||
                GetEffectiveCheckpointMachines().Count > 1 ||
                (ParameterSetName == "Channel" &&

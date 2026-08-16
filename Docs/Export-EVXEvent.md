@@ -413,7 +413,7 @@ XML always streams the raw native event XML and ignores this value.
 Type: EventReadMode
 Parameter Sets: Path, Channel, Provider, Xml
 Aliases: None
-Possible values: Metadata, Message, StructuredData, RawXml, Full
+Possible values: Metadata, Message, StructuredData, RawXml, Full, StructuredDataAndMessage
 
 Required: False
 Position: named

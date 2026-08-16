@@ -34,6 +34,14 @@ public sealed class CmdletNewEVXCollectorSubscription : PSCmdlet {
     [Parameter(Mandatory = true, Position = 2, ParameterSetName = "TypedFilter")]
     public string LogName { get; set; } = string.Empty;
 
+    /// <summary>Built-in leaf or composite event types. Their definitions own source channels and event IDs.</summary>
+    [Parameter(Mandatory = true, Position = 2, ParameterSetName = "Type")]
+    public EventType[] Type { get; set; } = Array.Empty<EventType>();
+
+    /// <summary>Custom typed definition or JSON definition path.</summary>
+    [Parameter(Mandatory = true, Position = 2, ParameterSetName = "Definition")]
+    public object? Definition { get; set; }
+
     /// <summary>Reusable typed event filter.</summary>
     [Parameter(Mandatory = true, ParameterSetName = "TypedFilter")]
     public EventFilter? Filter { get; set; }
@@ -154,6 +162,15 @@ public sealed class CmdletNewEVXCollectorSubscription : PSCmdlet {
         string queryXml;
         if (ParameterSetName == "QueryXml") {
             queryXml = QueryXml!;
+        } else if (ParameterSetName == "Type") {
+            queryXml = EventDefinitionCompiler.BuildQueryXml(Type);
+        } else if (ParameterSetName == "Definition") {
+            EventDefinition customDefinition = Definition switch {
+                EventDefinition typed => typed,
+                string path => EventDefinition.Load(path),
+                _ => throw new PSArgumentException("Definition must be an EventDefinition instance or a JSON file path.", nameof(Definition))
+            };
+            queryXml = EventDefinitionCompiler.BuildQueryXml(customDefinition);
         } else {
             EventFilter filter;
             if (ParameterSetName == "TypedFilter") {

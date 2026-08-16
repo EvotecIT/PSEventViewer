@@ -1,8 +1,8 @@
-﻿namespace EventViewerX {
+namespace EventViewerX {
     /// <summary>
-    /// Defines the named events that can be searched for
+    /// Defines the built-in event types that can be queried.
     /// </summary>
-    public enum NamedEvents {
+    public enum EventType {
         /// <summary>
         /// Active Directory computer account created or modified
         /// </summary>
@@ -401,5 +401,35 @@
         /// Network adapter entered promiscuous mode (events 10400, 10401)
         /// </summary>
         NetworkPromiscuousMode,
+
+        /// <summary>Composite view of Active Directory authentication activity.</summary>
+        ActiveDirectoryAuthentication,
+
+        /// <summary>Composite view of Active Directory account and object lifecycle activity.</summary>
+        ActiveDirectoryAccountLifecycle,
+
+        /// <summary>Composite view of Active Directory changes, including accounts, objects, and Group Policy.</summary>
+        ActiveDirectoryChanges,
+
+        /// <summary>Composite view of Group Policy changes and client processing.</summary>
+        GroupPolicyActivity,
+
+        /// <summary>Composite view of Kerberos ticket and policy activity.</summary>
+        KerberosActivity,
+
+        /// <summary>Composite view of operating-system startup, shutdown, crash, and time changes.</summary>
+        OperatingSystemLifecycle,
+
+        /// <summary>Composite view of Windows security-control changes and sensitive activity.</summary>
+        WindowsSecurityChanges,
+
+        /// <summary>Composite view of Microsoft Entra Connect and directory synchronization health.</summary>
+        EntraConnectHealth,
+
+        /// <summary>Composite view of network access, firewall, monitoring, and SMB security activity.</summary>
+        NetworkSecurity,
+
+        /// <summary>Composite view of infrastructure service health across Windows workloads.</summary>
+        InfrastructureHealth,
     }
 }

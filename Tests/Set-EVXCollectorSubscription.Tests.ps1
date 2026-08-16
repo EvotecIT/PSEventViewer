@@ -3,6 +3,7 @@ Describe 'Set-EVXCollectorSubscription' {
         $Command = Get-Command Set-EVXCollectorSubscription
         $Command.Parameters.Keys | Should -Contain 'Name'
         $Command.Parameters.Keys | Should -Contain 'Enabled'
+        $Command.Parameters.Keys | Should -Contain 'Remove'
         $Command.Parameters.Keys | Should -Contain 'WhatIf'
         $Command.Parameters.Keys | Should -Contain 'Confirm'
     }
@@ -18,6 +19,20 @@ Describe 'Set-EVXCollectorSubscription' {
                 -ErrorAction Stop
         } | Should -Throw
         Get-EVXCollectorSubscription -Name $Name |
+            Should -BeNullOrEmpty
+    }
+
+    It 'exposes removal through the existing cmdlet parameter sets' {
+        $Command = Get-Command Set-EVXCollectorSubscription
+        $Command.ParameterSets.Name | Should -Contain 'Remove'
+        ($Command.ParameterSets |
+                Where-Object Name -EQ 'Remove').Parameters.Name |
+            Should -Contain 'Remove'
+
+        Set-EVXCollectorSubscription `
+            -Name 'PSEventViewer-WhatIf-Removal' `
+            -Remove `
+            -WhatIf |
             Should -BeNullOrEmpty
     }
 }

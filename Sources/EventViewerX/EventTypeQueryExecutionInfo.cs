@@ -3,19 +3,19 @@ using System.Collections.Concurrent;
 namespace EventViewerX;
 
 /// <summary>
-/// Reports candidate-scan progress for a named-event query.
+/// Reports candidate-scan progress for an event-type query.
 /// </summary>
-public sealed class NamedEventsQueryExecutionInfo {
+public sealed class EventTypeQueryExecutionInfo {
     private readonly ConcurrentDictionary<string, EventLogQueryTargetFailure> _targetFailures =
         new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
-    /// Number of candidate event records evaluated by named-event rules.
+    /// Number of candidate event records evaluated by event-type rules.
     /// </summary>
     public long EventsScanned { get; internal set; }
 
     /// <summary>
-    /// Number of named-event matches emitted to the caller.
+    /// Number of typed event matches emitted to the caller.
     /// </summary>
     public long EventsEmitted { get; internal set; }
 
@@ -57,14 +57,14 @@ public sealed class NamedEventsQueryExecutionInfo {
     }
 }
 
-internal sealed class NamedEventCandidateCounter {
-    private readonly NamedEventsQueryExecutionInfo _executionInfo;
+internal sealed class EventTypeCandidateCounter {
+    private readonly EventTypeQueryExecutionInfo _executionInfo;
     private readonly long _maxEventsScanned;
     private long _eventsScanned;
 
-    internal NamedEventCandidateCounter(
+    internal EventTypeCandidateCounter(
         long maxEventsScanned,
-        NamedEventsQueryExecutionInfo executionInfo) {
+        EventTypeQueryExecutionInfo executionInfo) {
 
         _maxEventsScanned = maxEventsScanned;
         _executionInfo = executionInfo;

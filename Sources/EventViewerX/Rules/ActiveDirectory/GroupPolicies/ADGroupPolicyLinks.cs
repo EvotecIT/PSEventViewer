@@ -82,7 +82,7 @@ public class ADGroupPolicyLinks : EventRuleBase {
     /// <inheritdoc />
     public override string LogName => "Security";
     /// <inheritdoc />
-    public override NamedEvents NamedEvent => NamedEvents.ADGroupPolicyLinks;
+    public override EventType Type => EventType.ADGroupPolicyLinks;
 
     /// <summary>Handles gpLink attribute changes on domain/OU/site objects.</summary>
     public override bool CanHandle(EventObject eventObject) {
@@ -100,7 +100,7 @@ public class ADGroupPolicyLinks : EventRuleBase {
     /// <summary>Initialises a GPO link/unlink wrapper from an event record.</summary>
     public ADGroupPolicyLinks(EventObject eventObject) : base(eventObject) {
         SourceEvent = eventObject;
-        NamedEventName = "ADGroupPolicyLinks";
+        TypeName = "ADGroupPolicyLinks";
         Computer = SourceEvent.ComputerName;
         //Action = SourceEvent.MessageSubject;
         LinkedToType = SourceEvent.GetValueFromDataDictionary("ObjectClass");

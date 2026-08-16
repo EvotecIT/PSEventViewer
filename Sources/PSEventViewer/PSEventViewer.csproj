@@ -20,6 +20,7 @@
     </ItemGroup>
   <ItemGroup>
       <ProjectReference Include="..\EventViewerX\EventViewerX.csproj" />
+      <ProjectReference Include="..\EventViewerX.Reporting\EventViewerX.Reporting.csproj" />
   </ItemGroup>
 
   <ItemGroup Condition=" '$(TargetFramework)' == 'net472' ">
@@ -47,6 +48,7 @@
         <Using Include="System.Net" />
         <Using Include="System.Diagnostics" />
         <Using Include="EventViewerX" />
+        <Using Include="EventViewerX.Reporting" />
     </ItemGroup>
 
     <!-- We need to remove PowerShell conflicting libraries as it will break output -->

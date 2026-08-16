@@ -20,7 +20,7 @@ public class TestNamedEventsTimelineQueryExecutor {
     public async Task TryBuildAsync_ShouldFailWhenTimeRangeInvalid() {
         var (result, failure) = await NamedEventsTimelineQueryExecutor.TryBuildAsync(
             new NamedEventsTimelineQueryRequest {
-                NamedEvents = new[] { NamedEvents.ADUserLogon },
+                EventType = new[] { EventType.ADUserLogon },
                 StartTimeUtc = new DateTime(2026, 2, 20, 11, 0, 0, DateTimeKind.Utc),
                 EndTimeUtc = new DateTime(2026, 2, 20, 10, 0, 0, DateTimeKind.Utc)
             });
@@ -35,7 +35,7 @@ public class TestNamedEventsTimelineQueryExecutor {
     public async Task TryBuildAsync_ShouldFailWhenTimePeriodCombinedWithRange() {
         var (result, failure) = await NamedEventsTimelineQueryExecutor.TryBuildAsync(
             new NamedEventsTimelineQueryRequest {
-                NamedEvents = new[] { NamedEvents.ADUserLogon },
+                EventType = new[] { EventType.ADUserLogon },
                 TimePeriod = TimePeriod.Last1Hour,
                 StartTimeUtc = new DateTime(2026, 2, 20, 10, 0, 0, DateTimeKind.Utc)
             });
@@ -50,7 +50,7 @@ public class TestNamedEventsTimelineQueryExecutor {
     public async Task TryBuildAsync_ShouldFailWhenCorrelationKeyInvalid() {
         var (result, failure) = await NamedEventsTimelineQueryExecutor.TryBuildAsync(
             new NamedEventsTimelineQueryRequest {
-                NamedEvents = new[] { NamedEvents.ADUserLogon },
+                EventType = new[] { EventType.ADUserLogon },
                 CorrelationKeys = new[] { "invalid_dimension" }
             });
 
@@ -64,7 +64,7 @@ public class TestNamedEventsTimelineQueryExecutor {
     public async Task TryBuildAsync_ShouldFailWhenEventIdsContainNonPositiveValues() {
         var (result, failure) = await NamedEventsTimelineQueryExecutor.TryBuildAsync(
             new NamedEventsTimelineQueryRequest {
-                NamedEvents = new[] { NamedEvents.ADUserLogon },
+                EventType = new[] { EventType.ADUserLogon },
                 EventIds = new[] { 4624, 0 }
             });
 
@@ -78,7 +78,7 @@ public class TestNamedEventsTimelineQueryExecutor {
     public async Task TryBuildAsync_ShouldFailWhenCandidateScanLimitIsNegative() {
         var (result, failure) = await NamedEventsTimelineQueryExecutor.TryBuildAsync(
             new NamedEventsTimelineQueryRequest {
-                NamedEvents = new[] { NamedEvents.ADUserLogon },
+                EventType = new[] { EventType.ADUserLogon },
                 MaxEventsScanned = -1
             });
 
@@ -193,7 +193,7 @@ public class TestNamedEventsTimelineQueryExecutor {
 
     [Fact]
     public void ApplyTargetFailuresMarksPartialReportsIncompleteAndTruncated() {
-        var queryInfo = new NamedEventsQueryExecutionInfo();
+        var queryInfo = new EventTypeQueryExecutionInfo();
         queryInfo.Reset(maxEventsScanned: 0);
         queryInfo.RecordTargetFailure(
             new EventLogQueryTargetFailure("AD2", "System", EventLogRemoteQueryFailureKind.HostUnavailable, "offline"));
@@ -209,7 +209,7 @@ public class TestNamedEventsTimelineQueryExecutor {
         Assert.Equal(EventLogRemoteQueryFailureKind.HostUnavailable, failure.Kind);
     }
 
-    private sealed class PayloadTestSlim : NamedEventRecord {
+    private sealed class PayloadTestSlim : EventTypeRecord {
         private PayloadTestSlim(EventObject eventObject) : base(eventObject) {
         }
 

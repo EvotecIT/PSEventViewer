@@ -23,7 +23,7 @@ public class ADGroupCreateDelete : EventRuleBase {
     public override string LogName => "Security";
 
     /// <inheritdoc />
-    public override NamedEvents NamedEvent => NamedEvents.ADGroupCreateDelete;
+    public override EventType Type => EventType.ADGroupCreateDelete;
 
     /// <summary>Accepts matching Security log events without extra filtering.</summary>
     public override bool CanHandle(EventObject eventObject) {
@@ -49,7 +49,7 @@ public class ADGroupCreateDelete : EventRuleBase {
     /// <summary>Initialises a group creation/deletion wrapper from an event record.</summary>
     public ADGroupCreateDelete(EventObject eventObject) : base(eventObject) {
         SourceEvent = eventObject;
-        NamedEventName = "ADGroupCreateDelete";
+        TypeName = "ADGroupCreateDelete";
 
         Computer = SourceEvent.ComputerName;
         Action = SourceEvent.MessageSubject;

@@ -477,6 +477,16 @@ public sealed class TestNativeEventEngineContracts {
     }
 
     [Fact]
+    public void TypedQueriesDefaultToMessageAndStructuredDataWithoutAttachments() {
+        var query = new EventTypeQuery(
+            new[] { EventType.ADUserLogonFailed });
+
+        Assert.Equal(
+            EventReadMode.StructuredDataAndMessage,
+            query.ReadMode);
+    }
+
+    [Fact]
     public void LocalChannelRejectsCredentialsInsteadOfSilentlyIgnoringThem() {
         if (!OperatingSystem.IsWindows()) return;
         var query = new EventLogChannelQuery("System") {

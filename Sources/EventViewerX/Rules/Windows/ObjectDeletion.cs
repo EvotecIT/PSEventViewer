@@ -10,7 +10,7 @@ public class ObjectDeletion : EventRuleBase {
     /// <inheritdoc />
     public override string LogName => "Security";
     /// <inheritdoc />
-    public override NamedEvents NamedEvent => NamedEvents.ObjectDeletion;
+    public override EventType Type => EventType.ObjectDeletion;
 
     /// <summary>Accepts object deletion events (4660) in the Security log.</summary>
     public override bool CanHandle(EventObject eventObject) {
@@ -28,7 +28,7 @@ public class ObjectDeletion : EventRuleBase {
     /// <summary>Initialises an object deletion wrapper from an event record.</summary>
     public ObjectDeletion(EventObject eventObject) : base(eventObject) {
         SourceEvent = eventObject;
-        NamedEventName = "ObjectDeletion";
+        TypeName = "ObjectDeletion";
         Computer = SourceEvent.ComputerName;
         Path = SourceEvent.GetValueFromDataDictionary("ObjectName");
         Who = SourceEvent.GetSubjectAccountOrEmpty();

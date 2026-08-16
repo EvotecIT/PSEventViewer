@@ -16,6 +16,11 @@ Definition input creates or updates a subscription through the Windows inbox col
 Set-EVXCollectorSubscription [-Name] <string> -Enabled <bool> [-WhatIf] [-Confirm] [<CommonParameters>]
 ```
 
+### Remove
+```powershell
+Set-EVXCollectorSubscription [-Name] <string> -Remove [-WhatIf] [-Confirm] [<CommonParameters>]
+```
+
 ### Definition
 ```powershell
 Set-EVXCollectorSubscription -Definition <CollectorSubscriptionDefinition> [-WhatIf] [-Confirm] [<CommonParameters>]
@@ -41,6 +46,13 @@ New-EVXCollectorSubscription -Name FailedLogons -SourceComputer DC01,DC02 -LogNa
 ```
 
 Applies the typed definition transactionally and verifies the persisted Windows configuration.
+
+### EXAMPLE 3
+```powershell
+Set-EVXCollectorSubscription -Name FailedLogons -Remove
+```
+
+Deletes the local subscription through the inbox collector utility and verifies that it is absent.
 
 ## PARAMETERS
 
@@ -81,7 +93,7 @@ Exact local collector subscription name.
 
 ```yaml
 Type: String
-Parameter Sets: Enabled
+Parameter Sets: Enabled, Remove
 Aliases: SubscriptionName
 Possible values:
 
@@ -89,6 +101,22 @@ Required: True
 Position: 0
 Default value: None
 Accept pipeline input: True (ByPropertyName)
+Accept wildcard characters: False
+```
+
+### -Remove
+Removes the named local collector subscription.
+
+```yaml
+Type: SwitchParameter
+Parameter Sets: Remove
+Aliases: None
+Possible values:
+
+Required: True
+Position: named
+Default value: None
+Accept pipeline input: False
 Accept wildcard characters: False
 ```
 
@@ -103,6 +131,7 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 ## OUTPUTS
 
 - `EventViewerX.CollectorSubscriptionUpdateResult`
+- `EventViewerX.CollectorSubscriptionRemovalResult`
 - `EventViewerX.CollectorSubscriptionSnapshot`
 
 ## RELATED LINKS

@@ -85,21 +85,40 @@ public sealed partial class CmdletGetEVXEvent {
                             source.Kind ==
                             EventLogQuerySourceKind.File))
                     .ToArray();
-            case "NamedEvent":
-                IReadOnlyList<string> namedSources = NamedEventCatalog
-                    .GetEventInfoForNamedEvents(NamedEvent.ToList())
+            case "Type":
+                if (Path.Length > 0) {
+                    return ExpandFilePaths(Path, nameof(Path))
+                        .Select(static path => new CheckpointSource(path, isFile: true))
+                        .ToArray();
+                }
+                if (Collector != null) {
+                    return new[] {
+                        new CheckpointSource(
+                            "ForwardedEvents",
+                            isFile: false)
+                    };
+                }
+                IReadOnlyList<string> namedSources = EventTypeCatalog
+                    .GetSourceMap(Type)
                     .Keys
                     .ToArray();
-                return (LogName.Length == 0
-                    ? namedSources
-                    : namedSources
-                        .Where(source => string.Equals(
-                            source,
-                            LogName[0],
-                            StringComparison.OrdinalIgnoreCase))
-                        .ToArray())
+                return namedSources
                     .Select(static source =>
                         new CheckpointSource(source, isFile: false))
+                    .ToArray();
+            case "Definition":
+                if (Path.Length > 0) {
+                    return ExpandFilePaths(Path, nameof(Path))
+                        .Select(static path => new CheckpointSource(path, isFile: true))
+                        .ToArray();
+                }
+                if (Collector != null) {
+                    return new[] { new CheckpointSource("ForwardedEvents", isFile: false) };
+                }
+                return ResolveEventDefinition().Sources
+                    .Select(static source => source.LogName)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .Select(static source => new CheckpointSource(source, isFile: false))
                     .ToArray();
             case "Channel":
                 return ExpandCheckpointChannels(

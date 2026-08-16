@@ -79,7 +79,7 @@ namespace EventViewerX.Rules.ActiveDirectory {
     /// <inheritdoc />
     public override string LogName => "Security";
     /// <inheritdoc />
-    public override NamedEvents NamedEvent => NamedEvents.ADOrganizationalUnitChangeDetailed;
+    public override EventType Type => EventType.ADOrganizationalUnitChangeDetailed;
 
     /// <summary>Handles OU object events, ignoring the qPLik attribute noise.</summary>
     public override bool CanHandle(EventObject eventObject) {
@@ -95,7 +95,7 @@ namespace EventViewerX.Rules.ActiveDirectory {
         public ADOrganizationalUnitChangeDetailed(EventObject eventObject) : base(eventObject) {
             // common fields
             SourceEvent = eventObject;
-            NamedEventName = "ADOrganizationalUnitChangeDetailed";
+            TypeName = "ADOrganizationalUnitChangeDetailed";
             Computer = SourceEvent.ComputerName;
             Action = SourceEvent.MessageSubject;
             Who = SourceEvent.GetSubjectAccountOrEmpty();

@@ -14,7 +14,7 @@ public class AADSyncProvisionCredentialsPing : EventRuleBase
     /// <inheritdoc />
     public override string LogName => "Application";
     /// <inheritdoc />
-    public override NamedEvents NamedEvent => NamedEvents.AADSyncProvisionCredentialsPing;
+    public override EventType Type => EventType.AADSyncProvisionCredentialsPing;
 
     /// <summary>Accepts Directory Synchronization credential ping events.</summary>
     /// <param name="eventObject">Event to evaluate.</param>
@@ -47,7 +47,7 @@ public class AADSyncProvisionCredentialsPing : EventRuleBase
     public AADSyncProvisionCredentialsPing(EventObject eventObject) : base(eventObject)
     {
         SourceEvent = eventObject;
-        NamedEventName = "AADSyncProvisionCredentialsPing";
+        TypeName = "AADSyncProvisionCredentialsPing";
         Computer = SourceEvent.ComputerName;
         When = SourceEvent.TimeCreated;
 

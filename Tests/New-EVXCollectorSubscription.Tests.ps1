@@ -58,4 +58,19 @@ Describe 'New-EVXCollectorSubscription' {
         Get-EVXCollectorSubscription -Name $Definition.SubscriptionId |
             Should -BeNullOrEmpty
     }
+
+    It 'compiles a built-in Type without a caller-supplied LogName' {
+        $Definition = New-EVXCollectorSubscription `
+            -Name FailedLogons `
+            -SourceComputer DC01 `
+            -Type ADUserLogonFailed `
+            -Enabled $false
+
+        [xml] $Query = $Definition.QueryXml
+        $Query.QueryList.Query.Path | Should -Contain 'Security'
+        ($Definition.QueryXml) | Should -Match '4625'
+        ((Get-Command New-EVXCollectorSubscription).ParameterSets |
+                Where-Object Name -EQ 'Type').Parameters.Name |
+            Should -Not -Contain 'LogName'
+    }
 }

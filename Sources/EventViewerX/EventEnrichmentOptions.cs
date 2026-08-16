@@ -1,11 +1,11 @@
 namespace EventViewerX;
 
 /// <summary>
-/// Controls optional work performed after a raw event has been projected into a named event.
+/// Controls optional work performed after a raw event has been projected into an event type.
 /// </summary>
-public sealed class NamedEventEnrichmentOptions {
+public sealed class EventEnrichmentOptions {
     /// <summary>
-    /// Gets or sets whether named events with client addresses should be enriched with reverse-DNS names.
+    /// Gets or sets whether typed events with client addresses should be enriched with reverse-DNS names.
     /// </summary>
     public bool ResolveDns { get; set; }
 

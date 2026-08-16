@@ -10,7 +10,7 @@ public class OSShutdown : EventRuleBase {
     /// <inheritdoc />
     public override string LogName => "System";
     /// <inheritdoc />
-    public override NamedEvents NamedEvent => NamedEvents.OSShutdown;
+    public override EventType Type => EventType.OSShutdown;
 
     /// <summary>Accepts kernel general shutdown events.</summary>
     public override bool CanHandle(EventObject eventObject) {
@@ -35,7 +35,7 @@ public class OSShutdown : EventRuleBase {
     /// <summary>Initialises an OS shutdown wrapper from an event record.</summary>
     public OSShutdown(EventObject eventObject) : base(eventObject) {
         SourceEvent = eventObject;
-        NamedEventName = "OSShutdown";
+        TypeName = "OSShutdown";
         Computer = SourceEvent.ComputerName;
         Action = "System Shutdown";
         ObjectAffected = SourceEvent.MachineName;

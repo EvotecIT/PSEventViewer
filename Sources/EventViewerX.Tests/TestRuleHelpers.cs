@@ -46,6 +46,21 @@ public class TestRuleHelpers
     }
 
     [Fact]
+    public void IsChannel_UsesOriginalChannelForForwardedEvents()
+    {
+        var eo = BuildEventObject(
+            message: string.Empty,
+            provider: "Test",
+            containerLog: "ForwardedEvents",
+            originalLog: "Security");
+
+        Assert.True(Rules.RuleHelpers.IsChannel(eo, "security"));
+        Assert.False(Rules.RuleHelpers.IsChannel(eo, "ForwardedEvents"));
+        Assert.Equal("Security", eo.OriginalLogName);
+        Assert.Equal("ForwardedEvents", eo.ContainerLogName);
+    }
+
+    [Fact]
     public void GetMessage_PrefersLongestAvailable()
     {
         var data = new Dictionary<string, string> { { "NoNameA0", "DataFallback" } };
@@ -61,11 +76,11 @@ public class TestRuleHelpers
         Assert.Equal("FromData", Rules.RuleHelpers.GetMessage(eo));
     }
 
-    private static EventObject BuildEventObject(string message, string provider, string containerLog, Dictionary<string, string>? data = null, string messageSubject = "")
+    private static EventObject BuildEventObject(string message, string provider, string containerLog, Dictionary<string, string>? data = null, string messageSubject = "", string? originalLog = null)
     {
         var record = (FakeEventRecord)FormatterServices.GetUninitializedObject(typeof(FakeEventRecord));
         SetField(record, "_provider", provider);
-        SetField(record, "_log", containerLog);
+        SetField(record, "_log", originalLog ?? containerLog);
         SetField(record, "_message", message);
 
         var eo = new EventObject(record, "local", EventReadMode.Message);

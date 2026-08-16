@@ -10,7 +10,7 @@ public class OSBugCheck : EventRuleBase {
     /// <inheritdoc />
     public override string LogName => "System";
     /// <inheritdoc />
-    public override NamedEvents NamedEvent => NamedEvents.OSBugCheck;
+    public override EventType Type => EventType.OSBugCheck;
 
     /// <summary>Accepts any bugcheck (1001) event in the System log.</summary>
     public override bool CanHandle(EventObject eventObject) {
@@ -39,7 +39,7 @@ public class OSBugCheck : EventRuleBase {
     /// <summary>Initialises a bugcheck wrapper from an event record.</summary>
     public OSBugCheck(EventObject eventObject) : base(eventObject) {
         SourceEvent = eventObject;
-        NamedEventName = "OSBugCheck";
+        TypeName = "OSBugCheck";
         Computer = SourceEvent.ComputerName;
         BugCheckCode = SourceEvent.GetValueFromDataDictionary("BugcheckCode", "param1");
         Parameter1 = SourceEvent.GetValueFromDataDictionary("BugcheckParameter1", "param2");

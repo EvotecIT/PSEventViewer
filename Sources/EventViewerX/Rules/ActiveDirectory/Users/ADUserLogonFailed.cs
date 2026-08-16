@@ -30,7 +30,7 @@ public class ADUserLogonFailed : EventRuleBase {
     /// <inheritdoc />
     public override string LogName => "Security";
     /// <inheritdoc />
-    public override NamedEvents NamedEvent => NamedEvents.ADUserLogonFailed;
+    public override EventType Type => EventType.ADUserLogonFailed;
 
     /// <summary>Accepts any 4625 logon failure events in the Security log.</summary>
     public override bool CanHandle(EventObject eventObject) {
@@ -130,7 +130,7 @@ public class ADUserLogonFailed : EventRuleBase {
     /// <summary>Initialises a failed logon wrapper from an event record.</summary>
     public ADUserLogonFailed(EventObject eventObject) : base(eventObject) {
         SourceEvent = eventObject;
-        NamedEventName = "ADUserLogonFailed";
+        TypeName = "ADUserLogonFailed";
         Computer = SourceEvent.ComputerName;
         Action = SourceEvent.MessageSubject;
         //Who = SourceEvent.GetSubjectAccountOrEmpty();

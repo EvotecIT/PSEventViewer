@@ -32,7 +32,8 @@ internal sealed class WindowsEventSnapshotProjector : IDisposable {
         try {
             systemRenderer = new WindowsEventSystemRenderer();
             if (readMode == EventReadMode.Message ||
-                readMode == EventReadMode.Full) {
+                readMode == EventReadMode.Full ||
+                readMode == EventReadMode.StructuredDataAndMessage) {
                 messageRenderer = new WindowsEventMessageRenderer(
                     session,
                     null,
@@ -40,7 +41,8 @@ internal sealed class WindowsEventSnapshotProjector : IDisposable {
                     fallbackMessageLocale);
             }
             if (readMode == EventReadMode.StructuredData ||
-                readMode == EventReadMode.Full) {
+                readMode == EventReadMode.Full ||
+                readMode == EventReadMode.StructuredDataAndMessage) {
                 payloadRenderer = new WindowsEventPayloadRenderer();
             }
             if (includeBookmark &&
@@ -101,6 +103,7 @@ internal sealed class WindowsEventSnapshotProjector : IDisposable {
                     _queriedMachine,
                     _containerLog);
             case EventReadMode.Full:
+            case EventReadMode.StructuredDataAndMessage:
                 NativeEventMessage message =
                     _messageRenderer!.Render(
                         eventHandle,
@@ -115,7 +118,8 @@ internal sealed class WindowsEventSnapshotProjector : IDisposable {
                 return new EventObject(
                     new NativeEventFull(message, structured),
                     _queriedMachine,
-                    _containerLog);
+                    _containerLog,
+                    _readMode);
             default:
                 throw new ArgumentOutOfRangeException(
                     nameof(_readMode),

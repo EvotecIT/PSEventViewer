@@ -10,7 +10,7 @@ public class FirewallRuleChange : EventRuleBase {
     /// <inheritdoc />
     public override string LogName => "Security";
     /// <inheritdoc />
-    public override NamedEvents NamedEvent => NamedEvents.FirewallRuleChange;
+    public override EventType Type => EventType.FirewallRuleChange;
 
     /// <summary>Accepts firewall rule modification events from auditing or firewall providers.</summary>
     public override bool CanHandle(EventObject eventObject) {
@@ -30,7 +30,7 @@ public class FirewallRuleChange : EventRuleBase {
     /// <summary>Initialises a firewall rule change wrapper from an event record.</summary>
     public FirewallRuleChange(EventObject eventObject) : base(eventObject) {
         SourceEvent = eventObject;
-        NamedEventName = "FirewallRuleChange";
+        TypeName = "FirewallRuleChange";
         Computer = SourceEvent.ComputerName;
         Action = SourceEvent.MessageSubject;
         RuleName = SourceEvent.GetValueFromDataDictionary("RuleName");

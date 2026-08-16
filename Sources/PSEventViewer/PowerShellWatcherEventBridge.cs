@@ -6,12 +6,12 @@ using EventViewerX;
 namespace PSEventViewer;
 
 internal sealed class PowerShellWatcherEventArgs : EventArgs {
-    internal PowerShellWatcherEventArgs(EventObject eventObject) {
+    internal PowerShellWatcherEventArgs(object eventObject) {
         EventObject = eventObject;
     }
 
     /// <summary>The detached event snapshot delivered to the PowerShell action.</summary>
-    public EventObject EventObject { get; }
+    public object EventObject { get; }
 }
 
 internal sealed class PowerShellWatcherEventBridge {
@@ -27,7 +27,7 @@ internal sealed class PowerShellWatcherEventBridge {
     /// <summary>Raised when the native event-log callback publishes a detached event snapshot.</summary>
     public event EventHandler<PowerShellWatcherEventArgs>? EventReceived;
 
-    internal void Publish(EventObject eventObject) {
+    internal void Publish(object eventObject) {
         EventHandler<PowerShellWatcherEventArgs>? handler =
             EventReceived;
         if (handler == null) {

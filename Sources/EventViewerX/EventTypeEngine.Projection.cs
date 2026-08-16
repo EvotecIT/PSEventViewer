@@ -11,29 +11,29 @@ using System.Threading;
 using System.Threading.Tasks;
 
 namespace EventViewerX {
-    public static partial class NamedEventEngine {
+    public static partial class EventTypeEngine {
         /// <summary>
-        /// Builds the appropriate event object based on the NamedEvents value
+        /// Builds the appropriate event object based on the EventType value
         /// </summary>
     /// <param name="eventObject">Event to evaluate.</param>
     /// <param name="typeEventsList">List of target event types.</param>
     /// <returns>Concrete event rule instance or null.</returns>
     /// <exception cref="ArgumentException"></exception>
-        private static NamedEventRecord? BuildTargetEvents(EventObject eventObject, IReadOnlyList<NamedEvents> typeEventsList) {
+        private static EventTypeRecord? BuildTargetEvents(EventObject eventObject, IReadOnlyList<EventType> typeEventsList) {
             // Use the new reflection-based system - let each rule decide if it can handle the event
-            return NamedEventCatalog.CreateEventRule(eventObject, typeEventsList.ToList());
+            return EventTypeCatalog.CreateEventRule(eventObject, typeEventsList.ToList());
         }
 
         /// <summary>
         /// Projects and enriches an event before it becomes eligible for checkpoint observation.
         /// </summary>
-        private static async Task<NamedEventRecord?> BuildAndEnrichTargetAsync(
+        private static async Task<EventTypeRecord?> BuildAndEnrichTargetAsync(
             EventObject eventObject,
-            IReadOnlyList<NamedEvents> typeEventsList,
-            NamedEventEnricher? enricher,
+            IReadOnlyList<EventType> typeEventsList,
+            EventEnricher? enricher,
             CancellationToken cancellationToken) {
 
-            NamedEventRecord? targetEvent = BuildTargetEvents(eventObject, typeEventsList);
+            EventTypeRecord? targetEvent = BuildTargetEvents(eventObject, typeEventsList);
             if (targetEvent != null && enricher != null) {
                 await enricher.EnrichAsync(targetEvent, cancellationToken).ConfigureAwait(false);
             }
@@ -44,10 +44,10 @@ namespace EventViewerX {
         /// Projects a bounded batch concurrently, then exposes it in source order so observers and checkpoints
         /// cannot move past an event whose projection or enrichment has not completed.
         /// </summary>
-        internal static async IAsyncEnumerable<NamedEventProjection> ProjectCandidatesInOrderAsync(
+        internal static async IAsyncEnumerable<EventTypeProjection> ProjectCandidatesInOrderAsync(
             IAsyncEnumerable<EventObject> candidates,
-            IReadOnlyList<NamedEvents> typeEventsList,
-            NamedEventEnricher? enricher,
+            IReadOnlyList<EventType> typeEventsList,
+            EventEnricher? enricher,
             Func<bool> candidateAdmission,
             Action<EventObject>? candidateObserver,
             [EnumeratorCancellation] CancellationToken cancellationToken) {
@@ -55,7 +55,7 @@ namespace EventViewerX {
             int batchSize = enricher?.MaxConcurrency ?? 1;
             await using IAsyncEnumerator<EventObject> enumerator = candidates.GetAsyncEnumerator(cancellationToken);
             while (true) {
-                var batch = new List<PendingNamedEventProjection>(batchSize);
+                var batch = new List<PendingEventTypeProjection>(batchSize);
                 bool stopAfterBatch = false;
                 while (batch.Count < batchSize && await enumerator.MoveNextAsync().ConfigureAwait(false)) {
                     cancellationToken.ThrowIfCancellationRequested();
@@ -65,7 +65,7 @@ namespace EventViewerX {
                         break;
                     }
 
-                    batch.Add(new PendingNamedEventProjection(
+                    batch.Add(new PendingEventTypeProjection(
                         source,
                         BuildAndEnrichTargetAsync(source, typeEventsList, enricher, cancellationToken)));
                 }
@@ -74,16 +74,16 @@ namespace EventViewerX {
                     yield break;
                 }
 
-                var targetTasks = new Task<NamedEventRecord?>[batch.Count];
+                var targetTasks = new Task<EventTypeRecord?>[batch.Count];
                 for (int index = 0; index < batch.Count; index++) {
                     targetTasks[index] = batch[index].TargetTask;
                 }
-                NamedEventRecord?[] targets = await Task.WhenAll(targetTasks).ConfigureAwait(false);
+                EventTypeRecord?[] targets = await Task.WhenAll(targetTasks).ConfigureAwait(false);
                 cancellationToken.ThrowIfCancellationRequested();
                 for (int index = 0; index < batch.Count; index++) {
                     cancellationToken.ThrowIfCancellationRequested();
                     candidateObserver?.Invoke(batch[index].Source);
-                    yield return new NamedEventProjection(batch[index].Source, targets[index]);
+                    yield return new EventTypeProjection(batch[index].Source, targets[index]);
                 }
 
                 if (stopAfterBatch) {
@@ -92,24 +92,24 @@ namespace EventViewerX {
             }
         }
 
-        private sealed class PendingNamedEventProjection {
-            internal PendingNamedEventProjection(EventObject source, Task<NamedEventRecord?> targetTask) {
+        private sealed class PendingEventTypeProjection {
+            internal PendingEventTypeProjection(EventObject source, Task<EventTypeRecord?> targetTask) {
                 Source = source;
                 TargetTask = targetTask;
             }
 
             internal EventObject Source { get; }
-            internal Task<NamedEventRecord?> TargetTask { get; }
+            internal Task<EventTypeRecord?> TargetTask { get; }
         }
 
-        internal readonly struct NamedEventProjection {
-            internal NamedEventProjection(EventObject source, NamedEventRecord? target) {
+        internal readonly struct EventTypeProjection {
+            internal EventTypeProjection(EventObject source, EventTypeRecord? target) {
                 Source = source;
                 Target = target;
             }
 
             internal EventObject Source { get; }
-            internal NamedEventRecord? Target { get; }
+            internal EventTypeRecord? Target { get; }
         }
     }
 }

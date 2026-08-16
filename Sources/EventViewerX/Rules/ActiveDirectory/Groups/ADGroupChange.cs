@@ -43,7 +43,7 @@ public class ADGroupChange : EventRuleBase {
     public override string LogName => "Security";
 
     /// <inheritdoc />
-    public override NamedEvents NamedEvent => NamedEvents.ADGroupChange;
+    public override EventType Type => EventType.ADGroupChange;
 
     /// <summary>Skips anonymous noise events and only processes real actor changes.</summary>
     public override bool CanHandle(EventObject eventObject) {
@@ -55,7 +55,7 @@ public class ADGroupChange : EventRuleBase {
     /// <summary>Initialises an Active Directory group change wrapper from an event record.</summary>
     public ADGroupChange(EventObject eventObject) : base(eventObject) {
         SourceEvent = eventObject;
-        NamedEventName = "ADGroupChange";
+        TypeName = "ADGroupChange";
 
         Computer = SourceEvent.ComputerName;
         Action = SourceEvent.MessageSubject;

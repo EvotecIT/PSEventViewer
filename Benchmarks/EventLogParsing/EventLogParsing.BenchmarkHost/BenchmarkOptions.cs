@@ -17,6 +17,10 @@ internal sealed class BenchmarkOptions {
 
     public int MaxEvents { get; init; }
 
+    public EventViewerX.EventType[] Types { get; init; } = Array.Empty<EventViewerX.EventType>();
+
+    public string? ReportFormat { get; init; }
+
     public static BenchmarkOptions Parse(string[] args) {
         if (args is null) {
             throw new ArgumentNullException(nameof(args));
@@ -39,8 +43,10 @@ internal sealed class BenchmarkOptions {
         if (!string.Equals(engine, "dotnet", StringComparison.OrdinalIgnoreCase) &&
             !string.Equals(engine, "propertyselector", StringComparison.OrdinalIgnoreCase) &&
             !string.Equals(engine, "eventviewerx", StringComparison.OrdinalIgnoreCase) &&
-            !string.Equals(engine, "eventviewerxexport", StringComparison.OrdinalIgnoreCase)) {
-            throw new ArgumentException("--engine must be 'dotnet', 'propertyselector', 'eventviewerx', or 'eventviewerxexport'.");
+            !string.Equals(engine, "eventviewerxexport", StringComparison.OrdinalIgnoreCase) &&
+            !string.Equals(engine, "eventviewerxtyped", StringComparison.OrdinalIgnoreCase) &&
+            !string.Equals(engine, "eventviewerxreport", StringComparison.OrdinalIgnoreCase)) {
+            throw new ArgumentException("--engine must be dotnet, propertyselector, eventviewerx, eventviewerxexport, eventviewerxtyped, or eventviewerxreport.");
         }
 
         string path = System.IO.Path.GetFullPath(GetRequired(values, "path"));
@@ -49,7 +55,7 @@ internal sealed class BenchmarkOptions {
         }
 
         if (!Enum.TryParse(GetRequired(values, "mode"), ignoreCase: true, out EventViewerX.EventReadMode readMode)) {
-            throw new ArgumentException("--mode must be Metadata, Message, StructuredData, or Full.");
+            throw new ArgumentException("--mode must be Metadata, Message, StructuredData, StructuredDataAndMessage, or Full.");
         }
 
         int maxEvents = 0;
@@ -76,6 +82,21 @@ internal sealed class BenchmarkOptions {
             throw new ArgumentException(
                 "The eventviewerxexport engine requires --output-path and --format.");
         }
+        EventViewerX.EventType[] types = values.TryGetValue("type", out string? typeText)
+            ? typeText.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries)
+                .Select(static value => Enum.TryParse(value.Trim(), true, out EventViewerX.EventType type) && Enum.IsDefined(type)
+                    ? type
+                    : throw new ArgumentException($"Unknown event type '{value}'."))
+                .Distinct()
+                .ToArray()
+            : Array.Empty<EventViewerX.EventType>();
+        string? reportFormat = values.TryGetValue("report-format", out string? suppliedReportFormat)
+            ? suppliedReportFormat.Trim()
+            : null;
+        if (string.Equals(engine, "eventviewerxreport", StringComparison.OrdinalIgnoreCase) &&
+            (outputPath == null || reportFormat is not ("Html" or "Excel" or "Email" or "All"))) {
+            throw new ArgumentException("The eventviewerxreport engine requires --output-path and --report-format Html, Excel, Email, or All.");
+        }
 
         string cultureName = values.TryGetValue("culture", out string? suppliedCulture)
             ? suppliedCulture
@@ -88,7 +109,9 @@ internal sealed class BenchmarkOptions {
             OutputPath = outputPath,
             OutputFormat = outputFormat,
             MessageCulture = System.Globalization.CultureInfo.GetCultureInfo(cultureName),
-            MaxEvents = maxEvents
+            MaxEvents = maxEvents,
+            Types = types,
+            ReportFormat = reportFormat
         };
     }
 

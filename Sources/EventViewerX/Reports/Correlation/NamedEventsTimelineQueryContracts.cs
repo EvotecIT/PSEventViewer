@@ -10,7 +10,7 @@ internal sealed class NamedEventsTimelineQueryRequest {
     /// <summary>
     /// Named events to query.
     /// </summary>
-    public IReadOnlyList<NamedEvents>? NamedEvents { get; set; }
+    public IReadOnlyList<EventType>? EventType { get; set; }
 
     /// <summary>
     /// Optional remote machine names. Null/empty targets local machine.
@@ -152,7 +152,7 @@ internal sealed class NamedEventsTimelineEventRow {
     /// <summary>
     /// Named-event alias in snake_case.
     /// </summary>
-    public string NamedEvent { get; set; } = string.Empty;
+    public string EventType { get; set; } = string.Empty;
 
     /// <summary>
     /// Concrete rule type name.
@@ -247,7 +247,7 @@ internal sealed class NamedEventsTimelineGroupRow {
     /// <summary>
     /// Distinct named events in the group.
     /// </summary>
-    public IReadOnlyList<string> NamedEvents { get; set; } = Array.Empty<string>();
+    public IReadOnlyList<string> EventType { get; set; } = Array.Empty<string>();
 
     /// <summary>
     /// Distinct event IDs in the group.

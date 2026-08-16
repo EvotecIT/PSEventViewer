@@ -1,6 +1,7 @@
 using System.Diagnostics.Eventing.Reader;
 using System.Globalization;
 using EventViewerX;
+using EventViewerX.Reporting;
 
 namespace EventLogParsing.BenchmarkHost;
 
@@ -53,14 +54,14 @@ internal sealed class EventAccumulator {
             eventObject.ProcessId,
             eventObject.ThreadId);
 
-        if (readMode is EventReadMode.Message or EventReadMode.Full) {
+        if (readMode is EventReadMode.Message or EventReadMode.Full or EventReadMode.StructuredDataAndMessage) {
             MessageCharacters += eventObject.Message.Length;
             if (readMode == EventReadMode.Full) {
                 MessageFieldCount += eventObject.MessageData.Count;
             }
         }
 
-        if (readMode is EventReadMode.StructuredData or EventReadMode.Full) {
+        if (readMode is EventReadMode.StructuredData or EventReadMode.Full or EventReadMode.StructuredDataAndMessage) {
             XmlCharacters += eventObject.XMLData.Length;
             PropertyCount += eventObject.Properties.Count;
             StructuredFieldCount += eventObject.Data.Count;
@@ -68,6 +69,25 @@ internal sealed class EventAccumulator {
                 AttachmentBytes += attachment.LongLength;
             }
         }
+    }
+
+    public void Add(EventReportRow row) {
+        ArgumentNullException.ThrowIfNull(row);
+        AddMetadata(
+            row.EventId,
+            row.RecordId,
+            row.TimeCreated,
+            row.Provider,
+            row.SourceComputer,
+            row.SourceLog,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null);
+        MessageCharacters += row.Message.Length;
+        StructuredFieldCount += row.Values.Count;
     }
 
     public void Add(EventRecord record, EventReadMode readMode) {
@@ -87,7 +107,7 @@ internal sealed class EventAccumulator {
             record.ProcessId,
             record.ThreadId);
 
-        if (readMode is EventReadMode.Message or EventReadMode.Full) {
+        if (readMode is EventReadMode.Message or EventReadMode.Full or EventReadMode.StructuredDataAndMessage) {
             string message = SafeRead(record.FormatDescription);
             MessageCharacters += message.Length;
             MetadataTouch += SafeRead(() => record.LevelDisplayName).Length;
@@ -96,7 +116,7 @@ internal sealed class EventAccumulator {
             MetadataTouch += SafeReadKeywordCount(record);
         }
 
-        if (readMode is EventReadMode.StructuredData or EventReadMode.Full) {
+        if (readMode is EventReadMode.StructuredData or EventReadMode.Full or EventReadMode.StructuredDataAndMessage) {
             PropertyCount += SafeReadPropertyCount(record);
             string xml = SafeRead(record.ToXml);
             XmlCharacters += xml.Length;

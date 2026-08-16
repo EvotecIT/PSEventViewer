@@ -5,9 +5,9 @@ namespace EventViewerX.Tests {
     public class TestNetworkMonitorEvents {
         [Fact]
         public void EventInfoContainsNetworkMonitorEvents() {
-            var info = NamedEventCatalog.GetEventInfoForNamedEvents(new List<NamedEvents> {
-                NamedEvents.NetworkMonitorDriverLoaded,
-                NamedEvents.NetworkPromiscuousMode
+            var info = EventTypeCatalog.GetSourceMap(new List<EventType> {
+                EventType.NetworkMonitorDriverLoaded,
+                EventType.NetworkPromiscuousMode
             });
 
             Assert.Contains(6, info["System"]);

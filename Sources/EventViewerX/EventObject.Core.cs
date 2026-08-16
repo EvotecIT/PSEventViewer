@@ -39,11 +39,23 @@ public partial class EventObject {
     /// <summary>Log name reported by the event.</summary>
     public string LogName { get; }
 
+    /// <summary>
+    /// Original channel recorded in the event payload. For forwarded events this remains the source channel,
+    /// such as Security, while <see cref="ContainerLogName"/> identifies ForwardedEvents.
+    /// </summary>
+    public string OriginalLogName => LogName;
+
     /// <summary>Log name that contained the event.</summary>
     public string ContainerLog { get; set; } = string.Empty;
 
+    /// <summary>Channel or file container from which the event was read.</summary>
+    public string ContainerLogName => ContainerLog;
+
     /// <summary>Computer that created the event.</summary>
     public string ComputerName => MachineName;
+
+    /// <summary>Computer that originally created the event.</summary>
+    public string SourceComputer => MachineName;
 
     /// <summary>Display-friendly event level.</summary>
     public string LevelDisplayName { get; }
@@ -199,6 +211,12 @@ public partial class EventObject {
     /// <summary>Machine name or file path from which the event was queried.</summary>
     public string QueriedMachine { get; set; } = string.Empty;
 
+    /// <summary>
+    /// Collector or direct query target from which the event was retrieved. This is distinct from
+    /// <see cref="SourceComputer"/> for Windows Event Collector subscriptions.
+    /// </summary>
+    public string CollectorComputer => QueriedMachine;
+
     /// <summary>Computer name or file path from which the event was gathered.</summary>
     public string GatheredFrom { get; set; } = string.Empty;
 
@@ -231,7 +249,8 @@ public partial class EventObject {
         _payloadParsingEnabled =
             readMode == EventReadMode.StructuredData ||
             readMode == EventReadMode.RawXml ||
-            readMode == EventReadMode.Full;
+            readMode == EventReadMode.Full ||
+            readMode == EventReadMode.StructuredDataAndMessage;
         _includeAttachments = readMode == EventReadMode.Full;
 
         try {
@@ -256,14 +275,19 @@ public partial class EventObject {
             Task = eventRecord.Task;
             ProcessId = eventRecord.ProcessId;
             ThreadId = eventRecord.ThreadId;
-            Properties = readMode == EventReadMode.StructuredData || readMode == EventReadMode.Full
+            Properties = readMode == EventReadMode.StructuredData ||
+                         readMode == EventReadMode.Full ||
+                         readMode == EventReadMode.StructuredDataAndMessage
                 ? SnapshotProperties(eventRecord)
                 : Array.Empty<EventPropertyValue>();
             MatchedQueryIds = eventRecord is EventLogRecord matchedRecord
                 ? matchedRecord.MatchedQueryIds?.ToArray() ??
                   Array.Empty<int>()
                 : Array.Empty<int>();
-            bool includeProviderDisplayNames = readMode == EventReadMode.Message || readMode == EventReadMode.Full;
+            bool includeProviderDisplayNames =
+                readMode == EventReadMode.Message ||
+                readMode == EventReadMode.Full ||
+                readMode == EventReadMode.StructuredDataAndMessage;
             TaskDisplayName = includeProviderDisplayNames
                 ? SafeReadDisplayName(() => eventRecord.TaskDisplayName)
                 : string.Empty;
@@ -285,9 +309,11 @@ public partial class EventObject {
                 ? eventLogRecord.ContainerLog ?? string.Empty
                 : LogName;
             GatheredFrom = string.IsNullOrEmpty(QueriedMachine) ? Environment.MachineName : QueriedMachine;
-            GatheredLogName = LogName;
+            GatheredLogName = ContainerLog;
 
-            if (readMode == EventReadMode.Message || readMode == EventReadMode.Full) {
+            if (readMode == EventReadMode.Message ||
+                readMode == EventReadMode.Full ||
+                readMode == EventReadMode.StructuredDataAndMessage) {
                 _message = SafeFormatDescription(
                     eventRecord,
                     out EventMessageRenderStatus renderStatus,
@@ -299,7 +325,8 @@ public partial class EventObject {
 
             if (readMode == EventReadMode.StructuredData ||
                 readMode == EventReadMode.RawXml ||
-                readMode == EventReadMode.Full) {
+                readMode == EventReadMode.Full ||
+                readMode == EventReadMode.StructuredDataAndMessage) {
                 XMLData = SafeToXml(eventRecord);
             }
         } finally {

@@ -10,7 +10,7 @@ public class ScheduledTaskDeleted : EventRuleBase {
     /// <inheritdoc />
     public override string LogName => "Security";
     /// <inheritdoc />
-    public override NamedEvents NamedEvent => NamedEvents.ScheduledTaskDeleted;
+    public override EventType Type => EventType.ScheduledTaskDeleted;
 
     /// <summary>Accepts scheduled task deletion events (4699) in the Security log.</summary>
     public override bool CanHandle(EventObject eventObject) {
@@ -28,7 +28,7 @@ public class ScheduledTaskDeleted : EventRuleBase {
     /// <summary>Initialises a scheduled-task-deleted wrapper from an event record.</summary>
     public ScheduledTaskDeleted(EventObject eventObject) : base(eventObject) {
         SourceEvent = eventObject;
-        NamedEventName = "ScheduledTaskDeleted";
+        TypeName = "ScheduledTaskDeleted";
         Computer = SourceEvent.ComputerName;
         TaskName = SourceEvent.GetValueFromDataDictionary("TaskName");
         Who = SourceEvent.GetSubjectAccountOrEmpty();

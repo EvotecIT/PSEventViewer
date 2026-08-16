@@ -12,7 +12,7 @@ public class AADConnectStagingDisabled : EventRuleBase {
     public override string LogName => "Application";
 
     /// <inheritdoc />
-    public override NamedEvents NamedEvent => NamedEvents.AADConnectStagingDisabled;
+    public override EventType Type => EventType.AADConnectStagingDisabled;
 
     /// <summary>Accepts matching staging mode disablement events.</summary>
     public override bool CanHandle(EventObject eventObject) {
@@ -32,7 +32,7 @@ public class AADConnectStagingDisabled : EventRuleBase {
     /// <summary>Initialises a staging-disabled wrapper from an event record.</summary>
     public AADConnectStagingDisabled(EventObject eventObject) : base(eventObject) {
         SourceEvent = eventObject;
-        NamedEventName = "AADConnectStagingDisabled";
+        TypeName = "AADConnectStagingDisabled";
         Computer = SourceEvent.ComputerName;
         Operator = SourceEvent.GetValueFromDataDictionary("Operator");
         if (string.IsNullOrEmpty(Operator)) {

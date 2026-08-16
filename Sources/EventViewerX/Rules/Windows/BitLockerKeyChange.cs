@@ -11,7 +11,7 @@ public class BitLockerKeyChange : EventRuleBase {
     /// <inheritdoc />
     public override string LogName => "Security";
     /// <inheritdoc />
-    public override NamedEvents NamedEvent => NamedEvents.BitLockerKeyChange;
+    public override EventType Type => EventType.BitLockerKeyChange;
 
     /// <summary>Accepts BitLocker key change/backup events in the Security log.</summary>
     public override bool CanHandle(EventObject eventObject) {
@@ -39,7 +39,7 @@ public class BitLockerKeyChange : EventRuleBase {
     /// <summary>Initialises a BitLocker key change wrapper from an event record.</summary>
     public BitLockerKeyChange(EventObject eventObject) : base(eventObject) {
         SourceEvent = eventObject;
-        NamedEventName = "BitLockerKeyChange";
+        TypeName = "BitLockerKeyChange";
         Computer = SourceEvent.ComputerName;
         Action = SourceEvent.MessageSubject;
         Volume = EventsHelper.GetBitLockerVolumeType(

@@ -5,18 +5,18 @@ namespace EventViewerX.Examples {
     internal partial class Examples {
         public static async Task FindEventsTargetedBasic() {
 
-            var query = new NamedEventQuery([
-                NamedEvents.OSCrash,
-                NamedEvents.OSStartup,
-                NamedEvents.OSShutdown,
-                NamedEvents.OSUncleanShutdown,
-                NamedEvents.OSStartupSecurity,
-                NamedEvents.OSCrashOnAuditFailRecovery,
-                NamedEvents.OSBugCheck]);
-            await foreach (var foundObject in NamedEventEngine.ReadAsync(query)) {
+            var query = new EventTypeQuery([
+                EventType.OSCrash,
+                EventType.OSStartup,
+                EventType.OSShutdown,
+                EventType.OSUncleanShutdown,
+                EventType.OSStartupSecurity,
+                EventType.OSCrashOnAuditFailRecovery,
+                EventType.OSBugCheck]);
+            await foreach (var foundObject in EventTypeEngine.ReadAsync(query)) {
 
-                Console.WriteLine("Event ID: {0}", foundObject.EventId + ", " + foundObject.NamedEventName + " " + foundObject.MachineName);
-                Console.WriteLine("Type: " + foundObject.NamedEventName + ", " + foundObject.EventId + " " + foundObject.EventId + " " + foundObject.MachineName);
+                Console.WriteLine("Event ID: {0}", foundObject.EventId + ", " + foundObject.TypeName + " " + foundObject.MachineName);
+                Console.WriteLine("Type: " + foundObject.TypeName + ", " + foundObject.EventId + " " + foundObject.EventId + " " + foundObject.MachineName);
 
                 if (foundObject is OSCrash osCrash) {
                     //Display the properties of the ADComputerChangeDetailed object
@@ -60,15 +60,15 @@ namespace EventViewerX.Examples {
             internalLogger.IsVerbose = true;
             Settings.Logger = internalLogger;
 
-            List<NamedEvents> Type = new List<NamedEvents> { NamedEvents.ADLdapBindingDetails, NamedEvents.ADLdapBindingSummary };
-            var query = new NamedEventQuery(Type) {
+            List<EventType> Type = new List<EventType> { EventType.ADLdapBindingDetails, EventType.ADLdapBindingSummary };
+            var query = new EventTypeQuery(Type) {
                 MachineNames = MachineName
             };
-            await foreach (var foundObject in NamedEventEngine.ReadAsync(query)) {
+            await foreach (var foundObject in EventTypeEngine.ReadAsync(query)) {
                 // Check if the foundObject is of type ADComputerChangeDetailed
 
-                // Console.WriteLine("Event ID: {0}", foundObject.EventId + ", " + foundObject.NamedEventName + " " + foundObject.MachineName);
-                Console.WriteLine("Type: " + foundObject.NamedEventName + ", " + foundObject.EventId + " " + foundObject.EventId + " " + foundObject.MachineName);
+                // Console.WriteLine("Event ID: {0}", foundObject.EventId + ", " + foundObject.TypeName + " " + foundObject.MachineName);
+                Console.WriteLine("Type: " + foundObject.TypeName + ", " + foundObject.EventId + " " + foundObject.EventId + " " + foundObject.MachineName);
 
                 if (foundObject is ADComputerChangeDetailed adComputerChange) {
                     // Display the properties of the ADComputerChangeDetailed object

@@ -10,7 +10,7 @@ public class VmCheckpointCreated : EventRuleBase {
     /// <inheritdoc />
     public override string LogName => "Microsoft-Windows-Hyper-V-VMMS/Admin";
     /// <inheritdoc />
-    public override NamedEvents NamedEvent => NamedEvents.HyperVCheckpointCreated;
+    public override EventType Type => EventType.HyperVCheckpointCreated;
 
     /// <summary>Accepts Hyper-V checkpoint creation events.</summary>
     public override bool CanHandle(EventObject eventObject) {
@@ -31,7 +31,7 @@ public class VmCheckpointCreated : EventRuleBase {
     /// <summary>Initialises a Hyper-V checkpoint wrapper from an event record.</summary>
     public VmCheckpointCreated(EventObject eventObject) : base(eventObject) {
         SourceEvent = eventObject;
-        NamedEventName = "VmCheckpointCreated";
+        TypeName = "VmCheckpointCreated";
         Computer = SourceEvent.ComputerName;
         VmName = SourceEvent.GetValueFromDataDictionary("VmName");
         if (string.IsNullOrEmpty(VmName)) {

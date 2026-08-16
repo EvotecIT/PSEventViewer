@@ -12,6 +12,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\..\Sources\EventViewerX\EventViewerX.csproj" />
+    <ProjectReference Include="..\..\..\Sources\EventViewerX.Reporting\EventViewerX.Reporting.csproj" />
   </ItemGroup>
 
 </Project>

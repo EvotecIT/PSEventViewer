@@ -10,7 +10,7 @@ public class IISSiteStopped : EventRuleBase {
     /// <inheritdoc />
     public override string LogName => "System";
     /// <inheritdoc />
-    public override NamedEvents NamedEvent => NamedEvents.IISSiteStopped;
+    public override EventType Type => EventType.IISSiteStopped;
 
     /// <summary>Accepts IIS site stopped events (1005).</summary>
     public override bool CanHandle(EventObject eventObject) {
@@ -29,7 +29,7 @@ public class IISSiteStopped : EventRuleBase {
     /// <summary>Initialises an IIS site stopped wrapper from an event record.</summary>
     public IISSiteStopped(EventObject eventObject) : base(eventObject) {
         SourceEvent = eventObject;
-        NamedEventName = "IISSiteStopped";
+        TypeName = "IISSiteStopped";
         Computer = SourceEvent.ComputerName;
         SiteName = SourceEvent.GetValueFromDataDictionary("SiteName", "Name");
         if (string.IsNullOrEmpty(SiteName)) {

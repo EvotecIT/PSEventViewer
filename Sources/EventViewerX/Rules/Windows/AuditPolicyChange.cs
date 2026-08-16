@@ -10,7 +10,7 @@ public class AuditPolicyChange : EventRuleBase {
     /// <inheritdoc />
     public override string LogName => "Security";
     /// <inheritdoc />
-    public override NamedEvents NamedEvent => NamedEvents.AuditPolicyChange;
+    public override EventType Type => EventType.AuditPolicyChange;
 
     /// <summary>Accepts system audit policy change events.</summary>
     public override bool CanHandle(EventObject eventObject) {
@@ -34,7 +34,7 @@ public class AuditPolicyChange : EventRuleBase {
     /// <summary>Initialises an audit policy change wrapper from an event record.</summary>
     public AuditPolicyChange(EventObject eventObject) : base(eventObject) {
         SourceEvent = eventObject;
-        NamedEventName = "AuditPolicyChange";
+        TypeName = "AuditPolicyChange";
         Computer = SourceEvent.ComputerName;
         CategoryId = SourceEvent.GetValueFromDataDictionary("CategoryId");
         SubcategoryId = SourceEvent.GetValueFromDataDictionary("SubcategoryId");

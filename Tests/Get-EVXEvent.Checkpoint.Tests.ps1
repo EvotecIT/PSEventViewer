@@ -218,10 +218,10 @@ Describe 'Get-EVXEvent checkpoint compatibility' {
         [long] $AfterReset[0].RecordId | Should -BeLessThan ([long]::MaxValue)
     }
 
-    It 'does not fan out an aggregate legacy checkpoint across named-event sources' {
-        $Baseline = @(Get-EVXEvent -NamedEvent OSStartup -MaxEvents 1)
+    It 'does not fan out an aggregate legacy checkpoint across event-type sources' {
+        $Baseline = @(Get-EVXEvent -Type OSStartup -MaxEvents 1)
         if ($Baseline.Count -eq 0) {
-            Set-ItResult -Skipped -Because 'The local logs contained no OSStartup named event.'
+            Set-ItResult -Skipped -Because 'The local logs contained no OSStartup event-type match.'
             return
         }
 
@@ -229,7 +229,7 @@ Describe 'Get-EVXEvent checkpoint compatibility' {
         @{ aggregate = [long]::MaxValue } | ConvertTo-Json -Compress |
             Set-Content -LiteralPath $CheckpointPath -Encoding UTF8
 
-        $Events = @(Get-EVXEvent -NamedEvent OSStartup -RecordIdFile $CheckpointPath -RecordIdKey aggregate -MaxEvents 1)
+        $Events = @(Get-EVXEvent -Type OSStartup -RecordIdFile $CheckpointPath -RecordIdKey aggregate -MaxEvents 1)
 
         $Events.Count | Should -Be 1
     }

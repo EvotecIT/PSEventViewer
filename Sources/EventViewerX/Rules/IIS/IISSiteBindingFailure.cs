@@ -14,7 +14,7 @@ public class IISSiteBindingFailure : EventRuleBase {
     /// <inheritdoc />
     public override string LogName => "System";
     /// <inheritdoc />
-    public override NamedEvents NamedEvent => NamedEvents.IISSiteBindingFailure;
+    public override EventType Type => EventType.IISSiteBindingFailure;
 
     /// <summary>Accepts IIS binding failure events (1007).</summary>
     public override bool CanHandle(EventObject eventObject) {
@@ -33,7 +33,7 @@ public class IISSiteBindingFailure : EventRuleBase {
     /// <summary>Initialises an IIS binding failure wrapper from an event record.</summary>
     public IISSiteBindingFailure(EventObject eventObject) : base(eventObject) {
         SourceEvent = eventObject;
-        NamedEventName = "IISSiteBindingFailure";
+        TypeName = "IISSiteBindingFailure";
         Computer = SourceEvent.ComputerName;
         SiteName = SourceEvent.GetValueFromDataDictionary("SiteName", "Site");
         Binding = SourceEvent.GetValueFromDataDictionary("BindingInfo", "BindingInformation");

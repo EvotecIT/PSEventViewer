@@ -65,7 +65,7 @@ Describe 'Get-EVXEvent -Path parameter contract' {
             Select-Object -ExpandProperty Name
         $GenericParameters | Should -Contain 'MessageCulture'
         $NamedParameters = (Get-Command Get-EVXEvent).ParameterSets |
-            Where-Object Name -EQ 'NamedEvent' |
+            Where-Object Name -EQ 'Type' |
             Select-Object -ExpandProperty Parameters |
             Select-Object -ExpandProperty Name
         $NamedParameters | Should -Contain 'MessageCulture'
@@ -79,7 +79,7 @@ Describe 'Get-EVXEvent -Path parameter contract' {
         $Event.MessageRenderStatus.ToString() | Should -Not -Be 'NotRequested'
 
         $NamedEvent = Get-EVXEvent `
-            -NamedEvent OSStartup `
+            -Type OSStartup `
             -MaxEvents 1 `
             -MessageCulture en-US `
             -ErrorAction Stop |

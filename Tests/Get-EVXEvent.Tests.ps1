@@ -235,7 +235,8 @@ Describe 'Get-EVXEvent - Parameter validation' {
         $Parameter | Should -Not -BeNullOrEmpty
         $Parameter.Aliases | Should -Contain 'NumberOfThreads'
         $Parameter.ParameterSets.Keys | Should -Contain 'Channel'
-        $Parameter.ParameterSets.Keys | Should -Contain 'NamedEvent'
+        $Parameter.ParameterSets.Keys | Should -Contain 'Type'
+        $Parameter.ParameterSets.Keys | Should -Contain 'Definition'
         $Parameter.ParameterSets.Keys | Should -Contain 'Path'
         $Parameter.ParameterSets.Keys | Should -Contain 'Hashtable'
         $Parameter.ParameterSets.Keys | Should -Contain 'Xml'
@@ -250,12 +251,14 @@ Describe 'Get-EVXEvent - Parameter validation' {
         $Event | Should -HaveCount 1
     }
 
-    It 'exposes named-event source and projection controls' {
+    It 'exposes event-type source and projection controls' {
         $NamedSet = (Get-Command Get-EVXEvent).ParameterSets |
-            Where-Object Name -EQ 'NamedEvent'
+            Where-Object Name -EQ 'Type'
 
-        $NamedSet.Parameters.Name | Should -Contain 'LogName'
-        $NamedSet.Parameters.Name | Should -Contain 'EventId'
+        $NamedSet.Parameters.Name | Should -Contain 'Path'
+        $NamedSet.Parameters.Name | Should -Contain 'Collector'
+        $NamedSet.Parameters.Name | Should -Not -Contain 'LogName'
+        $NamedSet.Parameters.Name | Should -Not -Contain 'EventId'
         $NamedSet.Parameters.Name | Should -Contain 'Oldest'
         $NamedSet.Parameters.Name | Should -Contain 'ReadMode'
         $NamedSet.Parameters.Name | Should -Contain 'MessageCulture'

@@ -7,7 +7,7 @@ param(
     [string] $Path,
 
     [Parameter(Mandatory)]
-    [ValidateSet('Metadata', 'Message', 'StructuredData', 'Full')]
+    [ValidateSet('Metadata', 'Message', 'StructuredData', 'StructuredDataAndMessage', 'Full')]
     [string] $ReadMode,
 
     [Parameter(Mandatory)]
@@ -55,7 +55,7 @@ function Measure-EventPipeline {
         [string] $InputEngine,
 
         [Parameter(Mandatory)]
-        [ValidateSet('Metadata', 'Message', 'StructuredData', 'Full')]
+        [ValidateSet('Metadata', 'Message', 'StructuredData', 'StructuredDataAndMessage', 'Full')]
         [string] $Mode,
 
         [switch] $PassThru
@@ -121,7 +121,7 @@ function Measure-EventPipeline {
             }
         }
 
-        if ($Mode -eq 'Message' -or $Mode -eq 'Full') {
+        if ($Mode -in 'Message', 'StructuredDataAndMessage', 'Full') {
             $message = [string] $eventRecord.Message
             $messageCharacters += $message.Length
             foreach ($displayName in $eventRecord.LevelDisplayName, $eventRecord.TaskDisplayName,
@@ -135,7 +135,7 @@ function Measure-EventPipeline {
             }
         }
 
-        if ($Mode -eq 'StructuredData' -or $Mode -eq 'Full') {
+        if ($Mode -in 'StructuredData', 'StructuredDataAndMessage', 'Full') {
             if ($null -ne $eventRecord.Properties) {
                 $propertyCount += $eventRecord.Properties.Count
             }
