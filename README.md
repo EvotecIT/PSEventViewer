@@ -473,9 +473,19 @@ Get-EVXEvent -LogName Application -Level 1, 2 -MaxEvents 500 |
 
 HTML uses typed HtmlForgeX components and is self-contained, searchable,
 responsive, theme-aware, and suitable for opening or attaching. Excel uses
-OfficeIMO with an overview, coverage, event data, filters, frozen headers,
-formatting, and useful column sizing. Very wide event payloads are collapsed
-into `Details` instead of producing an unreadable hundred-column table.
+OfficeIMO with an overview, coverage, filters, frozen headers, formatting, and
+useful column sizing. A typed leaf definition gets its own domain table and
+worksheet. A composite such as `ActiveDirectoryAuthentication` gets one table
+and worksheet for each populated leaf type, so logons, privilege use, and
+Kerberos events never share an incompatible column set. Those tables contain
+the definition fields—account, action, IP address, logon type, GPO name, and so
+on—not generic provider or event-ID columns. Excel keeps that technical context
+in a separate `Event Provenance` worksheet for audit and troubleshooting.
+
+`-LogName` and untyped pipeline input intentionally produce a generic event
+view with time, event ID, level, provider, source, message, and provider data.
+Only a very wide generic provider payload may be collapsed into `Details`;
+typed and custom definitions always retain their declared columns.
 
 `-EmailPackage` returns `Subject`, responsive `Html`, `PlainText`, inline
 resources, attachments, and estimated size. That transport-neutral object can
@@ -528,6 +538,9 @@ request.TimePeriod = TimePeriod.Last24Hours;
 request.Collectors = new string?[] { "WEC01" };
 
 EventReport report = await EventReportEngine.QueryAsync(request);
+foreach (EventReportSection section in report.Sections) {
+    Console.WriteLine($"{section.DisplayName}: {section.Rows.Count} rows");
+}
 EventReportHtmlRenderer.Save(report, "Authentication.html");
 EventReportExcelRenderer.Save(report, "Authentication.xlsx");
 EventEmailPackage email = await EventReportEmailRenderer.RenderAsync(report);

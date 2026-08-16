@@ -27,7 +27,7 @@ public sealed class EventReportRow {
     /// <summary>Type-specific projected values.</summary>
     public IReadOnlyDictionary<string, object?> Values { get; set; } = new Dictionary<string, object?>();
 
-    /// <summary>Flattens common and type-specific fields for table renderers.</summary>
+    /// <summary>Flattens common and type-specific fields for serialization and transport adapters.</summary>
     public IReadOnlyDictionary<string, object?> ToDictionary() {
         var result = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase) {
             [nameof(TimeCreated)] = TimeCreated,

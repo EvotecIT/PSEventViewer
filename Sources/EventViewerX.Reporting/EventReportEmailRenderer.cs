@@ -30,28 +30,49 @@ public static class EventReportEmailRenderer {
             metrics.Add(new EmailMetricTile().WithIcon("🖥️").WithValue(report.Coverage.Count.ToString("N0"), "Sources"));
             metrics.Add(new EmailMetricTile().WithIcon("⚠️").WithValue(report.Coverage.Count(static item => !item.Succeeded).ToString("N0"), "Failures"));
             box.Add(metrics);
-            List<Dictionary<string, object?>> rows = report.Rows.Take(maximumRows)
-                .Select(static row => {
-                    var values = new Dictionary<string, object?> {
-                        ["Time"] = row.TimeCreated,
-                        ["Type"] = row.Type,
-                        ["Event ID"] = row.EventId,
-                        ["Computer"] = row.SourceComputer
-                    };
-                    string details = EventReportTableProjection.FormatDetails(row, maximumValues: 5);
-                    if (!string.IsNullOrWhiteSpace(details)) {
-                        values["Details"] = details;
-                    }
-                    values["Message"] = row.Message;
-                    return values;
-                }).ToList();
-            if (rows.Count > 0) {
+            EventReportSection[] populatedSections = report.Sections
+                .Where(static section => section.Rows.Count > 0)
+                .ToArray();
+            int rowsPerSection = populatedSections.Length == 0 ? 0 : maximumRows / populatedSections.Length;
+            int extraRows = populatedSections.Length == 0 ? 0 : maximumRows % populatedSections.Length;
+            for (int index = 0; index < populatedSections.Length; index++) {
+                EventReportSection section = populatedSections[index];
+                int allocation = rowsPerSection + (index < extraRows ? 1 : 0);
+                int take = Math.Min(allocation, section.Rows.Count);
+                if (take == 0) {
+                    continue;
+                }
+                List<Dictionary<string, object?>> rows = ProjectEmailRows(section, take);
                 box.EmailDivider().WithPattern(EmailDividerPattern.Dashed);
+                box.EmailHeading(section.DisplayName, level: 3);
+                box.EmailText($"{section.Rows.Count:N0} matching event{(section.Rows.Count == 1 ? string.Empty : "s")}");
                 box.EmailTable(rows);
             }
         });
         EmailRenderResult result = await email.RenderAsync().ConfigureAwait(false);
         string plainText = $"{report.Title}{Environment.NewLine}{report.Rows.Count:N0} events across {report.Coverage.Count:N0} sources.{Environment.NewLine}Query duration: {report.QueryDuration.TotalSeconds:N2}s";
         return new EventEmailPackage(subject, plainText, result);
+    }
+
+    private static List<Dictionary<string, object?>> ProjectEmailRows(EventReportSection section, int maximumRows) {
+        List<Dictionary<string, object?>> projected = EventReportTableProjection.Project(section);
+        string[] priorities = section.Kind == EventReportSectionKind.Generic
+            ? new[] { "Time Created", "Event ID", "Level", "Source Computer", "Message" }
+            : new[] {
+                "When", "Who", "Object Affected", "Account Name", "Action", "Failure Reason",
+                "Privileges", "Service Name", "IP Address", "Computer"
+            };
+        var available = new HashSet<string>(projected.SelectMany(static row => row.Keys), StringComparer.OrdinalIgnoreCase);
+        string[] columns = priorities.Where(available.Contains)
+            .Concat(section.Columns.Select(static column => column.DisplayName)
+                .Where(available.Contains)
+                .Where(column => !priorities.Contains(column, StringComparer.OrdinalIgnoreCase)))
+            .Take(4)
+            .ToArray();
+        return projected.Take(maximumRows)
+            .Select(row => columns.ToDictionary(column => column,
+                column => row.TryGetValue(column, out object? value) ? value : null,
+                StringComparer.OrdinalIgnoreCase))
+            .ToList();
     }
 }

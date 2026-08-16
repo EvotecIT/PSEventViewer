@@ -276,6 +276,7 @@ public static class EventDefinitionEngine {
         }).ToArray(),
         Fields = definition.Fields.Select(static field => new EventDefinitionField {
             Name = field.Name.Trim(),
+            DisplayName = field.DisplayName?.Trim() ?? string.Empty,
             Source = field.Source,
             SourceName = field.SourceName?.Trim() ?? string.Empty,
             DefaultValue = field.DefaultValue

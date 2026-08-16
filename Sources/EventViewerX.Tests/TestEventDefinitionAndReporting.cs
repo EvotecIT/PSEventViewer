@@ -3,6 +3,7 @@ using System.IO.Compression;
 using System.Security.Principal;
 using System.Xml.Linq;
 using EventViewerX.Reporting;
+using EventViewerX.Rules.ActiveDirectory;
 using Xunit;
 
 namespace EventViewerX.Tests;
@@ -43,6 +44,10 @@ public sealed class TestEventDefinitionAndReporting {
         CustomEventRecord custom = EventDefinitionEngine.CreateRecord(CreateDefinition(), source);
         EventReport report = EventReportEngine.Create(new object[] { custom }, "Failed logons");
         Assert.Single(report.Rows);
+        EventReportSection customSection = Assert.Single(report.Sections);
+        Assert.Equal(EventReportSectionKind.Custom, customSection.Kind);
+        Assert.Equal(new[] { "User", "Computer" }, customSection.Columns.Select(static column => column.Name));
+        Assert.DoesNotContain(customSection.Columns, static column => column.Name == nameof(EventReportRow.EventId));
         Assert.Equal("Security", report.Rows[0].SourceLog);
         Assert.Equal("ForwardedEvents", report.Rows[0].ContainerLog);
 
@@ -68,7 +73,113 @@ public sealed class TestEventDefinitionAndReporting {
     }
 
     [Fact]
-    public void WideProviderPayloadCollapsesIntoReadableDetailsWithoutLosingValues() {
+    public async Task TypedReportsUseDefinitionFieldsAndKeepDifferentTypesInSeparateSections() {
+        EventObject successfulSource = CreateSecuritySource(4624);
+        successfulSource.Data["TargetDomainName"] = "EVOTEC";
+        successfulSource.Data["TargetUserName"] = "alice";
+        successfulSource.Data["SubjectDomainName"] = "EVOTEC";
+        successfulSource.Data["SubjectUserName"] = "service.account";
+        successfulSource.Data["IpAddress"] = "10.0.0.20";
+        successfulSource.Data["IpPort"] = "55123";
+        successfulSource.Data["LogonType"] = "3";
+
+        EventObject failedSource = CreateSecuritySource(4625);
+        failedSource.Data["TargetDomainName"] = "EVOTEC";
+        failedSource.Data["TargetUserName"] = "bob";
+        failedSource.Data["WorkstationName"] = "CLIENT01";
+        failedSource.Data["IpAddress"] = "10.0.0.21";
+        failedSource.Data["IpPort"] = "55124";
+
+        EventReport report = EventReportEngine.Create(new object[] {
+            new ADUserLogon(successfulSource),
+            new ADUserLogonFailed(failedSource)
+        }, "Authentication activity");
+
+        Assert.Equal(2, report.Sections.Count);
+        EventReportSection successful = Assert.Single(report.Sections,
+            static section => section.Name == nameof(EventType.ADUserLogon));
+        EventReportSection failed = Assert.Single(report.Sections,
+            static section => section.Name == nameof(EventType.ADUserLogonFailed));
+        Assert.Equal(EventReportSectionKind.Typed, successful.Kind);
+        Assert.Contains(successful.Columns, static column => column.Name == "Who");
+        Assert.Contains(successful.Columns, static column => column.Name == "When");
+        Assert.Contains(successful.Columns, static column => column.Name == "IpAddress");
+        Assert.Contains(successful.Columns, static column => column.DisplayName == "IP Address");
+        Assert.DoesNotContain(successful.Columns, static column => column.Name is "EventId" or "Provider" or "EventIds" or "LogName" or "Type");
+        Assert.Equal("EVOTEC\\alice", successful.Rows[0].Values["ObjectAffected"]);
+        Assert.DoesNotContain(nameof(EventReportRow.EventId), successful.Rows[0].Values.Keys);
+        Assert.Contains(failed.Columns, static column => column.Name == "FailureReason");
+
+        string html = EventReportHtmlRenderer.Render(report);
+        Assert.Contains("AD User Logon", html, StringComparison.Ordinal);
+        Assert.Contains("AD User Logon Failed", html, StringComparison.Ordinal);
+        Assert.Contains("Object Affected", html, StringComparison.Ordinal);
+        Assert.Contains("EVOTEC\\alice", html, StringComparison.Ordinal);
+
+        EventEmailPackage email = await EventReportEmailRenderer.RenderAsync(report);
+        Assert.Contains("AD User Logon", email.Html, StringComparison.Ordinal);
+        Assert.Contains("AD User Logon Failed", email.Html, StringComparison.Ordinal);
+        Assert.Contains("EVOTEC\\alice", email.Html, StringComparison.Ordinal);
+
+        string workbook = Path.Combine(Path.GetTempPath(), $"evx-typed-report-{Guid.NewGuid():N}.xlsx");
+        try {
+            EventReportExcelRenderer.Save(report, workbook);
+            using ZipArchive archive = ZipFile.OpenRead(workbook);
+            XNamespace spreadsheet = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+            XDocument[] tables = archive.Entries
+                .Where(static entry => entry.FullName.StartsWith("xl/tables/table", StringComparison.Ordinal))
+                .Select(static entry => {
+                    using Stream stream = entry.Open();
+                    return XDocument.Load(stream);
+                }).ToArray();
+            Assert.Contains(tables, table => TableColumns(table, spreadsheet).Contains("Object Affected"));
+            Assert.Contains(tables, table => TableColumns(table, spreadsheet).Contains("Failure Reason"));
+            Assert.Contains(tables, table => TableColumns(table, spreadsheet).Contains("Event ID"));
+            Assert.DoesNotContain(tables.Where(table => TableColumns(table, spreadsheet).Contains("Object Affected")),
+                table => TableColumns(table, spreadsheet).Contains("Event ID"));
+        } finally {
+            File.Delete(workbook);
+        }
+    }
+
+    [Fact]
+    public async Task CompositeEmailReservesDigestRowsForEveryPopulatedType() {
+        EventObject successfulSource = CreateSecuritySource(4624);
+        EventObject failedSource = CreateSecuritySource(4625);
+        object[] events = Enumerable.Repeat<object>(new ADUserLogon(successfulSource), 30)
+            .Concat(new object[] { new ADUserLogonFailed(failedSource) })
+            .ToArray();
+        EventReport report = EventReportEngine.Create(events, "Authentication activity");
+
+        EventEmailPackage email = await EventReportEmailRenderer.RenderAsync(report, maximumRows: 25);
+
+        Assert.Contains("AD User Logon", email.Html, StringComparison.Ordinal);
+        Assert.Contains("AD User Logon Failed", email.Html, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task TypedCollectionFieldsRenderAsReadableValues() {
+        EventObject source = CreateSecuritySource(4672);
+        source.Data["SubjectDomainName"] = "EVOTEC";
+        source.Data["SubjectUserName"] = "alice";
+        source.Data["PrivilegeList"] = "SeSecurityPrivilege\r\n\tSeBackupPrivilege";
+        EventReport report = EventReportEngine.Create(new object[] {
+            new ADUserPrivilegeUse(source)
+        }, "Privilege use");
+
+        string html = EventReportHtmlRenderer.Render(report);
+        EventEmailPackage email = await EventReportEmailRenderer.RenderAsync(report);
+
+        Assert.Contains("SeSecurityPrivilege", html, StringComparison.Ordinal);
+        Assert.Contains("SeBackupPrivilege", html, StringComparison.Ordinal);
+        Assert.Contains("SeSecurityPrivilege", email.Html, StringComparison.Ordinal);
+        Assert.Contains("SeBackupPrivilege", email.Html, StringComparison.Ordinal);
+        Assert.DoesNotContain("System.Collections.Generic.List", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("System.Collections.Generic.List", email.Html, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void WideTypedDefinitionKeepsItsOwnColumnsWithoutFallingBackToGenericDetails() {
         EventDefinition definition = new() {
             Name = "WideProviderEvent",
             Sources = CreateDefinition().Sources,
@@ -92,8 +203,8 @@ public sealed class TestEventDefinitionAndReporting {
         }, "Wide provider event");
 
         string html = EventReportHtmlRenderer.Render(report);
-        Assert.Contains("Details", html, StringComparison.Ordinal);
-        Assert.Contains("Field13: value13", html, StringComparison.Ordinal);
+        Assert.Contains("Field13", html, StringComparison.Ordinal);
+        Assert.Contains("value13", html, StringComparison.Ordinal);
 
         string workbook = Path.Combine(Path.GetTempPath(), $"evx-wide-report-{Guid.NewGuid():N}.xlsx");
         try {
@@ -105,23 +216,16 @@ public sealed class TestEventDefinitionAndReporting {
                     using Stream stream = entry.Open();
                     return XDocument.Load(stream);
                 })
-                .Single(document => string.Equals(
-                    document.Root?.Attribute("displayName")?.Value, "Events", StringComparison.Ordinal));
+                .Single(document => TableColumns(document,
+                    "http://schemas.openxmlformats.org/spreadsheetml/2006/main").Contains("Field13"));
             XNamespace spreadsheet = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
             string[] columns = eventTable.Descendants(spreadsheet + "tableColumn")
                 .Select(static column => column.Attribute("name")?.Value ?? string.Empty)
                 .ToArray();
 
-            Assert.Equal(12, columns.Length);
-            Assert.Contains("Details", columns);
-            Assert.DoesNotContain("Field13", columns);
-            string packageXml = string.Join(Environment.NewLine, archive.Entries
-                .Where(static entry => entry.FullName.EndsWith(".xml", StringComparison.OrdinalIgnoreCase))
-                .Select(static entry => {
-                    using StreamReader reader = new(entry.Open());
-                    return reader.ReadToEnd();
-                }));
-            Assert.Contains("Field13: value13", packageXml, StringComparison.Ordinal);
+            Assert.Equal(13, columns.Length);
+            Assert.Contains("Field13", columns);
+            Assert.DoesNotContain("Details", columns);
         } finally {
             File.Delete(workbook);
         }
@@ -208,6 +312,10 @@ public sealed class TestEventDefinitionAndReporting {
         EventReport report = await EventReportEngine.QueryAsync(request);
 
         Assert.Equal(3, report.Rows.Count);
+        EventReportSection section = Assert.Single(report.Sections);
+        Assert.Equal(EventReportSectionKind.Generic, section.Kind);
+        Assert.Contains(section.Columns, static column => column.Name == nameof(EventReportRow.EventId));
+        Assert.Contains(section.Columns, static column => column.Name == nameof(EventReportRow.Provider));
         Assert.Single(report.Coverage);
         Assert.Equal("Offline", report.Coverage[0].MachineName);
         Assert.Equal(fixture, report.Coverage[0].LogName);
@@ -343,11 +451,28 @@ public sealed class TestEventDefinitionAndReporting {
         }
     };
 
+    private static EventObject CreateSecuritySource(int eventId) => new(
+        new SyntheticEventRecord(eventId), "WEC01", EventReadMode.StructuredDataAndMessage) {
+            ContainerLog = "ForwardedEvents",
+            GatheredLogName = "ForwardedEvents"
+        };
+
+    private static string[] TableColumns(XDocument table, XNamespace spreadsheet) => table
+        .Descendants(spreadsheet + "tableColumn")
+        .Select(static column => column.Attribute("name")?.Value ?? string.Empty)
+        .ToArray();
+
     private sealed class SyntheticEventRecord : EventRecord {
+        private readonly int _eventId;
+
+        internal SyntheticEventRecord(int eventId = 4625) {
+            _eventId = eventId;
+        }
+
         public override string ProviderName => "Microsoft-Windows-Security-Auditing";
         public override string LogName => "Security";
         public override string MachineName => "source.ad.evotec.xyz";
-        public override int Id => 4625;
+        public override int Id => _eventId;
         public override byte? Level => 0;
         public override int? Task => 12544;
         public override long? Keywords => 0;

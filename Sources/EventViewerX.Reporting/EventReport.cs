@@ -3,12 +3,13 @@ namespace EventViewerX.Reporting;
 /// <summary>Immutable, reusable result of one event query.</summary>
 public sealed class EventReport {
     internal EventReport(string title, DateTime generatedAt, TimeSpan queryDuration,
-        IReadOnlyList<EventReportRow> rows, IReadOnlyList<EventReportCoverage> coverage,
-        long scanned, bool scanLimitReached) {
+        IReadOnlyList<EventReportRow> rows, IReadOnlyList<EventReportSection> sections,
+        IReadOnlyList<EventReportCoverage> coverage, long scanned, bool scanLimitReached) {
         Title = title;
         GeneratedAt = generatedAt;
         QueryDuration = queryDuration;
         Rows = rows;
+        Sections = sections;
         Coverage = coverage;
         EventsScanned = scanned;
         ScanLimitReached = scanLimitReached;
@@ -22,6 +23,8 @@ public sealed class EventReport {
     public TimeSpan QueryDuration { get; }
     /// <summary>Normalized event rows.</summary>
     public IReadOnlyList<EventReportRow> Rows { get; }
+    /// <summary>Homogeneous generic or typed tables ready for presentation.</summary>
+    public IReadOnlyList<EventReportSection> Sections { get; }
     /// <summary>Source coverage and failures.</summary>
     public IReadOnlyList<EventReportCoverage> Coverage { get; }
     /// <summary>Raw typed candidates evaluated.</summary>

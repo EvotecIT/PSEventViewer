@@ -243,6 +243,14 @@ See [custom event definitions](Event-Definitions.md) and
 `Show-EVXEvent` is the one report command. It queries once and renders each
 selected output from the same normalized snapshot.
 
+`-Type` and `-Definition` create domain tables. Each populated leaf type has
+its own columns and, in Excel, its own worksheet. A composite type therefore
+keeps logons, group-policy changes, Kerberos activity, and other incompatible
+schemas separate. The primary typed tables do not add Event ID, provider, log
+name, or raw message columns. Excel records those technical fields in the
+separate `Event Provenance` worksheet. `-LogName` is the generic path and keeps
+the familiar Windows event metadata for browsing an arbitrary channel.
+
 ```powershell
 Show-EVXEvent -Type ActiveDirectoryAuthentication `
     -Collector WEC01 -TimePeriod Last24Hours `
@@ -257,7 +265,9 @@ Get-EVXEvent -LogName System -EventId 41, 6008 -TimePeriod Last7Days |
 With no explicit output and no `-PassThru`, the command creates and opens a
 temporary HTML report. `-EmailPackage` returns transport-neutral HTML, plain
 text, inline resources, and attachments for Mailozaurr, Graph, or Teams
-adapters; PSEventViewer itself does not send or own credentials.
+adapters; PSEventViewer itself does not send or own credentials. Its compact
+digest distributes the row limit across populated typed sections instead of
+letting the first event type consume the entire email.
 
 ```powershell
 $email = Show-EVXEvent -Type ADUserLogonFailed `

@@ -1,12 +1,7 @@
-using System.Collections.Concurrent;
-using System.Reflection;
-
 namespace EventViewerX.Reporting;
 
 /// <summary>Runs one optimized query and produces a reusable report snapshot.</summary>
 public static class EventReportEngine {
-    private static readonly ConcurrentDictionary<Type, PropertyInfo[]> TypedProperties = new();
-
     /// <summary>Queries and materializes an event report.</summary>
     public static async Task<EventReport> QueryAsync(EventReportRequest request, CancellationToken cancellationToken = default) {
         if (request == null) {
@@ -14,7 +9,7 @@ public static class EventReportEngine {
         }
         request.Validate();
         var stopwatch = Stopwatch.StartNew();
-        List<EventReportRow> rows;
+        List<EventReportProjection> projections;
         List<EventReportCoverage> coverage;
         long scanned = 0;
         bool scanLimitReached = false;
@@ -22,15 +17,15 @@ public static class EventReportEngine {
         if (request.Types != null && request.Types.Count > 0) {
             var info = new EventTypeQueryExecutionInfo();
             EventTypeQuery query = CreateTypedQuery(request);
-            rows = new List<EventReportRow>();
+            projections = new List<EventReportProjection>();
             await foreach (EventTypeRecord record in EventTypeEngine.ReadAsync(query, info, cancellationToken)) {
-                rows.Add(Project(record));
+                projections.Add(EventReportProjectionFactory.Create(record));
             }
             scanned = info.EventsScanned;
             scanLimitReached = info.ScanLimitReached;
             coverage = BuildTypedCoverage(request, info);
         } else if (request.Definition != null) {
-            rows = new List<EventReportRow>();
+            projections = new List<EventReportProjection>();
             var info = new EventDefinitionQueryExecutionInfo();
             var query = new EventDefinitionQuery(request.Definition) {
                 Paths = request.Paths,
@@ -49,26 +44,28 @@ public static class EventReportEngine {
                 ContinueOnRemoteFailure = request.ContinueOnRemoteFailure
             };
             await foreach (CustomEventRecord record in EventDefinitionEngine.ReadAsync(query, info, cancellationToken)) {
-                rows.Add(Project(record));
+                projections.Add(EventReportProjectionFactory.Create(record));
             }
             scanned = info.EventsScanned;
             scanLimitReached = info.ScanLimitReached;
             coverage = BuildCustomCoverage(request, info);
         } else {
-            (rows, coverage) = await QueryGenericAsync(request, cancellationToken);
-            scanned = rows.Count;
+            (projections, coverage) = await QueryGenericAsync(request, cancellationToken);
+            scanned = projections.Count;
         }
         stopwatch.Stop();
         string title = string.IsNullOrWhiteSpace(request.Title)
             ? request.Types != null && request.Types.Count > 0
-                ? string.Join(", ", request.Types.Select(static type => type.ToString()))
+                ? string.Join(", ", request.Types.Select(static type => EventTypeCatalog.GetDefinition(type).DisplayName))
                 : request.Definition != null
                     ? string.IsNullOrWhiteSpace(request.Definition.DisplayName) ? request.Definition.Name : request.Definition.DisplayName
                 : request.Paths != null && request.Paths.Count > 0
                     ? $"{request.Paths.Count} offline event log{(request.Paths.Count == 1 ? string.Empty : "s")}"
                     : $"{request.LogName} events"
             : request.Title!.Trim();
-        return new EventReport(title, DateTime.UtcNow, stopwatch.Elapsed, rows, coverage, scanned, scanLimitReached);
+        EventReportRow[] rows = projections.Select(static projection => projection.Row).ToArray();
+        return new EventReport(title, DateTime.UtcNow, stopwatch.Elapsed, rows,
+            EventReportSectionBuilder.Build(projections), coverage, scanned, scanLimitReached);
     }
 
     /// <summary>Creates a report snapshot from previously queried EventViewerX objects without reading logs again.</summary>
@@ -76,10 +73,11 @@ public static class EventReportEngine {
         if (input == null) {
             throw new ArgumentNullException(nameof(input));
         }
-        var rows = new List<EventReportRow>();
+        var projections = new List<EventReportProjection>();
         foreach (object item in input) {
-            rows.Add(CreateRow(item));
+            projections.Add(CreateProjection(item));
         }
+        EventReportRow[] rows = projections.Select(static projection => projection.Row).ToArray();
         List<EventReportCoverage> coverage = rows
             .GroupBy(static row => row.CollectorComputer + "\0" + row.SourceLog, StringComparer.OrdinalIgnoreCase)
             .Select(static group => {
@@ -93,15 +91,20 @@ public static class EventReportEngine {
                 };
             }).ToList();
         return new EventReport(string.IsNullOrWhiteSpace(title) ? "EventViewerX events" : title!.Trim(),
-            DateTime.UtcNow, TimeSpan.Zero, rows, coverage, rows.Count, scanLimitReached: false);
+            DateTime.UtcNow, TimeSpan.Zero, rows, EventReportSectionBuilder.Build(projections),
+            coverage, rows.Length, scanLimitReached: false);
     }
 
     /// <summary>Normalizes one generic, built-in typed, or custom event without querying the event log.</summary>
     public static EventReportRow CreateRow(object input) {
+        return CreateProjection(input).Row;
+    }
+
+    private static EventReportProjection CreateProjection(object input) {
         return input switch {
-            EventTypeRecord typed => Project(typed),
-            EventObject source => Project(source),
-            CustomEventRecord custom => Project(custom),
+            EventTypeRecord typed => EventReportProjectionFactory.Create(typed),
+            EventObject source => EventReportProjectionFactory.Create(source),
+            CustomEventRecord custom => EventReportProjectionFactory.Create(custom),
             null => throw new ArgumentNullException(nameof(input)),
             _ => throw new ArgumentException(
                 $"Unsupported report input type '{input.GetType().FullName}'. Expected EventObject, EventTypeRecord, or CustomEventRecord.",
@@ -131,7 +134,7 @@ public static class EventReportEngine {
         };
     }
 
-    private static async Task<(List<EventReportRow> Rows, List<EventReportCoverage> Coverage)> QueryGenericAsync(
+    private static async Task<(List<EventReportProjection> Rows, List<EventReportCoverage> Coverage)> QueryGenericAsync(
         EventReportRequest request, CancellationToken cancellationToken) {
         (DateTime? startTime, DateTime? endTime) = EventTimeRange.Resolve(request.StartTime, request.EndTime, request.TimePeriod);
         EventFilter filter = new() {
@@ -149,9 +152,9 @@ public static class EventReportEngine {
             EventLogBatchQuery fileBatch = EventLogBatchQuery.ForFiles(files);
             fileBatch.MaxEvents = request.MaxEvents;
             fileBatch.MaxConcurrency = request.MaxConcurrency;
-            var fileRows = new List<EventReportRow>();
+            var fileRows = new List<EventReportProjection>();
             await foreach (EventObject record in EventLogEngine.ReadBatchAsync(fileBatch, cancellationToken)) {
-                fileRows.Add(Project(record));
+                fileRows.Add(EventReportProjectionFactory.Create(record));
             }
             List<EventReportCoverage> fileCoverage = files.Select(static file => new EventReportCoverage {
                 MachineName = "Offline",
@@ -186,9 +189,9 @@ public static class EventReportEngine {
             }
             throw failure.Exception;
         };
-        var rows = new List<EventReportRow>();
+        var rows = new List<EventReportProjection>();
         await foreach (EventObject record in EventLogEngine.ReadBatchAsync(batch, cancellationToken)) {
-            rows.Add(Project(record));
+            rows.Add(EventReportProjectionFactory.Create(record));
         }
         var coverage = targets.Select(target => {
             string machine = string.IsNullOrWhiteSpace(target) ? Environment.MachineName : target!;
@@ -209,67 +212,6 @@ public static class EventReportEngine {
             };
         }).ToList();
         return (rows, coverage);
-    }
-
-    private static EventReportRow Project(EventTypeRecord record) {
-        PropertyInfo[] properties = TypedProperties.GetOrAdd(record.GetType(), static type => type
-            .GetProperties(BindingFlags.Instance | BindingFlags.Public)
-            .Where(static property => property.CanRead && property.GetIndexParameters().Length == 0 &&
-                property.DeclaringType != typeof(EventTypeRecord) && property.Name != nameof(EventTypeRecord.SourceEvent))
-            .OrderBy(static property => property.Name, StringComparer.Ordinal)
-            .ToArray());
-        var values = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
-        foreach (PropertyInfo property in properties) {
-            values[property.Name] = property.GetValue(record);
-        }
-        EventObject source = record.SourceEvent;
-        return new EventReportRow {
-            TimeCreated = source.TimeCreated,
-            Type = record.TypeName,
-            EventId = source.Id,
-            RecordId = source.RecordId,
-            Provider = source.ProviderName,
-            SourceLog = source.OriginalLogName,
-            ContainerLog = source.ContainerLogName,
-            SourceComputer = source.SourceComputer,
-            CollectorComputer = source.CollectorComputer,
-            Level = source.LevelDisplayName,
-            Message = source.Message,
-            Values = values
-        };
-    }
-
-    private static EventReportRow Project(EventObject source) => new() {
-        TimeCreated = source.TimeCreated,
-        Type = "Generic",
-        EventId = source.Id,
-        RecordId = source.RecordId,
-        Provider = source.ProviderName,
-        SourceLog = source.OriginalLogName,
-        ContainerLog = source.ContainerLogName,
-        SourceComputer = source.SourceComputer,
-        CollectorComputer = source.CollectorComputer,
-        Level = source.LevelDisplayName,
-        Message = source.Message,
-        Values = source.Data.ToDictionary(static item => item.Key, static item => (object?)item.Value, StringComparer.OrdinalIgnoreCase)
-    };
-
-    private static EventReportRow Project(CustomEventRecord record) {
-        EventObject source = record.SourceEvent;
-        return new EventReportRow {
-            TimeCreated = source.TimeCreated,
-            Type = record.TypeName,
-            EventId = source.Id,
-            RecordId = source.RecordId,
-            Provider = source.ProviderName,
-            SourceLog = source.OriginalLogName,
-            ContainerLog = source.ContainerLogName,
-            SourceComputer = source.SourceComputer,
-            CollectorComputer = source.CollectorComputer,
-            Level = source.LevelDisplayName,
-            Message = source.Message,
-            Values = record.Values
-        };
     }
 
     private static List<EventReportCoverage> BuildCustomCoverage(

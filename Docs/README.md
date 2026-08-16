@@ -112,6 +112,8 @@ Queries or accepts EventViewerX events and creates polished HTML, Excel, or emai
 
 Show-EVXEvent uses one normalized report snapshot for every selected output. A Type owns its source channels and event IDs; LogName is reserved for generic event queries.
 
+Typed and custom definitions render only their domain fields. Composite types keep each leaf schema in a separate table and Excel worksheet, while Event Provenance retains the technical Windows event context.
+
 ### [Start-EVXWatcher](Start-EVXWatcher.md)
 Starts real-time monitoring of Windows Event Logs with customizable filters and actions.
 

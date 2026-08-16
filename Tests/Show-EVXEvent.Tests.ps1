@@ -1,7 +1,9 @@
 Describe 'Show-EVXEvent' {
     It 'keeps Type, generic LogName, Definition, and pipeline input mutually exclusive' {
         $Command = Get-Command Show-EVXEvent
-        $Command.ParameterSets.Name | Should -Be @('Type', 'Log', 'Path', 'Definition', 'Input')
+        $Command.DefaultParameterSet | Should -Be 'Input'
+        $Command.ParameterSets.Name | Sort-Object |
+            Should -Be (@('Type', 'Log', 'Path', 'Definition', 'Input') | Sort-Object)
         ($Command.ParameterSets | Where-Object Name -EQ 'Type').Parameters.Name |
             Should -Not -Contain 'LogName'
         ($Command.ParameterSets | Where-Object Name -EQ 'Log').Parameters.Name |
@@ -14,6 +16,17 @@ Describe 'Show-EVXEvent' {
             Should -Contain 'Path'
         ($Command.ParameterSets | Where-Object Name -EQ 'Definition').Parameters.Name |
             Should -Contain 'MaxEventsScanned'
+    }
+
+    It 'uses Path alone for a generic offline report' {
+        $FixturePath = Join-Path $PSScriptRoot 'Logs\NamedFilterExamples.evtx'
+
+        $Report = Show-EVXEvent -Path $FixturePath -MaxEvents 2 -PassThru
+
+        $Report.Rows.Count | Should -Be 2
+        $Report.Sections.Count | Should -Be 1
+        $Report.Sections[0].Kind.ToString() | Should -Be 'Generic'
+        $Report.Sections[0].Columns.Name | Should -Contain 'EventId'
     }
 
     It 'renders HTML, Excel, email, and the report from one supplied snapshot' {

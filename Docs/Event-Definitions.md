@@ -20,9 +20,9 @@ portable `evx.exe` host.
     }
   ],
   "Fields": [
-    { "Name": "ServiceName", "Source": "Data", "SourceName": "param1" },
-    { "Name": "OldStartType", "Source": "Data", "SourceName": "param2" },
-    { "Name": "NewStartType", "Source": "Data", "SourceName": "param3" },
+    { "Name": "ServiceName", "DisplayName": "Service", "Source": "Data", "SourceName": "param1" },
+    { "Name": "OldStartType", "DisplayName": "Previous start type", "Source": "Data", "SourceName": "param2" },
+    { "Name": "NewStartType", "DisplayName": "New start type", "Source": "Data", "SourceName": "param3" },
     { "Name": "Computer", "Source": "Metadata", "SourceName": "SourceComputer" }
   ]
 }
@@ -32,7 +32,9 @@ portable `evx.exe` host.
 `SourceName` identifies the EventData key, parsed message field, EventObject
 property, or constant value. `DefaultValue` is optional. Names must be unique,
 event IDs must be positive, and every declared provider and channel must be
-non-empty.
+non-empty. Fields keep their declared order in typed output. Optional
+`DisplayName` controls the HTML, Excel, and email heading without changing the
+stable field name used by C# and PowerShell.
 
 ## PowerShell
 
@@ -64,6 +66,11 @@ Use `-Collector WEC01` instead of `-MachineName` after the source computers
 are forwarding. EventViewerX reads `ForwardedEvents` while matching the
 definition's original channel, provider, and event IDs. `-Path` is likewise a
 container override; neither option changes the definition's semantics.
+
+A custom definition produces only its declared fields in the primary report
+table and worksheet. Excel stores event ID, provider, channel, record ID, and
+raw message in `Event Provenance` instead of mixing transport metadata into the
+domain schema.
 
 ## C#
 

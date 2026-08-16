@@ -19,6 +19,8 @@ public sealed class TestEventTypeDefinitions {
                 Assert.NotNull(definition.RecordType);
                 Assert.NotEmpty(definition.Sources);
                 Assert.NotEmpty(definition.Fields);
+                Assert.Contains(definition.Fields, static field =>
+                    !field.IsCommon && field.Name is not "EventIds" and not "LogName" and not "Type");
             });
     }
 

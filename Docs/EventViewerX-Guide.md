@@ -299,10 +299,21 @@ request.TimePeriod = TimePeriod.Last24Hours;
 request.Collectors = new string?[] { "WEC01" };
 
 EventReport report = await EventReportEngine.QueryAsync(request);
+foreach (EventReportSection section in report.Sections) {
+    Console.WriteLine($"{section.DisplayName}: {section.Rows.Count} rows");
+}
 EventReportHtmlRenderer.Save(report, "Authentication.html");
 EventReportExcelRenderer.Save(report, "Authentication.xlsx");
 EventEmailPackage email = await EventReportEmailRenderer.RenderAsync(report);
 ```
+
+`EventReport.Sections` is the presentation schema. A leaf definition creates
+one homogeneous section containing its domain fields. Composite definitions
+create one section per populated leaf type, which becomes a separate HTML
+table and Excel worksheet. Generic log queries instead expose the familiar
+Windows event metadata. Excel adds `Event Provenance` for typed reports so the
+source log, provider, event ID, record ID, and raw message remain available
+without crowding the domain worksheets.
 
 The email package is transport-neutral. A host may give its HTML/plain-text
 body and resources to Mailozaurr, Microsoft Graph, or another sender without

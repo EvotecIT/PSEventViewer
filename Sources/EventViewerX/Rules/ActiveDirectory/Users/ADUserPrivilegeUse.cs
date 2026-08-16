@@ -59,7 +59,7 @@ public class ADUserPrivilegeUse : EventRuleBase {
 
         var privilegeList = SourceEvent.GetDataValueOrEmpty(KnownEventField.PrivilegeList);
         if (!string.IsNullOrEmpty(privilegeList)) {
-            Privileges = privilegeList.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries).ToList();
+            Privileges = privilegeList.Split(new[] { ' ', '\t', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries).ToList();
             PrivilegesTranslated = Privileges.Select(EventsHelper.TranslatePrivilege).ToList();
         } else {
             Privileges = new List<string>();

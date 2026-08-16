@@ -19,25 +19,18 @@ public static class EventReportHtmlRenderer {
             .Title("Events by type")
             .Subtitle("The most frequent typed projections in this result")
             .Accent(TablerColor.Indigo);
-        foreach (IGrouping<string, EventReportRow> group in report.Rows
-                     .GroupBy(static row => row.Type, StringComparer.OrdinalIgnoreCase)
-                     .OrderByDescending(static group => group.Count())
+        foreach (EventReportSection section in report.Sections
+                     .OrderByDescending(static section => section.Rows.Count)
                      .Take(12)) {
-            categoryChart.AddItem(group.Key, group.Count());
+            categoryChart.AddItem(section.DisplayName, section.Rows.Count);
         }
-        List<Dictionary<string, object?>> rows = EventReportTableProjection.Project(report.Rows);
         List<object> coverage = report.Coverage.Cast<object>().ToList();
-        var eventsCard = new TablerDataTableCard()
-            .Title("Events")
-            .Subtitle("Search, sort, filter, and inspect every normalized event")
-            .Accent(TablerColor.Blue)
-            .Bind(rows.Cast<object>());
         var coverageCard = new TablerDataTableCard()
             .Title("Coverage")
             .Subtitle("Every queried computer and source channel")
             .Accent(report.Coverage.All(static item => item.Succeeded) ? TablerColor.Green : TablerColor.Yellow)
             .Bind(coverage);
-        document.Body.Add(new TablerReportWorkspace()
+        var workspace = new TablerReportWorkspace()
             .Title("EventViewerX")
             .BrandIcon(TablerIconType.Activity, TablerColor.Indigo)
             .Settings(settings => settings
@@ -53,19 +46,35 @@ public static class EventReportHtmlRenderer {
             .TopBar(top => top
                 .Breadcrumb("EventViewerX", report.Title)
                 .ThemeSelector())
-            .Content(content => content
-                .Hero(hero => hero
+            .Content(content => {
+                content.Hero(hero => hero
                     .Title(report.Title)
-                    .Chip("Windows Event Log")
-                    .Illustration(TablerIconType.Activity))
-                .Metrics(metrics => metrics
+                    .Chip("Windows Event Log"));
+                content.Metrics(metrics => metrics
                     .Metric("Events", report.Rows.Count.ToString("N0"), TablerIconType.ListDetails, TablerColor.Blue)
                     .Metric("Sources", report.Coverage.Count.ToString("N0"), TablerIconType.Server, TablerColor.Indigo)
                     .Metric("Query", $"{report.QueryDuration.TotalSeconds:N2}s", TablerIconType.Bolt, TablerColor.Green)
-                    .Metric("Failures", report.Coverage.Count(static item => !item.Succeeded).ToString("N0"), TablerIconType.AlertTriangle, TablerColor.Yellow))
-                .AddContent(categoryChart)
-                .AddContent(eventsCard)
-                .AddContent(coverageCard)));
+                    .Metric("Failures", report.Coverage.Count(static item => !item.Succeeded).ToString("N0"), TablerIconType.AlertTriangle, TablerColor.Yellow));
+                content.AddContent(categoryChart);
+                foreach (EventReportSection section in report.Sections) {
+                    List<Dictionary<string, object?>> rows = EventReportTableProjection.Project(section);
+                    string subtitle = string.IsNullOrWhiteSpace(section.Description)
+                        ? $"{section.Rows.Count:N0} matching event{(section.Rows.Count == 1 ? string.Empty : "s")}"
+                        : $"{section.Rows.Count:N0} matching event{(section.Rows.Count == 1 ? string.Empty : "s")} · {section.Description}";
+                    content.AddContent(new TablerDataTableCard()
+                        .Title(section.DisplayName)
+                        .Subtitle(subtitle)
+                        .Accent(section.Kind == EventReportSectionKind.Generic ? TablerColor.Blue : TablerColor.Indigo)
+                        .Bind(rows.Cast<object>(), table => table.Settings(settings => settings
+                            .Searching(true)
+                            .Ordering(true)
+                            .Paging(25, new[] { 25, 50, 100, -1 })
+                            .ResponsiveInline()
+                            .End())));
+                }
+                content.AddContent(coverageCard);
+            });
+        document.Body.Add(workspace);
         return document.ToString();
     }
 

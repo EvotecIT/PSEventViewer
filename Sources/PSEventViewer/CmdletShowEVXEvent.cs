@@ -3,6 +3,7 @@ namespace PSEventViewer;
 /// <summary>
 /// <para type="synopsis">Queries or accepts EventViewerX events and creates polished HTML, Excel, or email output.</para>
 /// <para type="description">Show-EVXEvent uses one normalized report snapshot for every selected output. A Type owns its source channels and event IDs; LogName is reserved for generic event queries.</para>
+/// <para type="description">Typed and custom definitions render only their domain fields. Composite types keep each leaf schema in a separate table and Excel worksheet, while Event Provenance retains the technical Windows event context.</para>
 /// </summary>
 /// <example>
 ///   <summary>Open a failed-logon report</summary>
@@ -21,7 +22,7 @@ namespace PSEventViewer;
 /// </example>
 [OutputType(typeof(EventReport))]
 [OutputType(typeof(EventEmailPackage))]
-[Cmdlet(VerbsCommon.Show, "EVXEvent", DefaultParameterSetName = "Type")]
+[Cmdlet(VerbsCommon.Show, "EVXEvent", DefaultParameterSetName = "Input")]
 public sealed class CmdletShowEVXEvent : AsyncPSCmdlet {
     private readonly List<object> _input = new();
 

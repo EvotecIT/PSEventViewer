@@ -263,9 +263,25 @@ public static partial class EventTypeCatalog {
     }
 
     private static string SplitWords(string value) {
-        return Regex.Replace(
+        string separated = Regex.Replace(
             value,
             "(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])",
             " ");
+        return string.Join(" ", separated.Split(' ').Select(static word => word switch {
+            "Dhcp" => "DHCP",
+            "Dns" => "DNS",
+            "Gpo" => "GPO",
+            "Guid" => "GUID",
+            "Id" => "ID",
+            "Ip" => "IP",
+            "Rdp" => "RDP",
+            "Sid" => "SID",
+            "Smb" => "SMB",
+            "Tgt" => "TGT",
+            "Url" => "URL",
+            "Wec" => "WEC",
+            "Xml" => "XML",
+            _ => word
+        }));
     }
 }

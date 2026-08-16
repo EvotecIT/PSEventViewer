@@ -10,8 +10,15 @@ Queries or accepts EventViewerX events and creates polished HTML, Excel, or emai
 
 Show-EVXEvent uses one normalized report snapshot for every selected output. A Type owns its source channels and event IDs; LogName is reserved for generic event queries.
 
+Typed and custom definitions render only their domain fields. Composite types keep each leaf schema in a separate table and Excel worksheet, while Event Provenance retains the technical Windows event context.
+
 ## SYNTAX
-### Type (Default)
+### Input (Default)
+```powershell
+Show-EVXEvent -InputObject <Object> [-Title <string>] [-HtmlPath <string>] [-ExcelPath <string>] [-EmailPackage] [-Open] [-PassThru] [<CommonParameters>]
+```
+
+### Type
 ```powershell
 Show-EVXEvent [-Type] <EventType[]> [-Path <string[]>] [-EventRecordId <long[]>] [-MachineName <string[]>] [-Collector <string[]>] [-StartTime <DateTime>] [-EndTime <DateTime>] [-TimePeriod <TimePeriod>] [-MaxEvents <long>] [-MaxEventsScanned <long>] [-MaxConcurrency <int>] [-Oldest] [-ResolveDns] [-Credential <pscredential>] [-Authentication <EventLogAuthentication>] [-Title <string>] [-HtmlPath <string>] [-ExcelPath <string>] [-EmailPackage] [-Open] [-PassThru] [<CommonParameters>]
 ```
@@ -31,15 +38,12 @@ Show-EVXEvent [-Path] <string[]> [-EventId <int[]>] [-EventRecordId <long[]>] [-
 Show-EVXEvent [-Definition] <Object> [-Path <string[]>] [-EventRecordId <long[]>] [-MachineName <string[]>] [-Collector <string[]>] [-StartTime <DateTime>] [-EndTime <DateTime>] [-TimePeriod <TimePeriod>] [-MaxEvents <long>] [-MaxEventsScanned <long>] [-MaxConcurrency <int>] [-Oldest] [-Credential <pscredential>] [-Authentication <EventLogAuthentication>] [-Title <string>] [-HtmlPath <string>] [-ExcelPath <string>] [-EmailPackage] [-Open] [-PassThru] [<CommonParameters>]
 ```
 
-### Input
-```powershell
-Show-EVXEvent -InputObject <Object> [-Title <string>] [-HtmlPath <string>] [-ExcelPath <string>] [-EmailPackage] [-Open] [-PassThru] [<CommonParameters>]
-```
-
 ## DESCRIPTION
 Queries or accepts EventViewerX events and creates polished HTML, Excel, or email output.
 
 Show-EVXEvent uses one normalized report snapshot for every selected output. A Type owns its source channels and event IDs; LogName is reserved for generic event queries.
+
+Typed and custom definitions render only their domain fields. Composite types keep each leaf schema in a separate table and Excel worksheet, while Event Provenance retains the technical Windows event context.
 
 ## EXAMPLES
 
@@ -135,7 +139,7 @@ Returns a responsive transport-neutral email package for Mailozaurr.
 
 ```yaml
 Type: SwitchParameter
-Parameter Sets: Type, Log, Path, Definition, Input
+Parameter Sets: Input, Type, Log, Path, Definition
 Aliases: None
 Possible values:
 
@@ -199,7 +203,7 @@ Excel workbook output path.
 
 ```yaml
 Type: String
-Parameter Sets: Type, Log, Path, Definition, Input
+Parameter Sets: Input, Type, Log, Path, Definition
 Aliases: None
 Possible values:
 
@@ -215,7 +219,7 @@ Self-contained interactive HTML output path.
 
 ```yaml
 Type: String
-Parameter Sets: Type, Log, Path, Definition, Input
+Parameter Sets: Input, Type, Log, Path, Definition
 Aliases: None
 Possible values:
 
@@ -343,7 +347,7 @@ Opens generated files with the registered desktop applications.
 
 ```yaml
 Type: SwitchParameter
-Parameter Sets: Type, Log, Path, Definition, Input
+Parameter Sets: Input, Type, Log, Path, Definition
 Aliases: None
 Possible values:
 
@@ -359,7 +363,7 @@ Returns the normalized report snapshot in addition to generated output.
 
 ```yaml
 Type: SwitchParameter
-Parameter Sets: Type, Log, Path, Definition, Input
+Parameter Sets: Input, Type, Log, Path, Definition
 Aliases: None
 Possible values:
 
@@ -439,7 +443,7 @@ Report title.
 
 ```yaml
 Type: String
-Parameter Sets: Type, Log, Path, Definition, Input
+Parameter Sets: Input, Type, Log, Path, Definition
 Aliases: None
 Possible values:
 
