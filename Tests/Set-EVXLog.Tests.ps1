@@ -7,15 +7,15 @@ Describe 'Set-EVXLog channel policy' {
         $script:skip = -not $script:isAdmin
 
         if (-not $script:skip) {
-            Remove-EVXSource -SourceName $script:provider -LogName $script:log -ErrorAction SilentlyContinue
-            Remove-EVXLog -LogName $script:log -ErrorAction SilentlyContinue
-            New-EVXLog -LogName $script:log -ProviderName $script:provider | Out-Null
+            $configuration = [EventViewerX.ClassicEventLogConfiguration]::new()
+            $configuration.LogName = $script:log
+            $configuration.SourceName = $script:provider
+            [EventViewerX.ClassicEventLogManager]::EnsureLog($configuration) | Out-Null
         }
     }
     AfterAll {
-        if (-not $script:skip) {
-            Remove-EVXLog -LogName $script:log -ErrorAction SilentlyContinue
-            Remove-EVXSource -SourceName $script:provider -LogName $script:log -ErrorAction SilentlyContinue
+        if (-not $script:skip -and [EventViewerX.ClassicEventLogManager]::LogExists($script:log)) {
+            [EventViewerX.ClassicEventLogManager]::RemoveLog($script:log) | Out-Null
         }
     }
     It 'applies size and retention mode through one typed result' -Skip:$script:skip {

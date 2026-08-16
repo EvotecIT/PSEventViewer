@@ -6,7 +6,7 @@ namespace EventViewerX.Reports.Stats;
 /// <summary>
 /// Query contract for EVTX statistics aggregation.
 /// </summary>
-public sealed class EvtxStatsQueryRequest {
+internal sealed class EvtxStatsQueryRequest {
     /// <summary>
     /// EVTX file path (absolute or relative).
     /// </summary>
@@ -66,7 +66,7 @@ public sealed class EvtxStatsQueryRequest {
 /// <summary>
 /// Top event ID count row.
 /// </summary>
-public sealed class EvtxStatsTopEventIdRow {
+internal sealed class EvtxStatsTopEventIdRow {
     /// <summary>
     /// Event ID.
     /// </summary>
@@ -81,7 +81,7 @@ public sealed class EvtxStatsTopEventIdRow {
 /// <summary>
 /// Top provider count row.
 /// </summary>
-public sealed class EvtxStatsTopProviderRow {
+internal sealed class EvtxStatsTopProviderRow {
     /// <summary>
     /// Provider name.
     /// </summary>
@@ -96,7 +96,7 @@ public sealed class EvtxStatsTopProviderRow {
 /// <summary>
 /// Top computer count row.
 /// </summary>
-public sealed class EvtxStatsTopComputerRow {
+internal sealed class EvtxStatsTopComputerRow {
     /// <summary>
     /// Computer name.
     /// </summary>
@@ -111,7 +111,7 @@ public sealed class EvtxStatsTopComputerRow {
 /// <summary>
 /// Query result for EVTX stats aggregation.
 /// </summary>
-public sealed class EvtxStatsQueryResult {
+internal sealed class EvtxStatsQueryResult {
     /// <summary>
     /// Queried EVTX path.
     /// </summary>

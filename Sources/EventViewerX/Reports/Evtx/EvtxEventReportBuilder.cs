@@ -8,7 +8,7 @@ namespace EventViewerX.Reports.Evtx;
 /// <summary>
 /// Builds typed EVTX event reports from <see cref="EvtxQueryRequest"/>.
 /// </summary>
-public static class EvtxEventReportBuilder {
+internal static class EvtxEventReportBuilder {
     /// <summary>
     /// Reads an EVTX file and projects typed event rows for tool/report consumption.
     /// </summary>

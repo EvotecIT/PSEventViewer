@@ -9,7 +9,7 @@ namespace EventViewerX.Reports.Security;
 /// <summary>
 /// Report builder for Windows Security logon-related events (4624/4625/4634/4647).
 /// </summary>
-public sealed class SecurityUserLogonsReportBuilder {
+internal sealed class SecurityUserLogonsReportBuilder {
     private readonly bool _includeSamples;
     private readonly int _sampleSize;
     private readonly IReadOnlyList<int> _eventIds;

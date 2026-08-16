@@ -6,7 +6,7 @@ namespace EventViewerX.Reports.Evtx;
 /// <summary>
 /// Single event row projected from EVTX query output.
 /// </summary>
-public sealed class EvtxEventReportRow {
+internal sealed class EvtxEventReportRow {
     /// <summary>
     /// Event creation time in UTC (ISO-8601), when present.
     /// </summary>
@@ -86,7 +86,7 @@ public sealed class EvtxEventReportRow {
 /// <summary>
 /// EVTX event report result.
 /// </summary>
-public sealed class EvtxEventReportResult {
+internal sealed class EvtxEventReportResult {
     /// <summary>
     /// Queried EVTX path.
     /// </summary>

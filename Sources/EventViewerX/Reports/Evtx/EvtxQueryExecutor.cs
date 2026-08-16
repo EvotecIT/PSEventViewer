@@ -9,7 +9,7 @@ namespace EventViewerX.Reports.Evtx;
 /// <summary>
 /// Executes EVTX queries using a stable request/response contract.
 /// </summary>
-public static class EvtxQueryExecutor {
+internal static class EvtxQueryExecutor {
     /// <summary>
     /// Streams EVTX events to a callback and returns typed failures on errors.
     /// </summary>

@@ -4,7 +4,7 @@ using System.Reflection;
 
 namespace EventViewerX.Reports.Correlation;
 
-public static partial class NamedEventsTimelineQueryExecutor {
+internal static partial class NamedEventsTimelineQueryExecutor {
     private const int MaxSnakeCaseCacheEntries = 4096;
     private static readonly ConcurrentDictionary<Type, PayloadExtractionPlan> PayloadExtractionPlanCache = new();
     private static readonly ConcurrentDictionary<string, string> SnakeCaseCache = new(StringComparer.Ordinal);

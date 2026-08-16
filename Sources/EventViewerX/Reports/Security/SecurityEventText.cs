@@ -6,7 +6,7 @@ namespace EventViewerX.Reports.Security;
 /// <summary>
 /// Formatting helpers for security event fields.
 /// </summary>
-public static class SecurityEventText {
+internal static class SecurityEventText {
     /// <summary>
     /// Normalizes empty/"-" placeholder values to empty string and trims non-empty values.
     /// </summary>

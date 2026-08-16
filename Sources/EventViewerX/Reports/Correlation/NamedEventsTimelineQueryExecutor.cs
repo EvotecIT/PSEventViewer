@@ -7,7 +7,7 @@ namespace EventViewerX.Reports.Correlation;
 /// <summary>
 /// Builds timeline and correlation projections for named-event detections.
 /// </summary>
-public static partial class NamedEventsTimelineQueryExecutor {
+internal static partial class NamedEventsTimelineQueryExecutor {
     private const int MaxCorrelationKeys = 8;
     private const int MaxPayloadKeys = 64;
     private const int MaxGroupsCap = 2000;

@@ -2,7 +2,7 @@ using System.Globalization;
 
 namespace EventViewerX.Reports.Correlation;
 
-public static partial class NamedEventsTimelineQueryExecutor {
+internal static partial class NamedEventsTimelineQueryExecutor {
     internal static bool TryParseUtcValue(string? value, out DateTime utc) {
         utc = default;
         var text = value ?? string.Empty;

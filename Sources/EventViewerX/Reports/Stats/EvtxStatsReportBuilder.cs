@@ -10,7 +10,7 @@ namespace EventViewerX.Reports.Stats;
 /// <summary>
 /// Report builder for basic EVTX statistics (counts by ID/provider/level/computer, min/max times).
 /// </summary>
-public sealed class EvtxStatsReportBuilder {
+internal sealed class EvtxStatsReportBuilder {
     private readonly Dictionary<int, long> _byEventId = new();
     private readonly Dictionary<string, long> _byProviderName = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, long> _byComputerName = new(StringComparer.OrdinalIgnoreCase);

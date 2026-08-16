@@ -7,16 +7,22 @@ Describe 'Clear-EVXLog cmdlet' {
         $script:skip = -not $script:isAdmin
 
         if (-not $script:skip) {
-            Remove-EVXSource -SourceName $script:provider -LogName $script:log -ErrorAction SilentlyContinue
-            Remove-EVXLog -LogName $script:log -ErrorAction SilentlyContinue
-            New-EVXLog -LogName $script:log -ProviderName $script:provider | Out-Null
-            Write-EVXEvent -LogName $script:log -ProviderName $script:provider -Message 'test' -Id 1000
+            $configuration = [EventViewerX.ClassicEventLogConfiguration]::new()
+            $configuration.LogName = $script:log
+            $configuration.SourceName = $script:provider
+            [EventViewerX.ClassicEventLogManager]::EnsureLog($configuration) | Out-Null
+
+            $request = [EventViewerX.ClassicEventWriteRequest]::new()
+            $request.LogName = $script:log
+            $request.SourceName = $script:provider
+            $request.Message = 'test'
+            $request.EventId = 1000
+            [EventViewerX.ClassicEventLogManager]::Write($request)
         }
     }
     AfterAll {
-        if (-not $script:skip) {
-            Remove-EVXLog -LogName $script:log -ErrorAction SilentlyContinue
-            Remove-EVXSource -SourceName $script:provider -LogName $script:log -ErrorAction SilentlyContinue
+        if (-not $script:skip -and [EventViewerX.ClassicEventLogManager]::LogExists($script:log)) {
+            [EventViewerX.ClassicEventLogManager]::RemoveLog($script:log) | Out-Null
         }
     }
     It 'exposes bounded remote session controls' {

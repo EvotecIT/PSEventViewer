@@ -8,7 +8,7 @@ namespace EventViewerX.Reports;
 /// <summary>
 /// Engine-owned failure descriptor for stable machine-readable failure semantics.
 /// </summary>
-public sealed class EventViewerFailureDescriptor {
+internal sealed class EventViewerFailureDescriptor {
     /// <summary>
     /// Fallback error code used when input is missing/blank.
     /// </summary>
@@ -80,7 +80,7 @@ public sealed class EventViewerFailureDescriptor {
 /// Unknown enum values are mapped to <c>query_failed</c>.
 /// Consumer guidance: retry or adjust scope for recoverable descriptors; for non-recoverable descriptors, prompt for corrected inputs/permissions before retrying.
 /// </remarks>
-public static class EventViewerFailureDescriptorResolver {
+internal static class EventViewerFailureDescriptorResolver {
     /// <summary>
     /// Default failure entity used when no explicit entity is provided.
     /// </summary>

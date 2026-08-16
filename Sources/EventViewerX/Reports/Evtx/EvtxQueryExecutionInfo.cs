@@ -3,7 +3,7 @@ namespace EventViewerX.Reports.Evtx;
 /// <summary>
 /// Describes how an EVTX streaming query completed.
 /// </summary>
-public sealed class EvtxQueryExecutionInfo {
+internal sealed class EvtxQueryExecutionInfo {
     /// <summary>Number of events delivered to the callback.</summary>
     public int EventsDelivered { get; set; }
 

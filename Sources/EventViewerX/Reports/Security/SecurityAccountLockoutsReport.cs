@@ -6,7 +6,7 @@ namespace EventViewerX.Reports.Security;
 /// <summary>
 /// Summary report for Windows Security account lockout events (4740).
 /// </summary>
-public sealed class SecurityAccountLockoutsReport {
+internal sealed class SecurityAccountLockoutsReport {
     /// <summary>Number of scanned events passed into the builder.</summary>
     public int Scanned { get; set; }
     /// <summary>True when at least one additional matching event existed beyond the requested cap.</summary>
@@ -36,7 +36,7 @@ public sealed class SecurityAccountLockoutsReport {
 /// <summary>
 /// Sample row for a single 4740 event.
 /// </summary>
-public sealed class SecurityAccountLockoutSample {
+internal sealed class SecurityAccountLockoutSample {
     /// <summary>Event time (UTC), or null when the source record has no timestamp.</summary>
     public DateTime? TimeCreatedUtc { get; set; }
     /// <summary>Event ID (typically 4740).</summary>

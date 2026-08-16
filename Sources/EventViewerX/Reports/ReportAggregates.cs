@@ -8,7 +8,7 @@ namespace EventViewerX.Reports;
 /// <summary>
 /// Small aggregation helpers for report builders.
 /// </summary>
-public static class ReportAggregates {
+internal static class ReportAggregates {
     /// <summary>
     /// Increments a count for <paramref name="key"/> in <paramref name="dict"/>.
     /// </summary>

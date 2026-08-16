@@ -6,7 +6,7 @@ namespace EventViewerX.Reports.Correlation;
 /// <summary>
 /// Query contract for building timeline and correlation views from named-event detections.
 /// </summary>
-public sealed class NamedEventsTimelineQueryRequest {
+internal sealed class NamedEventsTimelineQueryRequest {
     /// <summary>
     /// Named events to query.
     /// </summary>
@@ -96,7 +96,7 @@ public sealed class NamedEventsTimelineQueryRequest {
 /// <summary>
 /// Canonical failure kinds produced by timeline queries.
 /// </summary>
-public enum NamedEventsTimelineQueryFailureKind {
+internal enum NamedEventsTimelineQueryFailureKind {
     /// <summary>
     /// Invalid request arguments.
     /// </summary>
@@ -116,7 +116,7 @@ public enum NamedEventsTimelineQueryFailureKind {
 /// <summary>
 /// Failure payload produced by timeline queries.
 /// </summary>
-public sealed class NamedEventsTimelineQueryFailure {
+internal sealed class NamedEventsTimelineQueryFailure {
     /// <summary>
     /// Failure kind.
     /// </summary>
@@ -131,7 +131,7 @@ public sealed class NamedEventsTimelineQueryFailure {
 /// <summary>
 /// Timeline row emitted by named-events correlation query.
 /// </summary>
-public sealed class NamedEventsTimelineEventRow {
+internal sealed class NamedEventsTimelineEventRow {
     /// <summary>
     /// Sequence number after timeline ordering.
     /// </summary>
@@ -213,7 +213,7 @@ public sealed class NamedEventsTimelineEventRow {
 /// <summary>
 /// Correlation group row emitted by named-events correlation query.
 /// </summary>
-public sealed class NamedEventsTimelineGroupRow {
+internal sealed class NamedEventsTimelineGroupRow {
     /// <summary>
     /// Correlation identifier.
     /// </summary>
@@ -263,7 +263,7 @@ public sealed class NamedEventsTimelineGroupRow {
 /// <summary>
 /// Timeline density bucket row emitted by named-events correlation query.
 /// </summary>
-public sealed class NamedEventsTimelineBucketRow {
+internal sealed class NamedEventsTimelineBucketRow {
     /// <summary>
     /// Bucket start in UTC ISO-8601 format.
     /// </summary>
@@ -288,7 +288,7 @@ public sealed class NamedEventsTimelineBucketRow {
 /// <summary>
 /// Result payload produced by timeline correlation query.
 /// </summary>
-public sealed class NamedEventsTimelineQueryResult {
+internal sealed class NamedEventsTimelineQueryResult {
     /// <summary>
     /// Effective named-event aliases requested.
     /// </summary>
