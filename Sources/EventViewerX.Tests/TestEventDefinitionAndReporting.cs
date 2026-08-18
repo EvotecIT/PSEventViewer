@@ -398,13 +398,16 @@ public sealed class TestEventDefinitionAndReporting {
             ResultPredicate = record => record.SourceEvent.RecordId == selectedRecordId
         };
         var actual = new List<CustomEventRecord>();
+        var info = new EventDefinitionQueryExecutionInfo();
 
-        await foreach (CustomEventRecord record in EventDefinitionEngine.ReadAsync(query)) {
+        await foreach (CustomEventRecord record in EventDefinitionEngine.ReadAsync(query, info)) {
             actual.Add(record);
         }
 
         Assert.Single(actual);
         Assert.Equal(selectedRecordId, actual[0].SourceEvent.RecordId);
+        Assert.True(info.ResultLimitReached);
+        Assert.False(info.ScanLimitReached);
     }
 
     [Fact]

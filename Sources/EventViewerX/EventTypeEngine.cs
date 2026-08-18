@@ -227,6 +227,14 @@ public static partial class EventTypeEngine {
                                 query.ReadMode,
                             IncludeBookmark =
                                 query.IncludeBookmark,
+                            BookmarkXml = ResolveBookmark(
+                                query,
+                                target,
+                                logName),
+                            BookmarkOffset =
+                                query.BookmarkOffset,
+                            StrictBookmark =
+                                query.StrictBookmark,
                             MessageCulture =
                                 query.MessageCulture,
                             FallbackMessageCulture =
@@ -367,6 +375,12 @@ public static partial class EventTypeEngine {
                         Oldest = query.Oldest,
                         ReadMode = query.ReadMode,
                         IncludeBookmark = query.IncludeBookmark,
+                        BookmarkXml = ResolveBookmark(
+                            query,
+                            fullPath,
+                            fullPath),
+                        BookmarkOffset = query.BookmarkOffset,
+                        StrictBookmark = query.StrictBookmark,
                         MessageCulture = query.MessageCulture,
                         FallbackMessageCulture = query.FallbackMessageCulture
                     });
@@ -491,6 +505,11 @@ public static partial class EventTypeEngine {
                 nameof(query),
                 "Buffer capacity must be between 1 and 4096.");
         }
+        if (query.BookmarkOffset == 0) {
+            throw new ArgumentOutOfRangeException(
+                nameof(query),
+                "Bookmark offset cannot be zero.");
+        }
         if (query.Credential != null &&
             NormalizeTargets(query.MachineNames)
                 .Any(EventLogTarget.IsLocalMachine)) {
@@ -514,5 +533,17 @@ public static partial class EventTypeEngine {
                 nameof(query));
         }
         query.Enrichment?.Validate();
+    }
+
+    private static string? ResolveBookmark(
+        EventTypeQuery query,
+        string? machineName,
+        string container) {
+
+        string? bookmark = query.BookmarkXmlResolver?
+            .Invoke(machineName, container);
+        return string.IsNullOrWhiteSpace(bookmark)
+            ? null
+            : bookmark;
     }
 }

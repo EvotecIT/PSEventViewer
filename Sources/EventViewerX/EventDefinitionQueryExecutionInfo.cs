@@ -16,6 +16,9 @@ public sealed class EventDefinitionQueryExecutionInfo {
     /// <summary>Whether another candidate existed after the configured scan cap.</summary>
     public bool ScanLimitReached { get; internal set; }
 
+    /// <summary>Whether the configured projected-result cap stopped the query.</summary>
+    public bool ResultLimitReached { get; internal set; }
+
     /// <summary>Expected remote-target failures isolated while healthy targets continued.</summary>
     public IReadOnlyList<EventLogQueryTargetFailure> TargetFailures => _targetFailures.Values
         .OrderBy(static failure => failure.MachineName, StringComparer.OrdinalIgnoreCase)
@@ -26,6 +29,7 @@ public sealed class EventDefinitionQueryExecutionInfo {
         EventsScanned = 0;
         EventsEmitted = 0;
         ScanLimitReached = false;
+        ResultLimitReached = false;
         _targetFailures.Clear();
     }
 

@@ -55,6 +55,7 @@ public static class EventDefinitionEngine {
             info.EventsEmitted = emitted;
             yield return record;
             if (query.MaxEvents > 0 && emitted >= query.MaxEvents) {
+                info.ResultLimitReached = true;
                 yield break;
             }
         }
@@ -94,6 +95,9 @@ public static class EventDefinitionEngine {
                         Oldest = query.Oldest,
                         ReadMode = query.ReadMode,
                         IncludeBookmark = query.IncludeBookmark,
+                        BookmarkXml = ResolveBookmark(query, target, logName),
+                        BookmarkOffset = query.BookmarkOffset,
+                        StrictBookmark = query.StrictBookmark,
                         MessageCulture = query.MessageCulture,
                         FallbackMessageCulture = query.FallbackMessageCulture,
                         RemoteConnectionTimeoutMilliseconds = query.RemoteConnectionTimeoutMilliseconds,
@@ -206,6 +210,9 @@ public static class EventDefinitionEngine {
                         Oldest = query.Oldest,
                         ReadMode = query.ReadMode,
                         IncludeBookmark = query.IncludeBookmark,
+                        BookmarkXml = ResolveBookmark(query, fullPath, fullPath),
+                        BookmarkOffset = query.BookmarkOffset,
+                        StrictBookmark = query.StrictBookmark,
                         MessageCulture = query.MessageCulture,
                         FallbackMessageCulture = query.FallbackMessageCulture
                     });
@@ -300,6 +307,9 @@ public static class EventDefinitionEngine {
         if (query.BufferCapacity is < 1 or > 4096) {
             throw new ArgumentOutOfRangeException(nameof(query), "Buffer capacity must be between 1 and 4096.");
         }
+        if (query.BookmarkOffset == 0) {
+            throw new ArgumentOutOfRangeException(nameof(query), "Bookmark offset cannot be zero.");
+        }
         if (!Enum.IsDefined(typeof(EventLogAuthentication), query.Authentication)) {
             throw new ArgumentOutOfRangeException(nameof(query), "The remote authentication value is not supported.");
         }
@@ -343,6 +353,9 @@ public static class EventDefinitionEngine {
             FallbackMessageCulture = query.FallbackMessageCulture,
             ResultPredicate = query.ResultPredicate,
             MinimumRecordIdExclusiveResolver = query.MinimumRecordIdExclusiveResolver,
+            BookmarkXmlResolver = query.BookmarkXmlResolver,
+            BookmarkOffset = query.BookmarkOffset,
+            StrictBookmark = query.StrictBookmark,
             CandidateObserver = query.CandidateObserver,
             ContinueOnRemoteFailure = query.ContinueOnRemoteFailure
         };
@@ -377,6 +390,15 @@ public static class EventDefinitionEngine {
         return candidates.Select(static machine => EventLogTarget.IsLocalMachine(machine) ? null : machine?.Trim())
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
+    }
+
+    private static string? ResolveBookmark(
+        EventDefinitionQuery query,
+        string? machineName,
+        string container) {
+
+        string? bookmark = query.BookmarkXmlResolver?.Invoke(machineName, container);
+        return string.IsNullOrWhiteSpace(bookmark) ? null : bookmark;
     }
 
     private static void HandleFailure(EventLogQueryFailure failure, EventDefinitionQueryExecutionInfo executionInfo) {
