@@ -4,8 +4,18 @@ Describe 'Set-EVXCollectorSubscription' {
         $Command.Parameters.Keys | Should -Contain 'Name'
         $Command.Parameters.Keys | Should -Contain 'Enabled'
         $Command.Parameters.Keys | Should -Contain 'Remove'
+        $Command.Parameters.Keys | Should -Contain 'InitializeCollector'
+        $Command.Parameters.Keys | Should -Contain 'SkipWinRmQuickConfig'
         $Command.Parameters.Keys | Should -Contain 'WhatIf'
         $Command.Parameters.Keys | Should -Contain 'Confirm'
+    }
+
+    It 'allows collector initialization as part of definition apply' {
+        $DefinitionSet = (Get-Command Set-EVXCollectorSubscription).ParameterSets |
+            Where-Object Name -EQ 'Definition'
+
+        $DefinitionSet.Parameters.Name | Should -Contain 'InitializeCollector'
+        $DefinitionSet.Parameters.Name | Should -Contain 'SkipWinRmQuickConfig'
     }
 
     It 'does not create a missing subscription' {

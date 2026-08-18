@@ -52,7 +52,11 @@ public sealed class TestEventDefinitionAndReporting {
         Assert.Equal("ForwardedEvents", report.Rows[0].ContainerLog);
 
         string html = EventReportHtmlRenderer.Render(report);
-        Assert.Contains("hfx-report-workspace", html, StringComparison.Ordinal);
+        Assert.Contains("data-hfx-monitoring-shell=\"true\"", html, StringComparison.Ordinal);
+        Assert.Contains("data-hfx-monitoring-nav=\"overview\"", html, StringComparison.Ordinal);
+        Assert.Contains("data-hfx-monitoring-record-explorer=\"true\"", html, StringComparison.Ordinal);
+        Assert.Contains("data-hfx-monitoring-column-picker-toggle=\"true\"", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("hfx-report-workspace", html, StringComparison.Ordinal);
         Assert.Contains("Failed logons", html, StringComparison.Ordinal);
         Assert.Contains("alice", html, StringComparison.Ordinal);
 
@@ -89,6 +93,7 @@ public sealed class TestEventDefinitionAndReporting {
         failedSource.Data["WorkstationName"] = "CLIENT01";
         failedSource.Data["IpAddress"] = "10.0.0.21";
         failedSource.Data["IpPort"] = "55124";
+        failedSource.Data["FailureReason"] = "%%2304";
 
         EventReport report = EventReportEngine.Create(new object[] {
             new ADUserLogon(successfulSource),
@@ -115,6 +120,11 @@ public sealed class TestEventDefinitionAndReporting {
         Assert.Contains("AD User Logon Failed", html, StringComparison.Ordinal);
         Assert.Contains("Object Affected", html, StringComparison.Ordinal);
         Assert.Contains("EVOTEC\\alice", html, StringComparison.Ordinal);
+        Assert.Contains("data-hfx-monitoring-nav=\"aduserlogon\"", html, StringComparison.Ordinal);
+        Assert.Contains("data-hfx-monitoring-nav=\"aduserlogonfailed\"", html, StringComparison.Ordinal);
+        Assert.Contains("data-hfx-monitoring-record-toggle", html, StringComparison.Ordinal);
+        Assert.Contains("Source computer", html, StringComparison.Ordinal);
+        Assert.Contains("ForwardedEvents", html, StringComparison.Ordinal);
 
         EventEmailPackage email = await EventReportEmailRenderer.RenderAsync(report);
         Assert.Contains("AD User Logon", email.Html, StringComparison.Ordinal);

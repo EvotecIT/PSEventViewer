@@ -19,6 +19,11 @@ namespace PSEventViewer;
 ///   <code>Set-EVXCollectorSubscription -Name FailedLogons -Remove</code>
 ///   <para>Deletes the local subscription through the inbox collector utility and verifies that it is absent.</para>
 /// </example>
+/// <example>
+///   <summary>Initialize the collector while applying a definition</summary>
+///   <code>$definition | Set-EVXCollectorSubscription -InitializeCollector -Confirm:$false</code>
+///   <para>Runs the inbox collector quick configuration, verifies readiness, and then transactionally applies the definition.</para>
+/// </example>
 [Cmdlet(
     VerbsCommon.Set,
     "EVXCollectorSubscription",
@@ -27,7 +32,8 @@ namespace PSEventViewer;
 [OutputType(
     typeof(CollectorSubscriptionUpdateResult),
     typeof(CollectorSubscriptionRemovalResult),
-    typeof(CollectorSubscriptionSnapshot))]
+    typeof(CollectorSubscriptionSnapshot),
+    typeof(CollectorReadinessStatus))]
 public sealed class CmdletSetEVXCollectorSubscription :
     PSCmdlet {
     private readonly CancellationTokenSource _stopping = new();
@@ -59,12 +65,36 @@ public sealed class CmdletSetEVXCollectorSubscription :
     [Parameter(Mandatory = true, ValueFromPipeline = true, ParameterSetName = "Definition")]
     public CollectorSubscriptionDefinition? Definition { get; set; }
 
+    /// <summary>Runs the inbox WinRM and Windows Event Collector quick configuration and verifies readiness.</summary>
+    [Parameter(Mandatory = true, ParameterSetName = "Initialize")]
+    [Parameter(ParameterSetName = "Definition")]
+    public SwitchParameter InitializeCollector { get; set; }
+
+    /// <summary>Skips WinRM quick configuration when initializing an already managed WinRM host.</summary>
+    [Parameter(ParameterSetName = "Initialize")]
+    [Parameter(ParameterSetName = "Definition")]
+    public SwitchParameter SkipWinRmQuickConfig { get; set; }
+
     /// <inheritdoc />
     protected override void ProcessRecord() {
+        if (ParameterSetName == "Initialize") {
+            if (!ShouldProcess(Environment.MachineName, "Initialize Windows Event Collector and verify readiness")) {
+                return;
+            }
+            WriteObject(CollectorSubscriptionManager.InitializeCollector(
+                configureWinRm: !SkipWinRmQuickConfig.IsPresent,
+                cancellationToken: _stopping.Token));
+            return;
+        }
         if (ParameterSetName == "Definition") {
             string subscriptionName = Definition!.SubscriptionId.Trim();
             if (!ShouldProcess(subscriptionName, "Create or update Windows Event Collector subscription")) {
                 return;
+            }
+            if (InitializeCollector.IsPresent) {
+                WriteObject(CollectorSubscriptionManager.InitializeCollector(
+                    configureWinRm: !SkipWinRmQuickConfig.IsPresent,
+                    cancellationToken: _stopping.Token));
             }
             WriteObject(
                 CollectorSubscriptionManager.ApplyCollectorSubscription(

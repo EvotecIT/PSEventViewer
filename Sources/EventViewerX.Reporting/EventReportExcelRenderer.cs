@@ -148,8 +148,9 @@ public static class EventReportExcelRenderer {
                 ? $"{section.Rows.Count:N0} matching events"
                 : section.Description;
             events.Title(section.DisplayName, subtitle);
-            List<Dictionary<string, object?>> eventRows = EventReportTableProjection.Project(section);
-            string[] eventColumns = section.Columns.Select(static column => column.DisplayName).ToArray();
+            EventReportPresentationSection presentation = EventReportPresentationProjection.Create(section);
+            List<Dictionary<string, object?>> eventRows = presentation.Rows.ToList();
+            string[] eventColumns = presentation.Columns.Select(static column => column.DisplayName).ToArray();
             string tableTitle = section.Kind == EventReportSectionKind.Generic
                 ? "Events"
                 : $"{section.DisplayName} events";

@@ -28,6 +28,11 @@ internal static class EventLogQuerySnapshot {
             MaxEvents = ApplyLimit(source.MaxEvents, outerLimit),
             BatchSourceIdentity =
                 source.BatchSourceIdentity,
+            ManagedStartTimeUtc = source.ManagedStartTimeUtc,
+            ManagedEndTimeUtc = source.ManagedEndTimeUtc,
+            ManagedPredicate = source.ManagedPredicate,
+            ManagedMaxEventsScanned = source.ManagedMaxEventsScanned,
+            ManagedScanLimitReached = source.ManagedScanLimitReached,
             IncludeBookmark = source.IncludeBookmark,
             RemoteConnectionTimeoutMilliseconds =
                 source.RemoteConnectionTimeoutMilliseconds,
@@ -87,6 +92,8 @@ internal static class EventLogQuerySnapshot {
             MaxEvents = ApplyLimit(source.MaxEvents, outerLimit),
             BatchSourceIdentity =
                 source.BatchSourceIdentity,
+            ManagedStartTimeUtc = source.ManagedStartTimeUtc,
+            ManagedEndTimeUtc = source.ManagedEndTimeUtc,
             IncludeBookmark = source.IncludeBookmark,
             RemoteConnectionTimeoutMilliseconds =
                 source.RemoteConnectionTimeoutMilliseconds,

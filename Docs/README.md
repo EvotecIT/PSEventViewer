@@ -56,9 +56,9 @@ Verifies package hashes and signatures before changing machine state, enforces s
 The target machine does not require the Windows SDK, Visual Studio, a C# compiler, generated source, or package build tools.
 
 ### [New-EVXCollectorSubscription](New-EVXCollectorSubscription.md)
-Creates a typed collector-initiated WEC subscription definition.
+Creates a typed collector- or source-initiated WEC subscription definition.
 
-Builds safe Windows Event Collector XML from a QueryList or common event filters. The command does not change the collector; pipe the definition to Set-EVXCollectorSubscription to apply it.
+Builds safe Windows Event Collector XML from typed reports, custom definitions, a QueryList, or common event filters. The command does not change the collector; pipe the definition to Set-EVXCollectorSubscription to apply it.
 
 ### [New-EVXFilter](New-EVXFilter.md)
 Creates a reusable typed Windows Event Log filter or compiles it to native query text.

@@ -38,6 +38,9 @@ public sealed record CollectorSubscriptionSnapshot {
     /// <summary>Normalized query fragments extracted from the XML payload.</summary>
     public IReadOnlyList<string> Queries { get; set; } = Array.Empty<string>();
 
+    /// <summary>Optional local runtime state populated on request.</summary>
+    public CollectorSubscriptionRuntimeStatus? RuntimeStatus { get; set; }
+
     /// <summary>
     /// Creates a reusable snapshot from a raw subscription model.
     /// </summary>

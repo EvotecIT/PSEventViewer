@@ -3,13 +3,18 @@ using System.Globalization;
 namespace PSEventViewer;
 
 /// <summary>
-/// <para type="synopsis">Creates a typed collector-initiated WEC subscription definition.</para>
-/// <para type="description">Builds safe Windows Event Collector XML from a QueryList or common event filters. The command does not change the collector; pipe the definition to Set-EVXCollectorSubscription to apply it.</para>
+/// <para type="synopsis">Creates a typed collector- or source-initiated WEC subscription definition.</para>
+/// <para type="description">Builds safe Windows Event Collector XML from typed reports, custom definitions, a QueryList, or common event filters. The command does not change the collector; pipe the definition to Set-EVXCollectorSubscription to apply it.</para>
 /// </summary>
 /// <example>
 ///   <summary>Create and apply a failed-logon collector subscription</summary>
 ///   <code>New-EVXCollectorSubscription -Name FailedLogons -SourceComputer DC1,DC2 -LogName Security -EventId 4625 | Set-EVXCollectorSubscription</code>
 ///   <para>Builds a typed definition and creates or updates the local collector subscription.</para>
+/// </example>
+/// <example>
+///   <summary>Create a source-initiated domain-controller subscription</summary>
+///   <code>New-EVXCollectorSubscription -Name GpoAudit -SubscriptionType SourceInitiated -CollectorHostName WEC01.contoso.com -Type GroupPolicyActivity -AllowedSourceSid $domainControllersSid | Set-EVXCollectorSubscription -InitializeCollector</code>
+///   <para>Uses source policy for discovery. Domain controllers need the Domain Controllers SID or explicit computer SIDs in the source authorization SDDL.</para>
 /// </example>
 /// <example>
 ///   <summary>Write a reviewable WEC XML template</summary>
@@ -25,9 +30,32 @@ public sealed class CmdletNewEVXCollectorSubscription : PSCmdlet {
     public string Name { get; set; } = string.Empty;
 
     /// <summary>Source computers collected by this subscription.</summary>
-    [Parameter(Mandatory = true, Position = 1)]
+    [Parameter(Position = 1)]
     [Alias("ComputerName", "MachineName", "ServerName")]
     public string[] SourceComputer { get; set; } = Array.Empty<string>();
+
+    /// <summary>CollectorInitiated for explicit sources, or SourceInitiated for policy-discovered sources.</summary>
+    [Parameter]
+    public CollectorSubscriptionType SubscriptionType { get; set; } =
+        CollectorSubscriptionType.CollectorInitiated;
+
+    /// <summary>Collector DNS name required for Push delivery and the source SubscriptionManager policy value.</summary>
+    [Parameter]
+    public string? CollectorHostName { get; set; }
+
+    /// <summary>Source authorization SDDL used by a source-initiated subscription.</summary>
+    [Parameter]
+    public string AllowedSourceDomainComputersSddl { get; set; } =
+        "O:NSG:NSD:(A;;GA;;;DC)(A;;GA;;;NS)";
+
+    /// <summary>Explicit computer or group SIDs authorized for source-initiated forwarding. This is a simpler alternative to AllowedSourceDomainComputersSddl.</summary>
+    [Parameter]
+    public string[] AllowedSourceSid { get; set; } = Array.Empty<string>();
+
+    /// <summary>Source policy refresh interval in seconds.</summary>
+    [Parameter]
+    [ValidateRange(1, int.MaxValue)]
+    public int SourceRefreshIntervalSeconds { get; set; } = 60;
 
     /// <summary>Event channel used by the generated query.</summary>
     [Parameter(Mandatory = true, Position = 2, ParameterSetName = "Filter")]
@@ -155,8 +183,11 @@ public sealed class CmdletNewEVXCollectorSubscription : PSCmdlet {
             .Where(static source => source.Length > 0)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
-        if (sources.Length == 0) {
-            throw new PSArgumentException("SourceComputer requires at least one non-empty computer name.");
+        if (SubscriptionType == CollectorSubscriptionType.CollectorInitiated && sources.Length == 0) {
+            throw new PSArgumentException("SourceComputer requires at least one non-empty computer name for a collector-initiated subscription.");
+        }
+        if (SubscriptionType == CollectorSubscriptionType.SourceInitiated && sources.Length > 0) {
+            throw new PSArgumentException("SourceComputer cannot be used with a source-initiated subscription; authorize sources with AllowedSourceDomainComputersSddl and configure their SubscriptionManager policy.");
         }
 
         string queryXml;
@@ -193,14 +224,29 @@ public sealed class CmdletNewEVXCollectorSubscription : PSCmdlet {
                 EventFilterPartitioner.Partition(filter));
         }
 
+        CollectorSubscriptionDeliveryMode deliveryMode = SubscriptionType == CollectorSubscriptionType.SourceInitiated &&
+                                                         !MyInvocation.BoundParameters.ContainsKey(nameof(DeliveryMode))
+            ? CollectorSubscriptionDeliveryMode.Push
+            : DeliveryMode;
+        if (AllowedSourceSid.Length > 0 &&
+            MyInvocation.BoundParameters.ContainsKey(nameof(AllowedSourceDomainComputersSddl))) {
+            throw new PSArgumentException("AllowedSourceSid and AllowedSourceDomainComputersSddl cannot be used together.");
+        }
+        string allowedSourceSddl = AllowedSourceSid.Length > 0
+            ? CollectorSourcePolicy.BuildAllowedSourceSddl(AllowedSourceSid)
+            : AllowedSourceDomainComputersSddl;
         var definition = new CollectorSubscriptionDefinition {
             SubscriptionId = Name,
             Description = Description,
             Enabled = Enabled,
+            SubscriptionType = SubscriptionType,
             QueryXml = queryXml,
             Sources = sources.Select(static source => new CollectorSubscriptionSource(source)).ToArray(),
+            CollectorHostName = CollectorHostName,
+            AllowedSourceDomainComputersSddl = allowedSourceSddl,
+            SourceRefreshIntervalSeconds = SourceRefreshIntervalSeconds,
             ReadExistingEvents = ReadExistingEvents.IsPresent,
-            DeliveryMode = DeliveryMode,
+            DeliveryMode = deliveryMode,
             MaxItems = MaxItems,
             MaxLatencyMilliseconds = MaxLatencyMilliseconds,
             HeartbeatIntervalMilliseconds = HeartbeatIntervalMilliseconds,

@@ -534,27 +534,72 @@ normally requires elevation. See [`Manage-Logs.ps1`](../Examples/Manage-Logs.ps1
 ### Windows Event Collector
 
 ```powershell
-Get-EVXCollectorSubscription -Name '*' |
-    Select-Object Name, Enabled, ConfigurationMode, DeliveryMode, Query
+# One-time collector setup and a read-only readiness check use the existing
+# Set/Get cmdlets rather than adding WEC-specific command sprawl.
+Set-EVXCollectorSubscription -InitializeCollector -Confirm:$false
+Get-EVXCollectorSubscription -Readiness
 
-New-EVXCollectorSubscription `
-    -Name 'Failed logons' `
-    -SourceComputer DC01, DC02 `
-    -Type ADUserLogonFailed `
-    -Description 'Security 4625 from domain controllers' |
-    Set-EVXCollectorSubscription -Confirm:$false
+# Source-initiated forwarding scales without maintaining a source list in WEC.
+$domainControllersSid = (Get-ADGroup 'Domain Controllers').SID.Value
+$definition = New-EVXCollectorSubscription `
+    -Name 'Domain controller authentication' `
+    -SubscriptionType SourceInitiated `
+    -CollectorHostName WEC01.ad.contoso.com `
+    -AllowedSourceSid $domainControllersSid `
+    -Type ActiveDirectoryAuthentication `
+    -Description 'Typed authentication events from domain controllers'
+
+# Apply the returned value through the Windows Event Forwarding
+# SubscriptionManager computer policy on the source domain controllers.
+$definition.SourceSubscriptionManagerValue
+$definition | Set-EVXCollectorSubscription `
+    -InitializeCollector -Confirm:$false
+
+Get-EVXCollectorSubscription `
+    -Name $definition.SubscriptionId `
+    -IncludeRuntimeStatus |
+    Select-Object SubscriptionName, Enabled, RuntimeStatus
 
 Set-EVXCollectorSubscription `
-    -Name 'Domain Controllers' `
+    -Name 'Domain controller authentication' `
     -Enabled $true `
     -Confirm:$false
 
 Set-EVXCollectorSubscription `
-    -Name 'Failed logons' -Remove -Confirm:$false
+    -Name 'Domain controller authentication' -Remove -Confirm:$false
 ```
 
 Inventory can target a remote collector. Updates are intentionally local-only
 because the Windows Event Collector write API has no remote-session contract.
+`-IncludeRuntimeStatus` is also local-only because the WEC runtime API does not
+accept a remote session; use PowerShell remoting to execute it on another
+collector.
+
+For source-initiated forwarding, deploy
+`$definition.SourceSubscriptionManagerValue` through **Computer Configuration >
+Administrative Templates > Windows Components > Event Forwarding > Configure
+target Subscription Manager**. The module generates the exact HTTP/HTTPS URI
+and refresh interval. The source authorization SDDL is generated from
+`-AllowedSourceSid`, so a caller does not need to author SDDL by hand.
+
+Security events are forwarded by Network Service. Preserve each source's
+existing Security channel descriptor and grant Network Service read access if
+it is missing. Domain controllers require their Domain Controllers group SID
+(RID 516) or explicit computer-account SIDs; the inbox Domain Computers ACE
+does not authorize domain controllers. `RuntimeStatus.Sources` then provides
+per-source Active/Trying state, processed-event counts, heartbeat time, and the
+native Windows error code. Do not treat a configured subscription as proven
+until sources are Active and events are arriving in `ForwardedEvents`.
+Affected Windows Server 2025 builds can terminate the Event Log service when
+`ForwardedEvents` evaluates any filtered native XPath, not only a
+`TimeCreated` predicate. `Get-EVXEvent -Collector` therefore opens that channel
+once with `*` and applies the complete event ID, provider, original-channel,
+data, checkpoint, and time selection in its bounded ordered reader. Direct live
+logs and EVTX files retain their selective native-query fast path. Raw filtered
+`-FilterXPath` and structured `QueryList` input for `ForwardedEvents` are
+rejected before Windows can execute them; use the normal typed/filter
+parameters and bound wide collector scans with checkpoints, `-MaxEvents`, or
+`-MaxEventsScanned`.
 See [`Manage-Collector.ps1`](../Examples/Manage-Collector.ps1).
 
 ## Recover PowerShell script blocks

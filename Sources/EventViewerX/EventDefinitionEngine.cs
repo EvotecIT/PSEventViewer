@@ -34,7 +34,7 @@ public static class EventDefinitionEngine {
         (DateTime? start, DateTime? end) = EventTimeRange.Resolve(query.StartTime, query.EndTime, query.TimePeriod);
         EventLogBatchQuery batch = query.Paths != null && query.Paths.Count > 0
             ? CreateFileBatch(query, start, end)
-            : CreateChannelBatch(query, start, end);
+            : CreateChannelBatch(query, info, start, end);
         batch.MaxEvents = 0;
         batch.MaxConcurrency = query.MaxConcurrency;
         batch.ContinueOnError = query.ContinueOnRemoteFailure;
@@ -62,10 +62,19 @@ public static class EventDefinitionEngine {
 
     private static EventLogBatchQuery CreateChannelBatch(
         EventDefinitionQuery query,
+        EventDefinitionQueryExecutionInfo executionInfo,
         DateTime? start,
         DateTime? end) {
 
         string?[] targets = NormalizeTargets(query.MachineNames);
+        if (!string.IsNullOrWhiteSpace(query.CollectorLogName)) {
+            return CreateCollectorBatch(
+                query,
+                executionInfo,
+                targets,
+                start,
+                end);
+        }
         var sources = new List<EventLogChannelQuery>();
         foreach (string? target in targets) {
             foreach (EventDefinitionSource source in query.Definition.Sources) {
@@ -77,7 +86,7 @@ public static class EventDefinitionEngine {
                              start,
                              end,
                              useOriginalChannel: !string.IsNullOrWhiteSpace(query.CollectorLogName))) {
-                    sources.Add(new EventLogChannelQuery(logName) {
+                    var channelQuery = new EventLogChannelQuery(logName) {
                         MachineName = target,
                         Credential = EventLogTarget.IsLocalMachine(target) ? null : query.Credential,
                         Authentication = query.Authentication,
@@ -90,11 +99,89 @@ public static class EventDefinitionEngine {
                         RemoteConnectionTimeoutMilliseconds = query.RemoteConnectionTimeoutMilliseconds,
                         RemoteReadTimeoutMilliseconds = query.RemoteReadTimeoutMilliseconds,
                         BufferCapacity = query.BufferCapacity
-                    });
+                    };
+                    sources.Add(channelQuery);
                 }
             }
         }
         return EventLogBatchConsolidator.Consolidate(EventLogBatchQuery.ForChannels(sources));
+    }
+
+    private static EventLogBatchQuery CreateCollectorBatch(
+        EventDefinitionQuery query,
+        EventDefinitionQueryExecutionInfo executionInfo,
+        IReadOnlyList<string?> targets,
+        DateTime? start,
+        DateTime? end) {
+
+        string collectorLogName = query.CollectorLogName!.Trim();
+        if (!string.Equals(
+                collectorLogName,
+                ForwardedEventsQuerySafety.ChannelName,
+                StringComparison.OrdinalIgnoreCase)) {
+            throw new ArgumentException(
+                "CollectorLogName must identify ForwardedEvents.",
+                nameof(query));
+        }
+        var definitionSources = query.Definition.Sources
+            .GroupBy(
+                static source => source.LogName,
+                StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                static group => group.Key,
+                static group => group.ToArray(),
+                StringComparer.OrdinalIgnoreCase);
+        var sources = new List<EventLogChannelQuery>(targets.Count);
+        foreach (string? target in targets) {
+            long? checkpoint = query.MinimumRecordIdExclusiveResolver?
+                .Invoke(target, collectorLogName);
+            var filter = new EventFilter {
+                RecordIds = query.RecordIds?.ToArray(),
+                MinimumRecordIdExclusive = checkpoint,
+                StartTime = start,
+                EndTime = end
+            };
+            Func<EventObject, bool>? basePredicate =
+                ManagedEventFilter.CreatePredicate(filter);
+            var channelQuery = new EventLogChannelQuery(collectorLogName) {
+                MachineName = target,
+                Credential = EventLogTarget.IsLocalMachine(target)
+                    ? null
+                    : query.Credential,
+                Authentication = query.Authentication,
+                XPath = "*",
+                Oldest = query.Oldest,
+                ReadMode = query.ReadMode,
+                IncludeBookmark = query.IncludeBookmark,
+                MessageCulture = query.MessageCulture,
+                FallbackMessageCulture = query.FallbackMessageCulture,
+                RemoteConnectionTimeoutMilliseconds =
+                    query.RemoteConnectionTimeoutMilliseconds,
+                RemoteReadTimeoutMilliseconds =
+                    query.RemoteReadTimeoutMilliseconds,
+                BufferCapacity = query.BufferCapacity,
+                ManagedMaxEventsScanned = query.MaxCandidates,
+                ManagedScanLimitReached = () =>
+                    executionInfo.ScanLimitReached = true,
+                ManagedPredicate = eventObject =>
+                    (basePredicate == null || basePredicate(eventObject)) &&
+                    definitionSources.TryGetValue(
+                        eventObject.OriginalLogName,
+                        out EventDefinitionSource[]? matchingSources) &&
+                    matchingSources.Any(source =>
+                        source.EventIds.Contains(eventObject.Id) &&
+                        (source.ProviderNames.Count == 0 ||
+                         source.ProviderNames.Contains(
+                             eventObject.ProviderName,
+                             StringComparer.Ordinal)))
+            };
+            ForwardedEventsQuerySafety.Apply(
+                channelQuery,
+                start,
+                end);
+            sources.Add(channelQuery);
+        }
+        return EventLogBatchQuery.ForChannels(sources);
     }
 
     private static EventLogBatchQuery CreateFileBatch(

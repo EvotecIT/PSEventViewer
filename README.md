@@ -290,22 +290,44 @@ Clear-EVXLog -LogName Contoso-App -BackupPath C:\EventBackups
 Remove-EVXSource -LogName Application -SourceName Contoso-App
 Remove-EVXLog -LogName Contoso-App
 
-# Windows Event Collector inventory, typed definitions, and local updates.
-Get-EVXCollectorSubscription -Name '*'
-New-EVXCollectorSubscription `
-    -Name 'Failed logons' `
-    -SourceComputer DC01, DC02 `
-    -LogName Security `
-    -Filter (New-EVXFilter -EventId 4625 -TimePeriod Last24Hours) `
-    -Description 'Security 4625 from domain controllers' |
-    Set-EVXCollectorSubscription -Confirm:$false
+# Windows Event Collector readiness, source-initiated definitions, and runtime health.
+Get-EVXCollectorSubscription -Readiness
+$domainControllersSid = (Get-ADGroup 'Domain Controllers').SID.Value
+$subscription = New-EVXCollectorSubscription `
+    -Name 'Domain controller authentication' `
+    -SubscriptionType SourceInitiated `
+    -CollectorHostName WEC01.ad.contoso.com `
+    -AllowedSourceSid $domainControllersSid `
+    -Type ActiveDirectoryAuthentication `
+    -Description 'Typed authentication events from domain controllers'
+$subscription | Set-EVXCollectorSubscription `
+    -InitializeCollector -Confirm:$false
+$subscription.SourceSubscriptionManagerValue
+Get-EVXCollectorSubscription -Name $subscription.SubscriptionId `
+    -IncludeRuntimeStatus
 Set-EVXCollectorSubscription -Name 'Domain Controllers' `
     -Enabled $true -Confirm:$false
 ```
 
 Collector inventory can target a remote collector. Updates are deliberately
 local-only because the Windows Event Collector write API does not define a
-remote session contract.
+remote session contract. Source-initiated forwarding additionally requires the
+returned `SourceSubscriptionManagerValue` in the sources' Event Forwarding
+SubscriptionManager policy. Security-log forwarding runs as Network Service,
+so preserve the channel's existing access descriptor and grant that identity
+read access where it is not already present. Domain controllers require their
+Domain Controllers group SID (RID 516) or explicit computer SIDs; the generic
+Domain Computers ACE is not sufficient. Runtime status exposes processed-event
+counters, source heartbeats, and the exact Windows error codes.
+Affected Windows Server 2025 builds can crash the Event Log service while
+evaluating any filtered native XPath against `ForwardedEvents`. EventViewerX
+therefore opens that collector channel once with `*` and applies the complete
+typed selection through a bounded ordered streaming path. Direct live logs and
+EVTX files retain their selective native-query fast path. Raw filtered XPath
+and structured `QueryList` input for `ForwardedEvents` are rejected before they
+can trigger the operating-system defect. Use `-MaxEventsScanned` for an
+explicit generic collector scan ceiling; typed/custom queries apply their
+`MaxCandidates` ceiling to the raw collector stream on this compatibility path.
 
 ## Writing events
 
@@ -471,8 +493,12 @@ Get-EVXEvent -LogName Application -Level 1, 2 -MaxEvents 500 |
     Show-EVXEvent -HtmlPath .\Application.html -EmailPackage -PassThru
 ```
 
-HTML uses typed HtmlForgeX components and is self-contained, searchable,
-responsive, theme-aware, and suitable for opening or attaching. Excel uses
+HTML uses typed HtmlForgeX components and is a self-contained, searchable,
+responsive, theme-aware report workspace. Its overview is first, report types
+are direct navigation pages, and each homogeneous type has column filters,
+paging, a column chooser, expandable rows, and a selected-record drawer.
+Punctuation-only Windows placeholders are suppressed instead of filling the
+screen with dashes. Excel uses
 OfficeIMO with an overview, coverage, filters, frozen headers, formatting, and
 useful column sizing. A typed leaf definition gets its own domain table and
 worksheet. A composite such as `ActiveDirectoryAuthentication` gets one table

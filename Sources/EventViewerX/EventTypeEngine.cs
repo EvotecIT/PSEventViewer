@@ -160,6 +160,14 @@ public static partial class EventTypeEngine {
                 startTime,
                 endTime);
         }
+        if (!string.IsNullOrWhiteSpace(query.CollectorLogName)) {
+            return CreateCollectorBatch(
+                query,
+                eventInfo,
+                executionInfo,
+                startTime,
+                endTime);
+        }
         string?[] targets = NormalizeTargets(
             query.MachineNames);
         var channelQueries =
@@ -202,7 +210,7 @@ public static partial class EventTypeEngine {
                             source.Key);
                         logName = query.CollectorLogName!;
                     }
-                    channelQueries.Add(
+                    var channelQuery =
                         new EventLogChannelQuery(
                             logName) {
                             MachineName = target,
@@ -229,7 +237,8 @@ public static partial class EventTypeEngine {
                                 query.RemoteReadTimeoutMilliseconds,
                             BufferCapacity =
                                 query.BufferCapacity
-                        });
+                        };
+                    channelQueries.Add(channelQuery);
                 }
             }
         }
@@ -247,6 +256,77 @@ public static partial class EventTypeEngine {
                 executionInfo);
         return EventLogBatchConsolidator.Consolidate(
             batch);
+    }
+
+    private static EventLogBatchQuery CreateCollectorBatch(
+        EventTypeQuery query,
+        IReadOnlyDictionary<string, HashSet<int>> eventInfo,
+        EventTypeQueryExecutionInfo executionInfo,
+        DateTime? startTime,
+        DateTime? endTime) {
+
+        string collectorLogName = query.CollectorLogName!.Trim();
+        if (!string.Equals(
+                collectorLogName,
+                ForwardedEventsQuerySafety.ChannelName,
+                StringComparison.OrdinalIgnoreCase)) {
+            throw new ArgumentException(
+                "CollectorLogName must identify ForwardedEvents.",
+                nameof(query));
+        }
+        var channelQueries = new List<EventLogChannelQuery>();
+        foreach (string? target in NormalizeTargets(query.MachineNames)) {
+            long? checkpoint = query.MinimumRecordIdExclusiveResolver?
+                .Invoke(target, collectorLogName);
+            var filter = new EventFilter {
+                RecordIds = query.SourceRecordIds?.ToArray(),
+                MinimumRecordIdExclusive = checkpoint,
+                StartTime = startTime,
+                EndTime = endTime
+            };
+            Func<EventObject, bool>? basePredicate =
+                ManagedEventFilter.CreatePredicate(filter);
+            var channelQuery = new EventLogChannelQuery(collectorLogName) {
+                MachineName = target,
+                Credential = EventLogTarget.IsLocalMachine(target)
+                    ? null
+                    : query.Credential,
+                Authentication = query.Authentication,
+                XPath = "*",
+                Oldest = query.Oldest,
+                ReadMode = query.ReadMode,
+                IncludeBookmark = query.IncludeBookmark,
+                MessageCulture = query.MessageCulture,
+                FallbackMessageCulture = query.FallbackMessageCulture,
+                RemoteConnectionTimeoutMilliseconds =
+                    query.RemoteConnectionTimeoutMilliseconds,
+                RemoteReadTimeoutMilliseconds =
+                    query.RemoteReadTimeoutMilliseconds,
+                BufferCapacity = query.BufferCapacity,
+                ManagedMaxEventsScanned = query.MaxCandidates,
+                ManagedScanLimitReached = () =>
+                    executionInfo.ScanLimitReached = true,
+                ManagedPredicate = eventObject =>
+                    (basePredicate == null || basePredicate(eventObject)) &&
+                    eventInfo.TryGetValue(
+                        eventObject.OriginalLogName,
+                        out HashSet<int>? eventIds) &&
+                    eventIds.Contains(eventObject.Id)
+            };
+            ForwardedEventsQuerySafety.Apply(
+                channelQuery,
+                startTime,
+                endTime);
+            channelQueries.Add(channelQuery);
+        }
+        EventLogBatchQuery batch = EventLogBatchQuery.ForChannels(
+            channelQueries);
+        batch.MaxConcurrency = query.MaxConcurrency;
+        batch.ContinueOnError = query.ContinueOnRemoteFailure;
+        batch.FailureHandler = failure => HandleFailure(
+            failure,
+            executionInfo);
+        return batch;
     }
 
     private static EventLogBatchQuery CreateFileBatch(

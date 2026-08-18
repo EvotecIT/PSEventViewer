@@ -55,21 +55,12 @@ public static class EventReportEmailRenderer {
     }
 
     private static List<Dictionary<string, object?>> ProjectEmailRows(EventReportSection section, int maximumRows) {
-        List<Dictionary<string, object?>> projected = EventReportTableProjection.Project(section);
-        string[] priorities = section.Kind == EventReportSectionKind.Generic
-            ? new[] { "Time Created", "Event ID", "Level", "Source Computer", "Message" }
-            : new[] {
-                "When", "Who", "Object Affected", "Account Name", "Action", "Failure Reason",
-                "Privileges", "Service Name", "IP Address", "Computer"
-            };
-        var available = new HashSet<string>(projected.SelectMany(static row => row.Keys), StringComparer.OrdinalIgnoreCase);
-        string[] columns = priorities.Where(available.Contains)
-            .Concat(section.Columns.Select(static column => column.DisplayName)
-                .Where(available.Contains)
-                .Where(column => !priorities.Contains(column, StringComparer.OrdinalIgnoreCase)))
-            .Take(4)
+        EventReportPresentationSection presentation = EventReportPresentationProjection.Create(section);
+        string[] columns = presentation.PrimaryColumns
+            .Select(static column => column.DisplayName)
+            .Take(5)
             .ToArray();
-        return projected.Take(maximumRows)
+        return presentation.Rows.Take(maximumRows)
             .Select(row => columns.ToDictionary(column => column,
                 column => row.TryGetValue(column, out object? value) ? value : null,
                 StringComparer.OrdinalIgnoreCase))

@@ -1896,12 +1896,24 @@ already provides integrity validation.</maml:para>
       <maml:para>Reads local or remote WEC subscription inventory and returns detached snapshots with normalized XML details and query definitions. Remote access uses the caller's Windows identity.</maml:para>
     </maml:description>
     <command:syntax>
-      <command:syntaxItem parameterSetName="__AllParameterSets">
+      <command:syntaxItem parameterSetName="Subscriptions">
         <maml:name>Get-EVXCollectorSubscription</maml:name>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>EnabledOnly</maml:name>
           <maml:description>
             <maml:para>Returns only enabled subscriptions.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>IncludeRuntimeStatus</maml:name>
+          <maml:description>
+            <maml:para>Includes current per-source runtime state and Windows error details. Runtime status is local-only.</maml:para>
           </maml:description>
           <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
           <dev:type>
@@ -1935,12 +1947,39 @@ already provides integrity validation.</maml:para>
           <dev:defaultValue>None</dev:defaultValue>
         </command:parameter>
       </command:syntaxItem>
+      <command:syntaxItem parameterSetName="Readiness">
+        <maml:name>Get-EVXCollectorSubscription</maml:name>
+        <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>Readiness</maml:name>
+          <maml:description>
+            <maml:para>Returns local WEC, WinRM listener, and ForwardedEvents readiness instead of subscription inventory.</maml:para>
+          </maml:description>
+          <command:parameterValue required="true" variableLength="false">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+      </command:syntaxItem>
     </command:syntax>
     <command:parameters>
       <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
         <maml:name>EnabledOnly</maml:name>
         <maml:description>
           <maml:para>Returns only enabled subscriptions.</maml:para>
+        </maml:description>
+        <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
+        <dev:type>
+          <maml:name>SwitchParameter</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+        <maml:name>IncludeRuntimeStatus</maml:name>
+        <maml:description>
+          <maml:para>Includes current per-source runtime state and Windows error details. Runtime status is local-only.</maml:para>
         </maml:description>
         <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
         <dev:type>
@@ -1973,6 +2012,18 @@ already provides integrity validation.</maml:para>
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
       </command:parameter>
+      <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+        <maml:name>Readiness</maml:name>
+        <maml:description>
+          <maml:para>Returns local WEC, WinRM listener, and ForwardedEvents readiness instead of subscription inventory.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="false">SwitchParameter</command:parameterValue>
+        <dev:type>
+          <maml:name>SwitchParameter</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
     </command:parameters>
     <command:inputTypes>
       <command:inputType>
@@ -1985,6 +2036,11 @@ already provides integrity validation.</maml:para>
       <command:returnValue>
         <dev:type>
           <maml:name>EventViewerX.CollectorSubscriptionSnapshot</maml:name>
+        </dev:type>
+      </command:returnValue>
+      <command:returnValue>
+        <dev:type>
+          <maml:name>EventViewerX.CollectorReadinessStatus</maml:name>
         </dev:type>
       </command:returnValue>
     </command:returnValues>
@@ -2006,6 +2062,20 @@ already provides integrity validation.</maml:para>
         <dev:code>Get-EVXCollectorSubscription -Name '*Domain Controllers*' -MachineName WEC01</dev:code>
         <dev:remarks>
           <maml:para>Uses Remote Registry access under the current Windows identity and applies wildcard matching to detached snapshots.</maml:para>
+        </dev:remarks>
+      </command:example>
+      <command:example>
+        <maml:title>Check collector prerequisites</maml:title>
+        <dev:code>Get-EVXCollectorSubscription -Readiness</dev:code>
+        <dev:remarks>
+          <maml:para>Reports the WEC service, WinRM listener, ForwardedEvents channel, elevation, and actionable readiness issues.</maml:para>
+        </dev:remarks>
+      </command:example>
+      <command:example>
+        <maml:title>Inspect live source health</maml:title>
+        <dev:code>Get-EVXCollectorSubscription -Name 'Domain controller authentication' -IncludeRuntimeStatus</dev:code>
+        <dev:remarks>
+          <maml:para>Adds processed-event counters, source heartbeat timestamps, and native Windows errors to the local snapshot.</maml:para>
         </dev:remarks>
       </command:example>
     </command:examples>
@@ -7476,17 +7546,53 @@ This cannot be combined with EventLogPath.</maml:para>
       <command:verb>New</command:verb>
       <command:noun>EVXCollectorSubscription</command:noun>
       <maml:description>
-        <maml:para>Creates a typed collector-initiated WEC subscription definition.</maml:para>
-        <maml:para>Builds safe Windows Event Collector XML from a QueryList or common event filters. The command does not change the collector; pipe the definition to Set-EVXCollectorSubscription to apply it.</maml:para>
+        <maml:para>Creates a typed collector- or source-initiated WEC subscription definition.</maml:para>
+        <maml:para>Builds safe Windows Event Collector XML from typed reports, custom definitions, a QueryList, or common event filters. The command does not change the collector; pipe the definition to Set-EVXCollectorSubscription to apply it.</maml:para>
       </maml:description>
     </command:details>
     <maml:description>
-      <maml:para>Creates a typed collector-initiated WEC subscription definition.</maml:para>
-      <maml:para>Builds safe Windows Event Collector XML from a QueryList or common event filters. The command does not change the collector; pipe the definition to Set-EVXCollectorSubscription to apply it.</maml:para>
+      <maml:para>Creates a typed collector- or source-initiated WEC subscription definition.</maml:para>
+      <maml:para>Builds safe Windows Event Collector XML from typed reports, custom definitions, a QueryList, or common event filters. The command does not change the collector; pipe the definition to Set-EVXCollectorSubscription to apply it.</maml:para>
     </maml:description>
     <command:syntax>
       <command:syntaxItem parameterSetName="Filter">
         <maml:name>New-EVXCollectorSubscription</maml:name>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>AllowedSourceDomainComputersSddl</maml:name>
+          <maml:description>
+            <maml:para>Source authorization SDDL used by a source-initiated subscription.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
+          <dev:type>
+            <maml:name>String</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="true" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>AllowedSourceSid</maml:name>
+          <maml:description>
+            <maml:para>Explicit computer or group SIDs authorized for source-initiated forwarding. This is a simpler alternative to AllowedSourceDomainComputersSddl.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">String[]</command:parameterValue>
+          <dev:type>
+            <maml:name>String[]</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>CollectorHostName</maml:name>
+          <maml:description>
+            <maml:para>Collector DNS name required for Push delivery and the source SubscriptionManager policy value.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
+          <dev:type>
+            <maml:name>String</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>ContentFormat</maml:name>
           <maml:description>
@@ -7743,14 +7849,26 @@ This cannot be combined with EventLogPath.</maml:para>
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
         </command:parameter>
-        <command:parameter required="true" variableLength="true" globbing="false" pipelineInput="False" position="1" aliases="ComputerName,MachineName,ServerName">
+        <command:parameter required="false" variableLength="true" globbing="false" pipelineInput="False" position="1" aliases="ComputerName,MachineName,ServerName">
           <maml:name>SourceComputer</maml:name>
           <maml:description>
             <maml:para>Source computers collected by this subscription.</maml:para>
           </maml:description>
-          <command:parameterValue required="true" variableLength="false">String[]</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">String[]</command:parameterValue>
           <dev:type>
             <maml:name>String[]</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>SourceRefreshIntervalSeconds</maml:name>
+          <maml:description>
+            <maml:para>Source policy refresh interval in seconds.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
+          <dev:type>
+            <maml:name>Int32</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -7763,6 +7881,22 @@ This cannot be combined with EventLogPath.</maml:para>
           <command:parameterValue required="false" variableLength="false">DateTime</command:parameterValue>
           <dev:type>
             <maml:name>DateTime</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>SubscriptionType</maml:name>
+          <maml:description>
+            <maml:para>CollectorInitiated for explicit sources, or SourceInitiated for policy-discovered sources.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">CollectorSubscriptionType</command:parameterValue>
+          <command:parameterValueGroup>
+            <command:parameterValue required="false" variableLength="false">CollectorInitiated</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">SourceInitiated</command:parameterValue>
+          </command:parameterValueGroup>
+          <dev:type>
+            <maml:name>CollectorSubscriptionType</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -7840,6 +7974,42 @@ This cannot be combined with EventLogPath.</maml:para>
       </command:syntaxItem>
       <command:syntaxItem parameterSetName="TypedFilter">
         <maml:name>New-EVXCollectorSubscription</maml:name>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>AllowedSourceDomainComputersSddl</maml:name>
+          <maml:description>
+            <maml:para>Source authorization SDDL used by a source-initiated subscription.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
+          <dev:type>
+            <maml:name>String</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="true" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>AllowedSourceSid</maml:name>
+          <maml:description>
+            <maml:para>Explicit computer or group SIDs authorized for source-initiated forwarding. This is a simpler alternative to AllowedSourceDomainComputersSddl.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">String[]</command:parameterValue>
+          <dev:type>
+            <maml:name>String[]</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>CollectorHostName</maml:name>
+          <maml:description>
+            <maml:para>Collector DNS name required for Push delivery and the source SubscriptionManager policy value.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
+          <dev:type>
+            <maml:name>String</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>ContentFormat</maml:name>
           <maml:description>
@@ -8052,14 +8222,42 @@ This cannot be combined with EventLogPath.</maml:para>
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
         </command:parameter>
-        <command:parameter required="true" variableLength="true" globbing="false" pipelineInput="False" position="1" aliases="ComputerName,MachineName,ServerName">
+        <command:parameter required="false" variableLength="true" globbing="false" pipelineInput="False" position="1" aliases="ComputerName,MachineName,ServerName">
           <maml:name>SourceComputer</maml:name>
           <maml:description>
             <maml:para>Source computers collected by this subscription.</maml:para>
           </maml:description>
-          <command:parameterValue required="true" variableLength="false">String[]</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">String[]</command:parameterValue>
           <dev:type>
             <maml:name>String[]</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>SourceRefreshIntervalSeconds</maml:name>
+          <maml:description>
+            <maml:para>Source policy refresh interval in seconds.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
+          <dev:type>
+            <maml:name>Int32</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>SubscriptionType</maml:name>
+          <maml:description>
+            <maml:para>CollectorInitiated for explicit sources, or SourceInitiated for policy-discovered sources.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">CollectorSubscriptionType</command:parameterValue>
+          <command:parameterValueGroup>
+            <command:parameterValue required="false" variableLength="false">CollectorInitiated</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">SourceInitiated</command:parameterValue>
+          </command:parameterValueGroup>
+          <dev:type>
+            <maml:name>CollectorSubscriptionType</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -8095,6 +8293,42 @@ This cannot be combined with EventLogPath.</maml:para>
       </command:syntaxItem>
       <command:syntaxItem parameterSetName="Type">
         <maml:name>New-EVXCollectorSubscription</maml:name>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>AllowedSourceDomainComputersSddl</maml:name>
+          <maml:description>
+            <maml:para>Source authorization SDDL used by a source-initiated subscription.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
+          <dev:type>
+            <maml:name>String</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="true" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>AllowedSourceSid</maml:name>
+          <maml:description>
+            <maml:para>Explicit computer or group SIDs authorized for source-initiated forwarding. This is a simpler alternative to AllowedSourceDomainComputersSddl.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">String[]</command:parameterValue>
+          <dev:type>
+            <maml:name>String[]</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>CollectorHostName</maml:name>
+          <maml:description>
+            <maml:para>Collector DNS name required for Push delivery and the source SubscriptionManager policy value.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
+          <dev:type>
+            <maml:name>String</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>ContentFormat</maml:name>
           <maml:description>
@@ -8283,14 +8517,42 @@ This cannot be combined with EventLogPath.</maml:para>
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
         </command:parameter>
-        <command:parameter required="true" variableLength="true" globbing="false" pipelineInput="False" position="1" aliases="ComputerName,MachineName,ServerName">
+        <command:parameter required="false" variableLength="true" globbing="false" pipelineInput="False" position="1" aliases="ComputerName,MachineName,ServerName">
           <maml:name>SourceComputer</maml:name>
           <maml:description>
             <maml:para>Source computers collected by this subscription.</maml:para>
           </maml:description>
-          <command:parameterValue required="true" variableLength="false">String[]</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">String[]</command:parameterValue>
           <dev:type>
             <maml:name>String[]</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>SourceRefreshIntervalSeconds</maml:name>
+          <maml:description>
+            <maml:para>Source policy refresh interval in seconds.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
+          <dev:type>
+            <maml:name>Int32</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>SubscriptionType</maml:name>
+          <maml:description>
+            <maml:para>CollectorInitiated for explicit sources, or SourceInitiated for policy-discovered sources.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">CollectorSubscriptionType</command:parameterValue>
+          <command:parameterValueGroup>
+            <command:parameterValue required="false" variableLength="false">CollectorInitiated</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">SourceInitiated</command:parameterValue>
+          </command:parameterValueGroup>
+          <dev:type>
+            <maml:name>CollectorSubscriptionType</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -8430,6 +8692,42 @@ This cannot be combined with EventLogPath.</maml:para>
       </command:syntaxItem>
       <command:syntaxItem parameterSetName="Definition">
         <maml:name>New-EVXCollectorSubscription</maml:name>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>AllowedSourceDomainComputersSddl</maml:name>
+          <maml:description>
+            <maml:para>Source authorization SDDL used by a source-initiated subscription.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
+          <dev:type>
+            <maml:name>String</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="true" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>AllowedSourceSid</maml:name>
+          <maml:description>
+            <maml:para>Explicit computer or group SIDs authorized for source-initiated forwarding. This is a simpler alternative to AllowedSourceDomainComputersSddl.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">String[]</command:parameterValue>
+          <dev:type>
+            <maml:name>String[]</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>CollectorHostName</maml:name>
+          <maml:description>
+            <maml:para>Collector DNS name required for Push delivery and the source SubscriptionManager policy value.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
+          <dev:type>
+            <maml:name>String</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>ContentFormat</maml:name>
           <maml:description>
@@ -8630,14 +8928,42 @@ This cannot be combined with EventLogPath.</maml:para>
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
         </command:parameter>
-        <command:parameter required="true" variableLength="true" globbing="false" pipelineInput="False" position="1" aliases="ComputerName,MachineName,ServerName">
+        <command:parameter required="false" variableLength="true" globbing="false" pipelineInput="False" position="1" aliases="ComputerName,MachineName,ServerName">
           <maml:name>SourceComputer</maml:name>
           <maml:description>
             <maml:para>Source computers collected by this subscription.</maml:para>
           </maml:description>
-          <command:parameterValue required="true" variableLength="false">String[]</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">String[]</command:parameterValue>
           <dev:type>
             <maml:name>String[]</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>SourceRefreshIntervalSeconds</maml:name>
+          <maml:description>
+            <maml:para>Source policy refresh interval in seconds.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
+          <dev:type>
+            <maml:name>Int32</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>SubscriptionType</maml:name>
+          <maml:description>
+            <maml:para>CollectorInitiated for explicit sources, or SourceInitiated for policy-discovered sources.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">CollectorSubscriptionType</command:parameterValue>
+          <command:parameterValueGroup>
+            <command:parameterValue required="false" variableLength="false">CollectorInitiated</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">SourceInitiated</command:parameterValue>
+          </command:parameterValueGroup>
+          <dev:type>
+            <maml:name>CollectorSubscriptionType</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -8673,6 +8999,42 @@ This cannot be combined with EventLogPath.</maml:para>
       </command:syntaxItem>
       <command:syntaxItem parameterSetName="QueryXml">
         <maml:name>New-EVXCollectorSubscription</maml:name>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>AllowedSourceDomainComputersSddl</maml:name>
+          <maml:description>
+            <maml:para>Source authorization SDDL used by a source-initiated subscription.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
+          <dev:type>
+            <maml:name>String</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="true" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>AllowedSourceSid</maml:name>
+          <maml:description>
+            <maml:para>Explicit computer or group SIDs authorized for source-initiated forwarding. This is a simpler alternative to AllowedSourceDomainComputersSddl.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">String[]</command:parameterValue>
+          <dev:type>
+            <maml:name>String[]</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>CollectorHostName</maml:name>
+          <maml:description>
+            <maml:para>Collector DNS name required for Push delivery and the source SubscriptionManager policy value.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
+          <dev:type>
+            <maml:name>String</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>ContentFormat</maml:name>
           <maml:description>
@@ -8873,14 +9235,42 @@ This cannot be combined with EventLogPath.</maml:para>
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
         </command:parameter>
-        <command:parameter required="true" variableLength="true" globbing="false" pipelineInput="False" position="1" aliases="ComputerName,MachineName,ServerName">
+        <command:parameter required="false" variableLength="true" globbing="false" pipelineInput="False" position="1" aliases="ComputerName,MachineName,ServerName">
           <maml:name>SourceComputer</maml:name>
           <maml:description>
             <maml:para>Source computers collected by this subscription.</maml:para>
           </maml:description>
-          <command:parameterValue required="true" variableLength="false">String[]</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">String[]</command:parameterValue>
           <dev:type>
             <maml:name>String[]</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>SourceRefreshIntervalSeconds</maml:name>
+          <maml:description>
+            <maml:para>Source policy refresh interval in seconds.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
+          <dev:type>
+            <maml:name>Int32</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>SubscriptionType</maml:name>
+          <maml:description>
+            <maml:para>CollectorInitiated for explicit sources, or SourceInitiated for policy-discovered sources.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">CollectorSubscriptionType</command:parameterValue>
+          <command:parameterValueGroup>
+            <command:parameterValue required="false" variableLength="false">CollectorInitiated</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">SourceInitiated</command:parameterValue>
+          </command:parameterValueGroup>
+          <dev:type>
+            <maml:name>CollectorSubscriptionType</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -8916,6 +9306,42 @@ This cannot be combined with EventLogPath.</maml:para>
       </command:syntaxItem>
     </command:syntax>
     <command:parameters>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+        <maml:name>AllowedSourceDomainComputersSddl</maml:name>
+        <maml:description>
+          <maml:para>Source authorization SDDL used by a source-initiated subscription.</maml:para>
+        </maml:description>
+        <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
+        <dev:type>
+          <maml:name>String</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="true" globbing="false" pipelineInput="False" position="named" aliases="None">
+        <maml:name>AllowedSourceSid</maml:name>
+        <maml:description>
+          <maml:para>Explicit computer or group SIDs authorized for source-initiated forwarding. This is a simpler alternative to AllowedSourceDomainComputersSddl.</maml:para>
+        </maml:description>
+        <command:parameterValue required="false" variableLength="false">String[]</command:parameterValue>
+        <dev:type>
+          <maml:name>String[]</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+        <maml:name>CollectorHostName</maml:name>
+        <maml:description>
+          <maml:para>Collector DNS name required for Push delivery and the source SubscriptionManager policy value.</maml:para>
+        </maml:description>
+        <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
+        <dev:type>
+          <maml:name>String</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
       <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
         <maml:name>ContentFormat</maml:name>
         <maml:description>
@@ -9208,14 +9634,26 @@ This cannot be combined with EventLogPath.</maml:para>
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
       </command:parameter>
-      <command:parameter required="true" variableLength="true" globbing="false" pipelineInput="False" position="1" aliases="ComputerName,MachineName,ServerName">
+      <command:parameter required="false" variableLength="true" globbing="false" pipelineInput="False" position="1" aliases="ComputerName,MachineName,ServerName">
         <maml:name>SourceComputer</maml:name>
         <maml:description>
           <maml:para>Source computers collected by this subscription.</maml:para>
         </maml:description>
-        <command:parameterValue required="true" variableLength="false">String[]</command:parameterValue>
+        <command:parameterValue required="false" variableLength="false">String[]</command:parameterValue>
         <dev:type>
           <maml:name>String[]</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+        <maml:name>SourceRefreshIntervalSeconds</maml:name>
+        <maml:description>
+          <maml:para>Source policy refresh interval in seconds.</maml:para>
+        </maml:description>
+        <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
+        <dev:type>
+          <maml:name>Int32</maml:name>
           <maml:uri />
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
@@ -9228,6 +9666,22 @@ This cannot be combined with EventLogPath.</maml:para>
         <command:parameterValue required="false" variableLength="false">DateTime</command:parameterValue>
         <dev:type>
           <maml:name>DateTime</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+        <maml:name>SubscriptionType</maml:name>
+        <maml:description>
+          <maml:para>CollectorInitiated for explicit sources, or SourceInitiated for policy-discovered sources.</maml:para>
+        </maml:description>
+        <command:parameterValue required="false" variableLength="false">CollectorSubscriptionType</command:parameterValue>
+        <command:parameterValueGroup>
+          <command:parameterValue required="false" variableLength="false">CollectorInitiated</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">SourceInitiated</command:parameterValue>
+        </command:parameterValueGroup>
+        <dev:type>
+          <maml:name>CollectorSubscriptionType</maml:name>
           <maml:uri />
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
@@ -9437,6 +9891,13 @@ This cannot be combined with EventLogPath.</maml:para>
         <dev:code>New-EVXCollectorSubscription -Name FailedLogons -SourceComputer DC1,DC2 -LogName Security -EventId 4625 | Set-EVXCollectorSubscription</dev:code>
         <dev:remarks>
           <maml:para>Builds a typed definition and creates or updates the local collector subscription.</maml:para>
+        </dev:remarks>
+      </command:example>
+      <command:example>
+        <maml:title>Create a source-initiated domain-controller subscription</maml:title>
+        <dev:code>New-EVXCollectorSubscription -Name GpoAudit -SubscriptionType SourceInitiated -CollectorHostName WEC01.contoso.com -Type GroupPolicyActivity -AllowedSourceSid $domainControllersSid | Set-EVXCollectorSubscription -InitializeCollector</dev:code>
+        <dev:remarks>
+          <maml:para>Uses source policy for discovery. Domain controllers need the Domain Controllers SID or explicit computer SIDs in the source authorization SDDL.</maml:para>
         </dev:remarks>
       </command:example>
       <command:example>
@@ -11755,6 +12216,57 @@ This cannot be combined with EventLogPath.</maml:para>
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
         </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>InitializeCollector</maml:name>
+          <maml:description>
+            <maml:para>Runs the inbox WinRM and Windows Event Collector quick configuration and verifies readiness.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>SkipWinRmQuickConfig</maml:name>
+          <maml:description>
+            <maml:para>Skips WinRM quick configuration when initializing an already managed WinRM host.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+      </command:syntaxItem>
+      <command:syntaxItem parameterSetName="Initialize">
+        <maml:name>Set-EVXCollectorSubscription</maml:name>
+        <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>InitializeCollector</maml:name>
+          <maml:description>
+            <maml:para>Runs the inbox WinRM and Windows Event Collector quick configuration and verifies readiness.</maml:para>
+          </maml:description>
+          <command:parameterValue required="true" variableLength="false">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>SkipWinRmQuickConfig</maml:name>
+          <maml:description>
+            <maml:para>Skips WinRM quick configuration when initializing an already managed WinRM host.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
       </command:syntaxItem>
     </command:syntax>
     <command:parameters>
@@ -11782,6 +12294,18 @@ This cannot be combined with EventLogPath.</maml:para>
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
       </command:parameter>
+      <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+        <maml:name>InitializeCollector</maml:name>
+        <maml:description>
+          <maml:para>Runs the inbox WinRM and Windows Event Collector quick configuration and verifies readiness.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="false">SwitchParameter</command:parameterValue>
+        <dev:type>
+          <maml:name>SwitchParameter</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
       <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="True (ByPropertyName)" position="0" aliases="SubscriptionName">
         <maml:name>Name</maml:name>
         <maml:description>
@@ -11800,6 +12324,18 @@ This cannot be combined with EventLogPath.</maml:para>
           <maml:para>Removes the named local collector subscription.</maml:para>
         </maml:description>
         <command:parameterValue required="true" variableLength="false">SwitchParameter</command:parameterValue>
+        <dev:type>
+          <maml:name>SwitchParameter</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+        <maml:name>SkipWinRmQuickConfig</maml:name>
+        <maml:description>
+          <maml:para>Skips WinRM quick configuration when initializing an already managed WinRM host.</maml:para>
+        </maml:description>
+        <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
         <dev:type>
           <maml:name>SwitchParameter</maml:name>
           <maml:uri />
@@ -11835,6 +12371,11 @@ This cannot be combined with EventLogPath.</maml:para>
           <maml:name>EventViewerX.CollectorSubscriptionSnapshot</maml:name>
         </dev:type>
       </command:returnValue>
+      <command:returnValue>
+        <dev:type>
+          <maml:name>EventViewerX.CollectorReadinessStatus</maml:name>
+        </dev:type>
+      </command:returnValue>
     </command:returnValues>
     <maml:alertSet>
       <maml:alert>
@@ -11861,6 +12402,13 @@ This cannot be combined with EventLogPath.</maml:para>
         <dev:code>Set-EVXCollectorSubscription -Name FailedLogons -Remove</dev:code>
         <dev:remarks>
           <maml:para>Deletes the local subscription through the inbox collector utility and verifies that it is absent.</maml:para>
+        </dev:remarks>
+      </command:example>
+      <command:example>
+        <maml:title>Initialize the collector while applying a definition</maml:title>
+        <dev:code>$definition | Set-EVXCollectorSubscription -InitializeCollector -Confirm:$false</dev:code>
+        <dev:remarks>
+          <maml:para>Runs the inbox collector quick configuration, verifies readiness, and then transactionally applies the definition.</maml:para>
         </dev:remarks>
       </command:example>
     </command:examples>

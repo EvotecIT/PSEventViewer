@@ -6,6 +6,8 @@ Describe 'Get-EVXCollectorSubscription' {
         $Command.Parameters.Keys | Should -Contain 'Name'
         $Command.Parameters.Keys | Should -Contain 'MachineName'
         $Command.Parameters.Keys | Should -Contain 'EnabledOnly'
+        $Command.Parameters.Keys | Should -Contain 'IncludeRuntimeStatus'
+        $Command.Parameters.Keys | Should -Contain 'Readiness'
     }
 
     It 'returns detached local snapshots or an empty inventory' {

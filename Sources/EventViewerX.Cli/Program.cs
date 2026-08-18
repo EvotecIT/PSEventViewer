@@ -123,26 +123,51 @@ internal static partial class Program {
 
     private static int Collector(CliArguments options) {
         if (options.Subcommand == "remove") {
-            return WriteJson(
-                CollectorSubscriptionManager
-                    .RemoveCollectorSubscription(
-                        options.Require("name")));
+            return WriteJson(CollectorSubscriptionManager.RemoveCollectorSubscription(options.Require("name")));
+        }
+        if (options.Subcommand == "readiness") {
+            return WriteJson(CollectorSubscriptionManager.GetCollectorReadiness());
+        }
+        if (options.Subcommand == "runtime") {
+            return WriteJson(CollectorSubscriptionManager.GetCollectorSubscriptionRuntimeStatus(options.Require("name")));
+        }
+        if (options.Subcommand == "initialize") {
+            return WriteJson(CollectorSubscriptionManager.InitializeCollector(!options.Has("skip-winrm")));
         }
         if (options.Subcommand != "create") {
-            throw new ArgumentException("collector supports the create and remove subcommands.");
+            throw new ArgumentException("collector supports create, remove, readiness, runtime, and initialize.");
         }
         EventType[] types = ParseTypes(options.GetMany("type"));
+        if (types.Length == 0) {
+            throw new ArgumentException("--type is required.");
+        }
         string[] computers = options.GetMany("source");
-        if (computers.Length == 0) {
+        bool sourceInitiated = options.Has("source-initiated");
+        if (!sourceInitiated && computers.Length == 0) {
             throw new ArgumentException("--source is required.");
         }
+        if (sourceInitiated && computers.Length > 0) {
+            throw new ArgumentException("--source cannot be used with --source-initiated; authorize source SIDs with --allowed-source-sddl.");
+        }
+        CollectorSubscriptionDeliveryMode deliveryMode = options.Get("delivery") is string delivery
+            ? Enum.TryParse(delivery, true, out CollectorSubscriptionDeliveryMode parsedDelivery)
+                ? parsedDelivery
+                : throw new ArgumentException("--delivery must be Pull or Push.")
+            : sourceInitiated ? CollectorSubscriptionDeliveryMode.Push : CollectorSubscriptionDeliveryMode.Pull;
         var definition = new CollectorSubscriptionDefinition {
             SubscriptionId = options.Require("name"),
             Description = options.Get("description") ?? $"EventViewerX {string.Join(", ", types.Select(static type => type.ToString()))}",
             Enabled = !options.Has("disabled"),
+            SubscriptionType = sourceInitiated
+                ? CollectorSubscriptionType.SourceInitiated
+                : CollectorSubscriptionType.CollectorInitiated,
             QueryXml = EventDefinitionCompiler.BuildQueryXml(types),
             Sources = computers.Select(static computer => new CollectorSubscriptionSource(computer)).ToArray(),
-            ReadExistingEvents = options.Has("read-existing")
+            ReadExistingEvents = options.Has("read-existing"),
+            DeliveryMode = deliveryMode,
+            CollectorHostName = options.Get("collector-host"),
+            AllowedSourceDomainComputersSddl = options.Get("allowed-source-sddl") ?? "O:NSG:NSD:(A;;GA;;;DC)(A;;GA;;;NS)",
+            SourceRefreshIntervalSeconds = options.GetInt("source-refresh", 60)
         };
         definition.Validate();
         if (options.Get("output") is string output) {
@@ -231,10 +256,18 @@ internal static partial class Program {
             case "collector" when options.Subcommand == "create":
                 options.ValidateAllowed(
                     "name", "source", "type", "description", "disabled", "read-existing",
-                    "output", "force", "apply");
+                    "output", "force", "apply", "source-initiated", "allowed-source-sddl",
+                    "delivery", "collector-host", "source-refresh");
                 break;
             case "collector" when options.Subcommand == "remove":
+            case "collector" when options.Subcommand == "runtime":
                 options.ValidateAllowed("name");
+                break;
+            case "collector" when options.Subcommand == "readiness":
+                options.ValidateAllowed();
+                break;
+            case "collector" when options.Subcommand == "initialize":
+                options.ValidateAllowed("skip-winrm");
                 break;
             case "provider" when options.Subcommand == "build":
                 options.ValidateAllowed("definition", "output", "force", "baseline");
@@ -260,7 +293,10 @@ internal static partial class Program {
             "  evx query  (--type TYPE[,TYPE] | --definition FILE | --log LOG | --path FILE[,FILE]) [--path FILE[,FILE] with type/definition] [--event-id ID] [--record-id ID] [--machine HOST | --collector WEC] [--since 01:00:00] [--max N]\n" +
             "  evx report (--type TYPE[,TYPE] | --definition FILE | --log LOG | --path FILE[,FILE]) [--path FILE[,FILE] with type/definition] (--html FILE | --excel FILE | --email-html FILE | --mail-profile FILE)\n" +
             "  evx watch  (--type TYPE[,TYPE] | --definition FILE) [--machine HOST | --collector WEC] [--jsonl FILE] [--outbox DIR | --mail-profile FILE] [--interval 00:05:00] [--stop-after N] [--timeout 01:00:00] [--ready-file FILE] [--summary-file FILE]\n" +
-            "  evx collector create --name NAME --source HOST[,HOST] --type TYPE[,TYPE] [--output FILE] [--apply]\n" +
+            "  evx collector create --name NAME --type TYPE[,TYPE] (--source HOST[,HOST] | --source-initiated --collector-host WEC) [--allowed-source-sddl SDDL] [--output FILE] [--apply]\n" +
+            "  evx collector readiness\n" +
+            "  evx collector runtime --name NAME\n" +
+            "  evx collector initialize [--skip-winrm]\n" +
             "  evx collector remove --name NAME\n" +
             "  evx provider build --definition FILE --output FILE.evxprovider\n" +
             "  evx provider install --package FILE.evxprovider\n" +

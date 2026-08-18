@@ -21,6 +21,51 @@ public static class EventLogBatchConsolidator {
         if (query == null) {
             throw new ArgumentNullException(nameof(query));
         }
+        EventLogChannelQuery[] forwarded = query.ChannelQueries
+            .Where(static channel =>
+                string.Equals(
+                    channel.LogName,
+                    ForwardedEventsQuerySafety.ChannelName,
+                    StringComparison.OrdinalIgnoreCase))
+            .Select(static channel =>
+                EventLogQuerySnapshot.Copy(channel))
+            .ToArray();
+        if (forwarded.Length > 0) {
+            EventLogBatchQuery forwardedBatch =
+                EventLogBatchQuery.ForChannels(forwarded);
+            CopyControls(query, forwardedBatch);
+            var remainderParts = new List<EventLogBatchQuery>();
+            EventLogChannelQuery[] otherChannels = query.ChannelQueries
+                .Where(static channel =>
+                    !string.Equals(
+                        channel.LogName,
+                        ForwardedEventsQuerySafety.ChannelName,
+                        StringComparison.OrdinalIgnoreCase))
+                .ToArray();
+            if (otherChannels.Length > 0) {
+                remainderParts.Add(
+                    EventLogBatchQuery.ForChannels(otherChannels));
+            }
+            if (query.FileQueries.Count > 0) {
+                remainderParts.Add(
+                    EventLogBatchQuery.ForFiles(query.FileQueries));
+            }
+            if (query.StructuredQueries.Count > 0) {
+                remainderParts.Add(
+                    EventLogBatchQuery.ForStructured(
+                        query.StructuredQueries));
+            }
+            foreach (EventLogBatchQuery part in remainderParts) {
+                CopyControls(query, part);
+            }
+            if (remainderParts.Count == 0) {
+                return forwardedBatch;
+            }
+            EventLogBatchQuery remainder = Consolidate(
+                EventLogBatchQuery.Combine(remainderParts));
+            return EventLogBatchQuery.Combine(
+                new[] { forwardedBatch, remainder });
+        }
         QueryInput[] inputs = Snapshot(query);
         if (inputs.Length == 0) {
             throw new ArgumentException(
@@ -39,6 +84,8 @@ public static class EventLogBatchConsolidator {
                         input.SourceIdentity.ToUpperInvariant(),
                     ConsolidationScope =
                         input.ConsolidationScope.ToUpperInvariant(),
+                    input.Profile.ManagedStartTimeUtc,
+                    input.Profile.ManagedEndTimeUtc,
                     input.TolerateQueryErrors,
                     input.FailureHandler
                 })
@@ -51,6 +98,16 @@ public static class EventLogBatchConsolidator {
         result.ContinueOnError = query.ContinueOnError;
         result.FailureHandler = query.FailureHandler;
         return result;
+    }
+
+    private static void CopyControls(
+        EventLogBatchQuery source,
+        EventLogBatchQuery target) {
+
+        target.MaxEvents = source.MaxEvents;
+        target.MaxConcurrency = source.MaxConcurrency;
+        target.ContinueOnError = source.ContinueOnError;
+        target.FailureHandler = source.FailureHandler;
     }
 
     private static EventLogStructuredQuery CreateStructuredQuery(
@@ -97,6 +154,8 @@ public static class EventLogBatchConsolidator {
                 MaxEvents = profile.MaxEvents,
                 BatchSourceIdentity =
                     profile.BatchSourceIdentity,
+                ManagedStartTimeUtc = profile.ManagedStartTimeUtc,
+                ManagedEndTimeUtc = profile.ManagedEndTimeUtc,
                 IncludeBookmark = profile.IncludeBookmark,
                 RemoteConnectionTimeoutMilliseconds =
                     profile.RemoteConnectionTimeoutMilliseconds,
@@ -284,6 +343,8 @@ public static class EventLogBatchConsolidator {
         }
         internal long MaxEvents { get; set; }
         internal string? BatchSourceIdentity { get; set; }
+        internal DateTime? ManagedStartTimeUtc { get; set; }
+        internal DateTime? ManagedEndTimeUtc { get; set; }
         internal bool IncludeBookmark { get; set; }
         internal int RemoteConnectionTimeoutMilliseconds {
             get;
@@ -316,6 +377,8 @@ public static class EventLogBatchConsolidator {
                 MaxEvents = query.MaxEvents,
                 BatchSourceIdentity =
                     query.BatchSourceIdentity,
+                ManagedStartTimeUtc = query.ManagedStartTimeUtc,
+                ManagedEndTimeUtc = query.ManagedEndTimeUtc,
                 IncludeBookmark = query.IncludeBookmark,
                 RemoteConnectionTimeoutMilliseconds =
                     query.RemoteConnectionTimeoutMilliseconds,
@@ -365,6 +428,8 @@ public static class EventLogBatchConsolidator {
                 MaxEvents = query.MaxEvents,
                 BatchSourceIdentity =
                     query.BatchSourceIdentity,
+                ManagedStartTimeUtc = query.ManagedStartTimeUtc,
+                ManagedEndTimeUtc = query.ManagedEndTimeUtc,
                 IncludeBookmark = query.IncludeBookmark,
                 RemoteConnectionTimeoutMilliseconds =
                     query.RemoteConnectionTimeoutMilliseconds,
@@ -384,6 +449,8 @@ public static class EventLogBatchConsolidator {
             if (Oldest != other.Oldest ||
                 ReadMode != other.ReadMode ||
                 MaxEvents != other.MaxEvents ||
+                ManagedStartTimeUtc != other.ManagedStartTimeUtc ||
+                ManagedEndTimeUtc != other.ManagedEndTimeUtc ||
                 IncludeBookmark != other.IncludeBookmark ||
                 !string.Equals(
                     MessageCulture?.Name,

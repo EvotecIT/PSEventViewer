@@ -122,10 +122,16 @@ internal static class EventReportTableProjection {
 
     private static object? NormalizeCellValue(object? value) => value switch {
         null => null,
-        string => value,
+        string text => IsPlaceholder(text) ? null : text,
         IEnumerable enumerable => FormatEnumerable(enumerable),
         _ => value
     };
+
+    private static bool IsPlaceholder(string value) {
+        string trimmed = value.Trim();
+        return trimmed.Length == 0 || trimmed.All(static character =>
+            character == '-' || character == '\\' || character == '/' || char.IsWhiteSpace(character));
+    }
 
     private static string FormatValue(object? value) => value switch {
         null => string.Empty,

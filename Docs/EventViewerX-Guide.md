@@ -319,6 +319,65 @@ The email package is transport-neutral. A host may give its HTML/plain-text
 body and resources to Mailozaurr, Microsoft Graph, or another sender without
 coupling EventViewerX.Reporting to credentials or delivery policy.
 
+## Provision and diagnose Windows Event Collector
+
+The reusable core builds both collector- and source-initiated subscription
+XML, initializes the local collector, and reports readiness and per-source
+runtime evidence. Source policy remains an explicit deployment concern rather
+than a hidden remote mutation.
+
+```csharp
+string domainControllersSid =
+    "S-1-5-21-111111111-222222222-333333333-516";
+var definition = new CollectorSubscriptionDefinition {
+    SubscriptionId = "Domain controller authentication",
+    SubscriptionType = CollectorSubscriptionType.SourceInitiated,
+    CollectorHostName = "WEC01.ad.contoso.com",
+    AllowedSourceDomainComputersSddl =
+        CollectorSourcePolicy.BuildAllowedSourceSddl(new[] {
+            domainControllersSid
+        }),
+    DeliveryMode = CollectorSubscriptionDeliveryMode.Push,
+    QueryXml = EventDefinitionCompiler.BuildQueryXml(
+        new[] { EventType.ActiveDirectoryAuthentication })
+};
+
+Console.WriteLine(definition.SourceSubscriptionManagerValue);
+CollectorSubscriptionManager.InitializeCollector();
+CollectorSubscriptionManager.ApplyCollectorSubscription(definition);
+
+CollectorSubscriptionRuntimeStatus runtime =
+    CollectorSubscriptionManager.GetCollectorSubscriptionRuntimeStatus(
+        definition.SubscriptionId);
+foreach (CollectorSubscriptionSourceRuntimeStatus source in runtime.Sources) {
+    Console.WriteLine(
+        $"{source.Address}: {source.Status}, {source.EventsProcessed} events, " +
+        $"error 0x{source.LastErrorCode:X8}");
+}
+```
+
+Deploy `SourceSubscriptionManagerValue` through the source computers' Windows
+Event Forwarding SubscriptionManager policy. Security-channel forwarding also
+requires Network Service read access on each source. Preserve the channel's
+existing access descriptor when adding that ACE. Domain controllers require
+their Domain Controllers group SID (RID 516) or explicit computer SIDs; the
+generic Domain Computers ACE is insufficient.
+
+Affected Windows Server 2025 builds can terminate the Event Log service when
+`ForwardedEvents` evaluates any filtered native XPath, including simple event
+ID and `TimeCreated` predicates. EventViewerX therefore opens that channel once
+with the native `*` selector and applies the complete typed filter in its
+bounded streaming reader. Inclusive time windows still stop after the reader
+crosses the ordered boundary; event IDs, providers, original channels, data
+fields, record checkpoints, `MaxEvents`, and `MaxCandidates` remain enforced.
+Direct live logs and EVTX files retain their selective native-query fast path.
+Raw filtered XPath and structured `QueryList` input against `ForwardedEvents`
+are rejected before Windows executes them; use `EventFilter`, typed event
+definitions, or the high-level query planner instead. Set
+`EventLogQueryOptions.MaxEventsScanned` when a generic collector query needs an
+explicit raw-scan ceiling; typed/custom queries use their `MaxCandidates`
+ceiling for the same purpose.
+
 ## Catalog, health, and administration
 
 ```csharp
