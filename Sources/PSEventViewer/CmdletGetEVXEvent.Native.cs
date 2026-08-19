@@ -93,6 +93,7 @@ public sealed partial class CmdletGetEVXEvent {
                 MessageCulture = MessageCulture,
                 FallbackMessageCulture = FallbackMessageCulture,
                 MaxEvents = GetNativeCandidateLimit(),
+                MaxEventsScanned = MaxEventsScanned,
                 IncludeBookmark = IncludeBookmark.IsPresent,
                 BookmarkXml = BookmarkXml,
                 BookmarkOffset = BookmarkOffset,
@@ -466,6 +467,20 @@ public sealed partial class CmdletGetEVXEvent {
                     machineFilter,
                     machine,
                     logName);
+                if (string.Equals(
+                        logName,
+                        "ForwardedEvents",
+                        StringComparison.OrdinalIgnoreCase) &&
+                    suppressions.Count == 0) {
+                    EventLogBatchQuery managed =
+                        EventLogQueryFactory.ForChannels(
+                            new[] { logName },
+                            new[] { machine },
+                            sourceFilter,
+                            CreateChannelFactoryOptions(machine));
+                    channels.AddRange(managed.ChannelQueries);
+                    continue;
+                }
                 IReadOnlyList<EventFilter> chunks =
                     EventFilterPartitioner.Partition(
                         sourceFilter);
@@ -513,6 +528,34 @@ public sealed partial class CmdletGetEVXEvent {
         batch = ConsolidateAndValidateBookmarkFanOut(batch);
         ConfigureBatch(batch);
         return batch;
+    }
+
+    private EventLogQueryOptions CreateChannelFactoryOptions(
+        string? machineName) {
+
+        return new EventLogQueryOptions {
+            Oldest = EffectiveOldest,
+            ReadMode = ReadMode,
+            MessageCulture = MessageCulture,
+            FallbackMessageCulture = FallbackMessageCulture,
+            MaxEvents = GetNativeCandidateLimit(),
+            MaxEventsScanned = MaxEventsScanned,
+            IncludeBookmark = IncludeBookmark,
+            BookmarkXml = BookmarkXml,
+            BookmarkOffset = BookmarkOffset,
+            StrictBookmark = !IgnoreStaleBookmark,
+            Credential = EventLogTarget.IsLocalMachine(machineName)
+                ? null
+                : Credential?.GetNetworkCredential(),
+            Authentication = Authentication,
+            RemoteConnectionTimeoutMilliseconds =
+                EffectiveRemoteConnectionTimeoutMilliseconds,
+            RemoteReadTimeoutMilliseconds =
+                EffectiveRemoteReadTimeoutMilliseconds,
+            BufferCapacity = BufferCapacity > 0 ? BufferCapacity : 64,
+            MaxConcurrency = DisableParallel.IsPresent ? 1 : MaxConcurrency,
+            ContinueOnError = ContinueOnError.IsPresent
+        };
     }
 
     private EventFilter ExpandProviderPatterns(

@@ -10,7 +10,7 @@ public class KerberosTGTRequest : EventRuleBase
     /// <inheritdoc />
     public override string LogName => "Security";
     /// <inheritdoc />
-    public override NamedEvents NamedEvent => NamedEvents.KerberosTGTRequest;
+    public override EventType Type => EventType.KerberosTGTRequest;
 
     /// <summary>Checks whether the supplied event originates from the security auditing provider.</summary>
     public override bool CanHandle(EventObject eventObject)
@@ -65,7 +65,7 @@ public class KerberosTGTRequest : EventRuleBase
     public KerberosTGTRequest(EventObject eventObject) : base(eventObject)
     {
         SourceEvent = eventObject;
-        NamedEventName = "KerberosTGTRequest";
+        TypeName = "KerberosTGTRequest";
         Computer = SourceEvent.ComputerName;
         Action = SourceEvent.MessageSubject;
         AccountName = SourceEvent.GetTargetAccountOrEmpty();

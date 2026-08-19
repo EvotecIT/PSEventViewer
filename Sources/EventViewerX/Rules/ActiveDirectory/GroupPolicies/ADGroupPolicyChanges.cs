@@ -31,7 +31,7 @@ public class ADGroupPolicyChanges : EventRuleBase {
     /// <inheritdoc />
     public override string LogName => "Security";
     /// <inheritdoc />
-    public override NamedEvents NamedEvent => NamedEvents.ADGroupPolicyChanges;
+    public override EventType Type => EventType.ADGroupPolicyChanges;
 
     /// <summary>Handles groupPolicyContainer or container objects in the Security log.</summary>
     public override bool CanHandle(EventObject eventObject) {
@@ -44,7 +44,7 @@ public class ADGroupPolicyChanges : EventRuleBase {
     /// <summary>Initialises a group policy change wrapper from an event record.</summary>
     public ADGroupPolicyChanges(EventObject eventObject) : base(eventObject) {
         SourceEvent = eventObject;
-        NamedEventName = "ADGroupPolicyChanges";
+        TypeName = "ADGroupPolicyChanges";
         Computer = SourceEvent.ComputerName;
         Action = SourceEvent.MessageSubject;
         ObjectClass = SourceEvent.GetValueFromDataDictionary("ObjectClass");

@@ -43,6 +43,51 @@ Describe 'Start-EVXWatcher - Parameter validation' {
         $sets | Should -Contain 'FilterHashtable'
     }
 
+    It 'lets a built-in Type own its source log and uses the optimized default read mode' {
+        $Command = Get-Command Start-EVXWatcher
+        $TypeSet = $Command.ParameterSets | Where-Object Name -EQ 'Type'
+        $TypeSet.Parameters.Name | Should -Not -Contain 'LogName'
+        $TypeSet.Parameters.Name | Should -Not -Contain 'Staging'
+
+        $Watcher = Start-EVXWatcher -Type OSStartup -Action {}
+        try {
+            $Watcher.LogName | Should -Be 'System'
+            $Watcher.SubscriptionQuery.ReadMode.ToString() |
+                Should -Be 'StructuredDataAndMessage'
+        } finally {
+            Stop-EVXWatcher -Id $Watcher.Id -ErrorAction SilentlyContinue
+        }
+    }
+
+    It 'lets a custom definition own its source log, provider, and event IDs' {
+        $DefinitionPath = Join-Path $TestDrive 'service-change.json'
+        @{
+            Name = 'ServiceStartTypeChange'
+            Sources = @(@{
+                    LogName = 'System'
+                    EventIds = @(7040)
+                    ProviderNames = @('Service Control Manager')
+                })
+            Fields = @(@{
+                    Name = 'ServiceName'
+                    Source = 'Data'
+                    SourceName = 'param1'
+                })
+        } | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $DefinitionPath -Encoding UTF8
+
+        $Watcher = Start-EVXWatcher -Definition $DefinitionPath -Action {}
+        try {
+            $Watcher.LogName | Should -Be 'System'
+            $Watcher.Types.Count | Should -Be 0
+            $Watcher.SubscriptionQuery.XPath | Should -Match 'EventID=7040'
+            $Watcher.SubscriptionQuery.XPath | Should -Match 'Service Control Manager'
+            $Watcher.SubscriptionQuery.ReadMode.ToString() |
+                Should -Be 'StructuredDataAndMessage'
+        } finally {
+            Stop-EVXWatcher -Id $Watcher.Id -ErrorAction SilentlyContinue
+        }
+    }
+
     It 'requires bookmark start semantics' {
         {
             Start-EVXWatcher -LogName System -FilterXPath '*' -BookmarkXml '<BookmarkList />' -Action {}
@@ -214,7 +259,7 @@ Describe 'Start-EVXWatcher - PowerShell event dispatch' {
         $ModulePath = (Get-Command -Name Start-EVXWatcher -CommandType Cmdlet).Module.Path
         $ExternalIds = [Collections.Generic.List[int]]::new()
         $ExternalIds.Add(1)
-        $ExternalNamedEvents = [Collections.Generic.List[EventViewerX.NamedEvents]]::new()
+        $ExternalNamedEvents = [Collections.Generic.List[EventViewerX.EventType]]::new()
         $ExternalAction = [Action[EventViewerX.EventObject]] { param($EventObject) }
         $ExternalWatcher = [EventViewerX.WatcherManager]::StartWatcher(
             ('EventViewerX.External.' + [Guid]::NewGuid().ToString('N')),
@@ -312,7 +357,7 @@ Describe 'Start-EVXWatcher - PowerShell event dispatch' {
         $ActiveOwner = $Begin.Invoke($null, @($RunspaceId))
         $Ids = [Collections.Generic.List[int]]::new()
         $Ids.Add(1)
-        $NamedEvents = [Collections.Generic.List[EventViewerX.NamedEvents]]::new()
+        $NamedEvents = [Collections.Generic.List[EventViewerX.EventType]]::new()
         $Action = [Action[EventViewerX.EventObject]] { param($EventObject) }
         $Watcher = [EventViewerX.WatcherManager]::StartWatcher(
             ('PSEventViewer.OwnerIsolation.' + [Guid]::NewGuid().ToString('N')),

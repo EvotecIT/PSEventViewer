@@ -30,6 +30,7 @@
 
     <ItemGroup>
         <ProjectReference Include="..\EventViewerX\EventViewerX.csproj" />
+        <ProjectReference Include="..\EventViewerX.Reporting\EventViewerX.Reporting.csproj" />
     </ItemGroup>
 
 </Project>

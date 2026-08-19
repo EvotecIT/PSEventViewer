@@ -13,7 +13,7 @@ public class ADGroupEnumeration : EventRuleBase {
     public override string LogName => "Security";
 
     /// <inheritdoc />
-    public override NamedEvents NamedEvent => NamedEvents.ADGroupEnumeration;
+    public override EventType Type => EventType.ADGroupEnumeration;
 
     /// <summary>Accepts matching enumeration events without additional filtering.</summary>
     public override bool CanHandle(EventObject eventObject) {
@@ -39,7 +39,7 @@ public class ADGroupEnumeration : EventRuleBase {
     /// <summary>Initialises a group enumeration wrapper from an event record.</summary>
     public ADGroupEnumeration(EventObject eventObject) : base(eventObject) {
         SourceEvent = eventObject;
-        NamedEventName = "ADGroupEnumeration";
+        TypeName = "ADGroupEnumeration";
 
         Computer = SourceEvent.ComputerName;
         Action = SourceEvent.MessageSubject;

@@ -10,7 +10,7 @@ public class KerberosServiceTicket : EventRuleBase
     /// <inheritdoc />
     public override string LogName => "Security";
     /// <inheritdoc />
-    public override NamedEvents NamedEvent => NamedEvents.KerberosServiceTicket;
+    public override EventType Type => EventType.KerberosServiceTicket;
 
     /// <summary>Accepts Kerberos service ticket (TGS) events from the auditing provider.</summary>
     public override bool CanHandle(EventObject eventObject)
@@ -44,7 +44,7 @@ public class KerberosServiceTicket : EventRuleBase
     public KerberosServiceTicket(EventObject eventObject) : base(eventObject)
     {
         SourceEvent = eventObject;
-        NamedEventName = "KerberosServiceTicket";
+        TypeName = "KerberosServiceTicket";
         Computer = SourceEvent.ComputerName;
         Action = SourceEvent.MessageSubject;
         AccountName = SourceEvent.GetTargetAccountOrEmpty();

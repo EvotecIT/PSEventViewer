@@ -11,7 +11,7 @@ public class SqlDatabaseCreated : EventRuleBase {
     /// <inheritdoc />
     public override string LogName => "Application";
     /// <inheritdoc />
-    public override NamedEvents NamedEvent => NamedEvents.SqlDatabaseCreated;
+    public override EventType Type => EventType.SqlDatabaseCreated;
 
     /// <summary>Accepts events based solely on ID/log matching.</summary>
     public override bool CanHandle(EventObject eventObject) {
@@ -29,7 +29,7 @@ public class SqlDatabaseCreated : EventRuleBase {
     /// <summary>Initialises a SQL database creation wrapper from an event record.</summary>
     public SqlDatabaseCreated(EventObject eventObject) : base(eventObject) {
         SourceEvent = eventObject;
-        NamedEventName = "SqlDatabaseCreated";
+        TypeName = "SqlDatabaseCreated";
         Computer = SourceEvent.ComputerName;
         DatabaseName = SourceEvent.GetValueFromDataDictionary("Database", "Database Name");
         if (string.IsNullOrEmpty(DatabaseName)) {

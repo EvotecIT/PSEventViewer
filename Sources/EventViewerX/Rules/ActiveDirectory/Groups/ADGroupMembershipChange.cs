@@ -27,7 +27,7 @@ public class ADGroupMembershipChange : EventRuleBase {
     public override string LogName => "Security";
 
     /// <inheritdoc />
-    public override NamedEvents NamedEvent => NamedEvents.ADGroupMembershipChange;
+    public override EventType Type => EventType.ADGroupMembershipChange;
 
     /// <summary>Handles all membership add/remove events in the Security log.</summary>
     public override bool CanHandle(EventObject eventObject) {
@@ -56,7 +56,7 @@ public class ADGroupMembershipChange : EventRuleBase {
     /// <summary>Initialises a group membership change wrapper from an event record.</summary>
     public ADGroupMembershipChange(EventObject eventObject) : base(eventObject) {
         SourceEvent = eventObject;
-        NamedEventName = "ADGroupMembershipChange";
+        TypeName = "ADGroupMembershipChange";
 
         Computer = SourceEvent.ComputerName;
         Action = SourceEvent.MessageSubject;

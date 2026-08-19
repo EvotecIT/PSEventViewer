@@ -14,7 +14,7 @@ public class AADSyncPasswordHashSyncStatus : EventRuleBase
     /// <inheritdoc />
     public override string LogName => "Application";
     /// <inheritdoc />
-    public override NamedEvents NamedEvent => NamedEvents.AADSyncPasswordHashSyncStatus;
+    public override EventType Type => EventType.AADSyncPasswordHashSyncStatus;
 
     /// <summary>Accepts Directory Synchronization password hash sync heartbeat events.</summary>
     /// <param name="eventObject">Event to evaluate.</param>
@@ -45,7 +45,7 @@ public class AADSyncPasswordHashSyncStatus : EventRuleBase
     public AADSyncPasswordHashSyncStatus(EventObject eventObject) : base(eventObject)
     {
         SourceEvent = eventObject;
-        NamedEventName = "AADSyncPasswordHashSyncStatus";
+        TypeName = "AADSyncPasswordHashSyncStatus";
         Computer = SourceEvent.ComputerName;
         When = SourceEvent.TimeCreated;
 

@@ -10,7 +10,7 @@ public class ADUserPrivilegeUse : EventRuleBase {
     /// <inheritdoc />
     public override string LogName => "Security";
     /// <inheritdoc />
-    public override NamedEvents NamedEvent => NamedEvents.ADUserPrivilegeUse;
+    public override EventType Type => EventType.ADUserPrivilegeUse;
 
     /// <summary>Accepts special-privilege logon events (4672).</summary>
     public override bool CanHandle(EventObject eventObject) {
@@ -49,7 +49,7 @@ public class ADUserPrivilegeUse : EventRuleBase {
     /// <summary>Initialises a privilege-assignment wrapper from an event record.</summary>
     public ADUserPrivilegeUse(EventObject eventObject) : base(eventObject) {
         SourceEvent = eventObject;
-        NamedEventName = "ADUserPrivilegeUse";
+        TypeName = "ADUserPrivilegeUse";
 
         Computer = SourceEvent.ComputerName;
         Action = SourceEvent.MessageSubject;
@@ -59,7 +59,7 @@ public class ADUserPrivilegeUse : EventRuleBase {
 
         var privilegeList = SourceEvent.GetDataValueOrEmpty(KnownEventField.PrivilegeList);
         if (!string.IsNullOrEmpty(privilegeList)) {
-            Privileges = privilegeList.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries).ToList();
+            Privileges = privilegeList.Split(new[] { ' ', '\t', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries).ToList();
             PrivilegesTranslated = Privileges.Select(EventsHelper.TranslatePrivilege).ToList();
         } else {
             Privileges = new List<string>();

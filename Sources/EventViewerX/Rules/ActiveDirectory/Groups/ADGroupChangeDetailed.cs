@@ -42,7 +42,7 @@ public class ADGroupChangeDetailed : EventRuleBase {
     public override string LogName => "Security";
 
     /// <inheritdoc />
-    public override NamedEvents NamedEvent => NamedEvents.ADGroupChangeDetailed;
+    public override EventType Type => EventType.ADGroupChangeDetailed;
 
     /// <summary>Processes only directory object events where the object class is <c>group</c>.</summary>
     public override bool CanHandle(EventObject eventObject) {
@@ -54,7 +54,7 @@ public class ADGroupChangeDetailed : EventRuleBase {
     /// <summary>Initialises a detailed group change wrapper from an event record.</summary>
     public ADGroupChangeDetailed(EventObject eventObject) : base(eventObject) {
         SourceEvent = eventObject;
-        NamedEventName = "ADGroupChangeDetailed";
+        TypeName = "ADGroupChangeDetailed";
 
         Computer = SourceEvent.ComputerName;
         Action = SourceEvent.MessageSubject;

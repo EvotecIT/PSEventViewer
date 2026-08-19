@@ -10,7 +10,7 @@ public class NetworkPromiscuousMode : EventRuleBase {
     /// <inheritdoc />
     public override string LogName => "System";
     /// <inheritdoc />
-    public override NamedEvents NamedEvent => NamedEvents.NetworkPromiscuousMode;
+    public override EventType Type => EventType.NetworkPromiscuousMode;
 
     /// <summary>Accepts NDIS provider events signalling promiscuous mode toggles.</summary>
     public override bool CanHandle(EventObject eventObject) {
@@ -28,7 +28,7 @@ public class NetworkPromiscuousMode : EventRuleBase {
     /// <summary>Initialises a promiscuous-mode event wrapper from an event record.</summary>
     public NetworkPromiscuousMode(EventObject eventObject) : base(eventObject) {
         SourceEvent = eventObject;
-        NamedEventName = "NetworkPromiscuousMode";
+        TypeName = "NetworkPromiscuousMode";
         Computer = SourceEvent.ComputerName;
         Adapter = SourceEvent.GetValueFromDataDictionary("AdapterName", "Name");
         When = SourceEvent.TimeCreated;

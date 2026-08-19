@@ -13,7 +13,7 @@ public class AADSyncCycleStage : EventRuleBase
     /// <inheritdoc />
     public override string LogName => "Application";
     /// <inheritdoc />
-    public override NamedEvents NamedEvent => NamedEvents.AADSyncCycleStage;
+    public override EventType Type => EventType.AADSyncCycleStage;
 
     /// <summary>Accepts Directory Synchronization provider events.</summary>
     /// <param name="eventObject">Event to evaluate.</param>
@@ -43,7 +43,7 @@ public class AADSyncCycleStage : EventRuleBase
     public AADSyncCycleStage(EventObject eventObject) : base(eventObject)
     {
         SourceEvent = eventObject;
-        NamedEventName = "AADSyncCycleStage";
+        TypeName = "AADSyncCycleStage";
         Computer = SourceEvent.ComputerName;
         When = SourceEvent.TimeCreated;
 

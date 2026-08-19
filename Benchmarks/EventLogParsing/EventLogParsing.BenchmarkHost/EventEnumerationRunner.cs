@@ -3,6 +3,7 @@ using System.Diagnostics.Eventing.Reader;
 using System.Globalization;
 using System.Text;
 using EventViewerX;
+using EventViewerX.Reporting;
 
 namespace EventLogParsing.BenchmarkHost;
 
@@ -43,7 +44,11 @@ internal static class EventEnumerationRunner {
         var stopwatch = Stopwatch.StartNew();
         ExportMeasurement? exportResult = null;
 
-        if (string.Equals(options.Engine, "eventviewerxexport", StringComparison.OrdinalIgnoreCase)) {
+        if (string.Equals(options.Engine, "eventviewerxreport", StringComparison.OrdinalIgnoreCase)) {
+            exportResult = RunEventViewerXReport(options, accumulator);
+        } else if (string.Equals(options.Engine, "eventviewerxtyped", StringComparison.OrdinalIgnoreCase)) {
+            RunEventViewerXTyped(options, accumulator);
+        } else if (string.Equals(options.Engine, "eventviewerxexport", StringComparison.OrdinalIgnoreCase)) {
             exportResult = RunEventViewerXExport(options);
         } else if (string.Equals(options.Engine, "eventviewerx", StringComparison.OrdinalIgnoreCase)) {
             RunEventViewerX(options, accumulator);
@@ -103,6 +108,92 @@ internal static class EventEnumerationRunner {
         foreach (EventObject eventObject in EventLogEngine.ReadFile(query)) {
             accumulator.Add(eventObject, options.ReadMode);
         }
+    }
+
+    private static void RunEventViewerXTyped(BenchmarkOptions options, EventAccumulator accumulator) {
+        foreach (EventTypeRecord record in ReadTypedFileAsync(options).GetAwaiter().GetResult()) {
+            accumulator.Add(EventReportEngine.CreateRow(record));
+        }
+    }
+
+    private static ExportMeasurement RunEventViewerXReport(BenchmarkOptions options, EventAccumulator accumulator) {
+        EventReport report;
+        if (options.Types.Length > 0) {
+            EventReportRequest request = EventReportRequest.ForTypes(options.Types);
+            request.Paths = new[] { options.Path };
+            request.MaxEvents = options.MaxEvents;
+            request.Oldest = true;
+            request.Title = "EventViewerX benchmark";
+            report = EventReportEngine.QueryAsync(request).GetAwaiter().GetResult();
+        } else {
+            var request = EventReportRequest.ForFiles(options.Path);
+            request.MaxEvents = options.MaxEvents;
+            request.Oldest = true;
+            request.Title = "EventViewerX benchmark";
+            report = EventReportEngine.QueryAsync(request).GetAwaiter().GetResult();
+        }
+        foreach (EventReportRow row in report.Rows) {
+            accumulator.Add(row);
+        }
+        string output = options.OutputPath!;
+        string? directory = Path.GetDirectoryName(output);
+        if (!string.IsNullOrWhiteSpace(directory)) {
+            Directory.CreateDirectory(directory);
+        }
+        long bytes = 0;
+        switch (options.ReportFormat) {
+            case "Html":
+                EventReportHtmlRenderer.Save(report, output);
+                bytes = new FileInfo(output).Length;
+                break;
+            case "Excel":
+                EventReportExcelRenderer.Save(report, output);
+                bytes = new FileInfo(output).Length;
+                break;
+            case "Email": {
+                EventEmailPackage email = EventReportEmailRenderer.RenderAsync(report).GetAwaiter().GetResult();
+                File.WriteAllText(output, email.Html, new UTF8Encoding(false));
+                string plainTextPath = Path.ChangeExtension(output, ".txt");
+                File.WriteAllText(plainTextPath, email.PlainText, new UTF8Encoding(false));
+                bytes = new FileInfo(output).Length + new FileInfo(plainTextPath).Length;
+                break;
+            }
+            case "All": {
+                string htmlPath = Path.ChangeExtension(output, ".html");
+                string excelPath = Path.ChangeExtension(output, ".xlsx");
+                string emailPath = Path.ChangeExtension(output, ".email.html");
+                EventReportHtmlRenderer.Save(report, htmlPath);
+                EventReportExcelRenderer.Save(report, excelPath);
+                EventEmailPackage email = EventReportEmailRenderer.RenderAsync(report).GetAwaiter().GetResult();
+                File.WriteAllText(emailPath, email.Html, new UTF8Encoding(false));
+                string plainTextPath = Path.ChangeExtension(output, ".email.txt");
+                File.WriteAllText(plainTextPath, email.PlainText, new UTF8Encoding(false));
+                bytes = new[] { htmlPath, excelPath, emailPath, plainTextPath }.Sum(static path => new FileInfo(path).Length);
+                break;
+            }
+            default:
+                throw new InvalidOperationException($"Unsupported report format '{options.ReportFormat}'.");
+        }
+        return new ExportMeasurement(output, report.Rows.Count, bytes, null);
+    }
+
+    private static async Task<IReadOnlyList<EventTypeRecord>> ReadTypedFileAsync(BenchmarkOptions options) {
+        EventType[] types = options.Types.Length > 0
+            ? options.Types
+            : EventTypeCatalog.GetDefinitions().Where(static definition => !definition.IsComposite)
+                .Select(static definition => definition.Type).ToArray();
+        var query = new EventTypeQuery(types) {
+            Paths = new[] { options.Path },
+            MaxEvents = options.MaxEvents,
+            Oldest = true,
+            ReadMode = EventReadMode.StructuredDataAndMessage,
+            MessageCulture = options.MessageCulture
+        };
+        var result = new List<EventTypeRecord>();
+        await foreach (EventTypeRecord record in EventTypeEngine.ReadAsync(query)) {
+            result.Add(record);
+        }
+        return result;
     }
 
     private static ExportMeasurement RunEventViewerXExport(BenchmarkOptions options) {

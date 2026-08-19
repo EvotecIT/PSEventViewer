@@ -10,7 +10,7 @@ public class KerberosPolicyChange : EventRuleBase
     /// <inheritdoc />
     public override string LogName => "Security";
     /// <inheritdoc />
-    public override NamedEvents NamedEvent => NamedEvents.KerberosPolicyChange;
+    public override EventType Type => EventType.KerberosPolicyChange;
 
     /// <summary>Accepts Kerberos policy change events.</summary>
     public override bool CanHandle(EventObject eventObject)
@@ -40,7 +40,7 @@ public class KerberosPolicyChange : EventRuleBase
     public KerberosPolicyChange(EventObject eventObject) : base(eventObject)
     {
         SourceEvent = eventObject;
-        NamedEventName = "KerberosPolicyChange";
+        TypeName = "KerberosPolicyChange";
         Computer = SourceEvent.ComputerName;
         Who = SourceEvent.GetSubjectAccountOrEmpty();
         PolicyChanges = SourceEvent.GetValueFromDataDictionary("KerberosPolicyChange");

@@ -31,7 +31,7 @@ public class ADComputerChangeDetailed : EventRuleBase {
     /// <inheritdoc />
     public override string LogName => "Security";
     /// <inheritdoc />
-    public override NamedEvents NamedEvent => NamedEvents.ADComputerChangeDetailed;
+    public override EventType Type => EventType.ADComputerChangeDetailed;
 
     /// <summary>
     /// Determines whether the event represents a computer object change.
@@ -47,7 +47,7 @@ public class ADComputerChangeDetailed : EventRuleBase {
     /// <summary>
     /// Creates a detailed computer change wrapper when the event matches, otherwise returns <c>null</c>.
     /// </summary>
-    public static NamedEventRecord? Create(EventObject eventObject) {
+    public static EventTypeRecord? Create(EventObject eventObject) {
         var rule = new ADComputerChangeDetailed(eventObject);
         return rule.CanHandle(eventObject) ? rule : null;
     }
@@ -59,7 +59,7 @@ public class ADComputerChangeDetailed : EventRuleBase {
     public ADComputerChangeDetailed(EventObject eventObject) : base(eventObject) {
         // common fields
         SourceEvent = eventObject;
-        NamedEventName = "ADComputerChangeDetailed";
+        TypeName = "ADComputerChangeDetailed";
         Computer = SourceEvent.ComputerName;
         ObjectClass = SourceEvent.GetValueFromDataDictionary("ObjectClass");
         Action = SourceEvent.MessageSubject;

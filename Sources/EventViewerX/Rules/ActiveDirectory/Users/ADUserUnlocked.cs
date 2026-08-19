@@ -9,7 +9,7 @@ public class ADUserUnlocked : EventRuleBase {
     /// <inheritdoc />
     public override string LogName => "Security";
     /// <inheritdoc />
-    public override NamedEvents NamedEvent => NamedEvents.ADUserUnlocked;
+    public override EventType Type => EventType.ADUserUnlocked;
 
     /// <summary>Accepts account unlock events (4767).</summary>
     public override bool CanHandle(EventObject eventObject) {
@@ -31,7 +31,7 @@ public class ADUserUnlocked : EventRuleBase {
     /// <summary>Initialises an account unlock wrapper from an event record.</summary>
     public ADUserUnlocked(EventObject eventObject) : base(eventObject) {
         SourceEvent = eventObject;
-        NamedEventName = "ADUserUnlocked";
+        TypeName = "ADUserUnlocked";
 
         Computer = SourceEvent.ComputerName;
         Action = SourceEvent.MessageSubject;

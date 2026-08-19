@@ -26,6 +26,12 @@ public sealed class EventLogQueryOptions {
     /// <summary>Maximum merged records. Zero streams every match.</summary>
     public long MaxEvents { get; set; }
 
+    /// <summary>
+    /// Maximum native records inspected by a managed compatibility selector. Zero is unlimited.
+    /// Native selective queries do not need this secondary bound.
+    /// </summary>
+    public long MaxEventsScanned { get; set; }
+
     /// <summary>Materializes a native bookmark for every result.</summary>
     public bool IncludeBookmark { get; set; }
 

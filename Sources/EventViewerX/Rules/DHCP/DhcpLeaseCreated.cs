@@ -10,7 +10,7 @@ public class DhcpLeaseCreated : EventRuleBase {
     /// <inheritdoc />
     public override string LogName => "Microsoft-Windows-DHCP Server/Operational";
     /// <inheritdoc />
-    public override NamedEvents NamedEvent => NamedEvents.DhcpLeaseCreated;
+    public override EventType Type => EventType.DhcpLeaseCreated;
 
     /// <summary>Accepts DHCP lease events from the DHCP Server provider.</summary>
     public override bool CanHandle(EventObject eventObject) {
@@ -40,7 +40,7 @@ public class DhcpLeaseCreated : EventRuleBase {
     /// <summary>Initialises a DHCP lease creation wrapper from an event record.</summary>
     public DhcpLeaseCreated(EventObject eventObject) : base(eventObject) {
         SourceEvent = eventObject;
-        NamedEventName = "DhcpLeaseCreated";
+        TypeName = "DhcpLeaseCreated";
         Computer = SourceEvent.ComputerName;
         IPAddress = SourceEvent.GetValueFromDataDictionary(KnownEventField.IpAddress, KnownEventField.ClientIp);
         MacAddress = SourceEvent.GetValueFromDataDictionary(KnownEventField.HwAddress, KnownEventField.MacAddress);

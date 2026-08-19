@@ -30,7 +30,7 @@ public class ADGroupPolicyEdits : EventRuleBase {
     /// <inheritdoc />
     public override string LogName => "Security";
     /// <inheritdoc />
-    public override NamedEvents NamedEvent => NamedEvents.ADGroupPolicyEdits;
+    public override EventType Type => EventType.ADGroupPolicyEdits;
 
     /// <summary>Accepts versionNumber attribute edits on groupPolicyContainer objects.</summary>
     public override bool CanHandle(EventObject eventObject) {
@@ -48,7 +48,7 @@ public class ADGroupPolicyEdits : EventRuleBase {
     /// <summary>Initialises a GPO edit wrapper from an event record.</summary>
     public ADGroupPolicyEdits(EventObject eventObject) : base(eventObject) {
         SourceEvent = eventObject;
-        NamedEventName = "ADGroupPolicyEdits";
+        TypeName = "ADGroupPolicyEdits";
         Computer = SourceEvent.ComputerName;
         Action = SourceEvent.MessageSubject;
         ObjectClass = SourceEvent.GetValueFromDataDictionary("ObjectClass");

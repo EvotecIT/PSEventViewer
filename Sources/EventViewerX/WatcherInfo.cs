@@ -19,7 +19,7 @@ namespace EventViewerX {
             string machineName,
             string logName,
             List<int> eventIds,
-            List<NamedEvents> namedEvents,
+            List<EventType> namedEvents,
             Action<EventObject> action,
             bool staging,
             bool stopOnMatch,
@@ -44,7 +44,7 @@ namespace EventViewerX {
             string machineName,
             string logName,
             List<int> eventIds,
-            List<NamedEvents> namedEvents,
+            List<EventType> namedEvents,
             Action<EventObject> action,
             bool staging,
             bool stopOnMatch,
@@ -57,7 +57,7 @@ namespace EventViewerX {
             MachineName = machineName;
             LogName = logName;
             EventIds = eventIds.ToArray();
-            NamedEvents = namedEvents.ToArray();
+            Types = namedEvents.ToArray();
             Action = action;
             Staging = staging;
             StopOnMatch = stopOnMatch;
@@ -82,7 +82,7 @@ namespace EventViewerX {
             string machineName,
             string logName,
             List<int> eventIds,
-            List<NamedEvents> namedEvents,
+            List<EventType> namedEvents,
             Action<EventObject> action,
             bool staging,
             bool stopOnMatch,
@@ -145,8 +145,8 @@ namespace EventViewerX {
         public string LogName { get; }
         /// <summary>Event IDs the watcher listens for.</summary>
         public IReadOnlyList<int> EventIds { get; }
-        /// <summary>NamedEvents packs that were expanded into <see cref="EventIds"/>.</summary>
-        public IReadOnlyList<NamedEvents> NamedEvents { get; }
+        /// <summary>EventType packs that were expanded into <see cref="EventIds"/>.</summary>
+        public IReadOnlyList<EventType> Types { get; }
         /// <summary>Callback invoked when a matching event arrives.</summary>
         public Action<EventObject> Action { get; }
         internal string? ActionIdentity { get; set; }

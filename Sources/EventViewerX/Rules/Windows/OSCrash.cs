@@ -10,7 +10,7 @@ public class OSCrash : EventRuleBase {
     /// <inheritdoc />
     public override string LogName => "System";
     /// <inheritdoc />
-    public override NamedEvents NamedEvent => NamedEvents.OSCrash;
+    public override EventType Type => EventType.OSCrash;
 
     /// <summary>Accepts unexpected shutdown events from the EventLog provider.</summary>
     public override bool CanHandle(EventObject eventObject) {
@@ -37,7 +37,7 @@ public class OSCrash : EventRuleBase {
     public OSCrash(EventObject eventObject) : base(eventObject) {
         SourceEvent = eventObject;
 
-        NamedEventName = "OSCrash";
+        TypeName = "OSCrash";
         Computer = SourceEvent.ComputerName;
         Action = SourceEvent.GetValueFromDataDictionary("EventAction");
         ObjectAffected = SourceEvent.MachineName;

@@ -11,7 +11,7 @@ public class ADUserCreateChange : EventRuleBase {
     public override string LogName => "Security";
 
     /// <inheritdoc />
-    public override NamedEvents NamedEvent => NamedEvents.ADUserCreateChange;
+    public override EventType Type => EventType.ADUserCreateChange;
 
     /// <summary>Accepts matching create/change user events without extra filtering.</summary>
     public override bool CanHandle(EventObject eventObject) {
@@ -70,7 +70,7 @@ public class ADUserCreateChange : EventRuleBase {
         // main object initialization
         SourceEvent = eventObject;
         // dedicated properties initialization
-        NamedEventName = "ADUserChange";
+        TypeName = "ADUserChange";
         Computer = SourceEvent.ComputerName;
         Action = SourceEvent.MessageSubject;
         UserAffected = SourceEvent.GetTargetAccountOrEmpty();

@@ -10,7 +10,7 @@ public class VmShutdown : EventRuleBase {
     /// <inheritdoc />
     public override string LogName => "Microsoft-Windows-Hyper-V-Worker/Operational";
     /// <inheritdoc />
-    public override NamedEvents NamedEvent => NamedEvents.HyperVVirtualMachineShutdown;
+    public override EventType Type => EventType.HyperVVirtualMachineShutdown;
 
     /// <summary>Accepts Hyper-V VM shutdown events.</summary>
     public override bool CanHandle(EventObject eventObject) {
@@ -29,7 +29,7 @@ public class VmShutdown : EventRuleBase {
     /// <summary>Initialises a Hyper-V VM shutdown wrapper from an event record.</summary>
     public VmShutdown(EventObject eventObject) : base(eventObject) {
         SourceEvent = eventObject;
-        NamedEventName = "HyperVVirtualMachineShutdown";
+        TypeName = "HyperVVirtualMachineShutdown";
         Computer = SourceEvent.ComputerName;
         VmName = SourceEvent.GetValueFromDataDictionary("VmName");
         if (string.IsNullOrEmpty(VmName)) {

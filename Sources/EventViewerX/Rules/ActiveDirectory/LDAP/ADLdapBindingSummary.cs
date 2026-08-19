@@ -10,7 +10,7 @@ public class ADLdapBindingSummary : EventRuleBase {
     /// <inheritdoc />
     public override string LogName => "Directory Service";
     /// <inheritdoc />
-    public override NamedEvents NamedEvent => NamedEvents.ADLdapBindingSummary;
+    public override EventType Type => EventType.ADLdapBindingSummary;
 
     /// <summary>Accepts events based solely on ID/log matching.</summary>
     public override bool CanHandle(EventObject eventObject) {
@@ -36,7 +36,7 @@ public class ADLdapBindingSummary : EventRuleBase {
     public ADLdapBindingSummary(EventObject eventObject) : base(eventObject) {
         SourceEvent = eventObject;
 
-        NamedEventName = "ADLdapBindingSummary";
+        TypeName = "ADLdapBindingSummary";
         Computer = SourceEvent.ComputerName;
         Action = SourceEvent.MessageSubject;
         SimpleBindsWithoutTls = RuleHelpers.GetInt(SourceEvent, "NoNameA0");

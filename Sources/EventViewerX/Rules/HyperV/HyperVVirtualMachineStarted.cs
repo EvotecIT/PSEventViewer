@@ -10,7 +10,7 @@ public class HyperVVirtualMachineStarted : EventRuleBase {
     /// <inheritdoc />
     public override string LogName => "Microsoft-Windows-Hyper-V-VMMS/Admin";
     /// <inheritdoc />
-    public override NamedEvents NamedEvent => NamedEvents.HyperVVirtualMachineStarted;
+    public override EventType Type => EventType.HyperVVirtualMachineStarted;
 
     /// <summary>Accepts Hyper-V VM start events.</summary>
     public override bool CanHandle(EventObject eventObject) {
@@ -29,7 +29,7 @@ public class HyperVVirtualMachineStarted : EventRuleBase {
     /// <summary>Initialises a Hyper-V VM start wrapper from an event record.</summary>
     public HyperVVirtualMachineStarted(EventObject eventObject) : base(eventObject) {
         SourceEvent = eventObject;
-        NamedEventName = "HyperVVirtualMachineStarted";
+        TypeName = "HyperVVirtualMachineStarted";
         Computer = SourceEvent.ComputerName;
         VirtualMachine = SourceEvent.GetValueFromDataDictionary("Name", "VMName");
         VirtualMachineId = SourceEvent.GetValueFromDataDictionary("VMId", "VirtualMachineId");

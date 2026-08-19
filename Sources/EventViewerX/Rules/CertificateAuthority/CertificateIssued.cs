@@ -12,7 +12,7 @@ public class CertificateIssued : EventRuleBase
     /// <inheritdoc />
     public override string LogName => "Security";
     /// <inheritdoc />
-    public override NamedEvents NamedEvent => NamedEvents.CertificateIssued;
+    public override EventType Type => EventType.CertificateIssued;
 
     /// <summary>Accepts certificate request/issue events from the CA.</summary>
     public override bool CanHandle(EventObject eventObject)
@@ -38,7 +38,7 @@ public class CertificateIssued : EventRuleBase
     public CertificateIssued(EventObject eventObject) : base(eventObject)
     {
         SourceEvent = eventObject;
-        NamedEventName = "CertificateIssued";
+        TypeName = "CertificateIssued";
         Computer = SourceEvent.ComputerName;
         Action = SourceEvent.MessageSubject;
         CertificateTemplate = DecodeHex(SourceEvent.GetValueFromDataDictionary("CertificateTemplate", "CertificateTemplateOid"));

@@ -111,7 +111,7 @@ public partial class EventObject {
             ? LogName
             : containerLog;
         GatheredFrom = string.IsNullOrEmpty(QueriedMachine) ? Environment.MachineName : QueriedMachine;
-        GatheredLogName = LogName;
+        GatheredLogName = ContainerLog;
     }
 
     internal EventObject(
@@ -229,8 +229,20 @@ public partial class EventObject {
         string queriedMachine,
         string containerLog)
         : this(
+            full,
+            queriedMachine,
+            containerLog,
+            EventReadMode.Full) {
+    }
+
+    internal EventObject(
+        NativeEventFull full,
+        string queriedMachine,
+        string containerLog,
+        EventReadMode readMode)
+        : this(
             full.Message.Metadata,
-            EventReadMode.Full,
+            readMode,
             queriedMachine,
             containerLog,
             full.Message.Message,
@@ -245,7 +257,15 @@ public partial class EventObject {
             full.Message.KeywordDisplayNames,
             full.Structured.Xml,
             parsePayload: true,
-            includeAttachments: true) {
+            includeAttachments: readMode == EventReadMode.Full) {
+
+        if (readMode != EventReadMode.Full &&
+            readMode != EventReadMode.StructuredDataAndMessage) {
+            throw new ArgumentOutOfRangeException(
+                nameof(readMode),
+                readMode,
+                "A full native projection requires Full or StructuredDataAndMessage mode.");
+        }
     }
 
     private EventObject(
@@ -304,7 +324,7 @@ public partial class EventObject {
             ? LogName
             : containerLog;
         GatheredFrom = string.IsNullOrEmpty(QueriedMachine) ? Environment.MachineName : QueriedMachine;
-        GatheredLogName = LogName;
+        GatheredLogName = ContainerLog;
         XMLData = xml;
 
     }

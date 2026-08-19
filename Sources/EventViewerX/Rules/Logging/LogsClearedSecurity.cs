@@ -12,7 +12,7 @@ public class LogsClearedSecurity : EventRuleBase {
     /// <inheritdoc />
     public override string LogName => "Security";
     /// <inheritdoc />
-    public override NamedEvents NamedEvent => NamedEvents.LogsClearedSecurity;
+    public override EventType Type => EventType.LogsClearedSecurity;
 
     /// <summary>Verifies the event originates from the EventLog provider.</summary>
     public override bool CanHandle(EventObject eventObject) {
@@ -35,7 +35,7 @@ public class LogsClearedSecurity : EventRuleBase {
     public LogsClearedSecurity(EventObject eventObject) : base(eventObject) {
         SourceEvent = eventObject;
 
-        NamedEventName = "LogsClearedSecurity";
+        TypeName = "LogsClearedSecurity";
         Computer = SourceEvent.ComputerName;
         Action = SourceEvent.MessageSubject;
         BackupPath = SourceEvent.GetValueFromDataDictionary("BackupPath");

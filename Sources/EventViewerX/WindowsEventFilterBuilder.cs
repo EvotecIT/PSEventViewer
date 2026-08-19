@@ -8,7 +8,7 @@ public static partial class WindowsEventFilterBuilder {
         return System.Security.SecurityElement.Escape(value);
     }
 
-    private static string FormatXPathStringLiteral(string value, string parameterName) {
+    internal static string FormatXPathStringLiteral(string value, string parameterName) {
         if (value.IndexOf('\'') < 0) {
             return $"'{value}'";
         }

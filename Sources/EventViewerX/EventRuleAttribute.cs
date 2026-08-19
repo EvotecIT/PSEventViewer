@@ -12,8 +12,8 @@ public class EventRuleAttribute : Attribute {
     public List<int> EventIds { get; }
     /// <summary>Name of the event log.</summary>
     public string LogName { get; }
-    /// <summary>Associated named event.</summary>
-    public NamedEvents NamedEvent { get; }
+    /// <summary>Associated event type.</summary>
+    public EventType Type { get; }
 
     /// <summary>
     /// Initializes a new instance of the attribute.
@@ -21,8 +21,8 @@ public class EventRuleAttribute : Attribute {
     /// <param name="namedEvent">Named event represented by the rule.</param>
     /// <param name="logName">Log name to watch.</param>
     /// <param name="eventIds">Event IDs handled by the rule.</param>
-    public EventRuleAttribute(NamedEvents namedEvent, string logName, params int[] eventIds) {
-        NamedEvent = namedEvent;
+    public EventRuleAttribute(EventType namedEvent, string logName, params int[] eventIds) {
+        Type = namedEvent;
         LogName = logName;
         EventIds = new List<int>(eventIds);
     }

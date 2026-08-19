@@ -14,6 +14,16 @@ namespace PSEventViewer;
 ///   <code>New-EVXCollectorSubscription -Name FailedLogons -SourceComputer DC01,DC02 -LogName Security -EventId 4625 | Set-EVXCollectorSubscription</code>
 ///   <para>Applies the typed definition transactionally and verifies the persisted Windows configuration.</para>
 /// </example>
+/// <example>
+///   <summary>Remove a collector subscription</summary>
+///   <code>Set-EVXCollectorSubscription -Name FailedLogons -Remove</code>
+///   <para>Deletes the local subscription through the inbox collector utility and verifies that it is absent.</para>
+/// </example>
+/// <example>
+///   <summary>Initialize the collector while applying a definition</summary>
+///   <code>$definition | Set-EVXCollectorSubscription -InitializeCollector -Confirm:$false</code>
+///   <para>Runs the inbox collector quick configuration, verifies readiness, and then transactionally applies the definition.</para>
+/// </example>
 [Cmdlet(
     VerbsCommon.Set,
     "EVXCollectorSubscription",
@@ -21,7 +31,9 @@ namespace PSEventViewer;
     ConfirmImpact = ConfirmImpact.High)]
 [OutputType(
     typeof(CollectorSubscriptionUpdateResult),
-    typeof(CollectorSubscriptionSnapshot))]
+    typeof(CollectorSubscriptionRemovalResult),
+    typeof(CollectorSubscriptionSnapshot),
+    typeof(CollectorReadinessStatus))]
 public sealed class CmdletSetEVXCollectorSubscription :
     PSCmdlet {
     private readonly CancellationTokenSource _stopping = new();
@@ -32,6 +44,11 @@ public sealed class CmdletSetEVXCollectorSubscription :
         Position = 0,
         ValueFromPipelineByPropertyName = true,
         ParameterSetName = "Enabled")]
+    [Parameter(
+        Mandatory = true,
+        Position = 0,
+        ValueFromPipelineByPropertyName = true,
+        ParameterSetName = "Remove")]
     [Alias("SubscriptionName")]
     public string Name { get; set; } =
         null!;
@@ -40,16 +57,44 @@ public sealed class CmdletSetEVXCollectorSubscription :
     [Parameter(Mandatory = true, ParameterSetName = "Enabled")]
     public bool Enabled { get; set; }
 
+    /// <summary>Removes the named local collector subscription.</summary>
+    [Parameter(Mandatory = true, ParameterSetName = "Remove")]
+    public SwitchParameter Remove { get; set; }
+
     /// <summary>Typed subscription definition produced by New-EVXCollectorSubscription.</summary>
     [Parameter(Mandatory = true, ValueFromPipeline = true, ParameterSetName = "Definition")]
     public CollectorSubscriptionDefinition? Definition { get; set; }
 
+    /// <summary>Runs the inbox WinRM and Windows Event Collector quick configuration and verifies readiness.</summary>
+    [Parameter(Mandatory = true, ParameterSetName = "Initialize")]
+    [Parameter(ParameterSetName = "Definition")]
+    public SwitchParameter InitializeCollector { get; set; }
+
+    /// <summary>Skips WinRM quick configuration when initializing an already managed WinRM host.</summary>
+    [Parameter(ParameterSetName = "Initialize")]
+    [Parameter(ParameterSetName = "Definition")]
+    public SwitchParameter SkipWinRmQuickConfig { get; set; }
+
     /// <inheritdoc />
     protected override void ProcessRecord() {
+        if (ParameterSetName == "Initialize") {
+            if (!ShouldProcess(Environment.MachineName, "Initialize Windows Event Collector and verify readiness")) {
+                return;
+            }
+            WriteObject(CollectorSubscriptionManager.InitializeCollector(
+                configureWinRm: !SkipWinRmQuickConfig.IsPresent,
+                cancellationToken: _stopping.Token));
+            return;
+        }
         if (ParameterSetName == "Definition") {
             string subscriptionName = Definition!.SubscriptionId.Trim();
             if (!ShouldProcess(subscriptionName, "Create or update Windows Event Collector subscription")) {
                 return;
+            }
+            if (InitializeCollector.IsPresent) {
+                WriteObject(CollectorSubscriptionManager.InitializeCollector(
+                    configureWinRm: !SkipWinRmQuickConfig.IsPresent,
+                    cancellationToken: _stopping.Token));
             }
             WriteObject(
                 CollectorSubscriptionManager.ApplyCollectorSubscription(
@@ -63,6 +108,19 @@ public sealed class CmdletSetEVXCollectorSubscription :
             throw new PSArgumentException(
                 "Name cannot be empty.",
                 nameof(Name));
+        }
+        if (ParameterSetName == "Remove") {
+            if (!ShouldProcess(
+                    name,
+                    "Remove Windows Event Collector subscription")) {
+                return;
+            }
+            WriteObject(
+                CollectorSubscriptionManager
+                    .RemoveCollectorSubscription(
+                        name,
+                        _stopping.Token));
+            return;
         }
         if (!ShouldProcess(
                 name,

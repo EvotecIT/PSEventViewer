@@ -10,7 +10,7 @@ public class DeviceRecognized : EventRuleBase {
     /// <inheritdoc />
     public override string LogName => "Security";
     /// <inheritdoc />
-    public override NamedEvents NamedEvent => NamedEvents.DeviceRecognized;
+    public override EventType Type => EventType.DeviceRecognized;
 
     /// <summary>Accepts device recognition events (6416) in the Security log.</summary>
     public override bool CanHandle(EventObject eventObject) {
@@ -44,7 +44,7 @@ public class DeviceRecognized : EventRuleBase {
     /// <summary>Initialises a device recognition wrapper from an event record.</summary>
     public DeviceRecognized(EventObject eventObject) : base(eventObject) {
         SourceEvent = eventObject;
-        NamedEventName = "DeviceRecognized";
+        TypeName = "DeviceRecognized";
         Computer = SourceEvent.ComputerName;
         DeviceId = SourceEvent.GetValueFromDataDictionary("DeviceId");
         DeviceName = SourceEvent.GetValueFromDataDictionary("DeviceDescription", "DeviceName");

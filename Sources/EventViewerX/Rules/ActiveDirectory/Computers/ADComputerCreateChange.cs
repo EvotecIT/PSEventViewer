@@ -10,7 +10,7 @@ public class ADComputerCreateChange : EventRuleBase {
     /// <inheritdoc />
     public override string LogName => "Security";
     /// <inheritdoc />
-    public override NamedEvents NamedEvent => NamedEvents.ADComputerCreateChange;
+    public override EventType Type => EventType.ADComputerCreateChange;
 
     /// <summary>Accepts matching computer create/change events without extra filtering.</summary>
     public override bool CanHandle(EventObject eventObject) {
@@ -72,7 +72,7 @@ public class ADComputerCreateChange : EventRuleBase {
     public ADComputerCreateChange(EventObject eventObject) : base(eventObject) {
         // common fields
         SourceEvent = eventObject;
-        NamedEventName = "ADComputerChange";
+        TypeName = "ADComputerChange";
 
         Computer = SourceEvent.ComputerName;
         Action = SourceEvent.MessageSubject;

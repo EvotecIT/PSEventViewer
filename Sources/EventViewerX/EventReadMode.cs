@@ -30,5 +30,11 @@ public enum EventReadMode {
     /// <summary>
     /// Captures metadata, the formatted message, structured XML data, and attachments.
     /// </summary>
-    Full
+    Full,
+
+    /// <summary>
+    /// Captures metadata, the formatted message, and structured XML data without decoding binary attachments.
+    /// This is the preferred mode for typed event projection and reporting.
+    /// </summary>
+    StructuredDataAndMessage
 }

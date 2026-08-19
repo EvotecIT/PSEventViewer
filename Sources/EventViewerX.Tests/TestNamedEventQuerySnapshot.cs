@@ -3,50 +3,50 @@ using Xunit;
 
 namespace EventViewerX.Tests;
 
-public sealed class TestNamedEventQuerySnapshot {
+public sealed class TestEventTypeQuerySnapshot {
     [Fact]
     public void QueryRejectsUndefinedNamedEventValues() {
         Assert.Throws<
             ArgumentOutOfRangeException>(() =>
-                new NamedEventQuery(
+                new EventTypeQuery(
                     new[] {
-                        (NamedEvents)int.MaxValue
+                        (EventType)int.MaxValue
                     }));
     }
 
     [Fact]
     public async Task ReadAsyncFreezesTheQueryBeforeEnumeration() {
-        NamedEvents namedEvent =
-            Enum.GetValues(typeof(NamedEvents))
-                .Cast<NamedEvents>()
+        EventType namedEvent =
+            Enum.GetValues(typeof(EventType))
+                .Cast<EventType>()
                 .First();
         var credential =
             new NetworkCredential(
                 "original",
                 "secret",
                 "domain");
-        var query = new NamedEventQuery(
+        var query = new EventTypeQuery(
             new[] { namedEvent }) {
             SourceEventIds = Array.Empty<int>(),
             MachineNames = new[] { "remote.contoso.test" },
             Credential = credential,
             MaxConcurrency = 1,
             Enrichment =
-                new NamedEventEnrichmentOptions {
+                new EventEnrichmentOptions {
                     ResolveDns = false,
                     DnsMaxConcurrency = 1
                 }
         };
 
-        IAsyncEnumerable<NamedEventRecord> stream =
-            NamedEventEngine.ReadAsync(query);
+        IAsyncEnumerable<EventTypeRecord> stream =
+            EventTypeEngine.ReadAsync(query);
         query.MaxConcurrency = 0;
         query.SourceEventIds = new[] { -1 };
         credential.UserName = "mutated";
         query.Enrichment.DnsMaxConcurrency = 0;
 
         int count = 0;
-        await foreach (NamedEventRecord _ in stream) {
+        await foreach (EventTypeRecord _ in stream) {
             count++;
         }
 
@@ -55,29 +55,31 @@ public sealed class TestNamedEventQuerySnapshot {
 
     [Fact]
     public void SnapshotClonesMutableCredentialsAndEnrichment() {
-        NamedEvents namedEvent =
-            Enum.GetValues(typeof(NamedEvents))
-                .Cast<NamedEvents>()
+        EventType namedEvent =
+            Enum.GetValues(typeof(EventType))
+                .Cast<EventType>()
                 .First();
         var credential =
             new NetworkCredential(
                 "original",
                 "secret",
                 "domain");
-        var query = new NamedEventQuery(
+        var query = new EventTypeQuery(
             new[] { namedEvent }) {
             Credential = credential,
+            SourceRecordIds = new long[] { 10, 20 },
             Enrichment =
-                new NamedEventEnrichmentOptions {
+                new EventEnrichmentOptions {
                     ResolveDns = true,
                     DnsMaxConcurrency = 2
                 }
         };
 
-        NamedEventQuery snapshot =
-            NamedEventQuerySnapshot.Copy(query);
+        EventTypeQuery snapshot =
+            EventTypeQuerySnapshot.Copy(query);
         credential.UserName = "mutated";
         query.Enrichment.DnsMaxConcurrency = 1;
+        query.SourceRecordIds = new long[] { 30 };
 
         Assert.Equal(
             "original",
@@ -85,32 +87,48 @@ public sealed class TestNamedEventQuerySnapshot {
         Assert.Equal(
             2,
             snapshot.Enrichment!.DnsMaxConcurrency);
+        Assert.Equal(new long[] { 10, 20 }, snapshot.SourceRecordIds);
+    }
+
+    [Fact]
+    public void SnapshotClonesOfflinePathsAndRejectsRemoteMixing() {
+        string[] paths = { "one.evtx", "two.evtx" };
+        var query = new EventTypeQuery(new[] { EventType.OSStartup }) {
+            Paths = paths
+        };
+
+        EventTypeQuery snapshot = EventTypeQuerySnapshot.Copy(query);
+        paths[0] = "changed.evtx";
+
+        Assert.Equal(new[] { "one.evtx", "two.evtx" }, snapshot.Paths);
+        query.MachineNames = new[] { "server" };
+        Assert.Throws<ArgumentException>(() => EventTypeEngine.ReadAsync(query));
     }
 
     [Fact]
     public void ReadAsyncValidatesRemoteOptionsBeforeEnumeration() {
-        NamedEvents namedEvent =
-            Enum.GetValues(typeof(NamedEvents))
-                .Cast<NamedEvents>()
+        EventType namedEvent =
+            Enum.GetValues(typeof(EventType))
+                .Cast<EventType>()
                 .First();
 
         Assert.Throws<ArgumentOutOfRangeException>(() =>
-            NamedEventEngine.ReadAsync(
-                new NamedEventQuery(
+            EventTypeEngine.ReadAsync(
+                new EventTypeQuery(
                     new[] { namedEvent }) {
                     Authentication =
                         (EventLogAuthentication)int.MaxValue
                 }));
         Assert.Throws<ArgumentOutOfRangeException>(() =>
-            NamedEventEngine.ReadAsync(
-                new NamedEventQuery(
+            EventTypeEngine.ReadAsync(
+                new EventTypeQuery(
                     new[] { namedEvent }) {
                     RemoteConnectionTimeoutMilliseconds =
                         0
                 }));
         Assert.Throws<ArgumentOutOfRangeException>(() =>
-            NamedEventEngine.ReadAsync(
-                new NamedEventQuery(
+            EventTypeEngine.ReadAsync(
+                new EventTypeQuery(
                     new[] { namedEvent }) {
                     RemoteReadTimeoutMilliseconds =
                         -1

@@ -234,7 +234,27 @@ public static partial class CollectorSubscriptionManager {
 
 #if NET472
     private static string QuoteProcessArgument(string argument) {
-        return "\"" + argument.Replace("\"", "\\\"") + "\"";
+        if (argument.Length > 0 && argument.IndexOfAny(new[] { ' ', '\t', '"' }) < 0) {
+            return argument;
+        }
+
+        var result = new StringBuilder(argument.Length + 2).Append('"');
+        int backslashes = 0;
+        foreach (char character in argument) {
+            if (character == '\\') {
+                backslashes++;
+                continue;
+            }
+            if (character == '"') {
+                result.Append('\\', backslashes * 2 + 1).Append(character);
+                backslashes = 0;
+                continue;
+            }
+            result.Append('\\', backslashes).Append(character);
+            backslashes = 0;
+        }
+        result.Append('\\', backslashes * 2).Append('"');
+        return result.ToString();
     }
 #endif
 }

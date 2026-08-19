@@ -9,7 +9,7 @@ internal static partial class NamedEventsTimelineQueryExecutor {
     private static readonly ConcurrentDictionary<Type, PayloadExtractionPlan> PayloadExtractionPlanCache = new();
     private static readonly ConcurrentDictionary<string, string> SnakeCaseCache = new(StringComparer.Ordinal);
 
-    private static Dictionary<string, object?> ExtractPayload(NamedEventRecord item) {
+    private static Dictionary<string, object?> ExtractPayload(EventTypeRecord item) {
         if (item is null) {
             throw new ArgumentNullException(nameof(item));
         }
@@ -131,10 +131,10 @@ internal static partial class NamedEventsTimelineQueryExecutor {
             return false;
         }
 
-        if (string.Equals(field.Name, nameof(NamedEventRecord.EventId), StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(field.Name, nameof(NamedEventRecord.RecordId), StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(field.Name, nameof(NamedEventRecord.MachineName), StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(field.Name, nameof(NamedEventRecord.SourceLogName), StringComparison.OrdinalIgnoreCase)) {
+        if (string.Equals(field.Name, nameof(EventTypeRecord.EventId), StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(field.Name, nameof(EventTypeRecord.RecordId), StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(field.Name, nameof(EventTypeRecord.MachineName), StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(field.Name, nameof(EventTypeRecord.SourceLogName), StringComparison.OrdinalIgnoreCase)) {
             return false;
         }
 
@@ -142,7 +142,7 @@ internal static partial class NamedEventsTimelineQueryExecutor {
     }
 
     private static bool ShouldIncludeProperty(PropertyInfo property) {
-        if (property.DeclaringType == typeof(NamedEventRecord) ||
+        if (property.DeclaringType == typeof(EventTypeRecord) ||
             property.Name.StartsWith("_", StringComparison.Ordinal) ||
             typeof(EventObject).IsAssignableFrom(property.PropertyType)) {
             return false;

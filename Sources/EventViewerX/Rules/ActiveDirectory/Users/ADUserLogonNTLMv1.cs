@@ -44,7 +44,7 @@ public class ADUserLogonNTLMv1 : EventRuleBase {
     /// <inheritdoc />
     public override string LogName => "Security";
     /// <inheritdoc />
-    public override NamedEvents NamedEvent => NamedEvents.ADUserLogonNTLMv1;
+    public override EventType Type => EventType.ADUserLogonNTLMv1;
 
     /// <summary>Handles only logon events that include the NTLM V1 package.</summary>
     public override bool CanHandle(EventObject eventObject) {
@@ -55,7 +55,7 @@ public class ADUserLogonNTLMv1 : EventRuleBase {
     /// <summary>Initialises an NTLMv1 logon wrapper from an event record.</summary>
     public ADUserLogonNTLMv1(EventObject eventObject) : base(eventObject) {
         SourceEvent = eventObject;
-        NamedEventName = "ADUserLogonNTLMv1";
+        TypeName = "ADUserLogonNTLMv1";
 
         // Copy all the base ADUserLogon fields
         Computer = SourceEvent.ComputerName;

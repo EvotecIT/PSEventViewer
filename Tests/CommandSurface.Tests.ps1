@@ -20,6 +20,7 @@ Describe 'PSEventViewer v4 command surface' {
             'Reset-EVXEventCheckpoint'
             'Set-EVXCollectorSubscription'
             'Set-EVXLog'
+            'Show-EVXEvent'
             'Start-EVXWatcher'
             'Stop-EVXWatcher'
             'Test-EVXLog'
@@ -69,6 +70,7 @@ Describe 'PSEventViewer v4 command surface' {
         $OutputTypes = (Get-Command Set-EVXCollectorSubscription).OutputType.Name
 
         $OutputTypes | Should -Contain 'EventViewerX.CollectorSubscriptionUpdateResult'
+        $OutputTypes | Should -Contain 'EventViewerX.CollectorSubscriptionRemovalResult'
         $OutputTypes | Should -Contain 'EventViewerX.CollectorSubscriptionSnapshot'
     }
 
@@ -78,12 +80,14 @@ Describe 'PSEventViewer v4 command surface' {
             $Command.ParameterSets.Count | Should -BeGreaterThan 0
         }
 
-        (Get-Command Get-EVXEvent).ParameterSets.Name |
-            Should -Be @('Channel', 'NamedEvent', 'Path', 'Provider', 'Hashtable', 'Xml')
-        (Get-Command New-EVXFilter).ParameterSets.Name |
-            Should -Be @('Object', 'XPath', 'ChannelXml', 'FileXml')
-        (Get-Command Get-EVXPowerShellScript).ParameterSets.Name |
-            Should -Be @('Script', 'Execution')
+        (Get-Command Get-EVXEvent).ParameterSets.Name | Sort-Object |
+            Should -Be (@('Channel', 'Path', 'Definition', 'Provider', 'Type', 'Hashtable', 'Xml') | Sort-Object)
+        (Get-Command Show-EVXEvent).ParameterSets.Name | Sort-Object |
+            Should -Be (@('Type', 'Path', 'Log', 'Definition', 'Input') | Sort-Object)
+        (Get-Command New-EVXFilter).ParameterSets.Name | Sort-Object |
+            Should -Be (@('Object', 'XPath', 'ChannelXml', 'FileXml') | Sort-Object)
+        (Get-Command Get-EVXPowerShellScript).ParameterSets.Name | Sort-Object |
+            Should -Be (@('Script', 'Execution') | Sort-Object)
         (Get-Command Write-EVXEvent).ParameterSets.Name |
             Should -Contain 'Classic'
         $WriteCommand = Get-Command Write-EVXEvent

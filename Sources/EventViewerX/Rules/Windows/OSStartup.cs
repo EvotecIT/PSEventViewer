@@ -10,7 +10,7 @@ public class OSStartup : EventRuleBase {
     /// <inheritdoc />
     public override string LogName => "System";
     /// <inheritdoc />
-    public override NamedEvents NamedEvent => NamedEvents.OSStartup;
+    public override EventType Type => EventType.OSStartup;
 
     /// <summary>Accepts kernel general provider startup events.</summary>
     public override bool CanHandle(EventObject eventObject) {
@@ -35,7 +35,7 @@ public class OSStartup : EventRuleBase {
     /// <summary>Initialises an OS startup wrapper from an event record.</summary>
     public OSStartup(EventObject eventObject) : base(eventObject) {
         SourceEvent = eventObject;
-        NamedEventName = "OSStartup";
+        TypeName = "OSStartup";
         Computer = SourceEvent.ComputerName;
         Action = "System Start";
         ObjectAffected = SourceEvent.MachineName;

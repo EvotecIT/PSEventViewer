@@ -94,7 +94,7 @@ internal static class RuleHelpers
         if (e == null || channels == null) return false;
         foreach (var c in channels)
         {
-            if (string.Equals(e.ContainerLog, c, StringComparison.OrdinalIgnoreCase)) return true;
+            if (string.Equals(e.OriginalLogName, c, StringComparison.OrdinalIgnoreCase)) return true;
         }
         return false;
     }

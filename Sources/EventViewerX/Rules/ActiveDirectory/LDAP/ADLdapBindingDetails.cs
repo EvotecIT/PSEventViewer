@@ -12,7 +12,7 @@ public class ADLdapBindingDetails : EventRuleBase {
     public override string LogName => "Directory Service";
 
     /// <inheritdoc />
-    public override NamedEvents NamedEvent => NamedEvents.ADLdapBindingDetails;
+    public override EventType Type => EventType.ADLdapBindingDetails;
 
     /// <summary>Accepts matching LDAP binding detail events without extra filters.</summary>
     public override bool CanHandle(EventObject eventObject) {
@@ -49,7 +49,7 @@ public class ADLdapBindingDetails : EventRuleBase {
     public ADLdapBindingDetails(EventObject eventObject) : base(eventObject) {
         SourceEvent = eventObject;
 
-        NamedEventName = "ADLdapBindingDetails";
+        TypeName = "ADLdapBindingDetails";
         Computer = SourceEvent.ComputerName;
         Action = SourceEvent.MessageSubject;
         RemoteEndpoint = SourceEvent.GetValueFromDataDictionary("NoNameA0");

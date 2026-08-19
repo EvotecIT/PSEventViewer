@@ -16,9 +16,9 @@ namespace EventViewerX.Tests {
             WatcherManager.StopAll();
             Action<EventObject> action = _ => { };
             var first = WatcherManager.StartWatcher(
-                "unit", Environment.MachineName, "Application", new List<int> { 1 }, new List<NamedEvents>(), action, false, false, 0, null);
+                "unit", Environment.MachineName, "Application", new List<int> { 1 }, new List<EventType>(), action, false, false, 0, null);
             var second = WatcherManager.StartWatcher(
-                "unit", Environment.MachineName, "Application", new List<int> { 1 }, new List<NamedEvents>(), action, false, false, 0, null);
+                "unit", Environment.MachineName, "Application", new List<int> { 1 }, new List<EventType>(), action, false, false, 0, null);
             if (first.EndTime == null) {
                 Assert.Same(first, second);
             } else {
@@ -34,7 +34,7 @@ namespace EventViewerX.Tests {
             WatcherManager.StopAll();
             Action<EventObject> firstAction = _ => { };
             var existing = new WatcherInfo(
-                "unit-stable-action", Environment.MachineName, "Application", new List<int> { 1 }, new List<NamedEvents>(), firstAction, false, false, 0, null) {
+                "unit-stable-action", Environment.MachineName, "Application", new List<int> { 1 }, new List<EventType>(), firstAction, false, false, 0, null) {
                 ActionIdentity = "script:stable"
             };
             var watchersField = typeof(WatcherManager).GetField("_watchers", BindingFlags.NonPublic | BindingFlags.Static);
@@ -50,7 +50,7 @@ namespace EventViewerX.Tests {
                     existing.MachineName,
                     existing.LogName,
                     new List<int> { 1 },
-                    new List<NamedEvents>(),
+                    new List<EventType>(),
                     _ => { },
                     false,
                     false,
@@ -64,7 +64,7 @@ namespace EventViewerX.Tests {
                     existing.MachineName,
                     existing.LogName,
                     new List<int> { 1 },
-                    new List<NamedEvents>(),
+                    new List<EventType>(),
                     _ => { },
                     false,
                     false,
@@ -86,7 +86,7 @@ namespace EventViewerX.Tests {
                     Environment.MachineName,
                     "Application",
                     new List<int> { 1 },
-                    new List<NamedEvents>(),
+                    new List<EventType>(),
                     _ => { },
                     false,
                     false,
@@ -99,7 +99,7 @@ namespace EventViewerX.Tests {
                     Environment.MachineName,
                     "Application",
                     new List<int> { 1 },
-                    new List<NamedEvents>(),
+                    new List<EventType>(),
                     _ => { },
                     false,
                     false,
@@ -125,7 +125,7 @@ namespace EventViewerX.Tests {
             WatcherManager.StopAll();
             Action<EventObject> action = _ => { };
             var existing = new WatcherInfo(
-                "unit-mismatch", Environment.MachineName, "Application", new List<int> { 1 }, new List<NamedEvents>(), action, false, false, 0, null);
+                "unit-mismatch", Environment.MachineName, "Application", new List<int> { 1 }, new List<EventType>(), action, false, false, 0, null);
             var watchersField = typeof(WatcherManager).GetField("_watchers", BindingFlags.NonPublic | BindingFlags.Static);
             var namesField = typeof(WatcherManager).GetField("_watchersByName", BindingFlags.NonPublic | BindingFlags.Static);
             var watchers = Assert.IsType<ConcurrentDictionary<Guid, WatcherInfo>>(watchersField!.GetValue(null));
@@ -135,7 +135,7 @@ namespace EventViewerX.Tests {
 
             try {
                 var exception = Assert.Throws<InvalidOperationException>(() => WatcherManager.StartWatcher(
-                    "unit-mismatch", Environment.MachineName, "Application", new List<int> { 2 }, new List<NamedEvents>(), action, false, false, 0, null));
+                    "unit-mismatch", Environment.MachineName, "Application", new List<int> { 2 }, new List<EventType>(), action, false, false, 0, null));
 
                 Assert.Contains("different configuration", exception.Message, StringComparison.OrdinalIgnoreCase);
             } finally {
@@ -165,7 +165,7 @@ namespace EventViewerX.Tests {
                 Environment.MachineName,
                 "Application",
                 new List<int> { 1 },
-                new List<NamedEvents>(),
+                new List<EventType>(),
                 action,
                 false,
                 false,
@@ -199,7 +199,7 @@ namespace EventViewerX.Tests {
                             Environment.MachineName,
                             "Application",
                             new List<int> { 1 },
-                            new List<NamedEvents>(),
+                            new List<EventType>(),
                             _ => { },
                             false,
                             false,
@@ -244,7 +244,7 @@ namespace EventViewerX.Tests {
                 machineName,
                 "Application",
                 new List<int>(),
-                new List<NamedEvents>(),
+                new List<EventType>(),
                 action,
                 false,
                 false,
@@ -307,7 +307,7 @@ namespace EventViewerX.Tests {
                     Environment.MachineName,
                     "Application",
                     new List<int>(),
-                    new List<NamedEvents>(),
+                    new List<EventType>(),
                     _ => { },
                     staging: false,
                     stopOnMatch: false,
@@ -368,7 +368,7 @@ namespace EventViewerX.Tests {
                 Environment.MachineName,
                 "Application",
                 new List<int>(),
-                new List<NamedEvents>(),
+                new List<EventType>(),
                 _ => { },
                 staging: false,
                 stopOnMatch: false,
@@ -399,13 +399,13 @@ namespace EventViewerX.Tests {
             var field = typeof(WatcherManager).GetField("_watchers", BindingFlags.NonPublic | BindingFlags.Static);
             Assert.NotNull(field);
             var dict = (ConcurrentDictionary<Guid, WatcherInfo>)field!.GetValue(null)!;
-            var watcher1 = new WatcherInfo("dup", Environment.MachineName, "Application", new List<int> { 1 }, new List<NamedEvents>(), _ => { }, false, false, 0, null);
-            var watcher2 = new WatcherInfo("dup", Environment.MachineName, "Application", new List<int> { 1 }, new List<NamedEvents>(), _ => { }, false, false, 0, null);
+            var watcher1 = new WatcherInfo("dup", Environment.MachineName, "Application", new List<int> { 1 }, new List<EventType>(), _ => { }, false, false, 0, null);
+            var watcher2 = new WatcherInfo("dup", Environment.MachineName, "Application", new List<int> { 1 }, new List<EventType>(), _ => { }, false, false, 0, null);
             dict.TryAdd(Guid.NewGuid(), watcher1);
             dict.TryAdd(Guid.NewGuid(), watcher2);
 
             var ex = Assert.Throws<InvalidOperationException>(() =>
-                WatcherManager.StartWatcher("dup", Environment.MachineName, "Application", new List<int> { 1 }, new List<NamedEvents>(), _ => { }, false, false, 0, null));
+                WatcherManager.StartWatcher("dup", Environment.MachineName, "Application", new List<int> { 1 }, new List<EventType>(), _ => { }, false, false, 0, null));
             Assert.Contains("Multiple watchers", ex.Message);
             WatcherManager.StopAll();
         }
@@ -416,7 +416,7 @@ namespace EventViewerX.Tests {
                 BindingFlags.Instance | BindingFlags.NonPublic, null,
                 new object[] {
                     "test", Environment.MachineName, "Application", new List<int> { 1 },
-                    new List<NamedEvents>(), new Action<EventObject>(_ => throw new InvalidOperationException("fail")),
+                    new List<EventType>(), new Action<EventObject>(_ => throw new InvalidOperationException("fail")),
                     false, false, 0, null
                 }, null)!;
 
@@ -449,7 +449,7 @@ namespace EventViewerX.Tests {
                     Environment.MachineName,
                     "Application",
                     new List<int> { 1 },
-                    new List<NamedEvents>(),
+                    new List<EventType>(),
                     new Action<EventObject>(_ =>
                         Interlocked.Increment(ref delivered)),
                     false,
@@ -493,7 +493,7 @@ namespace EventViewerX.Tests {
                 Environment.MachineName,
                 "Application",
                 new List<int>(),
-                new List<NamedEvents>(),
+                new List<EventType>(),
                 _ => Interlocked.Increment(
                     ref delivered),
                 false,
@@ -529,7 +529,7 @@ namespace EventViewerX.Tests {
                 Environment.MachineName,
                 "Application",
                 new List<int> { 1 },
-                new List<NamedEvents>(),
+                new List<EventType>(),
                 _ => { },
                 false,
                 false,
@@ -564,7 +564,7 @@ namespace EventViewerX.Tests {
                     Environment.MachineName,
                     "Application",
                     new List<int> { 1 },
-                    new List<NamedEvents>(),
+                    new List<EventType>(),
                     _ => { },
                     false,
                     false,
@@ -609,7 +609,7 @@ namespace EventViewerX.Tests {
             for (int i = 0; i < 5; i++) {
                 tasks.Add(Task.Run(() => WatcherManager.StartWatcher(
                     "sync", Environment.MachineName, "Application", new List<int> { 1 },
-                    new List<NamedEvents>(), action, false, false, 0, null)));
+                    new List<EventType>(), action, false, false, 0, null)));
             }
             Task.WaitAll(tasks.ToArray());
             var first = tasks[0].Result;
@@ -653,7 +653,7 @@ namespace EventViewerX.Tests {
                 Environment.MachineName,
                 "Application",
                 new List<int> { 1 },
-                new List<NamedEvents>(),
+                new List<EventType>(),
                 _ => { },
                 false,
                 false,
@@ -686,7 +686,7 @@ namespace EventViewerX.Tests {
                 Environment.MachineName,
                 "Application",
                 new List<int> { 1 },
-                new List<NamedEvents>(),
+                new List<EventType>(),
                 action,
                 false,
                 false,
@@ -721,7 +721,7 @@ namespace EventViewerX.Tests {
                     Environment.MachineName,
                     "Application",
                     new List<int> { 1 },
-                    new List<NamedEvents>(),
+                    new List<EventType>(),
                     action,
                     false,
                     false,
@@ -739,7 +739,7 @@ namespace EventViewerX.Tests {
                         Environment.MachineName,
                         "Application",
                         new List<int> { 1 },
-                        new List<NamedEvents>(),
+                        new List<EventType>(),
                         action,
                         false,
                         false,

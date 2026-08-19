@@ -10,7 +10,7 @@ public class NetworkMonitorDriverLoaded : EventRuleBase {
     /// <inheritdoc />
     public override string LogName => "System";
     /// <inheritdoc />
-    public override NamedEvents NamedEvent => NamedEvents.NetworkMonitorDriverLoaded;
+    public override EventType Type => EventType.NetworkMonitorDriverLoaded;
 
     private static readonly string[] _driverNames = ["npcap", "npf", "netmon"];
 
@@ -43,7 +43,7 @@ public class NetworkMonitorDriverLoaded : EventRuleBase {
     /// <summary>Initialises a network monitor driver detection wrapper from an event record.</summary>
     public NetworkMonitorDriverLoaded(EventObject eventObject) : base(eventObject) {
         SourceEvent = eventObject;
-        NamedEventName = "NetworkMonitorDriverLoaded";
+        TypeName = "NetworkMonitorDriverLoaded";
         Computer = SourceEvent.ComputerName;
         DriverName = SourceEvent.GetValueFromDataDictionary("DriverName", "FilterName", "ImageName") ??
                      _driverNames.FirstOrDefault(n => (SourceEvent.MessageSubject ?? string.Empty)

@@ -15,7 +15,7 @@ public class ADUserStatus : EventRuleBase {
     /// <inheritdoc />
     public override string LogName => "Security";
     /// <inheritdoc />
-    public override NamedEvents NamedEvent => NamedEvents.ADUserStatus;
+    public override EventType Type => EventType.ADUserStatus;
 
     /// <summary>Accepts matching status change events without additional filtering.</summary>
     public override bool CanHandle(EventObject eventObject) {
@@ -51,7 +51,7 @@ public class ADUserStatus : EventRuleBase {
     /// <summary>Initialises a user status change wrapper from an event record.</summary>
     public ADUserStatus(EventObject eventObject) : base(eventObject) {
         SourceEvent = eventObject;
-        NamedEventName = "ADUsersStatus";
+        TypeName = "ADUsersStatus";
 
         Computer = SourceEvent.ComputerName;
         Action = SourceEvent.MessageSubject;

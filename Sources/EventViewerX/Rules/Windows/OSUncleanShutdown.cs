@@ -10,7 +10,7 @@ public class OSUncleanShutdown : EventRuleBase {
     /// <inheritdoc />
     public override string LogName => "System";
     /// <inheritdoc />
-    public override NamedEvents NamedEvent => NamedEvents.OSUncleanShutdown;
+    public override EventType Type => EventType.OSUncleanShutdown;
 
     /// <summary>Accepts kernel power events indicating unclean shutdowns.</summary>
     public override bool CanHandle(EventObject eventObject) {
@@ -35,7 +35,7 @@ public class OSUncleanShutdown : EventRuleBase {
     /// <summary>Initialises an unclean shutdown wrapper from an event record.</summary>
     public OSUncleanShutdown(EventObject eventObject) : base(eventObject) {
         SourceEvent = eventObject;
-        NamedEventName = "OSUncleanShutdown";
+        TypeName = "OSUncleanShutdown";
         Computer = SourceEvent.ComputerName;
         Action = "System Dirty Reboot";
         ObjectAffected = SourceEvent.MachineName;

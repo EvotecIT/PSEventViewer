@@ -36,13 +36,32 @@ param(
     [ValidateRange(1, [int]::MaxValue)]
     [int] $ExpensiveSampleCount = 100000,
 
+    [ValidateRange(1, [int]::MaxValue)]
+    [int[]] $ScaleSampleCount = @(1000, 10000, 100000, 1000000),
+
+    [ValidateRange(1, [int]::MaxValue)]
+    [int] $ReportSampleCount = 1000,
+
+    [string] $TypedFixturePath,
+
+    [ValidateRange(0, [long]::MaxValue)]
+    [long] $ExpectedTypedCount,
+
+    [string] $TypedEventTypes = 'ADUserLogon,ADUserLogonFailed,ADUserLockouts',
+
     [string] $EvtxECmdPath,
 
     [string] $EvtxMapsPath,
 
     [string] $BaselineHostPath,
 
+    [string] $PSEventViewerPath,
+
     [string] $BaselineModulePath,
+
+    [string] $EventViewerXCliPath,
+
+    [string] $EventViewerXPortableCliPath,
 
     [string] $OutputRoot,
 
@@ -52,7 +71,7 @@ param(
     [ValidateRange(1, [int]::MaxValue)]
     [int] $IterationCount = 1,
 
-    [ValidateSet('None', 'Common', 'ExactOutput', 'NativeOutput', 'EvtxNative')]
+    [ValidateSet('None', 'Common', 'Scale', 'ColdStart', 'Reporting', 'ExactOutput', 'NativeOutput', 'EvtxNative')]
     [string] $ReadmeTable = 'None',
 
     [switch] $Plan
@@ -69,7 +88,7 @@ if ([bool] $EvtxECmdPath -ne [bool] $EvtxMapsPath) {
     throw 'EvtxECmdPath and EvtxMapsPath must be supplied together.'
 }
 
-if ($ReadmeTable -ne 'None') {
+if ($ReadmeTable -notin 'None', 'ColdStart', 'Reporting') {
     if (-not $LargeFixturePath -or $ExpectedLargeCount -le 0) {
         throw 'ReadmeTable requires LargeFixturePath and a positive ExpectedLargeCount.'
     }
@@ -86,8 +105,18 @@ if ($ReadmeTable -ne 'None') {
             'Large-Common-Scan-Metadata'
             'Large-Common-Sample-Message'
             'Large-Common-Sample-StructuredData'
+            'Large-Common-Sample-StructuredDataAndMessage'
             'Large-Common-Sample-Full'
         )
+        $Engine = 'DotNet', 'EventViewerX', 'PSEventViewer', 'GetWinEvent'
+    } elseif ($ReadmeTable -eq 'Scale') {
+        [array] $Case = foreach ($sampleCount in $ScaleSampleCount | Sort-Object -Unique) {
+            if ($sampleCount -le $ExpectedLargeCount) {
+                foreach ($mode in 'Metadata', 'StructuredDataAndMessage', 'Full') {
+                    "Large-Scale-$sampleCount-$mode"
+                }
+            }
+        }
         $Engine = 'DotNet', 'EventViewerX', 'PSEventViewer', 'GetWinEvent'
     } elseif ($ReadmeTable -eq 'ExactOutput') {
         $Case = @(
@@ -105,7 +134,7 @@ if ($ReadmeTable -ne 'None') {
             'Large-Native-Output-Xml'
         )
         $Engine = 'EventViewerXExport', 'EvtxECmd'
-    } else {
+    } elseif ($ReadmeTable -eq 'EvtxNative') {
         if (-not $EvtxECmdPath -or -not $EvtxMapsPath) {
             throw 'ReadmeTable EvtxNative requires EvtxECmdPath and EvtxMapsPath.'
         }
@@ -118,6 +147,33 @@ if ($ReadmeTable -ne 'None') {
         $Engine = 'EvtxECmd'
     }
 }
+if ($ReadmeTable -eq 'Reporting') {
+    if ($Case -or $Engine) {
+        throw 'ReadmeTable Reporting owns its curated Case and Engine matrix. Do not combine it with Case or Engine.'
+    }
+    if (-not $TypedFixturePath -or $ExpectedTypedCount -le 0) {
+        throw 'ReadmeTable Reporting requires TypedFixturePath and a positive ExpectedTypedCount.'
+    }
+    if (-not $Plan -and $IterationCount -lt 3) {
+        throw 'The public Reporting table requires at least three iterations.'
+    }
+    $Case = 'Typed-Report-Html', 'Typed-Report-Excel', 'Typed-Report-Email', 'Typed-Report-All'
+    $Engine = 'EventViewerXReport'
+}
+if ($ReadmeTable -eq 'ColdStart') {
+    if ($Case -or $Engine) {
+        throw 'ReadmeTable ColdStart owns its curated Case and Engine matrix. Do not combine it with Case or Engine.'
+    }
+    if (-not $Plan -and $IterationCount -lt 3) {
+        throw 'The public ColdStart table requires at least three iterations.'
+    }
+    $Case = 'Smoke-Command-Cold-StructuredDataAndMessage'
+    $Engine = @('EventViewerXCli')
+    if ($EventViewerXPortableCliPath) {
+        $Engine += 'EventViewerXCliPortable'
+    }
+    $Engine += 'PSEventViewer', 'GetWinEvent'
+}
 
 dotnet build $hostProject --configuration Release --framework net10.0-windows
 if ($LASTEXITCODE -ne 0) {
@@ -128,14 +184,28 @@ dotnet build (Join-Path $repositoryRoot 'Sources\PSEventViewer\PSEventViewer.csp
 if ($LASTEXITCODE -ne 0) {
     throw "The PSEventViewer build failed with exit code $LASTEXITCODE."
 }
+dotnet build (Join-Path $repositoryRoot 'Sources\EventViewerX.Cli\EventViewerX.Cli.csproj') --configuration Release --framework net10.0-windows
+if ($LASTEXITCODE -ne 0) {
+    throw "The EventViewerX CLI build failed with exit code $LASTEXITCODE."
+}
 
 $variables = @{
-    ReadmeTable = $ReadmeTable
+    ReadmeTable       = $ReadmeTable
+    ReportSampleCount = $ReportSampleCount
+    ScaleSampleCounts = [string] ($ScaleSampleCount -join ',')
 }
 if ($LargeFixturePath) {
     $variables.LargeFixturePath = [IO.Path]::GetFullPath($LargeFixturePath)
     $variables.ExpectedLargeCount = $ExpectedLargeCount
     $variables.ExpensiveSampleCount = $ExpensiveSampleCount
+}
+if ($TypedFixturePath) {
+    if ($ExpectedTypedCount -le 0) {
+        throw 'TypedFixturePath requires a positive ExpectedTypedCount.'
+    }
+    $variables.TypedFixturePath = [IO.Path]::GetFullPath($TypedFixturePath)
+    $variables.ExpectedTypedCount = $ExpectedTypedCount
+    $variables.TypedEventTypes = $TypedEventTypes
 }
 if ($EvtxECmdPath) {
     $variables.EvtxECmdPath = [IO.Path]::GetFullPath($EvtxECmdPath)
@@ -150,8 +220,25 @@ if ($EvtxMapsPath) {
 if ($BaselineHostPath) {
     $variables.BaselineHostPath = [IO.Path]::GetFullPath($BaselineHostPath)
 }
+if ($PSEventViewerPath) {
+    $moduleFullPath = [IO.Path]::GetFullPath($PSEventViewerPath)
+    if (-not (Test-Path -LiteralPath $moduleFullPath -PathType Leaf)) {
+        throw "The PSEventViewer module '$moduleFullPath' does not exist."
+    }
+    $variables.PSEventViewerPath = $moduleFullPath
+}
 if ($BaselineModulePath) {
     $variables.BaselineModulePath = [IO.Path]::GetFullPath($BaselineModulePath)
+}
+if ($EventViewerXCliPath) {
+    $variables.EventViewerXCliPath = [IO.Path]::GetFullPath($EventViewerXCliPath)
+}
+if ($EventViewerXPortableCliPath) {
+    $portableFullPath = [IO.Path]::GetFullPath($EventViewerXPortableCliPath)
+    if (-not (Test-Path -LiteralPath $portableFullPath -PathType Leaf)) {
+        throw "The portable EventViewerX CLI '$portableFullPath' does not exist."
+    }
+    $variables.EventViewerXPortableCliPath = $portableFullPath
 }
 
 $parameters = @{
@@ -190,6 +277,27 @@ if (-not $Plan) {
         Update-BenchmarkDocument `
             -Path $readmePath `
             -BlockId 'event-log-common-benchmark' `
+            -ComparisonPath $benchmarkResult.Artifacts['comparison.json'] `
+            -Renderer ComparisonTable `
+            -Confirm:$false | Out-Null
+    } elseif ($ReadmeTable -eq 'Scale') {
+        Update-BenchmarkDocument `
+            -Path $readmePath `
+            -BlockId 'event-log-scale-benchmark' `
+            -ComparisonPath $benchmarkResult.Artifacts['comparison.json'] `
+            -Renderer ComparisonTable `
+            -Confirm:$false | Out-Null
+    } elseif ($ReadmeTable -eq 'ColdStart') {
+        Update-BenchmarkDocument `
+            -Path $readmePath `
+            -BlockId 'event-log-cold-start-benchmark' `
+            -ComparisonPath $benchmarkResult.Artifacts['comparison.json'] `
+            -Renderer ComparisonTable `
+            -Confirm:$false | Out-Null
+    } elseif ($ReadmeTable -eq 'Reporting') {
+        Update-BenchmarkDocument `
+            -Path $readmePath `
+            -BlockId 'event-log-reporting-benchmark' `
             -ComparisonPath $benchmarkResult.Artifacts['comparison.json'] `
             -Renderer ComparisonTable `
             -Confirm:$false | Out-Null

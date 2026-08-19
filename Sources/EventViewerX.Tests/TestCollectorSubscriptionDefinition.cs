@@ -5,6 +5,81 @@ namespace EventViewerX.Tests;
 
 public class TestCollectorSubscriptionDefinition {
     [Fact]
+    public void RemoveIsIdempotentWhenSubscriptionIsAlreadyAbsent() {
+        bool runnerCalled = false;
+
+        CollectorSubscriptionRemovalResult result =
+            CollectorSubscriptionManager
+                .RemoveCollectorSubscription(
+                    "Missing",
+                    _ => null,
+                    (_, _) => {
+                        runnerCalled = true;
+                        return string.Empty;
+                    },
+                    1,
+                    TimeSpan.Zero,
+                    CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.False(result.Changed);
+        Assert.Null(result.Before);
+        Assert.Null(result.After);
+        Assert.False(runnerCalled);
+    }
+
+    [Fact]
+    public void RemoveDeletesAndVerifiesExistingSubscription() {
+        CollectorSubscriptionSnapshot snapshot =
+            CreateSnapshot("Existing");
+        bool exists = true;
+        int deleteCount = 0;
+
+        CollectorSubscriptionRemovalResult result =
+            CollectorSubscriptionManager
+                .RemoveCollectorSubscription(
+                    snapshot.SubscriptionName,
+                    _ => exists ? snapshot : null,
+                    (arguments, _) => {
+                        Assert.Equal("ds", arguments[0]);
+                        deleteCount++;
+                        exists = false;
+                        return string.Empty;
+                    },
+                    1,
+                    TimeSpan.Zero,
+                    CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.True(result.Changed);
+        Assert.Same(snapshot, result.Before);
+        Assert.Null(result.After);
+        Assert.Equal(1, deleteCount);
+    }
+
+    [Fact]
+    public void RemoveFailsWhenPersistedStateRemainsPresent() {
+        CollectorSubscriptionSnapshot snapshot =
+            CreateSnapshot("StillPresent");
+
+        InvalidOperationException exception =
+            Assert.Throws<InvalidOperationException>(() =>
+                CollectorSubscriptionManager
+                    .RemoveCollectorSubscription(
+                        snapshot.SubscriptionName,
+                        _ => snapshot,
+                        (_, _) => string.Empty,
+                        2,
+                        TimeSpan.Zero,
+                        CancellationToken.None));
+
+        Assert.Contains(
+            "still present",
+            exception.Message,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ProducesCollectorInitiatedSubscriptionWithTypedQuery() {
         var definition = new CollectorSubscriptionDefinition {
             SubscriptionId = "Security failures",
@@ -20,6 +95,94 @@ public class TestCollectorSubscriptionDefinition {
         Assert.Contains("<Address>dc01.contoso.com</Address>", xml, StringComparison.Ordinal);
         Assert.Contains("<![CDATA[<QueryList>", xml, StringComparison.Ordinal);
         Assert.DoesNotContain("<Locale", xml, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ProducesSourceInitiatedSubscriptionWithoutExplicitSources() {
+        var definition = new CollectorSubscriptionDefinition {
+            SubscriptionId = "Domain controller audit",
+            SubscriptionType = CollectorSubscriptionType.SourceInitiated,
+            DeliveryMode = CollectorSubscriptionDeliveryMode.Push,
+            CollectorHostName = "wec01.ad.evotec.xyz",
+            QueryXml = "<QueryList><Query Id=\"0\" Path=\"Security\"><Select Path=\"Security\">*[System[EventID=5136]]</Select></Query></QueryList>",
+            AllowedSourceDomainComputersSddl = "O:NSG:NSD:(A;;GA;;;S-1-5-21-1-2-3-516)"
+        };
+
+        string xml = definition.ToXml();
+
+        Assert.Contains("<SubscriptionType>SourceInitiated</SubscriptionType>", xml, StringComparison.Ordinal);
+        Assert.Contains("<Delivery Mode=\"Push\">", xml, StringComparison.Ordinal);
+        Assert.Contains("<AllowedSourceDomainComputers>O:NSG:NSD:(A;;GA;;;S-1-5-21-1-2-3-516)</AllowedSourceDomainComputers>", xml, StringComparison.Ordinal);
+        Assert.DoesNotContain("<EventSources>", xml, StringComparison.Ordinal);
+        Assert.DoesNotContain("<CredentialsType>", xml, StringComparison.Ordinal);
+        Assert.Equal(
+            "Server=http://wec01.ad.evotec.xyz:5985/wsman/SubscriptionManager/WEC,Refresh=60",
+            definition.SourceSubscriptionManagerValue);
+    }
+
+    [Fact]
+    public void SourcePolicyBuildsAuthorizationFromDomainControllersSid() {
+        string sddl = CollectorSourcePolicy.BuildAllowedSourceSddl(new[] {
+            "S-1-5-21-853615985-2870445339-3163598659-516"
+        });
+
+        Assert.Equal(
+            "O:NSG:NSD:(A;;GA;;;S-1-5-21-853615985-2870445339-3163598659-516)(A;;GA;;;NS)",
+            sddl);
+        Assert.Equal(
+            "Server=https://wec01.ad.evotec.xyz:5986/wsman/SubscriptionManager/WEC,Refresh=120",
+            CollectorSourcePolicy.BuildSubscriptionManagerValue(
+                "wec01.ad.evotec.xyz",
+                "HTTPS",
+                refreshIntervalSeconds: 120));
+    }
+
+    [Fact]
+    public void CollectorInitiatedPushRequiresAndEmitsCollectorHostName() {
+        CollectorSubscriptionDefinition definition = CreateDefinition("Push");
+        definition.DeliveryMode = CollectorSubscriptionDeliveryMode.Push;
+        Assert.Throws<ArgumentException>(definition.Validate);
+
+        definition.CollectorHostName = "wec01.ad.evotec.xyz";
+        string xml = definition.ToXml();
+
+        Assert.Contains("<HostName>wec01.ad.evotec.xyz</HostName>", xml, StringComparison.Ordinal);
+        Assert.True(xml.IndexOf("<HostName>", StringComparison.Ordinal) <
+                    xml.IndexOf("<Heartbeat", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void RuntimeStatusParserRetainsOverallAndPerSourceEvidence() {
+        const string output = """
+            Subscription: Domain audit
+                RunTimeStatus: Active
+                Events processed: 157
+                LastError: 0
+                EventSources:
+                    AD0.ad.evotec.xyz
+                        RunTimeStatus: Active
+                        Events processed: 144
+                        LastError: 0
+                        LastHeartbeatTime: 2026-08-18T22:16:58.626
+                    AD1.ad.evotec.xyz
+                        RunTimeStatus: Trying
+                        LastError: 80338012
+                        ErrorMessage: The client cannot connect.
+            """;
+
+        CollectorSubscriptionRuntimeStatus status =
+            CollectorSubscriptionManager.ParseRuntimeStatus(output, "fallback");
+
+        Assert.Equal("Domain audit", status.SubscriptionName);
+        Assert.Equal("Active", status.Status);
+        Assert.Equal(157, status.EventsProcessed);
+        Assert.Equal((uint)0, status.LastErrorCode);
+        Assert.Equal(2, status.Sources.Count);
+        Assert.True(status.Sources[0].IsHealthy);
+        Assert.Equal((uint)0x80338012, status.Sources[1].LastErrorCode);
+        Assert.Equal("The client cannot connect.", status.Sources[1].ErrorMessage);
+        Assert.False(status.IsHealthy);
+        Assert.Equal(output, status.RawStatus);
     }
 
     [Fact]
@@ -66,6 +229,30 @@ public class TestCollectorSubscriptionDefinition {
               <ContentFormat>Events</ContentFormat>
               <Locale Language="en-US" />
               <EventSources><EventSource Enabled="true"><Address>server01</Address></EventSource></EventSources>
+            </Subscription>
+            """;
+
+        Assert.True(CollectorSubscriptionXml.AreEquivalent(requested, persisted));
+    }
+
+    [Fact]
+    public void ComparisonIgnoresWindowsEmptyNonDomainSourceDefault() {
+        const string requested = """
+            <Subscription xmlns="http://schemas.microsoft.com/2006/03/windows/events/subscription">
+              <SubscriptionId>Test</SubscriptionId>
+              <SubscriptionType>SourceInitiated</SubscriptionType>
+              <ContentFormat>Events</ContentFormat>
+              <AllowedSourceDomainComputers>O:NSG:NSD:(A;;GA;;;S-1-5-21-1-2-3-516)</AllowedSourceDomainComputers>
+            </Subscription>
+            """;
+        const string persisted = """
+            <Subscription xmlns="http://schemas.microsoft.com/2006/03/windows/events/subscription">
+              <SubscriptionId>Test</SubscriptionId>
+              <SubscriptionType>SourceInitiated</SubscriptionType>
+              <ContentFormat>Events</ContentFormat>
+              <Locale Language="pl-PL" />
+              <AllowedSourceNonDomainComputers></AllowedSourceNonDomainComputers>
+              <AllowedSourceDomainComputers>O:NSG:NSD:(A;;GA;;;S-1-5-21-1-2-3-516)</AllowedSourceDomainComputers>
             </Subscription>
             """;
 

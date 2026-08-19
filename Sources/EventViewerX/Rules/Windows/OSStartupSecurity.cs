@@ -10,7 +10,7 @@ public class OSStartupSecurity : EventRuleBase {
     /// <inheritdoc />
     public override string LogName => "Security";
     /// <inheritdoc />
-    public override NamedEvents NamedEvent => NamedEvents.OSStartupSecurity;
+    public override EventType Type => EventType.OSStartupSecurity;
 
     /// <summary>Accepts all startup events within the Security log.</summary>
     /// <param name="eventObject">Event to evaluate.</param>
@@ -38,7 +38,7 @@ public class OSStartupSecurity : EventRuleBase {
     /// <param name="eventObject">Event carrying startup details.</param>
     public OSStartupSecurity(EventObject eventObject) : base(eventObject) {
         SourceEvent = eventObject;
-        NamedEventName = "OSStartupSecurity";
+        TypeName = "OSStartupSecurity";
         Computer = SourceEvent.ComputerName;
         Action = "Windows is starting up";
         ObjectAffected = SourceEvent.MachineName;

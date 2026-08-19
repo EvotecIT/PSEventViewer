@@ -252,6 +252,7 @@ public static class EventQueryPlanner {
             MessageCulture = options.MessageCulture,
             FallbackMessageCulture = options.FallbackMessageCulture,
             MaxEvents = options.MaxEvents,
+            MaxEventsScanned = options.MaxEventsScanned,
             IncludeBookmark = options.IncludeBookmark,
             BookmarkXml = options.BookmarkXml,
             BookmarkOffset = options.BookmarkOffset,

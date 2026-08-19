@@ -1,6 +1,6 @@
 # EventViewerX .NET guide
 
-EventViewerX is the dependency-free reusable C# engine beneath PSEventViewer.
+EventViewerX is the reusable C# engine beneath PSEventViewer.
 It targets .NET Framework 4.7.2, .NET 8 for Windows, and .NET 10 for Windows.
 The typed APIs own native query construction, filter partitioning, bounded
 multi-source reads, projection, message rendering, export, subscriptions,
@@ -254,26 +254,129 @@ failure.
 subscription needs native `Suppress` clauses; build it with
 `EventFilterCompiler.BuildChannelQueryXml`.
 The higher-level `WatcherManager` adds named lifecycle, stop-after, timeout,
-and named-event projection.
+and event-type projection.
 
-## Use named event rules
+## Use typed event definitions
 
 ```csharp
-var query = new NamedEventQuery(new[] {
-    NamedEvents.ADUserLogonFailed,
-    NamedEvents.ADUserLockouts
+var query = new EventTypeQuery(new[] {
+    EventType.ADUserLogonFailed,
+    EventType.ADUserLockouts
 }) {
     MachineNames = new string?[] { "DC01", "DC02" }
 };
 
-await foreach (NamedEventRecord item in NamedEventEngine.ReadAsync(query)) {
+await foreach (EventTypeRecord item in EventTypeEngine.ReadAsync(query)) {
     Console.WriteLine(
-        $"{item.NamedEventName} {item.EventId} {item.MachineName}");
+        $"{item.TypeName} {item.EventId} {item.MachineName}");
 }
 ```
 
-Named events are projections over the same engine. They do not require a
-different reader or a second copy of query logic.
+Typed events are projections over the same engine. A type owns its source
+logs, providers, event IDs, filters, and projection, so callers do not supply a
+log name. A query may instead point the type at offline files or a collector's
+`ForwardedEvents` channel without weakening those semantics.
+
+For a user-defined schema, load an `EventDefinition` and stream it through
+`EventDefinitionEngine`. `EventDefinitionQuery` provides the same remote,
+offline, collector, time, record ID, result/candidate limit, culture,
+checkpoint-observer, and failure contracts. See
+[custom event definitions](Event-Definitions.md).
+
+## Create HTML, Excel, and email output
+
+Install or reference `EventViewerX.Reporting` when presentation is needed.
+The reporting assembly keeps HtmlForgeX, HtmlForgeX.Email, and OfficeIMO out of
+the low-level query package while reusing EventViewerX for all data access.
+
+```csharp
+using EventViewerX.Reporting;
+
+var request = EventReportRequest.ForTypes(
+    EventType.ADUserLogonFailed,
+    EventType.ADUserLockouts);
+request.TimePeriod = TimePeriod.Last24Hours;
+request.Collectors = new string?[] { "WEC01" };
+
+EventReport report = await EventReportEngine.QueryAsync(request);
+foreach (EventReportSection section in report.Sections) {
+    Console.WriteLine($"{section.DisplayName}: {section.Rows.Count} rows");
+}
+EventReportHtmlRenderer.Save(report, "Authentication.html");
+EventReportExcelRenderer.Save(report, "Authentication.xlsx");
+EventEmailPackage email = await EventReportEmailRenderer.RenderAsync(report);
+```
+
+`EventReport.Sections` is the presentation schema. A leaf definition creates
+one homogeneous section containing its domain fields. Composite definitions
+create one section per populated leaf type, which becomes a separate HTML
+table and Excel worksheet. Generic log queries instead expose the familiar
+Windows event metadata. Excel adds `Event Provenance` for typed reports so the
+source log, provider, event ID, record ID, and raw message remain available
+without crowding the domain worksheets.
+
+The email package is transport-neutral. A host may give its HTML/plain-text
+body and resources to Mailozaurr, Microsoft Graph, or another sender without
+coupling EventViewerX.Reporting to credentials or delivery policy.
+
+## Provision and diagnose Windows Event Collector
+
+The reusable core builds both collector- and source-initiated subscription
+XML, initializes the local collector, and reports readiness and per-source
+runtime evidence. Source policy remains an explicit deployment concern rather
+than a hidden remote mutation.
+
+```csharp
+string domainControllersSid =
+    "S-1-5-21-111111111-222222222-333333333-516";
+var definition = new CollectorSubscriptionDefinition {
+    SubscriptionId = "Domain controller authentication",
+    SubscriptionType = CollectorSubscriptionType.SourceInitiated,
+    CollectorHostName = "WEC01.ad.contoso.com",
+    AllowedSourceDomainComputersSddl =
+        CollectorSourcePolicy.BuildAllowedSourceSddl(new[] {
+            domainControllersSid
+        }),
+    DeliveryMode = CollectorSubscriptionDeliveryMode.Push,
+    QueryXml = EventDefinitionCompiler.BuildQueryXml(
+        new[] { EventType.ActiveDirectoryAuthentication })
+};
+
+Console.WriteLine(definition.SourceSubscriptionManagerValue);
+CollectorSubscriptionManager.InitializeCollector();
+CollectorSubscriptionManager.ApplyCollectorSubscription(definition);
+
+CollectorSubscriptionRuntimeStatus runtime =
+    CollectorSubscriptionManager.GetCollectorSubscriptionRuntimeStatus(
+        definition.SubscriptionId);
+foreach (CollectorSubscriptionSourceRuntimeStatus source in runtime.Sources) {
+    Console.WriteLine(
+        $"{source.Address}: {source.Status}, {source.EventsProcessed} events, " +
+        $"error 0x{source.LastErrorCode:X8}");
+}
+```
+
+Deploy `SourceSubscriptionManagerValue` through the source computers' Windows
+Event Forwarding SubscriptionManager policy. Security-channel forwarding also
+requires Network Service read access on each source. Preserve the channel's
+existing access descriptor when adding that ACE. Domain controllers require
+their Domain Controllers group SID (RID 516) or explicit computer SIDs; the
+generic Domain Computers ACE is insufficient.
+
+Affected Windows Server 2025 builds can terminate the Event Log service when
+`ForwardedEvents` evaluates any filtered native XPath, including simple event
+ID and `TimeCreated` predicates. EventViewerX therefore opens that channel once
+with the native `*` selector and applies the complete typed filter in its
+bounded streaming reader. Inclusive time windows still stop after the reader
+crosses the ordered boundary; event IDs, providers, original channels, data
+fields, record checkpoints, `MaxEvents`, and `MaxCandidates` remain enforced.
+Direct live logs and EVTX files retain their selective native-query fast path.
+Raw filtered XPath and structured `QueryList` input against `ForwardedEvents`
+are rejected before Windows executes them; use `EventFilter`, typed event
+definitions, or the high-level query planner instead. Set
+`EventLogQueryOptions.MaxEventsScanned` when a generic collector query needs an
+explicit raw-scan ceiling; typed/custom queries use their `MaxCandidates`
+ceiling for the same purpose.
 
 ## Catalog, health, and administration
 
@@ -346,7 +449,8 @@ provider registration is cached. For compile-time payload contracts, see
 | Direct export | `EventLogExporter` |
 | Native real-time subscription | `EventLogSubscription` |
 | Managed watcher lifecycle | `WatcherManager` |
-| Named scenarios | `NamedEventEngine` |
+| Typed event definitions | `EventTypeEngine` |
+| HTML, Excel, and email projection | `EventViewerX.Reporting` |
 | Catalog and health | `EventLogCatalog`, `EventProviderCatalog`, `EventLogProbe` |
 | Administration | `EventLogChannelPolicyService`, `ClassicEventLogManager`, `CollectorSubscriptionManager` |
 | Provider packages | `EventProviderPackageBuilder`, `EventProviderPackageManager` |

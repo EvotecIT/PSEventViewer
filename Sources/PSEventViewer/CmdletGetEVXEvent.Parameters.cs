@@ -10,7 +10,8 @@ public sealed partial class CmdletGetEVXEvent {
     /// so deterministic English is preferred without discarding locally available messages.
     /// </summary>
     [Parameter(Mandatory = false, ParameterSetName = "Channel")]
-    [Parameter(Mandatory = false, ParameterSetName = "NamedEvent")]
+    [Parameter(Mandatory = false, ParameterSetName = "Type")]
+    [Parameter(Mandatory = false, ParameterSetName = "Definition")]
     [Parameter(Mandatory = false, ParameterSetName = "Path")]
     [Parameter(Mandatory = false, ParameterSetName = "Hashtable")]
     [Parameter(Mandatory = false, ParameterSetName = "Xml")]
@@ -57,7 +58,8 @@ public sealed partial class CmdletGetEVXEvent {
     /// <summary>Credentials used for remote channel or structured queries.</summary>
     [Credential]
     [Parameter(Mandatory = false, ParameterSetName = "Channel")]
-    [Parameter(Mandatory = false, ParameterSetName = "NamedEvent")]
+    [Parameter(Mandatory = false, ParameterSetName = "Type")]
+    [Parameter(Mandatory = false, ParameterSetName = "Definition")]
     [Parameter(Mandatory = false, ParameterSetName = "Hashtable")]
     [Parameter(Mandatory = false, ParameterSetName = "Xml")]
     [Parameter(Mandatory = false, ParameterSetName = "Provider")]
@@ -65,7 +67,8 @@ public sealed partial class CmdletGetEVXEvent {
 
     /// <summary>Authentication package used for remote Windows Event Log sessions.</summary>
     [Parameter(Mandatory = false, ParameterSetName = "Channel")]
-    [Parameter(Mandatory = false, ParameterSetName = "NamedEvent")]
+    [Parameter(Mandatory = false, ParameterSetName = "Type")]
+    [Parameter(Mandatory = false, ParameterSetName = "Definition")]
     [Parameter(Mandatory = false, ParameterSetName = "Hashtable")]
     [Parameter(Mandatory = false, ParameterSetName = "Xml")]
     [Parameter(Mandatory = false, ParameterSetName = "Provider")]
@@ -107,7 +110,8 @@ public sealed partial class CmdletGetEVXEvent {
     /// Each isolated failure is emitted as a non-terminating PowerShell error.
     /// </summary>
     [Parameter(Mandatory = false, ParameterSetName = "Channel")]
-    [Parameter(Mandatory = false, ParameterSetName = "NamedEvent")]
+    [Parameter(Mandatory = false, ParameterSetName = "Type")]
+    [Parameter(Mandatory = false, ParameterSetName = "Definition")]
     [Parameter(Mandatory = false, ParameterSetName = "Path")]
     [Parameter(Mandatory = false, ParameterSetName = "Hashtable")]
     [Parameter(Mandatory = false, ParameterSetName = "Xml")]
@@ -135,7 +139,8 @@ public sealed partial class CmdletGetEVXEvent {
     /// default because bookmark creation adds native handle and render work per record.
     /// </summary>
     [Parameter(Mandatory = false, ParameterSetName = "Channel")]
-    [Parameter(Mandatory = false, ParameterSetName = "NamedEvent")]
+    [Parameter(Mandatory = false, ParameterSetName = "Type")]
+    [Parameter(Mandatory = false, ParameterSetName = "Definition")]
     [Parameter(Mandatory = false, ParameterSetName = "Path")]
     [Parameter(Mandatory = false, ParameterSetName = "Hashtable")]
     [Parameter(Mandatory = false, ParameterSetName = "Xml")]

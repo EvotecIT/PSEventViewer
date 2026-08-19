@@ -9,7 +9,7 @@ public class ClientGroupPoliciesApplication : ClientGroupPoliciesBase {
     /// <inheritdoc />
     public override string LogName => "Application";
     /// <inheritdoc />
-    public override NamedEvents NamedEvent => NamedEvents.ClientGroupPoliciesApplication;
+    public override EventType Type => EventType.ClientGroupPoliciesApplication;
 
     /// <summary>Initialises a client-side GPO processing wrapper for Application log events.</summary>
     public ClientGroupPoliciesApplication(EventObject eventObject) : base(eventObject) { }

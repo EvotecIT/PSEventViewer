@@ -19,6 +19,31 @@ public static class EventLogQueryFactory {
             nameof(logNames));
         string?[] machines = NormalizeMachines(
             machineNames);
+        EventLogQueryOptions snapshot =
+            SnapshotAndValidate(options);
+        if (logs.Any(static logName =>
+                string.Equals(
+                    logName,
+                    ForwardedEventsQuerySafety.ChannelName,
+                    StringComparison.OrdinalIgnoreCase))) {
+            var batches = new List<EventLogBatchQuery>(logs.Length);
+            foreach (string logName in logs) {
+                batches.Add(string.Equals(
+                        logName,
+                        ForwardedEventsQuerySafety.ChannelName,
+                        StringComparison.OrdinalIgnoreCase)
+                    ? CreateManagedForwardedBatch(
+                        machines,
+                        filter,
+                        snapshot)
+                    : ForChannels(
+                        new[] { logName },
+                        machines,
+                        filter,
+                        snapshot));
+            }
+            return EventLogBatchQuery.Combine(batches);
+        }
         EventFilter? namedDataSuppression =
             EventFilterCompiler
                 .CreateExcludedNamedDataSuppression(
@@ -30,8 +55,6 @@ public static class EventLogQueryFactory {
         EventFilter[] filters = Partition(
             EventFilterCompiler
                 .WithoutExcludedNamedData(filter));
-        EventLogQueryOptions snapshot =
-            SnapshotAndValidate(options);
         if (namedDataSuppression != null) {
             var structured =
                 new List<EventLogStructuredQuery>(
@@ -112,6 +135,71 @@ public static class EventLogQueryFactory {
             EventLogBatchQuery.ForChannels(
                 queries),
             snapshot);
+    }
+
+    private static EventLogBatchQuery CreateManagedForwardedBatch(
+        IReadOnlyList<string?> machines,
+        EventFilter? filter,
+        EventLogQueryOptions options) {
+
+        ForwardedEventsQuerySafety.ValidateTimeWindow(
+            filter?.StartTime,
+            filter?.EndTime);
+        Func<EventObject, bool>? predicate =
+            ManagedEventFilter.CreatePredicate(filter);
+        EventReadMode readMode =
+            ManagedEventFilter.RequiresStructuredData(filter)
+                ? UpgradeForStructuredData(options.ReadMode)
+                : options.ReadMode;
+        EventLogChannelQuery[] queries = machines
+            .Select(machine => {
+                bool local = EventLogTarget.IsLocalMachine(machine);
+                var query = new EventLogChannelQuery(
+                    ForwardedEventsQuerySafety.ChannelName) {
+                    MachineName = local ? null : machine,
+                    Credential = local ? null : options.Credential,
+                    Authentication = options.Authentication,
+                    XPath = "*",
+                    Oldest = options.Oldest,
+                    ReadMode = readMode,
+                    MessageCulture = options.MessageCulture,
+                    FallbackMessageCulture = options.FallbackMessageCulture,
+                    IncludeBookmark = options.IncludeBookmark,
+                    BookmarkXml = options.BookmarkXml,
+                    BookmarkOffset = options.BookmarkOffset,
+                    StrictBookmark = options.StrictBookmark,
+                    RemoteConnectionTimeoutMilliseconds =
+                        options.RemoteConnectionTimeoutMilliseconds,
+                    RemoteReadTimeoutMilliseconds =
+                        options.RemoteReadTimeoutMilliseconds,
+                    BufferCapacity = options.BufferCapacity,
+                    RpcEndpointPort = options.RpcEndpointPort,
+                    ManagedPredicate = predicate,
+                    ManagedMaxEventsScanned = options.MaxEventsScanned
+                };
+                ForwardedEventsQuerySafety.Apply(
+                    query,
+                    filter?.StartTime,
+                    filter?.EndTime);
+                return query;
+            })
+            .ToArray();
+        EventLogBatchQuery batch = EventLogBatchQuery.ForChannels(queries);
+        batch.MaxEvents = options.MaxEvents;
+        batch.MaxConcurrency = options.MaxConcurrency;
+        batch.ContinueOnError = options.ContinueOnError;
+        batch.FailureHandler = options.FailureHandler;
+        return batch;
+    }
+
+    private static EventReadMode UpgradeForStructuredData(
+        EventReadMode readMode) {
+
+        return readMode switch {
+            EventReadMode.Metadata => EventReadMode.StructuredData,
+            EventReadMode.Message => EventReadMode.StructuredDataAndMessage,
+            _ => readMode
+        };
     }
 
     /// <summary>
@@ -325,6 +413,11 @@ public static class EventLogQueryFactory {
                 nameof(options),
                 "Maximum events must be greater than or equal to zero.");
         }
+        if (options.MaxEventsScanned < 0) {
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                "Maximum scanned events must be greater than or equal to zero.");
+        }
         if (options.MaxConcurrency <= 0 ||
             options.MaxConcurrency >
             EventLogLimits.MaximumConcurrency) {
@@ -377,6 +470,7 @@ public static class EventLogQueryFactory {
             FallbackMessageCulture =
                 options.FallbackMessageCulture,
             MaxEvents = options.MaxEvents,
+            MaxEventsScanned = options.MaxEventsScanned,
             IncludeBookmark =
                 options.IncludeBookmark,
             BookmarkXml = options.BookmarkXml,

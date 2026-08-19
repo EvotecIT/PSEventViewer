@@ -10,7 +10,7 @@ public class ScheduledTaskCreated : EventRuleBase {
     /// <inheritdoc />
     public override string LogName => "Security";
     /// <inheritdoc />
-    public override NamedEvents NamedEvent => NamedEvents.ScheduledTaskCreated;
+    public override EventType Type => EventType.ScheduledTaskCreated;
 
     /// <summary>Accepts scheduled task creation events (4698) in the Security log.</summary>
     public override bool CanHandle(EventObject eventObject) {
@@ -30,7 +30,7 @@ public class ScheduledTaskCreated : EventRuleBase {
     /// <summary>Initialises a scheduled-task-created wrapper from an event record.</summary>
     public ScheduledTaskCreated(EventObject eventObject) : base(eventObject) {
         SourceEvent = eventObject;
-        NamedEventName = "ScheduledTaskCreated";
+        TypeName = "ScheduledTaskCreated";
         Computer = SourceEvent.ComputerName;
         TaskName = SourceEvent.GetValueFromDataDictionary("TaskName");
         var taskContent = SourceEvent.GetValueFromDataDictionary("TaskContent");

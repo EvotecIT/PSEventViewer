@@ -3,7 +3,8 @@
   "RootPath": "..",
   "ExpectedVersion": null,
   "ExpectedVersionMap": {
-    "EventViewerX": "4.0.X"
+    "EventViewerX": "4.0.X",
+    "EventViewerX.Reporting": "4.0.X"
   },
   "ExpectedVersionMapAsInclude": true,
   "ExpectedVersionMapUseWildcards": false,

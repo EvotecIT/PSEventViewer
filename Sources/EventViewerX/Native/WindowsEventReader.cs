@@ -52,11 +52,12 @@ internal static class WindowsEventReader {
                 }
                 break;
             case EventReadMode.Full:
+            case EventReadMode.StructuredDataAndMessage:
                 foreach (NativeEventFull full in ReadFullIterator(
                              query,
                              cancellationToken,
                              queryOpened)) {
-                    yield return new EventObject(full, queriedMachine, containerLog);
+                    yield return new EventObject(full, queriedMachine, containerLog, readMode);
                 }
                 break;
             default:

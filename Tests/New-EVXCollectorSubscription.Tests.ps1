@@ -58,4 +58,41 @@ Describe 'New-EVXCollectorSubscription' {
         Get-EVXCollectorSubscription -Name $Definition.SubscriptionId |
             Should -BeNullOrEmpty
     }
+
+    It 'compiles a built-in Type without a caller-supplied LogName' {
+        $Definition = New-EVXCollectorSubscription `
+            -Name FailedLogons `
+            -SourceComputer DC01 `
+            -Type ADUserLogonFailed `
+            -Enabled $false
+
+        [xml] $Query = $Definition.QueryXml
+        $Query.QueryList.Query.Path | Should -Contain 'Security'
+        ($Definition.QueryXml) | Should -Match '4625'
+        ((Get-Command New-EVXCollectorSubscription).ParameterSets |
+                Where-Object Name -EQ 'Type').Parameters.Name |
+            Should -Not -Contain 'LogName'
+    }
+
+    It 'creates a source-initiated push definition without enumerating sources' {
+        $DomainControllersSid =
+            'S-1-5-21-111111111-222222222-333333333-516'
+        $Definition = New-EVXCollectorSubscription `
+            -Name DomainControllerSecurity `
+            -SubscriptionType SourceInitiated `
+            -CollectorHostName wec01.ad.evotec.xyz `
+            -AllowedSourceSid $DomainControllersSid `
+            -LogName Security `
+            -EventId 4624 `
+            -Enabled $false
+
+        [xml] $Xml = $Definition.ToXml()
+        $Xml.Subscription.SubscriptionType | Should -Be 'SourceInitiated'
+        $Xml.Subscription.Delivery.Mode | Should -Be 'Push'
+        $Xml.Subscription.AllowedSourceDomainComputers | Should -Match '-516'
+        $Xml.Subscription.EventSources | Should -BeNullOrEmpty
+        $Definition.SourceSubscriptionManagerValue | Should -Be (
+            'Server=http://wec01.ad.evotec.xyz:5985/' +
+            'wsman/SubscriptionManager/WEC,Refresh=60')
+    }
 }

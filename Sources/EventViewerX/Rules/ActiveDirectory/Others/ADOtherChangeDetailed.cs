@@ -41,7 +41,7 @@ namespace EventViewerX.Rules.ActiveDirectory {
     /// <inheritdoc />
     public override string LogName => "Security";
     /// <inheritdoc />
-    public override NamedEvents NamedEvent => NamedEvents.ADOtherChangeDetailed;
+    public override EventType Type => EventType.ADOtherChangeDetailed;
 
     /// <summary>Ignores user, computer, OU and group classes; captures all other object changes.</summary>
     public override bool CanHandle(EventObject eventObject) {
@@ -60,7 +60,7 @@ namespace EventViewerX.Rules.ActiveDirectory {
         public ADOtherChangeDetailed(EventObject eventObject) : base(eventObject) {
             SourceEvent = eventObject;
 
-            NamedEventName = "ADOtherChangeDetailed";
+            TypeName = "ADOtherChangeDetailed";
             Computer = SourceEvent.ComputerName;
             Action = SourceEvent.MessageSubject;
             ObjectClass = SourceEvent.GetValueFromDataDictionary("ObjectClass");

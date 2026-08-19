@@ -1,6 +1,8 @@
 $repositoryRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
 $hostDll = Get-BenchmarkInput -Name BenchmarkHostPath -Default (Join-Path $PSScriptRoot 'EventLogParsing.BenchmarkHost\bin\Release\net10.0-windows\EventLogParsing.BenchmarkHost.dll')
 $modulePath = Get-BenchmarkInput -Name PSEventViewerPath -Default (Join-Path $repositoryRoot 'Sources\PSEventViewer\bin\Release\net10.0-windows\PSEventViewer.dll')
+$cliPath = Get-BenchmarkInput -Name EventViewerXCliPath -Default (Join-Path $repositoryRoot 'Sources\EventViewerX.Cli\bin\Release\net10.0-windows\evx.exe')
+$portableCliPath = Get-BenchmarkInput -Name EventViewerXPortableCliPath
 $baselineHostPath = Get-BenchmarkInput -Name BaselineHostPath
 $baselineModulePath = Get-BenchmarkInput -Name BaselineModulePath
 $evtxECmdPath = Get-BenchmarkInput -Name EvtxECmdPath
@@ -8,6 +10,11 @@ $evtxMapsPath = Get-BenchmarkInput -Name EvtxMapsPath
 $largeFixturePath = Get-BenchmarkInput -Name LargeFixturePath
 $expectedLargeCount = Get-BenchmarkInput -Name ExpectedLargeCount -Int -Default 0
 $expensiveSampleCount = Get-BenchmarkInput -Name ExpensiveSampleCount -Int -Default 100000
+$scaleSampleCountsText = Get-BenchmarkInput -Name ScaleSampleCounts -Default '1000,10000,100000,1000000'
+$reportSampleCount = Get-BenchmarkInput -Name ReportSampleCount -Int -Default 1000
+$typedFixturePath = Get-BenchmarkInput -Name TypedFixturePath
+$expectedTypedCount = Get-BenchmarkInput -Name ExpectedTypedCount -Int -Default 0
+$typedEventTypes = Get-BenchmarkInput -Name TypedEventTypes -Default 'ADUserLogon,ADUserLogonFailed,ADUserLockouts'
 $readmeTable = Get-BenchmarkInput -Name ReadmeTable -Default None
 $smokeFixturePath = Join-Path $repositoryRoot 'Tests\Logs\NamedFilterExamples.evtx'
 $powerShellRunner = Join-Path $PSScriptRoot 'Invoke-PowerShellEventLogBenchmark.ps1'
@@ -16,9 +23,17 @@ $benchmarkWrapper = Join-Path $PSScriptRoot 'Invoke-EventLogParsingBenchmark.ps1
 $benchmarkSpec = Join-Path $PSScriptRoot 'event-log-parsing.benchmark.ps1'
 $pwshPath = [string] (Get-Command pwsh -ErrorAction Stop).Source
 $dotnetPath = [string] (Get-Command dotnet -ErrorAction Stop).Source
-if ($readmeTable -notin 'None', 'Common', 'ExactOutput', 'NativeOutput', 'EvtxNative') {
-    throw "ReadmeTable must be None, Common, ExactOutput, NativeOutput, or EvtxNative. Received '$readmeTable'."
+if ($readmeTable -notin 'None', 'Common', 'Scale', 'ColdStart', 'Reporting', 'ExactOutput', 'NativeOutput', 'EvtxNative') {
+    throw "ReadmeTable must be None, Common, Scale, ColdStart, Reporting, ExactOutput, NativeOutput, or EvtxNative. Received '$readmeTable'."
 }
+[long[]] $scaleSampleCounts = @($scaleSampleCountsText.Split(',') |
+        ForEach-Object {
+            [long] $parsed = 0
+            if (-not [long]::TryParse($_.Trim(), [ref] $parsed) -or $parsed -le 0 -or $parsed -gt [int]::MaxValue) {
+                throw "ScaleSampleCounts must contain positive 32-bit event counts. Received '$($_)'."
+            }
+            $parsed
+        } | Sort-Object -Unique)
 
 [array] $fixtures = & {
     [pscustomobject] @{
@@ -36,7 +51,7 @@ if ($readmeTable -notin 'None', 'Common', 'ExactOutput', 'NativeOutput', 'EvtxNa
 }
 
 [array] $definitions = foreach ($fixture in $fixtures) {
-    foreach ($mode in 'Metadata', 'Message', 'StructuredData', 'Full') {
+    foreach ($mode in 'Metadata', 'Message', 'StructuredData', 'StructuredDataAndMessage', 'Full') {
         [pscustomobject] @{
             Name          = "$($fixture.Name)-Common-First-$mode"
             Fixture       = $fixture.Name
@@ -61,7 +76,7 @@ if ($readmeTable -notin 'None', 'Common', 'ExactOutput', 'NativeOutput', 'EvtxNa
         } else {
             $expensiveSampleCount
         }
-        foreach ($mode in 'Metadata', 'Message', 'StructuredData', 'Full') {
+        foreach ($mode in 'Metadata', 'Message', 'StructuredData', 'StructuredDataAndMessage', 'Full') {
             [pscustomobject] @{
                 Name          = "$($fixture.Name)-Common-Sample-$mode"
                 Fixture       = $fixture.Name
@@ -69,6 +84,21 @@ if ($readmeTable -notin 'None', 'Common', 'ExactOutput', 'NativeOutput', 'EvtxNa
                 ExpectedCount = $sampleCount
                 MaxEvents     = $sampleCount
                 Workload      = $mode
+            }
+        }
+    }
+
+    if ($fixture.Name -eq 'Large' -and $fixture.ExpectedCount -gt 0) {
+        foreach ($scaleCount in $scaleSampleCounts | Where-Object { $_ -le $fixture.ExpectedCount }) {
+            foreach ($mode in 'Metadata', 'StructuredDataAndMessage', 'Full') {
+                [pscustomobject] @{
+                    Name          = "$($fixture.Name)-Scale-$scaleCount-$mode"
+                    Fixture       = $fixture.Name
+                    FixturePath   = $fixture.Path
+                    ExpectedCount = $scaleCount
+                    MaxEvents     = $scaleCount
+                    Workload      = $mode
+                }
             }
         }
     }
@@ -161,6 +191,71 @@ if ($readmeTable -notin 'None', 'Common', 'ExactOutput', 'NativeOutput', 'EvtxNa
         OutputFormat    = 'Xml'
         OutputExtension = 'xml'
     }
+    $reportCount = if ($fixture.ExpectedCount -gt 0) {
+        [Math]::Min([long] $fixture.ExpectedCount, [long] $reportSampleCount)
+    } else {
+        $reportSampleCount
+    }
+    foreach ($format in 'Html', 'Excel', 'Email', 'All') {
+        [pscustomobject] @{
+            Name            = "$($fixture.Name)-Report-$format"
+            Fixture         = $fixture.Name
+            FixturePath     = $fixture.Path
+            ExpectedCount   = $reportCount
+            MaxEvents       = $reportCount
+            Workload        = "Report$format"
+            ReadMode        = 'StructuredDataAndMessage'
+            ReportFormat    = $format
+            OutputExtension = switch ($format) {
+                'Excel' { 'xlsx' }
+                default { 'html' }
+            }
+        }
+    }
+}
+
+[array] $typedDefinitions = if ($typedFixturePath) {
+    if ($expectedTypedCount -le 0) {
+        throw 'TypedFixturePath requires a positive ExpectedTypedCount so typed projection identity cannot silently regress.'
+    }
+    [pscustomobject] @{
+        Name          = 'Typed-Scan-StructuredDataAndMessage'
+        Fixture       = 'Typed'
+        FixturePath   = [IO.Path]::GetFullPath($typedFixturePath)
+        ExpectedCount = $expectedTypedCount
+        MaxEvents     = 0
+        Workload      = 'TypedScan'
+        ReadMode      = 'StructuredDataAndMessage'
+        Types         = $typedEventTypes
+    }
+    $typedReportCount = [Math]::Min([long] $expectedTypedCount, [long] $reportSampleCount)
+    foreach ($format in 'Html', 'Excel', 'Email', 'All') {
+        [pscustomobject] @{
+            Name            = "Typed-Report-$format"
+            Fixture         = 'Typed'
+            FixturePath     = [IO.Path]::GetFullPath($typedFixturePath)
+            ExpectedCount   = $typedReportCount
+            MaxEvents       = $typedReportCount
+            Workload        = "TypedReport$format"
+            ReadMode        = 'StructuredDataAndMessage'
+            Types           = $typedEventTypes
+            ReportFormat    = $format
+            OutputExtension = switch ($format) {
+                'Excel' { 'xlsx' }
+                default { 'html' }
+            }
+        }
+    }
+}
+$definitions = @($definitions) + @($typedDefinitions | Where-Object { $null -ne $_ })
+$definitions += [pscustomobject] @{
+    Name          = 'Smoke-Command-Cold-StructuredDataAndMessage'
+    Fixture       = 'Smoke'
+    FixturePath   = $smokeFixturePath
+    ExpectedCount = 1
+    MaxEvents     = 1
+    Workload      = 'CommandCold'
+    ReadMode      = 'StructuredDataAndMessage'
 }
 
 $caseDefinitions = @{}
@@ -185,8 +280,19 @@ New-BenchmarkSuite 'event-log-parsing' -OutputRoot (Join-Path $repositoryRoot 'I
     Add-BenchmarkMetadata PowerShellVersion $PSVersionTable.PSVersion.ToString()
     Add-BenchmarkMetadata BenchmarkHostSha256 (Get-FileHash -LiteralPath $hostDll -Algorithm SHA256).Hash
     Add-BenchmarkMetadata PSEventViewerSha256 (Get-FileHash -LiteralPath $modulePath -Algorithm SHA256).Hash
+    Add-BenchmarkMetadata EventViewerXCliSha256 (Get-FileHash -LiteralPath $cliPath -Algorithm SHA256).Hash
+    if ($portableCliPath) {
+        Add-BenchmarkMetadata EventViewerXPortableCliSha256 (Get-FileHash -LiteralPath $portableCliPath -Algorithm SHA256).Hash
+    }
     Add-BenchmarkMetadata BenchmarkHostEventViewerXSha256 (Get-FileHash -LiteralPath (Join-Path (Split-Path -Parent $hostDll) 'EventViewerX.dll') -Algorithm SHA256).Hash
-    Add-BenchmarkMetadata PSEventViewerEventViewerXSha256 (Get-FileHash -LiteralPath (Join-Path (Split-Path -Parent $modulePath) 'EventViewerX.dll') -Algorithm SHA256).Hash
+    $moduleDirectory = Split-Path -Parent $modulePath
+    $moduleEventViewerXPath = @(
+        Join-Path $moduleDirectory 'EventViewerX.dll'
+        Join-Path $moduleDirectory 'Lib\Core\EventViewerX.dll'
+    ) | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } | Select-Object -First 1
+    if ($moduleEventViewerXPath) {
+        Add-BenchmarkMetadata PSEventViewerEventViewerXSha256 (Get-FileHash -LiteralPath $moduleEventViewerXPath -Algorithm SHA256).Hash
+    }
     Add-BenchmarkMetadata BenchmarkScriptManifest ([string] (@(
         foreach ($scriptPath in $benchmarkWrapper, $benchmarkSpec, $powerShellRunner, $evtxRunner) {
             [ordered] @{
@@ -276,6 +382,11 @@ New-BenchmarkSuite 'event-log-parsing' -OutputRoot (Join-Path $repositoryRoot 'I
                 $cleanupPath
             }
         }
+        if ($run.Definition.Workload -like '*Report*' -and $run.EventOutputPath) {
+            foreach ($extension in '.html', '.xlsx', '.email.html', '.email.txt', '.txt') {
+                [IO.Path]::ChangeExtension($run.EventOutputPath, $extension)
+            }
+        }
         Remove-Item -LiteralPath $cleanupPaths -Force -ErrorAction SilentlyContinue
     }
 
@@ -283,6 +394,21 @@ New-BenchmarkSuite 'event-log-parsing' -OutputRoot (Join-Path $repositoryRoot 'I
         param($case)
 
         $definition = $caseDefinitions[$case.Scenario]
+        if ($definition.Workload -eq 'CommandCold') {
+            if ($case.Engine -eq 'EventViewerXCliPortable') {
+                return -not $portableCliPath
+            }
+            return $case.Engine -notin 'EventViewerXCli', 'PSEventViewer', 'GetWinEvent'
+        }
+        if ($definition.Workload -eq 'TypedScan') {
+            return $case.Engine -ne 'EventViewerXTyped'
+        }
+        if ($definition.Workload -like '*Report*') {
+            return $case.Engine -ne 'EventViewerXReport'
+        }
+        if ($case.Engine -in 'EventViewerXTyped', 'EventViewerXReport', 'EventViewerXCli', 'EventViewerXCliPortable') {
+            return $true
+        }
         if ($definition.Workload -like 'Evtx*') {
             return $case.Engine -ne 'EvtxECmd' -or -not $evtxECmdPath -or -not $evtxMapsPath
         }
@@ -323,7 +449,7 @@ New-BenchmarkSuite 'event-log-parsing' -OutputRoot (Join-Path $repositoryRoot 'I
             $definition = $run.Definition
             $readMode = if ($definition.Workload -eq 'MetadataCsv') {
                 'Metadata'
-            } elseif ($definition.Workload -eq 'ExactRawXml') {
+            } elseif ($definition.Workload -in 'ExactRawXml', 'CommandCold') {
                 $definition.ReadMode
             } else {
                 $definition.Workload
@@ -391,6 +517,158 @@ New-BenchmarkSuite 'event-log-parsing' -OutputRoot (Join-Path $repositoryRoot 'I
         }
     }
 
+    Add-BenchmarkEngine EventViewerXTyped {
+        Add-BenchmarkOperation Scan {
+            param($case, $run)
+
+            $definition = $run.Definition
+            [array] $arguments = @(
+                $hostDll
+                '--engine'
+                'eventviewerxtyped'
+                '--path'
+                $definition.FixturePath
+                '--mode'
+                'StructuredDataAndMessage'
+                '--result'
+                $run.ResultPath
+                '--max-events'
+                $definition.MaxEvents
+                '--type'
+                $definition.Types
+            )
+            & $dotnetPath @arguments *> $run.StandardOutputPath
+            if ($LASTEXITCODE -ne 0) {
+                throw "EventViewerX typed benchmark host exited with code $LASTEXITCODE."
+            }
+        }
+    }
+
+    Add-BenchmarkEngine EventViewerXReport {
+        Add-BenchmarkOperation Scan {
+            param($case, $run)
+
+            $definition = $run.Definition
+            [array] $arguments = @(
+                $hostDll
+                '--engine'
+                'eventviewerxreport'
+                '--path'
+                $definition.FixturePath
+                '--mode'
+                'StructuredDataAndMessage'
+                '--result'
+                $run.ResultPath
+                '--max-events'
+                $definition.MaxEvents
+                '--output-path'
+                $run.EventOutputPath
+                '--report-format'
+                $definition.ReportFormat
+                if ($definition.Types) {
+                    '--type'
+                    $definition.Types
+                }
+            )
+            & $dotnetPath @arguments *> $run.StandardOutputPath
+            if ($LASTEXITCODE -ne 0) {
+                throw "EventViewerX report benchmark host exited with code $LASTEXITCODE."
+            }
+        }
+    }
+
+    Add-BenchmarkEngine EventViewerXCli {
+        Add-BenchmarkOperation Scan {
+            param($case, $run)
+
+            $definition = $run.Definition
+            [array] $lines = @(& $cliPath query `
+                    --path $definition.FixturePath `
+                    --max $definition.MaxEvents `
+                    --oldest 2> $run.StandardOutputPath)
+            if ($LASTEXITCODE -ne 0) {
+                throw "EventViewerX CLI benchmark process exited with code $LASTEXITCODE."
+            }
+            [array] $rows = @($lines | ForEach-Object { $_ | ConvertFrom-Json })
+            [ordered] @{
+                Engine               = 'eventviewerxcli'
+                ReadMode             = $definition.ReadMode
+                FixturePath          = [IO.Path]::GetFullPath($definition.FixturePath)
+                RuntimeVersion       = [Environment]::Version.ToString()
+                ProductVersion       = [Diagnostics.FileVersionInfo]::GetVersionInfo($cliPath).ProductVersion
+                Count                = $rows.Count
+                IdSum                = 0
+                RecordIdSum          = 0
+                TimeTicksXor         = 0
+                OrderSignature       = 0
+                FirstRecordId        = $null
+                LastRecordId         = $null
+                MetadataTouch        = 0
+                MessageCharacters    = 0
+                XmlCharacters        = 0
+                PropertyCount        = 0
+                StructuredFieldCount = 0
+                MessageFieldCount    = 0
+                AttachmentBytes      = 0
+                AllocatedBytes       = 0
+                PeakWorkingSetBytes  = 0
+                Gen0Collections      = 0
+                Gen1Collections      = 0
+                Gen2Collections      = 0
+                ElapsedMilliseconds  = 0
+                OutputPath           = $null
+                OutputBytes          = [Text.Encoding]::UTF8.GetByteCount([string] ($lines -join "`n"))
+                OutputSha256         = $null
+            } | ConvertTo-Json | Set-Content -LiteralPath $run.ResultPath -Encoding utf8
+        }
+    }
+
+    Add-BenchmarkEngine EventViewerXCliPortable {
+        Add-BenchmarkOperation Scan {
+            param($case, $run)
+
+            $definition = $run.Definition
+            [array] $lines = @(& $portableCliPath query `
+                    --path $definition.FixturePath `
+                    --max $definition.MaxEvents `
+                    --oldest 2> $run.StandardOutputPath)
+            if ($LASTEXITCODE -ne 0) {
+                throw "Portable EventViewerX CLI benchmark process exited with code $LASTEXITCODE."
+            }
+            [array] $rows = @($lines | ForEach-Object { $_ | ConvertFrom-Json })
+            [ordered] @{
+                Engine               = 'eventviewerxcliportable'
+                ReadMode             = $definition.ReadMode
+                FixturePath          = [IO.Path]::GetFullPath($definition.FixturePath)
+                RuntimeVersion       = [Environment]::Version.ToString()
+                ProductVersion       = [Diagnostics.FileVersionInfo]::GetVersionInfo($portableCliPath).ProductVersion
+                Count                = $rows.Count
+                IdSum                = 0
+                RecordIdSum          = 0
+                TimeTicksXor         = 0
+                OrderSignature       = 0
+                FirstRecordId        = $null
+                LastRecordId         = $null
+                MetadataTouch        = 0
+                MessageCharacters    = 0
+                XmlCharacters        = 0
+                PropertyCount        = 0
+                StructuredFieldCount = 0
+                MessageFieldCount    = 0
+                AttachmentBytes      = 0
+                AllocatedBytes       = 0
+                PeakWorkingSetBytes  = 0
+                Gen0Collections      = 0
+                Gen1Collections      = 0
+                Gen2Collections      = 0
+                ElapsedMilliseconds  = 0
+                OutputPath           = $null
+                OutputBytes          = [Text.Encoding]::UTF8.GetByteCount([string] ($lines -join "`n"))
+                OutputSha256         = $null
+            } | ConvertTo-Json | Set-Content -LiteralPath $run.ResultPath -Encoding utf8
+        }
+    }
+
     Add-BenchmarkEngine EventViewerXExport {
         Add-BenchmarkOperation Scan {
             param($case, $run)
@@ -435,7 +713,7 @@ New-BenchmarkSuite 'event-log-parsing' -OutputRoot (Join-Path $repositoryRoot 'I
             $definition = $run.Definition
             $readMode = if ($definition.Workload -eq 'MetadataCsv') {
                 'Metadata'
-            } elseif ($definition.Workload -eq 'ExactRawXml') {
+            } elseif ($definition.Workload -in 'ExactRawXml', 'CommandCold') {
                 $definition.ReadMode
             } else {
                 $definition.Workload
@@ -482,7 +760,7 @@ New-BenchmarkSuite 'event-log-parsing' -OutputRoot (Join-Path $repositoryRoot 'I
             $definition = $run.Definition
             $readMode = if ($definition.Workload -eq 'MetadataCsv') {
                 'Metadata'
-            } elseif ($definition.Workload -eq 'ExactRawXml') {
+            } elseif ($definition.Workload -in 'ExactRawXml', 'CommandCold') {
                 $definition.ReadMode
             } else {
                 $definition.Workload
@@ -529,7 +807,7 @@ New-BenchmarkSuite 'event-log-parsing' -OutputRoot (Join-Path $repositoryRoot 'I
             $definition = $run.Definition
             $readMode = if ($definition.Workload -eq 'MetadataCsv') {
                 'Metadata'
-            } elseif ($definition.Workload -eq 'ExactRawXml') {
+            } elseif ($definition.Workload -in 'ExactRawXml', 'CommandCold') {
                 $definition.ReadMode
             } else {
                 $definition.Workload
@@ -629,14 +907,17 @@ New-BenchmarkSuite 'event-log-parsing' -OutputRoot (Join-Path $repositoryRoot 'I
         $requiresOutput = $definition.Workload -eq 'MetadataCsv' -or
             $definition.Workload -eq 'ExactRawXml' -or
             ($definition.Workload -like 'Evtx*' -and $definition.Workload -ne 'EvtxNativeParse') -or
-            $definition.Workload -like 'NativeOutput*'
+            $definition.Workload -like 'NativeOutput*' -or
+            $definition.Workload -like '*Report*'
         if ($requiresOutput) {
             Assert-BenchmarkPath $run.EventOutputPath
             $outputFile = Get-Item -LiteralPath $run.EventOutputPath
             if ($outputFile.Length -le 0) {
                 throw "The $($definition.Workload) benchmark did not produce a non-empty output file."
             }
-            $run.Result.OutputBytes = [long] $outputFile.Length
+            if ($definition.Workload -notlike '*Report*') {
+                $run.Result.OutputBytes = [long] $outputFile.Length
+            }
             $run.Result.OutputSha256 = [string] (Get-FileHash -LiteralPath $outputFile.FullName -Algorithm SHA256).Hash
             [ordered] @{
                 FileName = $outputFile.Name
@@ -645,7 +926,7 @@ New-BenchmarkSuite 'event-log-parsing' -OutputRoot (Join-Path $repositoryRoot 'I
             } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $run.OutputDirectory 'output-validation.json') -Encoding utf8
         }
 
-        if ($definition.Workload -in 'Metadata', 'Message', 'StructuredData', 'Full', 'MetadataCsv') {
+        if ($definition.Workload -in 'Metadata', 'Message', 'StructuredData', 'StructuredDataAndMessage', 'Full', 'MetadataCsv') {
             if ([long] $run.Result.IdSum -le 0 -or [long] $run.Result.RecordIdSum -le 0) {
                 throw 'The common-work benchmark did not record non-empty event identity checks.'
             }
@@ -694,11 +975,11 @@ New-BenchmarkSuite 'event-log-parsing' -OutputRoot (Join-Path $repositoryRoot 'I
                 if ([long] $run.Result.XmlCharacters -le 0 -or [long] $run.Result.PropertyCount -le 0) {
                     throw 'StructuredData mode did not materialize XML and event properties.'
                 }
-            } elseif ($readMode -eq 'Full' -and (
+            } elseif (($readMode -in @('StructuredDataAndMessage', 'Full')) -and (
                 [long] $run.Result.MessageCharacters -le 0 -or
                 [long] $run.Result.XmlCharacters -le 0 -or
                 [long] $run.Result.PropertyCount -le 0)) {
-                throw 'Full mode did not format messages or materialize XML and event properties.'
+                throw "$readMode mode did not format messages or materialize XML and event properties."
             }
         }
 
@@ -716,6 +997,14 @@ New-BenchmarkSuite 'event-log-parsing' -OutputRoot (Join-Path $repositoryRoot 'I
         # payloads. KeepOnFailure still preserves the output when an assertion above fails.
         if ($requiresOutput -and (Test-Path -LiteralPath $run.EventOutputPath -PathType Leaf)) {
             Remove-Item -LiteralPath $run.EventOutputPath -Force
+        }
+        if ($definition.Workload -like '*Report*' -and $run.EventOutputPath) {
+            foreach ($extension in '.xlsx', '.email.html', '.email.txt', '.txt') {
+                $sidecarPath = [IO.Path]::ChangeExtension($run.EventOutputPath, $extension)
+                if (Test-Path -LiteralPath $sidecarPath -PathType Leaf) {
+                    Remove-Item -LiteralPath $sidecarPath -Force
+                }
+            }
         }
     }
 
@@ -856,11 +1145,15 @@ New-BenchmarkSuite 'event-log-parsing' -OutputRoot (Join-Path $repositoryRoot 'I
         }
     }
 
-    if ($readmeTable -eq 'Common' -or $readmeTable -eq 'ExactOutput') {
+    if ($readmeTable -in 'Common', 'Scale', 'ExactOutput') {
         Add-BenchmarkComparison Engine -Baseline PSEventViewer -Metric MedianMs -TieTolerance 0.03
         if ($readmeTable -eq 'ExactOutput') {
             Add-BenchmarkComparison Engine -Baseline PSEventViewer -Metric OutputBytes
         }
+    } elseif ($readmeTable -eq 'ColdStart') {
+        Add-BenchmarkComparison Engine -Baseline EventViewerXCli -Metric MedianMs -TieTolerance 0.03
+    } elseif ($readmeTable -eq 'Reporting') {
+        Add-BenchmarkComparison Engine -Baseline EventViewerXReport -Metric MedianMs -TieTolerance 0.03
     } elseif ($readmeTable -eq 'NativeOutput') {
         Add-BenchmarkComparison Engine -Baseline EventViewerXExport -Metric MedianMs -TieTolerance 0.03
         Add-BenchmarkComparison Engine -Baseline EventViewerXExport -Metric OutputBytes

@@ -59,7 +59,7 @@ public class ADUserChangeDetailed : EventRuleBase {
     public override string LogName => "Security";
 
     /// <inheritdoc />
-    public override NamedEvents NamedEvent => NamedEvents.ADUserChangeDetailed;
+    public override EventType Type => EventType.ADUserChangeDetailed;
 
     /// <summary>Handles only directory events where the object class is <c>user</c>.</summary>
     public override bool CanHandle(EventObject eventObject) {
@@ -73,7 +73,7 @@ public class ADUserChangeDetailed : EventRuleBase {
     public ADUserChangeDetailed(EventObject eventObject) : base(eventObject) {
         SourceEvent = eventObject;
 
-        NamedEventName = "ADUserChangeDetailed";
+        TypeName = "ADUserChangeDetailed";
         Computer = SourceEvent.ComputerName;
         Action = SourceEvent.MessageSubject;
         ObjectClass = SourceEvent.GetValueFromDataDictionary("ObjectClass");

@@ -48,8 +48,8 @@ public sealed class TestEventLogEngineAsync {
 
     [Fact]
     public async Task CancellationDoesNotWaitForAStuckNativeProducer() {
-        using var producerEntered =
-            new ManualResetEventSlim();
+        var producerEntered = new TaskCompletionSource<bool>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
         using var releaseProducer =
             new ManualResetEventSlim();
         using var cancellation =
@@ -65,7 +65,7 @@ public sealed class TestEventLogEngineAsync {
             Task<bool> moveNext =
                 enumerator.MoveNextAsync().AsTask();
             Assert.True(
-                producerEntered.Wait(
+                await producerEntered.Task.WaitAsync(
                     TimeSpan.FromSeconds(5)),
                 "The producer did not enter the blocking source.");
 
@@ -82,7 +82,7 @@ public sealed class TestEventLogEngineAsync {
         }
 
         IEnumerable<EventObject> BlockingSource() {
-            producerEntered.Set();
+            producerEntered.TrySetResult(true);
             releaseProducer.Wait();
             yield break;
         }
@@ -90,7 +90,8 @@ public sealed class TestEventLogEngineAsync {
 
     [Fact]
     public async Task StreamCancellationPreservesTheSuppliedToken() {
-        using var producerEntered = new ManualResetEventSlim();
+        var producerEntered = new TaskCompletionSource<bool>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
         using var releaseProducer = new ManualResetEventSlim();
         using var cancellation = new CancellationTokenSource();
         IAsyncEnumerator<EventObject> enumerator =
@@ -100,7 +101,8 @@ public sealed class TestEventLogEngineAsync {
                     cancellation.Token)
                 .GetAsyncEnumerator();
         Task<bool> moveNext = enumerator.MoveNextAsync().AsTask();
-        Assert.True(producerEntered.Wait(TimeSpan.FromSeconds(5)));
+        Assert.True(
+            await producerEntered.Task.WaitAsync(TimeSpan.FromSeconds(5)));
 
         cancellation.Cancel();
 
@@ -113,7 +115,7 @@ public sealed class TestEventLogEngineAsync {
         await enumerator.DisposeAsync();
 
         IEnumerable<EventObject> BlockingSource() {
-            producerEntered.Set();
+            producerEntered.TrySetResult(true);
             releaseProducer.Wait();
             yield break;
         }
@@ -121,7 +123,8 @@ public sealed class TestEventLogEngineAsync {
 
     [Fact]
     public async Task EnumerationCancellationPreservesTheSuppliedToken() {
-        using var producerEntered = new ManualResetEventSlim();
+        var producerEntered = new TaskCompletionSource<bool>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
         using var releaseProducer = new ManualResetEventSlim();
         using var cancellation = new CancellationTokenSource();
         IAsyncEnumerator<EventObject> enumerator =
@@ -131,7 +134,8 @@ public sealed class TestEventLogEngineAsync {
                     CancellationToken.None)
                 .GetAsyncEnumerator(cancellation.Token);
         Task<bool> moveNext = enumerator.MoveNextAsync().AsTask();
-        Assert.True(producerEntered.Wait(TimeSpan.FromSeconds(5)));
+        Assert.True(
+            await producerEntered.Task.WaitAsync(TimeSpan.FromSeconds(5)));
 
         cancellation.Cancel();
 
@@ -144,7 +148,7 @@ public sealed class TestEventLogEngineAsync {
         await enumerator.DisposeAsync();
 
         IEnumerable<EventObject> BlockingSource() {
-            producerEntered.Set();
+            producerEntered.TrySetResult(true);
             releaseProducer.Wait();
             yield break;
         }
@@ -152,7 +156,8 @@ public sealed class TestEventLogEngineAsync {
 
     [Fact]
     public async Task ConcurrentMoveNextAndDisposeCompleteWithoutWaitingForProducer() {
-        using var producerEntered = new ManualResetEventSlim();
+        var producerEntered = new TaskCompletionSource<bool>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
         using var releaseProducer = new ManualResetEventSlim();
         IAsyncEnumerator<EventObject> enumerator =
             EventLogEngine.ReadAsync(
@@ -163,7 +168,8 @@ public sealed class TestEventLogEngineAsync {
         try {
             Task<bool> moveNext = enumerator.MoveNextAsync().AsTask();
             Assert.True(
-                producerEntered.Wait(TimeSpan.FromSeconds(5)),
+                await producerEntered.Task.WaitAsync(
+                    TimeSpan.FromSeconds(5)),
                 "The producer did not enter the blocking source.");
 
             Task dispose = enumerator.DisposeAsync().AsTask();
@@ -175,7 +181,7 @@ public sealed class TestEventLogEngineAsync {
         }
 
         IEnumerable<EventObject> BlockingSource() {
-            producerEntered.Set();
+            producerEntered.TrySetResult(true);
             releaseProducer.Wait();
             yield break;
         }
@@ -184,7 +190,8 @@ public sealed class TestEventLogEngineAsync {
     [Fact]
     public async Task CancellationAndDisposalRemainStableAcrossRepeatedRaces() {
         for (var iteration = 0; iteration < 100; iteration++) {
-            using var producerEntered = new ManualResetEventSlim();
+            var producerEntered = new TaskCompletionSource<bool>(
+                TaskCreationOptions.RunContinuationsAsynchronously);
             using var releaseProducer = new ManualResetEventSlim();
             using var cancellation = new CancellationTokenSource();
             IAsyncEnumerator<EventObject> enumerator =
@@ -196,7 +203,8 @@ public sealed class TestEventLogEngineAsync {
             try {
                 Task<bool> moveNext = enumerator.MoveNextAsync().AsTask();
                 Assert.True(
-                    producerEntered.Wait(TimeSpan.FromSeconds(2)),
+                    await producerEntered.Task.WaitAsync(
+                        TimeSpan.FromSeconds(2)),
                     $"Producer did not start in iteration {iteration}.");
 
                 cancellation.Cancel();
@@ -211,7 +219,7 @@ public sealed class TestEventLogEngineAsync {
             }
 
             IEnumerable<EventObject> BlockingSource() {
-                producerEntered.Set();
+                producerEntered.TrySetResult(true);
                 releaseProducer.Wait();
                 yield break;
             }

@@ -155,6 +155,13 @@ public static class CollectorSubscriptionXml {
                 .Where(static element => element.Name.LocalName.Equals("Locale", StringComparison.OrdinalIgnoreCase))
                 .Remove();
         }
+        root.Elements()
+            .Where(static element =>
+                element.Name.LocalName.Equals("AllowedSourceNonDomainComputers", StringComparison.OrdinalIgnoreCase) &&
+                string.IsNullOrWhiteSpace(element.Value) &&
+                !element.HasElements &&
+                !element.HasAttributes)
+            .Remove();
         foreach (XElement query in root.Elements()
                      .Where(static element => element.Name.LocalName.Equals("Query", StringComparison.OrdinalIgnoreCase))) {
             string value = query.Value.Trim();

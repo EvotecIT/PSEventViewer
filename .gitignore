@@ -4,6 +4,9 @@ Ignore/*
 Examples/Output/*
 Releases/*
 Artefacts/*
+.powerforge/
+.playwright-cli/
+/output/
 ReleasedUnpacked/*
 Sources/.vs
 Sources/*/.vs

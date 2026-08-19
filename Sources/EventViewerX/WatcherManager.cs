@@ -24,7 +24,7 @@ namespace EventViewerX {
             TimeSpan? timeout = null,
             string? actionIdentity = null,
             string? reuseScopeIdentity = null,
-            IReadOnlyList<NamedEvents>? namedEvents = null,
+            IReadOnlyList<EventType>? namedEvents = null,
             CancellationToken cancellationToken = default) {
 
             if (query == null) {
@@ -55,7 +55,7 @@ namespace EventViewerX {
             TimeSpan? timeout = null,
             string? actionIdentity = null,
             string? reuseScopeIdentity = null,
-            IReadOnlyList<NamedEvents>? namedEvents = null,
+            IReadOnlyList<EventType>? namedEvents = null,
             CancellationToken cancellationToken = default) {
 
             cancellationToken.ThrowIfCancellationRequested();
@@ -85,7 +85,7 @@ namespace EventViewerX {
                     : first.MachineName!,
                 first.LogName,
                 new List<int>(),
-                namedEvents?.ToList() ?? new List<NamedEvents>(),
+                namedEvents?.ToList() ?? new List<EventType>(),
                 action,
                 staging: false,
                 stopOnMatch,
@@ -107,7 +107,7 @@ namespace EventViewerX {
         /// <param name="machineName">Target computer.</param>
         /// <param name="logName">Log name to monitor.</param>
         /// <param name="eventIds">Event IDs to watch.</param>
-        /// <param name="namedEvents">NamedEvents packs expanded for discovery.</param>
+        /// <param name="namedEvents">EventType packs expanded for discovery.</param>
         /// <param name="action">Callback invoked for each matching event.</param>
         /// <param name="staging">When true, also watches staging events (e.g., 350).</param>
         /// <param name="stopOnMatch">Stop after first match when true.</param>
@@ -124,7 +124,7 @@ namespace EventViewerX {
             string machineName,
             string logName,
             List<int> eventIds,
-            List<NamedEvents> namedEvents,
+            List<EventType> namedEvents,
             Action<EventObject> action,
             bool staging,
             bool stopOnMatch,
@@ -252,7 +252,7 @@ namespace EventViewerX {
             string machineName,
             string logName,
             IReadOnlyList<int> eventIds,
-            IReadOnlyList<NamedEvents> namedEvents,
+            IReadOnlyList<EventType> namedEvents,
             Action<EventObject> action,
             bool staging,
             bool stopOnMatch,
@@ -348,7 +348,7 @@ namespace EventViewerX {
             string machineName,
             string logName,
             IReadOnlyList<int> eventIds,
-            IReadOnlyList<NamedEvents> namedEvents,
+            IReadOnlyList<EventType> namedEvents,
             Action<EventObject> action,
             bool staging,
             bool stopOnMatch,
@@ -376,7 +376,7 @@ namespace EventViewerX {
             return string.Equals(existing.MachineName, machineName, StringComparison.OrdinalIgnoreCase) &&
                    string.Equals(existing.LogName, logName, StringComparison.OrdinalIgnoreCase) &&
                    existing.EventIds.SequenceEqual(eventIds) &&
-                   existing.NamedEvents.SequenceEqual(namedEvents) &&
+                   existing.Types.SequenceEqual(namedEvents) &&
                    actionMatches &&
                    existing.Staging == staging &&
                    existing.StopOnMatch == stopOnMatch &&

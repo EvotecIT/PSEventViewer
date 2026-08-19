@@ -46,8 +46,8 @@ public sealed class TestNativeEventEngineContracts {
 
     [Fact]
     public async Task CatalogEnumerationCancellationReturnsBeforeNativeWorkAndRetainsSession() {
-        using var started =
-            new ManualResetEventSlim();
+        var started = new TaskCompletionSource<bool>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
         using var release =
             new ManualResetEventSlim();
         using var disposed =
@@ -62,7 +62,7 @@ public sealed class TestNativeEventEngineContracts {
         Task<string[]> enumeration = Task.Run(() =>
             EventLogCatalog.EnumerateNamesBounded(
                 () => {
-                    started.Set();
+                    started.TrySetResult(true);
                     release.Wait();
                     return new[] {
                         "Application"
@@ -72,9 +72,8 @@ public sealed class TestNativeEventEngineContracts {
                 "catalog enumeration timed out",
                 cancellation.Token,
                 lifetime.Retain()));
-        Assert.True(
-            started.Wait(
-                TimeSpan.FromSeconds(5)));
+        await started.Task.WaitAsync(
+            TimeSpan.FromSeconds(5));
 
         cancellation.Cancel();
         Task completed = await Task.WhenAny(
@@ -103,8 +102,8 @@ public sealed class TestNativeEventEngineContracts {
 
     [Fact]
     public async Task ProviderMetadataCancellationReturnsBeforeNativeWorkAndRetainsSession() {
-        using var started =
-            new ManualResetEventSlim();
+        var started = new TaskCompletionSource<bool>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
         using var release =
             new ManualResetEventSlim();
         using var disposed =
@@ -120,7 +119,7 @@ public sealed class TestNativeEventEngineContracts {
             Task.Run(() =>
                 EventLogCatalog.SnapshotProviderBounded(
                     () => {
-                        started.Set();
+                        started.TrySetResult(true);
                         release.Wait();
                         return null!;
                     },
@@ -128,9 +127,8 @@ public sealed class TestNativeEventEngineContracts {
                     5000,
                     cancellation.Token,
                     lifetime.Retain()));
-        Assert.True(
-            started.Wait(
-                TimeSpan.FromSeconds(5)));
+        await started.Task.WaitAsync(
+            TimeSpan.FromSeconds(5));
 
         cancellation.Cancel();
         Task completed = await Task.WhenAny(
@@ -193,8 +191,8 @@ public sealed class TestNativeEventEngineContracts {
 
     [Fact]
     public async Task LocalClearReturnsOnCancellationWhileNativeWorkRetainsOwnership() {
-        using var started =
-            new ManualResetEventSlim();
+        var started = new TaskCompletionSource<bool>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
         using var release =
             new ManualResetEventSlim();
         using var cancellation =
@@ -202,13 +200,12 @@ public sealed class TestNativeEventEngineContracts {
         Task clear = Task.Run(() =>
             EventLogMaintenance.ExecuteLocalClear(
                 () => {
-                    started.Set();
+                    started.TrySetResult(true);
                     release.Wait();
                 },
                 cancellation.Token));
-        Assert.True(
-            started.Wait(
-                TimeSpan.FromSeconds(5)));
+        await started.Task.WaitAsync(
+            TimeSpan.FromSeconds(5));
 
         cancellation.Cancel();
         Task completed = await Task.WhenAny(
@@ -227,8 +224,8 @@ public sealed class TestNativeEventEngineContracts {
 
     [Fact]
     public async Task RemoteClearReturnsOnCancellationWhileNativeWorkRetainsOwnership() {
-        using var started =
-            new ManualResetEventSlim();
+        var started = new TaskCompletionSource<bool>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
         using var release =
             new ManualResetEventSlim();
         using var leaseReleased =
@@ -241,15 +238,14 @@ public sealed class TestNativeEventEngineContracts {
         Task clear = Task.Run(() =>
             EventLogMaintenance.ExecuteRemoteClear(
                 () => {
-                    started.Set();
+                    started.TrySetResult(true);
                     release.Wait();
                 },
                 5000,
                 cancellation.Token,
                 lease));
-        Assert.True(
-            started.Wait(
-                TimeSpan.FromSeconds(5)));
+        await started.Task.WaitAsync(
+            TimeSpan.FromSeconds(5));
 
         cancellation.Cancel();
         Task completed = await Task.WhenAny(
@@ -474,6 +470,16 @@ public sealed class TestNativeEventEngineContracts {
         Assert.Equal(
             EventReadMode.Message,
             new EventLogQueryOptions().ReadMode);
+    }
+
+    [Fact]
+    public void TypedQueriesDefaultToMessageAndStructuredDataWithoutAttachments() {
+        var query = new EventTypeQuery(
+            new[] { EventType.ADUserLogonFailed });
+
+        Assert.Equal(
+            EventReadMode.StructuredDataAndMessage,
+            query.ReadMode);
     }
 
     [Fact]
@@ -999,9 +1005,11 @@ public sealed class TestNativeEventEngineContracts {
 
     [Fact]
     public async Task AsyncStreamCancellationDoesNotWaitForAStalledProducer() {
-        using var entered = new ManualResetEventSlim();
+        var entered = new TaskCompletionSource<bool>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
         using var release = new ManualResetEventSlim();
-        using var exited = new ManualResetEventSlim();
+        var exited = new TaskCompletionSource<bool>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
         using var cancellation =
             new CancellationTokenSource();
         await using IAsyncEnumerator<EventObject> events =
@@ -1012,8 +1020,8 @@ public sealed class TestNativeEventEngineContracts {
                 .GetAsyncEnumerator();
         Task<bool> moveNext =
             events.MoveNextAsync().AsTask();
-        Assert.True(
-            entered.Wait(TimeSpan.FromSeconds(2)));
+        await entered.Task.WaitAsync(
+            TimeSpan.FromSeconds(5));
 
         cancellation.Cancel();
         Task completed = await Task.WhenAny(
@@ -1024,19 +1032,19 @@ public sealed class TestNativeEventEngineContracts {
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
             async () => await moveNext);
         release.Set();
-        Assert.True(
-            exited.Wait(TimeSpan.FromSeconds(5)));
+        await exited.Task.WaitAsync(
+            TimeSpan.FromSeconds(5));
 
         IEnumerable<EventObject> Source(
             CancellationToken cancellationToken) {
 
-            entered.Set();
+            entered.TrySetResult(true);
             try {
                 release.Wait();
                 cancellationToken.ThrowIfCancellationRequested();
                 yield break;
             } finally {
-                exited.Set();
+                exited.TrySetResult(true);
             }
         }
     }

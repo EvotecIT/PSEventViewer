@@ -14,7 +14,7 @@ public class AADSyncImportStatus : EventRuleBase
     /// <inheritdoc />
     public override string LogName => "Application";
     /// <inheritdoc />
-    public override NamedEvents NamedEvent => NamedEvents.AADSyncImportStatus;
+    public override EventType Type => EventType.AADSyncImportStatus;
 
     /// <summary>Accepts Directory Synchronization import/status events.</summary>
     /// <param name="eventObject">Event to evaluate.</param>
@@ -51,7 +51,7 @@ public class AADSyncImportStatus : EventRuleBase
     public AADSyncImportStatus(EventObject eventObject) : base(eventObject)
     {
         SourceEvent = eventObject;
-        NamedEventName = "AADSyncImportStatus";
+        TypeName = "AADSyncImportStatus";
         Computer = SourceEvent.ComputerName;
         When = SourceEvent.TimeCreated;
 

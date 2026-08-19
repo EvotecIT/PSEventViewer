@@ -67,6 +67,9 @@ public static partial class EventLogEngine {
         }
         string logName = query.LogName;
         string xpath = string.IsNullOrWhiteSpace(query.XPath) ? "*" : query.XPath;
+        ForwardedEventsQuerySafety.EnsureNativeChannelQueryIsSafe(
+            logName,
+            xpath);
         bool oldest = query.Oldest;
         EventReadMode readMode = query.ReadMode;
         int messageLocale = query.MessageCulture?.LCID ?? 0;
@@ -86,6 +89,16 @@ public static partial class EventLogEngine {
             : query.BookmarkXml;
         long bookmarkOffset = query.BookmarkOffset;
         bool strictBookmark = query.StrictBookmark;
+        DateTime? managedStartTimeUtc = query.ManagedStartTimeUtc;
+        DateTime? managedEndTimeUtc = query.ManagedEndTimeUtc;
+        Func<EventObject, bool>? managedPredicate = query.ManagedPredicate;
+        long managedMaxEventsScanned = query.ManagedMaxEventsScanned;
+        Action? managedScanLimitReached = query.ManagedScanLimitReached;
+        if (managedMaxEventsScanned < 0) {
+            throw new ArgumentOutOfRangeException(
+                nameof(query),
+                "Maximum managed scanned events must be greater than or equal to zero.");
+        }
 
         return ReadChannelIterator(
             remote,
@@ -107,6 +120,11 @@ public static partial class EventLogEngine {
             bookmarkXml,
             bookmarkOffset,
             strictBookmark,
+            managedStartTimeUtc,
+            managedEndTimeUtc,
+            managedPredicate,
+            managedMaxEventsScanned,
+            managedScanLimitReached,
             cancellationToken);
     }
 
@@ -143,6 +161,8 @@ public static partial class EventLogEngine {
         XElement[] queryElements =
             EventLogStructuredQueryParser.ParseQueries(
                 query.QueryXml);
+        ForwardedEventsQuerySafety.EnsureNativeStructuredQueryIsSafe(
+            queryElements);
         var resolvedSources = queryElements
             .Select(queryElement => new {
                 Query = queryElement,
@@ -231,6 +251,11 @@ public static partial class EventLogEngine {
                 : query.BookmarkXml,
             query.BookmarkOffset,
             query.StrictBookmark,
+            query.ManagedStartTimeUtc,
+            query.ManagedEndTimeUtc,
+            managedPredicate: null,
+            managedMaxEventsScanned: 0,
+            managedScanLimitReached: null,
             query.FailureHandler,
             cancellationToken);
     }
@@ -422,6 +447,11 @@ public static partial class EventLogEngine {
         string? bookmarkXml,
         long bookmarkOffset,
         bool strictBookmark,
+        DateTime? managedStartTimeUtc,
+        DateTime? managedEndTimeUtc,
+        Func<EventObject, bool>? managedPredicate,
+        long managedMaxEventsScanned,
+        Action? managedScanLimitReached,
         CancellationToken cancellationToken) {
 
         WindowsEventNativeMethods.QueryFlags flags =
@@ -452,6 +482,11 @@ public static partial class EventLogEngine {
             bookmarkXml,
             bookmarkOffset,
             strictBookmark,
+            managedStartTimeUtc,
+            managedEndTimeUtc,
+            managedPredicate,
+            managedMaxEventsScanned,
+            managedScanLimitReached,
             failureHandler: null,
             cancellationToken);
     }
@@ -479,35 +514,44 @@ public static partial class EventLogEngine {
         string? bookmarkXml,
         long bookmarkOffset,
         bool strictBookmark,
+        DateTime? managedStartTimeUtc,
+        DateTime? managedEndTimeUtc,
+        Func<EventObject, bool>? managedPredicate,
+        long managedMaxEventsScanned,
+        Action? managedScanLimitReached,
         Action<EventLogQueryFailure>? failureHandler,
         CancellationToken cancellationToken) {
 
+        bool hasManagedTimeWindow =
+            managedStartTimeUtc.HasValue || managedEndTimeUtc.HasValue;
+        bool hasManagedSelection =
+            hasManagedTimeWindow || managedPredicate != null;
+        long nativeMaxEvents = hasManagedSelection ? 0 : maxEvents;
+        IEnumerable<EventObject> events;
         if (remote) {
-            foreach (EventObject eventObject in WindowsEventRemoteReader.Read(
-                         machineName,
-                         path,
-                         query,
-                         displayName,
-                         containerLog,
-                         flags,
-                         readMode,
-                         messageLocale,
-                         fallbackMessageLocale,
-                         includeBookmark,
-                         maxEvents,
-                         remoteConnectionTimeoutMilliseconds,
-                         remoteReadTimeoutMilliseconds,
-                         bufferCapacity,
-                         rpcEndpointPort,
-                         credential,
-                         authentication,
-                         bookmarkXml,
-                         bookmarkOffset,
-                         strictBookmark,
-                         failureHandler,
-                         cancellationToken)) {
-                yield return eventObject;
-            }
+            events = WindowsEventRemoteReader.Read(
+                machineName,
+                path,
+                query,
+                displayName,
+                containerLog,
+                flags,
+                readMode,
+                messageLocale,
+                fallbackMessageLocale,
+                includeBookmark,
+                nativeMaxEvents,
+                remoteConnectionTimeoutMilliseconds,
+                remoteReadTimeoutMilliseconds,
+                bufferCapacity,
+                rpcEndpointPort,
+                credential,
+                authentication,
+                bookmarkXml,
+                bookmarkOffset,
+                strictBookmark,
+                failureHandler,
+                cancellationToken);
         } else {
             var nativeQuery = new NativeEventQuery(
                 IntPtr.Zero,
@@ -525,22 +569,49 @@ public static partial class EventLogEngine {
                 strictBookmark: strictBookmark,
                 machineName: machineName,
                 failureHandler: failureHandler);
+            events = WindowsEventReader.Read(
+                nativeQuery,
+                readMode,
+                (flags & WindowsEventNativeMethods.QueryFlags.FilePath) != 0
+                    ? machineName
+                    : Environment.MachineName,
+                containerLog,
+                cancellationToken);
+        }
 
-            long returned = 0;
-            foreach (EventObject eventObject in WindowsEventReader.Read(
-                         nativeQuery,
-                         readMode,
-                         (flags &
-                          WindowsEventNativeMethods.QueryFlags.FilePath) != 0
-                             ? machineName
-                             : Environment.MachineName,
-                         containerLog,
-                         cancellationToken)) {
-                yield return eventObject;
-                returned++;
-                if (maxEvents > 0 && returned >= maxEvents) {
+        long returned = 0;
+        long scanned = 0;
+        bool oldest = (flags & WindowsEventNativeMethods.QueryFlags.ForwardDirection) != 0;
+        foreach (EventObject eventObject in events) {
+            if (managedMaxEventsScanned > 0 &&
+                scanned >= managedMaxEventsScanned) {
+                managedScanLimitReached?.Invoke();
+                yield break;
+            }
+            scanned++;
+            if (hasManagedTimeWindow) {
+                if (ForwardedEventsQuerySafety.HasCrossedWindow(
+                        eventObject,
+                        oldest,
+                        managedStartTimeUtc,
+                        managedEndTimeUtc)) {
                     yield break;
                 }
+                if (!ForwardedEventsQuerySafety.ShouldInclude(
+                        eventObject,
+                        managedStartTimeUtc,
+                        managedEndTimeUtc)) {
+                    continue;
+                }
+            }
+            if (managedPredicate != null &&
+                !managedPredicate(eventObject)) {
+                continue;
+            }
+            yield return eventObject;
+            returned++;
+            if (maxEvents > 0 && returned >= maxEvents) {
+                yield break;
             }
         }
     }

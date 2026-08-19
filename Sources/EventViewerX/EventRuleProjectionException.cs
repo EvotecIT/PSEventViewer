@@ -1,7 +1,7 @@
 namespace EventViewerX;
 
 /// <summary>
-/// Indicates that one or more matching named-event rules failed while projecting a raw event.
+/// Indicates that one or more matching event-type rules failed while projecting a raw event.
 /// </summary>
 public sealed class EventRuleProjectionException : Exception {
     internal EventRuleProjectionException(
@@ -26,7 +26,7 @@ public sealed class EventRuleProjectionException : Exception {
     /// <summary>Source log containing the event.</summary>
     public string LogName { get; }
 
-    /// <summary>Rule types or named-event registrations that failed.</summary>
+    /// <summary>Rule types or event-type registrations that failed.</summary>
     public IReadOnlyList<string> RuleNames { get; }
 
     private static string BuildMessage(EventObject eventObject, IReadOnlyList<string> ruleNames) {
@@ -38,10 +38,6 @@ public sealed class EventRuleProjectionException : Exception {
     }
 
     private static string ResolveLogName(EventObject eventObject) {
-        return !string.IsNullOrWhiteSpace(eventObject.ContainerLog)
-            ? eventObject.ContainerLog
-            : !string.IsNullOrWhiteSpace(eventObject.GatheredLogName)
-                ? eventObject.GatheredLogName
-                : eventObject.LogName;
+        return eventObject.OriginalLogName;
     }
 }

@@ -10,7 +10,7 @@ public class BitLockerSuspended : EventRuleBase {
     /// <inheritdoc />
     public override string LogName => "BitLocker-API";
     /// <inheritdoc />
-    public override NamedEvents NamedEvent => NamedEvents.BitLockerSuspended;
+    public override EventType Type => EventType.BitLockerSuspended;
 
     /// <summary>Accepts BitLocker suspend events from the BitLocker-API log.</summary>
     public override bool CanHandle(EventObject eventObject) {
@@ -28,7 +28,7 @@ public class BitLockerSuspended : EventRuleBase {
     /// <summary>Initialises a BitLocker suspended wrapper from an event record.</summary>
     public BitLockerSuspended(EventObject eventObject) : base(eventObject) {
         SourceEvent = eventObject;
-        NamedEventName = "BitLockerSuspended";
+        TypeName = "BitLockerSuspended";
         Computer = SourceEvent.ComputerName;
         Volume = EventsHelper.GetBitLockerVolumeType(
             SourceEvent.GetValueFromDataDictionary("VolumeName", "Volume"));

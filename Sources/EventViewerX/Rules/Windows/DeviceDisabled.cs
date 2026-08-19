@@ -10,7 +10,7 @@ public class DeviceDisabled : EventRuleBase {
     /// <inheritdoc />
     public override string LogName => "Security";
     /// <inheritdoc />
-    public override NamedEvents NamedEvent => NamedEvents.DeviceDisabled;
+    public override EventType Type => EventType.DeviceDisabled;
 
     /// <summary>Accepts device disabled events (6420) in the Security log.</summary>
     public override bool CanHandle(EventObject eventObject) {
@@ -37,7 +37,7 @@ public class DeviceDisabled : EventRuleBase {
     /// <summary>Initialises a device-disabled wrapper from an event record.</summary>
     public DeviceDisabled(EventObject eventObject) : base(eventObject) {
         SourceEvent = eventObject;
-        NamedEventName = "DeviceDisabled";
+        TypeName = "DeviceDisabled";
         Computer = SourceEvent.ComputerName;
         DeviceId = SourceEvent.GetValueFromDataDictionary("DeviceId");
         DeviceName = SourceEvent.GetValueFromDataDictionary("DeviceDescription", "DeviceName");

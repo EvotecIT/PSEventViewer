@@ -18,9 +18,9 @@ public interface IEventRule {
     string LogName { get; }
 
     /// <summary>
-    /// Gets the named event type this rule represents
+    /// Gets the event type this rule represents.
     /// </summary>
-    NamedEvents NamedEvent { get; }
+    EventType Type { get; }
 
     /// <summary>
     /// Determines if this rule can handle the given event object
@@ -33,13 +33,13 @@ public interface IEventRule {
 /// <summary>
 /// Base class for event rules with metadata
 /// </summary>
-public abstract class EventRuleBase : NamedEventRecord, IEventRule {
+public abstract class EventRuleBase : EventTypeRecord, IEventRule {
     /// <summary>Event identifiers this rule is responsible for.</summary>
     public abstract List<int> EventIds { get; }
     /// <summary>Windows log name (channel) where the events are emitted.</summary>
     public abstract string LogName { get; }
-    /// <summary>Named logical category used by the module for routing results.</summary>
-    public abstract NamedEvents NamedEvent { get; }
+    /// <summary>Logical event type used by the module for routing results.</summary>
+    public abstract EventType Type { get; }
 
     /// <summary>
     /// Initializes the rule with the raw event data so subclasses can hydrate their fields.
@@ -58,7 +58,7 @@ public abstract class EventRuleBase : NamedEventRecord, IEventRule {
     /// </summary>
     /// <param name="eventObject">The event object to process</param>
     /// <returns>An instance of the event rule or null if it cannot be processed</returns>
-    public static NamedEventRecord? TryCreate<T>(EventObject eventObject) where T : EventRuleBase, new() {
+    public static EventTypeRecord? TryCreate<T>(EventObject eventObject) where T : EventRuleBase, new() {
         var instance = new T();
         return instance.CanHandle(eventObject) ? Activator.CreateInstance(typeof(T), eventObject) as T : null;
     }

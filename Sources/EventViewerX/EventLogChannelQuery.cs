@@ -53,6 +53,16 @@ public sealed class EventLogChannelQuery {
 
     internal string? BatchSourceIdentity { get; set; }
 
+    internal DateTime? ManagedStartTimeUtc { get; set; }
+
+    internal DateTime? ManagedEndTimeUtc { get; set; }
+
+    internal Func<EventObject, bool>? ManagedPredicate { get; set; }
+
+    internal long ManagedMaxEventsScanned { get; set; }
+
+    internal Action? ManagedScanLimitReached { get; set; }
+
     /// <summary>Materializes a native bookmark for every returned event.</summary>
     public bool IncludeBookmark { get; set; }
 

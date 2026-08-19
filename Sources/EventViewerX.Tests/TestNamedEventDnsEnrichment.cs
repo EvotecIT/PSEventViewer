@@ -1,5 +1,5 @@
 using EventViewerX.Rules.ActiveDirectory;
-using System.Net;
+using DnsClientX;
 using System.Runtime.CompilerServices;
 using Xunit;
 
@@ -19,8 +19,8 @@ public class TestNamedEventDnsEnrichment {
         SMBServerAudit projected = CreateSmbEvent("\\\\10.0.0.5");
         int calls = 0;
         string? queriedAddress = null;
-        using var enricher = new NamedEventEnricher(
-            new NamedEventEnrichmentOptions { ResolveDns = true },
+        using var enricher = new EventEnricher(
+            new EventEnrichmentOptions { ResolveDns = true },
             (address, _) => {
                 calls++;
                 queriedAddress = address;
@@ -46,8 +46,8 @@ public class TestNamedEventDnsEnrichment {
     public async Task ExistingHostNameDoesNotIssueAPtrQuery() {
         SMBServerAudit projected = CreateSmbEvent("client.ad.evotec.xyz.");
         int calls = 0;
-        using var enricher = new NamedEventEnricher(
-            new NamedEventEnrichmentOptions { ResolveDns = true },
+        using var enricher = new EventEnricher(
+            new EventEnrichmentOptions { ResolveDns = true },
             (_, _) => {
                 calls++;
                 return Task.FromResult(new DnsResponse());
@@ -63,8 +63,8 @@ public class TestNamedEventDnsEnrichment {
     [Fact]
     public async Task DnsTimeoutIsReportedWithoutDroppingTheProjectedEvent() {
         SMBServerAudit projected = CreateSmbEvent("10.0.0.6");
-        using var enricher = new NamedEventEnricher(
-            new NamedEventEnrichmentOptions { ResolveDns = true },
+        using var enricher = new EventEnricher(
+            new EventEnrichmentOptions { ResolveDns = true },
             (_, _) => Task.FromException<DnsResponse>(new TimeoutException("PTR lookup timed out.")));
 
         await enricher.EnrichAsync(projected, CancellationToken.None);
@@ -79,8 +79,8 @@ public class TestNamedEventDnsEnrichment {
         SMBServerAudit projected = CreateSmbEvent("10.0.0.8");
         using var resolverTimeout = new CancellationTokenSource();
         resolverTimeout.Cancel();
-        using var enricher = new NamedEventEnricher(
-            new NamedEventEnrichmentOptions { ResolveDns = true },
+        using var enricher = new EventEnricher(
+            new EventEnrichmentOptions { ResolveDns = true },
             (_, _) => Task.FromCanceled<DnsResponse>(resolverTimeout.Token));
 
         await enricher.EnrichAsync(projected, CancellationToken.None);
@@ -93,8 +93,8 @@ public class TestNamedEventDnsEnrichment {
     [Fact]
     public async Task ResolverFailureIsVisibleOnTheEvent() {
         SMBServerAudit projected = CreateSmbEvent("10.0.0.9");
-        using var enricher = new NamedEventEnricher(
-            new NamedEventEnrichmentOptions { ResolveDns = true },
+        using var enricher = new EventEnricher(
+            new EventEnrichmentOptions { ResolveDns = true },
             (_, _) => throw new InvalidOperationException("No usable system resolver."));
 
         await enricher.EnrichAsync(projected, CancellationToken.None);
@@ -107,8 +107,8 @@ public class TestNamedEventDnsEnrichment {
     public async Task FailedResponseAfterCallerCancellationDoesNotCrossTheCheckpointBoundary() {
         SMBServerAudit projected = CreateSmbEvent("10.0.0.10");
         using var cancellation = new CancellationTokenSource();
-        using var enricher = new NamedEventEnricher(
-            new NamedEventEnrichmentOptions { ResolveDns = true },
+        using var enricher = new EventEnricher(
+            new EventEnrichmentOptions { ResolveDns = true },
             (_, _) => {
                 cancellation.Cancel();
                 return Task.FromResult(new DnsResponse {
@@ -128,8 +128,8 @@ public class TestNamedEventDnsEnrichment {
         int calls = 0;
         int active = 0;
         int maximumActive = 0;
-        using var enricher = new NamedEventEnricher(
-            new NamedEventEnrichmentOptions {
+        using var enricher = new EventEnricher(
+            new EventEnrichmentOptions {
                 ResolveDns = true,
                 DnsMaxConcurrency = 2,
                 DnsTimeoutMilliseconds = 5000
@@ -171,8 +171,8 @@ public class TestNamedEventDnsEnrichment {
     [Fact]
     public async Task ConfiguredTimeoutBoundsTheWholeResolverCall() {
         SMBServerAudit projected = CreateSmbEvent("10.0.0.14");
-        using var enricher = new NamedEventEnricher(
-            new NamedEventEnrichmentOptions {
+        using var enricher = new EventEnricher(
+            new EventEnrichmentOptions {
                 ResolveDns = true,
                 DnsTimeoutMilliseconds = 30
             },
@@ -190,27 +190,29 @@ public class TestNamedEventDnsEnrichment {
     }
 
     [Fact]
-    public async Task TimedOutSystemLookupRetainsItsLeaseButQueuedLookupKeepsItsOwnDeadline() {
-        var firstLookup =
-            new TaskCompletionSource<IPHostEntry>(
-                TaskCreationOptions.RunContinuationsAsynchronously);
+    public async Task CancelAwareResolverReleasesItsLeaseAfterTimeout() {
         int calls = 0;
-        using var enricher = new NamedEventEnricher(
-            new NamedEventEnrichmentOptions {
+        using var enricher = new EventEnricher(
+            new EventEnrichmentOptions {
                 ResolveDns = true,
                 DnsMaxConcurrency = 1,
-                DnsTimeoutMilliseconds = 30
+                DnsTimeoutMilliseconds = 100
             },
-            systemDnsResolver: address => {
+            async (address, token) => {
                 int call = Interlocked.Increment(
                     ref calls);
-                return call == 1
-                    ? firstLookup.Task
-                    : Task.FromResult(new IPHostEntry {
-                        HostName =
-                            address +
-                            ".example.test"
-                    });
+                if (call == 1) {
+                    await Task.Delay(TimeSpan.FromSeconds(30), token);
+                }
+                return new DnsResponse {
+                    Status = DnsResponseCode.NoError,
+                    Answers = new[] {
+                        new DnsAnswer {
+                            Type = DnsRecordType.PTR,
+                            DataRaw = address + ".example.test."
+                        }
+                    }
+                };
             });
         SMBServerAudit first =
             CreateSmbEvent("10.0.0.31");
@@ -220,34 +222,18 @@ public class TestNamedEventDnsEnrichment {
         await enricher.EnrichAsync(
             first,
             CancellationToken.None);
-        Task secondEnrichment =
-            enricher.EnrichAsync(
-                second,
-                CancellationToken.None);
-        await secondEnrichment.WaitAsync(
-            TimeSpan.FromSeconds(5));
+        await enricher.EnrichAsync(
+            second,
+            CancellationToken.None).WaitAsync(
+                TimeSpan.FromSeconds(5));
 
         Assert.Equal(
             ReverseDnsResolutionStatus.TimedOut,
             first.ClientDnsResolutionStatus);
         Assert.Equal(
-            ReverseDnsResolutionStatus.TimedOut,
-            second.ClientDnsResolutionStatus);
-        Assert.Equal(1, Volatile.Read(ref calls));
-
-        firstLookup.SetResult(new IPHostEntry {
-            HostName = "first.example.test"
-        });
-        SMBServerAudit third =
-            CreateSmbEvent("10.0.0.33");
-        await enricher.EnrichAsync(
-            third,
-            CancellationToken.None);
-
-        Assert.Equal(2, calls);
-        Assert.Equal(
             ReverseDnsResolutionStatus.Resolved,
-            third.ClientDnsResolutionStatus);
+            second.ClientDnsResolutionStatus);
+        Assert.Equal(2, calls);
     }
 
     [Fact]
@@ -259,8 +245,8 @@ public class TestNamedEventDnsEnrichment {
             CreateSmbEventObject("10.0.0.22", 22),
             CreateSmbEventObject("10.0.0.23", 23)
         };
-        using var enricher = new NamedEventEnricher(
-            new NamedEventEnrichmentOptions {
+        using var enricher = new EventEnricher(
+            new EventEnrichmentOptions {
                 ResolveDns = true,
                 DnsMaxConcurrency = 3,
                 DnsTimeoutMilliseconds = 1000
@@ -271,9 +257,9 @@ public class TestNamedEventDnsEnrichment {
                 return new DnsResponse { Status = DnsResponseCode.NoError };
             });
 
-        await foreach (NamedEventEngine.NamedEventProjection projection in NamedEventEngine.ProjectCandidatesInOrderAsync(
+        await foreach (EventTypeEngine.EventTypeProjection projection in EventTypeEngine.ProjectCandidatesInOrderAsync(
                            YieldEventsAsync(sourceEvents),
-                           new List<NamedEvents> { NamedEvents.ADSMBServerAuditV1 },
+                           new List<EventType> { EventType.ADSMBServerAuditV1 },
                            enricher,
                            () => true,
                            source => observedRecordIds.Add(source.RecordId),
@@ -289,8 +275,8 @@ public class TestNamedEventDnsEnrichment {
     public async Task DependencySwallowedCancellationNeverReachesCheckpointObserver() {
         var observedRecordIds = new List<long?>();
         using var cancellation = new CancellationTokenSource();
-        using var enricher = new NamedEventEnricher(
-            new NamedEventEnrichmentOptions { ResolveDns = true },
+        using var enricher = new EventEnricher(
+            new EventEnrichmentOptions { ResolveDns = true },
             (_, _) => {
                 cancellation.Cancel();
                 return Task.FromResult(new DnsResponse {
@@ -300,9 +286,9 @@ public class TestNamedEventDnsEnrichment {
             });
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(async () => {
-            await foreach (NamedEventEngine.NamedEventProjection _ in NamedEventEngine.ProjectCandidatesInOrderAsync(
+            await foreach (EventTypeEngine.EventTypeProjection _ in EventTypeEngine.ProjectCandidatesInOrderAsync(
                                YieldEventsAsync(new[] { CreateSmbEventObject("10.0.0.24", 24) }),
-                               new List<NamedEvents> { NamedEvents.ADSMBServerAuditV1 },
+                               new List<EventType> { EventType.ADSMBServerAuditV1 },
                                enricher,
                                () => true,
                                source => observedRecordIds.Add(source.RecordId),
@@ -328,8 +314,8 @@ public class TestNamedEventDnsEnrichment {
         SMBServerAudit projected = CreateSmbEvent("10.0.0.7");
         using var cts = new CancellationTokenSource();
         cts.Cancel();
-        using var enricher = new NamedEventEnricher(
-            new NamedEventEnrichmentOptions { ResolveDns = true },
+        using var enricher = new EventEnricher(
+            new EventEnrichmentOptions { ResolveDns = true },
             (_, token) => Task.FromCanceled<DnsResponse>(token));
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
@@ -348,7 +334,7 @@ public class TestNamedEventDnsEnrichment {
             });
 
         EventRuleProjectionException exception = Assert.Throws<EventRuleProjectionException>(() =>
-            NamedEventCatalog.CreateEventRule(eventObject, new List<NamedEvents> { NamedEvents.KerberosPolicyChange }));
+            EventTypeCatalog.CreateEventRule(eventObject, new List<EventType> { EventType.KerberosPolicyChange }));
 
         Assert.Equal(4713, exception.EventId);
         Assert.Equal(42L, exception.RecordId);

@@ -10,7 +10,7 @@ public class KerberosTicketFailure : EventRuleBase
     /// <inheritdoc />
     public override string LogName => "Security";
     /// <inheritdoc />
-    public override NamedEvents NamedEvent => NamedEvents.KerberosTicketFailure;
+    public override EventType Type => EventType.KerberosTicketFailure;
 
     /// <summary>Checks whether the supplied event is a Kerberos ticket failure from the security auditing provider.</summary>
     public override bool CanHandle(EventObject eventObject)
@@ -40,7 +40,7 @@ public class KerberosTicketFailure : EventRuleBase
     public KerberosTicketFailure(EventObject eventObject) : base(eventObject)
     {
         SourceEvent = eventObject;
-        NamedEventName = "KerberosTicketFailure";
+        TypeName = "KerberosTicketFailure";
         Computer = SourceEvent.ComputerName;
         Action = SourceEvent.MessageSubject;
         AccountName = SourceEvent.GetTargetAccountOrEmpty();

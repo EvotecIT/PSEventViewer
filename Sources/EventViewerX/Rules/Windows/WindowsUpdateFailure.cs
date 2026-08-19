@@ -10,7 +10,7 @@ public class WindowsUpdateFailure : EventRuleBase {
     /// <inheritdoc />
     public override string LogName => "Setup";
     /// <inheritdoc />
-    public override NamedEvents NamedEvent => NamedEvents.WindowsUpdateFailure;
+    public override EventType Type => EventType.WindowsUpdateFailure;
 
     /// <summary>Accepts update failure events from the Windows Update Client provider.</summary>
     public override bool CanHandle(EventObject eventObject) {
@@ -28,7 +28,7 @@ public class WindowsUpdateFailure : EventRuleBase {
     /// <summary>Initialises a Windows Update failure wrapper from an event record.</summary>
     public WindowsUpdateFailure(EventObject eventObject) : base(eventObject) {
         SourceEvent = eventObject;
-        NamedEventName = "WindowsUpdateFailure";
+        TypeName = "WindowsUpdateFailure";
         Computer = SourceEvent.ComputerName;
         var title = SourceEvent.GetValueFromDataDictionary("UpdateTitle", "Title");
         if (string.IsNullOrEmpty(title)) {

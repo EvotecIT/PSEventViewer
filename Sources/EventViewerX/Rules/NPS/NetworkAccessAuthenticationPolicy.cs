@@ -11,7 +11,7 @@ public class NetworkAccessAuthenticationPolicy : EventRuleBase {
     /// <inheritdoc />
     public override string LogName => "Security";
     /// <inheritdoc />
-    public override NamedEvents NamedEvent => NamedEvents.NetworkAccessAuthenticationPolicy;
+    public override EventType Type => EventType.NetworkAccessAuthenticationPolicy;
 
     /// <summary>Accepts any event whose ID/log match the overrides.</summary>
     public override bool CanHandle(EventObject eventObject) {
@@ -146,7 +146,7 @@ public class NetworkAccessAuthenticationPolicy : EventRuleBase {
     public NetworkAccessAuthenticationPolicy(EventObject eventObject) : base(eventObject) {
         SourceEvent = eventObject;
 
-        NamedEventName = "NetworkAccessAuthenticationPolicy";
+        TypeName = "NetworkAccessAuthenticationPolicy";
         Computer = SourceEvent.ComputerName;
         Action = SourceEvent.MessageSubject;
         SecurityID = SourceEvent.GetDataValueOrEmpty("SubjectUserSid");

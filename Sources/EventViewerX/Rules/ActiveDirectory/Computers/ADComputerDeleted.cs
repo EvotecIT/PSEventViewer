@@ -9,7 +9,7 @@ public class ADComputerDeleted : EventRuleBase {
     /// <inheritdoc />
     public override string LogName => "Security";
     /// <inheritdoc />
-    public override NamedEvents NamedEvent => NamedEvents.ADComputerDeleted;
+    public override EventType Type => EventType.ADComputerDeleted;
 
     /// <summary>Accepts matching computer deletion events without extra filtering.</summary>
     public override bool CanHandle(EventObject eventObject) {
@@ -31,7 +31,7 @@ public class ADComputerDeleted : EventRuleBase {
     public ADComputerDeleted(EventObject eventObject) : base(eventObject) {
         // common fields
         SourceEvent = eventObject;
-        NamedEventName = "ADComputerDeleted";
+        TypeName = "ADComputerDeleted";
 
         Computer = SourceEvent.ComputerName;
         Action = SourceEvent.MessageSubject;

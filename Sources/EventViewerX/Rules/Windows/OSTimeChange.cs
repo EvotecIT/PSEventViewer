@@ -4,14 +4,14 @@ namespace EventViewerX.Rules.Windows;
 /// OS Time Change
 /// 4616: The system time was changed
 /// </summary>
-/// <seealso cref="EventViewerX.NamedEventRecord" />
+/// <seealso cref="EventViewerX.EventTypeRecord" />
 public class OSTimeChange : EventRuleBase {
     /// <inheritdoc />
     public override List<int> EventIds => new() { 4616 };
     /// <inheritdoc />
     public override string LogName => "Security";
     /// <inheritdoc />
-    public override NamedEvents NamedEvent => NamedEvents.OSTimeChange;
+    public override EventType Type => EventType.OSTimeChange;
 
     /// <summary>Accepts system time change events (4616).</summary>
     public override bool CanHandle(EventObject eventObject) {
@@ -36,7 +36,7 @@ public class OSTimeChange : EventRuleBase {
     public OSTimeChange(EventObject eventObject) : base(eventObject) {
         SourceEvent = eventObject;
 
-        NamedEventName = "OSTimeChange";
+        TypeName = "OSTimeChange";
         Computer = SourceEvent.ComputerName;
         Action = SourceEvent.MessageSubject;
         ObjectAffected = SourceEvent.MachineName;

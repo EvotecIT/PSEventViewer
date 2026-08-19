@@ -5,12 +5,12 @@ namespace EventViewerX.Tests {
     public class TestOsEvents {
         [Fact]
         public void EventInfoContainsOsEvents() {
-            var info = NamedEventCatalog.GetEventInfoForNamedEvents(new List<NamedEvents> {
-                NamedEvents.OSStartup,
-                NamedEvents.OSShutdown,
-                NamedEvents.OSUncleanShutdown,
-                NamedEvents.OSStartupSecurity,
-                NamedEvents.OSCrashOnAuditFailRecovery
+            var info = EventTypeCatalog.GetSourceMap(new List<EventType> {
+                EventType.OSStartup,
+                EventType.OSShutdown,
+                EventType.OSUncleanShutdown,
+                EventType.OSStartupSecurity,
+                EventType.OSCrashOnAuditFailRecovery
             });
 
             Assert.Contains(12, info["System"]);

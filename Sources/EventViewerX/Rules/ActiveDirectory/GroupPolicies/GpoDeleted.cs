@@ -19,7 +19,7 @@ public class GpoDeleted : EventRuleBase {
     /// <inheritdoc />
     public override string LogName => "Security";
     /// <inheritdoc />
-    public override NamedEvents NamedEvent => NamedEvents.GpoDeleted;
+    public override EventType Type => EventType.GpoDeleted;
 
     /// <summary>Processes only GPO container objects for deletion events.</summary>
     public override bool CanHandle(EventObject eventObject) {
@@ -31,7 +31,7 @@ public class GpoDeleted : EventRuleBase {
     /// <summary>Initialises a GPO deletion wrapper from an event record.</summary>
     public GpoDeleted(EventObject eventObject) : base(eventObject) {
         SourceEvent = eventObject;
-        NamedEventName = "GpoDeleted";
+        TypeName = "GpoDeleted";
         Computer = SourceEvent.ComputerName;
         Action = SourceEvent.MessageSubject;
         GpoName = SourceEvent.GetValueFromDataDictionary("ObjectDN");

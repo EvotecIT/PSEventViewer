@@ -11,7 +11,7 @@ namespace EventViewerX.Examples {
                 Environment.MachineName,
                 "Security",
                 new List<int> { 4624, 4625 },
-                new List<NamedEvents>(),
+                new List<EventType>(),
                 e => Console.WriteLine($"Event {e.Id} arrived"),
                 false,
                 false,
@@ -22,13 +22,15 @@ namespace EventViewerX.Examples {
             WatcherManager.StopAll();
         }
 
-        public static void WatchNamedEvents() {
+        public static void WatchEventTypes() {
             var watcher = WatcherManager.StartWatcher(
                 "named",
                 Environment.MachineName,
                 "System",
-                NamedEventCatalog.GetEventInfoForNamedEvents(new List<NamedEvents> { NamedEvents.OSCrash })["System"].ToList(),
-                new List<NamedEvents> { NamedEvents.OSCrash },
+                EventTypeCatalog.GetSources(new[] { EventType.OSCrash })
+                    .Single(source => source.LogName == "System")
+                    .EventIds.ToList(),
+                new List<EventType> { EventType.OSCrash },
                 e => Console.WriteLine($"Named event {e.Id}"),
                 false,
                 false,
@@ -44,7 +46,7 @@ namespace EventViewerX.Examples {
                 Environment.MachineName,
                 "Security",
                 new List<int> { 4625 },
-                new List<NamedEvents>(),
+                new List<EventType>(),
                 e => Console.WriteLine("Event " + e.Id),
                 false,
                 false,
@@ -61,7 +63,7 @@ namespace EventViewerX.Examples {
                 Environment.MachineName,
                 "Application",
                 new List<int> { 1000 },
-                new List<NamedEvents>(),
+                new List<EventType>(),
                 e => Console.WriteLine("Event " + e.Id),
                 false,
                 false,
@@ -77,7 +79,7 @@ namespace EventViewerX.Examples {
                 Environment.MachineName,
                 "Application",
                 new List<int> { 1 },
-                new List<NamedEvents>(),
+                new List<EventType>(),
                 _ => { },
                 false,
                 false,
@@ -88,7 +90,7 @@ namespace EventViewerX.Examples {
                 Environment.MachineName,
                 "Application",
                 new List<int> { 1 },
-                new List<NamedEvents>(),
+                new List<EventType>(),
                 _ => { },
                 false,
                 false,

@@ -23,7 +23,7 @@ public class GpoModified : EventRuleBase {
     /// <inheritdoc />
     public override string LogName => "Security";
     /// <inheritdoc />
-    public override NamedEvents NamedEvent => NamedEvents.GpoModified;
+    public override EventType Type => EventType.GpoModified;
 
     /// <summary>Processes only GPO container modifications.</summary>
     public override bool CanHandle(EventObject eventObject) {
@@ -35,7 +35,7 @@ public class GpoModified : EventRuleBase {
     /// <summary>Initialises a GPO modification wrapper from an event record.</summary>
     public GpoModified(EventObject eventObject) : base(eventObject) {
         SourceEvent = eventObject;
-        NamedEventName = "GpoModified";
+        TypeName = "GpoModified";
         Computer = SourceEvent.ComputerName;
         Action = SourceEvent.MessageSubject;
         GpoName = SourceEvent.GetValueFromDataDictionary("ObjectDN");

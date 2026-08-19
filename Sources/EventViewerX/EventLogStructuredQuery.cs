@@ -127,6 +127,10 @@ public sealed class EventLogStructuredQuery {
 
     internal string? BatchSourceIdentity { get; set; }
 
+    internal DateTime? ManagedStartTimeUtc { get; set; }
+
+    internal DateTime? ManagedEndTimeUtc { get; set; }
+
     /// <summary>Materializes a native bookmark for every returned event.</summary>
     public bool IncludeBookmark { get; set; }
 
@@ -175,6 +179,8 @@ public sealed class EventLogStructuredQuery {
             FallbackMessageCulture = FallbackMessageCulture,
             MaxEvents = MaxEvents,
             BatchSourceIdentity = BatchSourceIdentity,
+            ManagedStartTimeUtc = ManagedStartTimeUtc,
+            ManagedEndTimeUtc = ManagedEndTimeUtc,
             IncludeBookmark = IncludeBookmark,
             RemoteConnectionTimeoutMilliseconds =
                 RemoteConnectionTimeoutMilliseconds,
