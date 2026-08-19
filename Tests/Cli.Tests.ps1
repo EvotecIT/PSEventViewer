@@ -33,17 +33,32 @@ Describe 'evx portable host' {
                 --path $script:FixturePath `
                 --max 3 `
                 --html $HtmlPath `
+                --drawer-placement Top `
                 --excel $ExcelPath `
                 --email-html $EmailPath `
                 --mail-profile $script:SmtpProfilePath)
 
         $LASTEXITCODE | Should -Be 0
         Test-Path -LiteralPath $HtmlPath | Should -BeTrue
+        (Get-Content -LiteralPath $HtmlPath -Raw) | Should -Match 'data-hfx-monitoring-record-drawer-placement="top"'
         Test-Path -LiteralPath $ExcelPath | Should -BeTrue
         Test-Path -LiteralPath $EmailPath | Should -BeTrue
         $Delivery = $Output[-1] | ConvertFrom-Json
         $Delivery.DryRun | Should -BeTrue
         $Delivery.Delivered | Should -BeFalse
+    }
+
+    It 'rejects an unknown HTML drawer placement' {
+        $PreviousErrorActionPreference = $ErrorActionPreference
+        $ErrorActionPreference = 'Continue'
+        try {
+            $Output = & $script:CliPath report --path $script:FixturePath --html (Join-Path $TestDrive 'invalid.html') --drawer-placement Bottom 2>&1
+        } finally {
+            $ErrorActionPreference = $PreviousErrorActionPreference
+        }
+
+        $LASTEXITCODE | Should -Be 1
+        [string] $Output | Should -Match 'Auto, Top, or Right'
     }
 
     It 'rejects ambiguous query sources' {

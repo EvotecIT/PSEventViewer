@@ -1,3 +1,5 @@
+using HtmlForgeX;
+
 namespace PSEventViewer;
 
 /// <summary>
@@ -152,6 +154,10 @@ public sealed class CmdletShowEVXEvent : AsyncPSCmdlet {
     [Parameter]
     public string? HtmlPath { get; set; }
 
+    /// <summary>Preferred location of the selected-record drawer in interactive HTML output.</summary>
+    [Parameter]
+    public MonitoringRecordDrawerPlacement DrawerPlacement { get; set; } = MonitoringRecordDrawerPlacement.Auto;
+
     /// <summary>Excel workbook output path.</summary>
     [Parameter]
     public string? ExcelPath { get; set; }
@@ -231,7 +237,8 @@ public sealed class CmdletShowEVXEvent : AsyncPSCmdlet {
             htmlPath = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"EventViewerX-{DateTime.Now:yyyyMMdd-HHmmss}.html");
         }
         if (!string.IsNullOrWhiteSpace(htmlPath)) {
-            string saved = EventReportHtmlRenderer.Save(report, htmlPath!, Open.IsPresent || !hasDestination);
+            var htmlOptions = new EventReportHtmlOptions { RecordDrawerPlacement = DrawerPlacement };
+            string saved = EventReportHtmlRenderer.Save(report, htmlPath!, htmlOptions, Open.IsPresent || !hasDestination);
             WriteObject(saved);
         }
         if (!string.IsNullOrWhiteSpace(ExcelPath)) {

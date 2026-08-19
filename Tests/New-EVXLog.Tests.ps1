@@ -5,19 +5,14 @@ Describe 'New-EVXLog cmdlet' {
         $script:provider = 'EVXTestSource' + $suffix
         $script:isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltinRole]::Administrator)
         $script:skip = -not $script:isAdmin
-
-        if (-not $script:skip -and [EventViewerX.ClassicEventLogManager]::LogExists($script:log)) {
-            [EventViewerX.ClassicEventLogManager]::RemoveLog($script:log) | Out-Null
-        }
-    }
-    AfterAll {
-        if (-not $script:skip -and [EventViewerX.ClassicEventLogManager]::LogExists($script:log)) {
-            [EventViewerX.ClassicEventLogManager]::RemoveLog($script:log) | Out-Null
-        }
     }
     It 'creates new log with provider' -Skip:$script:skip {
-        $result = New-EVXLog -LogName $script:log -ProviderName $script:provider -MaximumKilobytes 1024 -OverflowAction OverwriteAsNeeded
-        if ($script:isAdmin) {
+        try {
+            if ([EventViewerX.ClassicEventLogManager]::LogExists($script:log)) {
+                [EventViewerX.ClassicEventLogManager]::RemoveLog($script:log) | Out-Null
+            }
+
+            $result = New-EVXLog -LogName $script:log -ProviderName $script:provider -MaximumKilobytes 1024 -OverflowAction OverwriteAsNeeded
             $result.CreatedLog | Should -BeTrue
             $result.CreatedSource | Should -BeTrue
             $result.After.LogExists | Should -BeTrue
@@ -27,9 +22,10 @@ Describe 'New-EVXLog cmdlet' {
             $info.LogName | Should -Be $script:log
             Remove-EVXLog -LogName $script:log | Should -Be $true
             [System.Diagnostics.EventLog]::Exists($script:log) | Should -Be $false
-        }
-        else {
-            $result | Should -Be $false
+        } finally {
+            if ([EventViewerX.ClassicEventLogManager]::LogExists($script:log)) {
+                [EventViewerX.ClassicEventLogManager]::RemoveLog($script:log) | Out-Null
+            }
         }
     }
 }

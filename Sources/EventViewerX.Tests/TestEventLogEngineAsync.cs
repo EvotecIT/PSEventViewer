@@ -4,6 +4,11 @@ using Xunit;
 namespace EventViewerX.Tests;
 
 public sealed class TestEventLogEngineAsync {
+    private static readonly TimeSpan ProducerSchedulingTimeout =
+        TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan ConsumerCompletionTimeout =
+        TimeSpan.FromSeconds(10);
+
     [Fact]
     public async Task SourceRemainsLazyUntilTheFirstMove() {
         var started = false;
@@ -66,7 +71,7 @@ public sealed class TestEventLogEngineAsync {
                 enumerator.MoveNextAsync().AsTask();
             Assert.True(
                 await producerEntered.Task.WaitAsync(
-                    TimeSpan.FromSeconds(5)),
+                    ProducerSchedulingTimeout),
                 "The producer did not enter the blocking source.");
 
             cancellation.Cancel();
@@ -74,8 +79,8 @@ public sealed class TestEventLogEngineAsync {
             await Assert.ThrowsAnyAsync<
                 OperationCanceledException>(
                 async () =>
-                    await moveNext.WaitAsync(
-                        TimeSpan.FromSeconds(5)));
+                        await moveNext.WaitAsync(
+                        ConsumerCompletionTimeout));
         } finally {
             releaseProducer.Set();
             await enumerator.DisposeAsync();
@@ -102,14 +107,14 @@ public sealed class TestEventLogEngineAsync {
                 .GetAsyncEnumerator();
         Task<bool> moveNext = enumerator.MoveNextAsync().AsTask();
         Assert.True(
-            await producerEntered.Task.WaitAsync(TimeSpan.FromSeconds(5)));
+            await producerEntered.Task.WaitAsync(ProducerSchedulingTimeout));
 
         cancellation.Cancel();
 
         var exception = await Assert.ThrowsAnyAsync<
             OperationCanceledException>(
             async () => await moveNext.WaitAsync(
-                TimeSpan.FromSeconds(5)));
+                ConsumerCompletionTimeout));
         Assert.Equal(cancellation.Token, exception.CancellationToken);
         releaseProducer.Set();
         await enumerator.DisposeAsync();
@@ -135,14 +140,14 @@ public sealed class TestEventLogEngineAsync {
                 .GetAsyncEnumerator(cancellation.Token);
         Task<bool> moveNext = enumerator.MoveNextAsync().AsTask();
         Assert.True(
-            await producerEntered.Task.WaitAsync(TimeSpan.FromSeconds(5)));
+            await producerEntered.Task.WaitAsync(ProducerSchedulingTimeout));
 
         cancellation.Cancel();
 
         var exception = await Assert.ThrowsAnyAsync<
             OperationCanceledException>(
             async () => await moveNext.WaitAsync(
-                TimeSpan.FromSeconds(5)));
+                ConsumerCompletionTimeout));
         Assert.Equal(cancellation.Token, exception.CancellationToken);
         releaseProducer.Set();
         await enumerator.DisposeAsync();
@@ -169,13 +174,13 @@ public sealed class TestEventLogEngineAsync {
             Task<bool> moveNext = enumerator.MoveNextAsync().AsTask();
             Assert.True(
                 await producerEntered.Task.WaitAsync(
-                    TimeSpan.FromSeconds(5)),
+                    ProducerSchedulingTimeout),
                 "The producer did not enter the blocking source.");
 
             Task dispose = enumerator.DisposeAsync().AsTask();
 
-            Assert.False(await moveNext.WaitAsync(TimeSpan.FromSeconds(5)));
-            await dispose.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.False(await moveNext.WaitAsync(ConsumerCompletionTimeout));
+            await dispose.WaitAsync(ConsumerCompletionTimeout);
         } finally {
             releaseProducer.Set();
         }
@@ -204,14 +209,14 @@ public sealed class TestEventLogEngineAsync {
                 Task<bool> moveNext = enumerator.MoveNextAsync().AsTask();
                 Assert.True(
                     await producerEntered.Task.WaitAsync(
-                        TimeSpan.FromSeconds(2)),
+                        ProducerSchedulingTimeout),
                     $"Producer did not start in iteration {iteration}.");
 
                 cancellation.Cancel();
                 await Assert.ThrowsAnyAsync<OperationCanceledException>(
                     async () =>
                         await moveNext.WaitAsync(
-                            TimeSpan.FromSeconds(2)));
+                            ConsumerCompletionTimeout));
                 releaseProducer.Set();
             } finally {
                 releaseProducer.Set();

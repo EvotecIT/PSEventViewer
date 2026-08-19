@@ -5,10 +5,14 @@ namespace EventViewerX.Reporting;
 /// <summary>Renders an interactive, self-contained HtmlForgeX event report.</summary>
 public static class EventReportHtmlRenderer {
     /// <summary>Renders an event report to an HTML string.</summary>
-    public static string Render(EventReport report) {
+    public static string Render(EventReport report) => Render(report, null);
+
+    /// <summary>Renders an event report to an HTML string using the supplied presentation options.</summary>
+    public static string Render(EventReport report, EventReportHtmlOptions? options) {
         if (report == null) {
             throw new ArgumentNullException(nameof(report));
         }
+        options ??= new EventReportHtmlOptions();
         using var document = new Document {
             LibraryMode = LibraryMode.Offline,
             ThemeMode = ThemeMode.System,
@@ -34,10 +38,10 @@ public static class EventReportHtmlRenderer {
             string key = CreatePageKey(section.Section.Name);
             dashboard.AddPage(key, section.Section.DisplayName, BuildSectionSubtitle(section.Section),
                 section.Section.Kind == EventReportSectionKind.Generic ? TablerIconType.ListDetails : TablerIconType.ReportAnalytics,
-                page => BuildEventPage(page, section), badge: section.Section.Rows.Count.ToString("N0"), group: "Events");
+                page => BuildEventPage(page, section, options), badge: section.Section.Rows.Count.ToString("N0"), group: "Events");
         }
         dashboard.AddPage("coverage", "Coverage", "Every queried computer and source channel", TablerIconType.Server,
-            page => BuildCoveragePage(page, report),
+            page => BuildCoveragePage(page, report, options),
             badge: report.Coverage.Count(static item => !item.Succeeded) > 0
                 ? report.Coverage.Count(static item => !item.Succeeded).ToString("N0")
                 : null,
@@ -96,7 +100,7 @@ public static class EventReportHtmlRenderer {
         });
     }
 
-    private static void BuildEventPage(MonitoringPage page, EventReportPresentationSection section) {
+    private static void BuildEventPage(MonitoringPage page, EventReportPresentationSection section, EventReportHtmlOptions options) {
         DateTime? first = section.Section.Rows.Count == 0 ? null : section.Section.Rows.Min(static row => row.TimeCreated);
         DateTime? last = section.Section.Rows.Count == 0 ? null : section.Section.Rows.Max(static row => row.TimeCreated);
         page.AddMetric(metric => metric.Title("Matching events").Value(section.Section.Rows.Count.ToString("N0"))
@@ -118,6 +122,8 @@ public static class EventReportHtmlRenderer {
                 .DrawerLabel($"Selected {section.Section.DisplayName} record")
                 .PaginationLabel($"{section.Section.DisplayName} pages")
                 .PageSize(25)
+                .DrawerPlacement(options.RecordDrawerPlacement)
+                .InlineDetails(false)
                 .RawDrawerPanel(false)
                 .ExportDrawerPanel(false)
                 .End());
@@ -149,11 +155,11 @@ public static class EventReportHtmlRenderer {
         }
 
         page.Panel("Records", panel => panel
-            .Subtitle("Search all values, filter individual fields, choose columns, or expand a row for provenance")
+            .Subtitle("Search all values, filter individual fields, choose columns, or select a row for provenance")
             .Content(explorer));
     }
 
-    private static void BuildCoveragePage(MonitoringPage page, EventReport report) {
+    private static void BuildCoveragePage(MonitoringPage page, EventReport report, EventReportHtmlOptions options) {
         int healthy = report.Coverage.Count(static item => item.Succeeded);
         int failed = report.Coverage.Count - healthy;
         page.AddMetric(metric => metric.Title("Healthy sources").Value(healthy.ToString("N0"))
@@ -165,7 +171,12 @@ public static class EventReportHtmlRenderer {
         var explorer = new MonitoringRecordExplorer()
             .SavedView("Source health")
             .ActiveGroup("Coverage")
-            .Settings(settings => settings.AccessibleLabel("Queried event sources").PageSize(25).End())
+            .Settings(settings => settings
+                .AccessibleLabel("Queried event sources")
+                .PageSize(25)
+                .DrawerPlacement(options.RecordDrawerPlacement)
+                .InlineDetails(false)
+                .End())
             .AddColumnGroup("Coverage", "status", "machine", "log", "detail")
             .AddColumn("status", "Status", pinned: true)
             .AddColumn("machine", "Machine")
@@ -204,17 +215,17 @@ public static class EventReportHtmlRenderer {
     }
 
     private static void AddProvenance(MonitoringExplorerRecord record, EventReportRow row) {
-        AddDetail(record, "Event ID", row.EventId.ToString());
-        AddDetail(record, "Level", row.Level);
-        AddDetail(record, "Source computer", row.SourceComputer);
-        AddDetail(record, "Source log", row.SourceLog);
-        AddDetail(record, "Provider", row.Provider);
-        AddDetail(record, "Record ID", row.RecordId?.ToString());
-        AddDetail(record, "Container log", row.ContainerLog);
-        AddDetail(record, "Collector computer", row.CollectorComputer);
+        AddDetail(record, "Event ID", row.EventId.ToString(), "Provenance");
+        AddDetail(record, "Level", row.Level, "Provenance");
+        AddDetail(record, "Source computer", row.SourceComputer, "Provenance");
+        AddDetail(record, "Source log", row.SourceLog, "Provenance");
+        AddDetail(record, "Provider", row.Provider, "Provenance");
+        AddDetail(record, "Record ID", row.RecordId?.ToString(), "Provenance");
+        AddDetail(record, "Container log", row.ContainerLog, "Provenance");
+        AddDetail(record, "Collector computer", row.CollectorComputer, "Provenance");
         string message = EventReportPresentationProjection.FormatValue(row.Message);
         if (!string.IsNullOrWhiteSpace(message)) {
-            record.Detail("Message excerpt", message.Length <= 320 ? message : message.Substring(0, 319) + "…");
+            record.Detail("Message excerpt", message.Length <= 320 ? message : message.Substring(0, 319) + "…", "Message");
         }
     }
 
@@ -227,10 +238,10 @@ public static class EventReportHtmlRenderer {
         return -1;
     }
 
-    private static void AddDetail(MonitoringExplorerRecord record, string label, string? value) {
+    private static void AddDetail(MonitoringExplorerRecord record, string label, string? value, string? group = null) {
         string formatted = EventReportPresentationProjection.FormatValue(value);
         if (!string.IsNullOrWhiteSpace(formatted)) {
-            record.Detail(label, formatted);
+            record.Detail(label, formatted, group);
         }
     }
 
@@ -264,7 +275,10 @@ public static class EventReportHtmlRenderer {
     };
 
     /// <summary>Writes a self-contained HTML report.</summary>
-    public static string Save(EventReport report, string path, bool open = false) {
+    public static string Save(EventReport report, string path, bool open = false) => Save(report, path, null, open);
+
+    /// <summary>Writes a self-contained HTML report using the supplied presentation options.</summary>
+    public static string Save(EventReport report, string path, EventReportHtmlOptions? options, bool open = false) {
         if (string.IsNullOrWhiteSpace(path)) {
             throw new ArgumentException("Output path cannot be empty.", nameof(path));
         }
@@ -273,7 +287,7 @@ public static class EventReportHtmlRenderer {
         if (!string.IsNullOrWhiteSpace(directory)) {
             Directory.CreateDirectory(directory!);
         }
-        File.WriteAllText(fullPath, Render(report), new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+        File.WriteAllText(fullPath, Render(report, options), new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
         if (open) {
             Process.Start(new ProcessStartInfo(fullPath) { UseShellExecute = true });
         }

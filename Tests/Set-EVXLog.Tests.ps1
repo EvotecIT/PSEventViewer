@@ -5,25 +5,24 @@ Describe 'Set-EVXLog channel policy' {
         $script:provider = 'EVXLimitSource' + $suffix
         $script:isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltinRole]::Administrator)
         $script:skip = -not $script:isAdmin
-
-        if (-not $script:skip) {
+    }
+    It 'applies size and retention mode through one typed result' -Skip:$script:skip {
+        try {
             $configuration = [EventViewerX.ClassicEventLogConfiguration]::new()
             $configuration.LogName = $script:log
             $configuration.SourceName = $script:provider
             [EventViewerX.ClassicEventLogManager]::EnsureLog($configuration) | Out-Null
-        }
-    }
-    AfterAll {
-        if (-not $script:skip -and [EventViewerX.ClassicEventLogManager]::LogExists($script:log)) {
-            [EventViewerX.ClassicEventLogManager]::RemoveLog($script:log) | Out-Null
-        }
-    }
-    It 'applies size and retention mode through one typed result' -Skip:$script:skip {
-        $result = Set-EVXLog -LogName $script:log -MaximumSizeMB 2 -Mode Retain
-        $result.Success | Should -BeTrue
 
-        $details = Get-EVXLog -LogName $script:log
-        $details.MaximumSizeInBytes | Should -Be (2MB)
-        $details.LogMode | Should -Be 'Retain'
+            $result = Set-EVXLog -LogName $script:log -MaximumSizeMB 2 -Mode Retain
+            $result.Success | Should -BeTrue
+
+            $details = Get-EVXLog -LogName $script:log
+            $details.MaximumSizeInBytes | Should -Be (2MB)
+            $details.LogMode | Should -Be 'Retain'
+        } finally {
+            if ([EventViewerX.ClassicEventLogManager]::LogExists($script:log)) {
+                [EventViewerX.ClassicEventLogManager]::RemoveLog($script:log) | Out-Null
+            }
+        }
     }
 }

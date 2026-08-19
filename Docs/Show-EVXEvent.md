@@ -15,27 +15,27 @@ Typed and custom definitions render only their domain fields. Composite types ke
 ## SYNTAX
 ### Input (Default)
 ```powershell
-Show-EVXEvent -InputObject <Object> [-Title <string>] [-HtmlPath <string>] [-ExcelPath <string>] [-EmailPackage] [-Open] [-PassThru] [<CommonParameters>]
+Show-EVXEvent -InputObject <Object> [-Title <string>] [-HtmlPath <string>] [-DrawerPlacement <MonitoringRecordDrawerPlacement>] [-ExcelPath <string>] [-EmailPackage] [-Open] [-PassThru] [<CommonParameters>]
 ```
 
 ### Type
 ```powershell
-Show-EVXEvent [-Type] <EventType[]> [-Path <string[]>] [-EventRecordId <long[]>] [-MachineName <string[]>] [-Collector <string[]>] [-StartTime <DateTime>] [-EndTime <DateTime>] [-TimePeriod <TimePeriod>] [-MaxEvents <long>] [-MaxEventsScanned <long>] [-MaxConcurrency <int>] [-Oldest] [-ResolveDns] [-Credential <pscredential>] [-Authentication <EventLogAuthentication>] [-Title <string>] [-HtmlPath <string>] [-ExcelPath <string>] [-EmailPackage] [-Open] [-PassThru] [<CommonParameters>]
+Show-EVXEvent [-Type] <EventType[]> [-Path <string[]>] [-EventRecordId <long[]>] [-MachineName <string[]>] [-Collector <string[]>] [-StartTime <DateTime>] [-EndTime <DateTime>] [-TimePeriod <TimePeriod>] [-MaxEvents <long>] [-MaxEventsScanned <long>] [-MaxConcurrency <int>] [-Oldest] [-ResolveDns] [-Credential <pscredential>] [-Authentication <EventLogAuthentication>] [-Title <string>] [-HtmlPath <string>] [-DrawerPlacement <MonitoringRecordDrawerPlacement>] [-ExcelPath <string>] [-EmailPackage] [-Open] [-PassThru] [<CommonParameters>]
 ```
 
 ### Log
 ```powershell
-Show-EVXEvent [-LogName] <string> [-EventId <int[]>] [-EventRecordId <long[]>] [-MachineName <string[]>] [-StartTime <DateTime>] [-EndTime <DateTime>] [-TimePeriod <TimePeriod>] [-MaxEvents <long>] [-MaxConcurrency <int>] [-Oldest] [-Credential <pscredential>] [-Authentication <EventLogAuthentication>] [-Title <string>] [-HtmlPath <string>] [-ExcelPath <string>] [-EmailPackage] [-Open] [-PassThru] [<CommonParameters>]
+Show-EVXEvent [-LogName] <string> [-EventId <int[]>] [-EventRecordId <long[]>] [-MachineName <string[]>] [-StartTime <DateTime>] [-EndTime <DateTime>] [-TimePeriod <TimePeriod>] [-MaxEvents <long>] [-MaxConcurrency <int>] [-Oldest] [-Credential <pscredential>] [-Authentication <EventLogAuthentication>] [-Title <string>] [-HtmlPath <string>] [-DrawerPlacement <MonitoringRecordDrawerPlacement>] [-ExcelPath <string>] [-EmailPackage] [-Open] [-PassThru] [<CommonParameters>]
 ```
 
 ### Path
 ```powershell
-Show-EVXEvent [-Path] <string[]> [-EventId <int[]>] [-EventRecordId <long[]>] [-StartTime <DateTime>] [-EndTime <DateTime>] [-TimePeriod <TimePeriod>] [-MaxEvents <long>] [-MaxConcurrency <int>] [-Oldest] [-Title <string>] [-HtmlPath <string>] [-ExcelPath <string>] [-EmailPackage] [-Open] [-PassThru] [<CommonParameters>]
+Show-EVXEvent [-Path] <string[]> [-EventId <int[]>] [-EventRecordId <long[]>] [-StartTime <DateTime>] [-EndTime <DateTime>] [-TimePeriod <TimePeriod>] [-MaxEvents <long>] [-MaxConcurrency <int>] [-Oldest] [-Title <string>] [-HtmlPath <string>] [-DrawerPlacement <MonitoringRecordDrawerPlacement>] [-ExcelPath <string>] [-EmailPackage] [-Open] [-PassThru] [<CommonParameters>]
 ```
 
 ### Definition
 ```powershell
-Show-EVXEvent [-Definition] <Object> [-Path <string[]>] [-EventRecordId <long[]>] [-MachineName <string[]>] [-Collector <string[]>] [-StartTime <DateTime>] [-EndTime <DateTime>] [-TimePeriod <TimePeriod>] [-MaxEvents <long>] [-MaxEventsScanned <long>] [-MaxConcurrency <int>] [-Oldest] [-Credential <pscredential>] [-Authentication <EventLogAuthentication>] [-Title <string>] [-HtmlPath <string>] [-ExcelPath <string>] [-EmailPackage] [-Open] [-PassThru] [<CommonParameters>]
+Show-EVXEvent [-Definition] <Object> [-Path <string[]>] [-EventRecordId <long[]>] [-MachineName <string[]>] [-Collector <string[]>] [-StartTime <DateTime>] [-EndTime <DateTime>] [-TimePeriod <TimePeriod>] [-MaxEvents <long>] [-MaxEventsScanned <long>] [-MaxConcurrency <int>] [-Oldest] [-Credential <pscredential>] [-Authentication <EventLogAuthentication>] [-Title <string>] [-HtmlPath <string>] [-DrawerPlacement <MonitoringRecordDrawerPlacement>] [-ExcelPath <string>] [-EmailPackage] [-Open] [-PassThru] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -129,6 +129,22 @@ Possible values:
 
 Required: True
 Position: 0
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -DrawerPlacement
+Preferred location of the selected-record drawer in interactive HTML output.
+
+```yaml
+Type: MonitoringRecordDrawerPlacement
+Parameter Sets: Input, Type, Log, Path, Definition
+Aliases: None
+Possible values: Auto, Top, Right
+
+Required: False
+Position: named
 Default value: None
 Accept pipeline input: False
 Accept wildcard characters: False

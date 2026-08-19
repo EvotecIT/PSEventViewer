@@ -12778,6 +12778,23 @@ This cannot be combined with EventLogPath.</maml:para>
       <command:syntaxItem parameterSetName="Input">
         <maml:name>Show-EVXEvent</maml:name>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>DrawerPlacement</maml:name>
+          <maml:description>
+            <maml:para>Preferred location of the selected-record drawer in interactive HTML output.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">MonitoringRecordDrawerPlacement</command:parameterValue>
+          <command:parameterValueGroup>
+            <command:parameterValue required="false" variableLength="false">Auto</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Top</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Right</command:parameterValue>
+          </command:parameterValueGroup>
+          <dev:type>
+            <maml:name>MonitoringRecordDrawerPlacement</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>EmailPackage</maml:name>
           <maml:description>
             <maml:para>Returns a responsive transport-neutral email package for Mailozaurr.</maml:para>
@@ -12902,6 +12919,23 @@ This cannot be combined with EventLogPath.</maml:para>
           <command:parameterValue required="false" variableLength="false">PSCredential</command:parameterValue>
           <dev:type>
             <maml:name>PSCredential</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>DrawerPlacement</maml:name>
+          <maml:description>
+            <maml:para>Preferred location of the selected-record drawer in interactive HTML output.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">MonitoringRecordDrawerPlacement</command:parameterValue>
+          <command:parameterValueGroup>
+            <command:parameterValue required="false" variableLength="false">Auto</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Top</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Right</command:parameterValue>
+          </command:parameterValueGroup>
+          <dev:type>
+            <maml:name>MonitoringRecordDrawerPlacement</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -13278,6 +13312,23 @@ This cannot be combined with EventLogPath.</maml:para>
           <dev:defaultValue>None</dev:defaultValue>
         </command:parameter>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>DrawerPlacement</maml:name>
+          <maml:description>
+            <maml:para>Preferred location of the selected-record drawer in interactive HTML output.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">MonitoringRecordDrawerPlacement</command:parameterValue>
+          <command:parameterValueGroup>
+            <command:parameterValue required="false" variableLength="false">Auto</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Top</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Right</command:parameterValue>
+          </command:parameterValueGroup>
+          <dev:type>
+            <maml:name>MonitoringRecordDrawerPlacement</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>EmailPackage</maml:name>
           <maml:description>
             <maml:para>Returns a responsive transport-neutral email package for Mailozaurr.</maml:para>
@@ -13502,6 +13553,23 @@ This cannot be combined with EventLogPath.</maml:para>
       </command:syntaxItem>
       <command:syntaxItem parameterSetName="Path">
         <maml:name>Show-EVXEvent</maml:name>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>DrawerPlacement</maml:name>
+          <maml:description>
+            <maml:para>Preferred location of the selected-record drawer in interactive HTML output.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">MonitoringRecordDrawerPlacement</command:parameterValue>
+          <command:parameterValueGroup>
+            <command:parameterValue required="false" variableLength="false">Auto</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Top</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Right</command:parameterValue>
+          </command:parameterValueGroup>
+          <dev:type>
+            <maml:name>MonitoringRecordDrawerPlacement</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>EmailPackage</maml:name>
           <maml:description>
@@ -13765,6 +13833,23 @@ This cannot be combined with EventLogPath.</maml:para>
           <command:parameterValue required="true" variableLength="false">Object</command:parameterValue>
           <dev:type>
             <maml:name>Object</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>DrawerPlacement</maml:name>
+          <maml:description>
+            <maml:para>Preferred location of the selected-record drawer in interactive HTML output.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">MonitoringRecordDrawerPlacement</command:parameterValue>
+          <command:parameterValueGroup>
+            <command:parameterValue required="false" variableLength="false">Auto</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Top</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Right</command:parameterValue>
+          </command:parameterValueGroup>
+          <dev:type>
+            <maml:name>MonitoringRecordDrawerPlacement</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -14044,6 +14129,23 @@ This cannot be combined with EventLogPath.</maml:para>
         <command:parameterValue required="true" variableLength="false">Object</command:parameterValue>
         <dev:type>
           <maml:name>Object</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+        <maml:name>DrawerPlacement</maml:name>
+        <maml:description>
+          <maml:para>Preferred location of the selected-record drawer in interactive HTML output.</maml:para>
+        </maml:description>
+        <command:parameterValue required="false" variableLength="false">MonitoringRecordDrawerPlacement</command:parameterValue>
+        <command:parameterValueGroup>
+          <command:parameterValue required="false" variableLength="false">Auto</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Top</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Right</command:parameterValue>
+        </command:parameterValueGroup>
+        <dev:type>
+          <maml:name>MonitoringRecordDrawerPlacement</maml:name>
           <maml:uri />
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>

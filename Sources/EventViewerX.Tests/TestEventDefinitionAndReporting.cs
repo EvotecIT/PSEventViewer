@@ -4,6 +4,7 @@ using System.Security.Principal;
 using System.Xml.Linq;
 using EventViewerX.Reporting;
 using EventViewerX.Rules.ActiveDirectory;
+using HtmlForgeX;
 using Xunit;
 
 namespace EventViewerX.Tests;
@@ -56,9 +57,18 @@ public sealed class TestEventDefinitionAndReporting {
         Assert.Contains("data-hfx-monitoring-nav=\"overview\"", html, StringComparison.Ordinal);
         Assert.Contains("data-hfx-monitoring-record-explorer=\"true\"", html, StringComparison.Ordinal);
         Assert.Contains("data-hfx-monitoring-column-picker-toggle=\"true\"", html, StringComparison.Ordinal);
+        Assert.Contains("data-hfx-monitoring-inline-details=\"false\"", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("data-hfx-monitoring-inline-details=\"true\"", html, StringComparison.Ordinal);
+        Assert.Contains("data-hfx-monitoring-record-drawer-tab=\"detail-provenance\">Provenance</button>", html, StringComparison.Ordinal);
+        Assert.Contains("data-hfx-monitoring-record-drawer-detail-group=\"provenance\"", html, StringComparison.Ordinal);
         Assert.DoesNotContain("hfx-report-workspace", html, StringComparison.Ordinal);
         Assert.Contains("Failed logons", html, StringComparison.Ordinal);
         Assert.Contains("alice", html, StringComparison.Ordinal);
+
+        string topDrawerHtml = EventReportHtmlRenderer.Render(report, new EventReportHtmlOptions {
+            RecordDrawerPlacement = MonitoringRecordDrawerPlacement.Top
+        });
+        Assert.Contains("data-hfx-monitoring-record-drawer-placement=\"top\"", topDrawerHtml, StringComparison.Ordinal);
 
         string workbook = Path.Combine(Path.GetTempPath(), $"evx-report-{Guid.NewGuid():N}.xlsx");
         try {
