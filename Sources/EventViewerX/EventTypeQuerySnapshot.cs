@@ -51,6 +51,9 @@ internal static class EventTypeQuerySnapshot {
             ResultPredicate = source.ResultPredicate,
             MinimumRecordIdExclusiveResolver =
                 source.MinimumRecordIdExclusiveResolver,
+            BookmarkXmlResolver = source.BookmarkXmlResolver,
+            BookmarkOffset = source.BookmarkOffset,
+            StrictBookmark = source.StrictBookmark,
             CandidateObserver = source.CandidateObserver,
             ContinueOnRemoteFailure =
                 source.ContinueOnRemoteFailure

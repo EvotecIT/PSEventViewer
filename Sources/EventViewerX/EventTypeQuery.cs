@@ -156,6 +156,20 @@ public sealed class EventTypeQuery {
     }
 
     /// <summary>
+    /// Optional per-machine and per-container bookmark checkpoint. The resolver receives the queried
+    /// machine or file path and the actual container channel or file path.
+    /// </summary>
+    public Func<string?, string, string?>? BookmarkXmlResolver { get; set; }
+
+    /// <summary>
+    /// Record offset relative to a resolved bookmark. The default of one resumes after the bookmarked event.
+    /// </summary>
+    public long BookmarkOffset { get; set; } = 1;
+
+    /// <summary>Fails the source when a resolved bookmark is no longer valid.</summary>
+    public bool StrictBookmark { get; set; } = true;
+
+    /// <summary>
     /// Optional observer invoked in source order after projection and enrichment complete.
     /// </summary>
     public Action<EventObject>? CandidateObserver {

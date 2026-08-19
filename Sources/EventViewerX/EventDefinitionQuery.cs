@@ -58,6 +58,17 @@ public sealed class EventDefinitionQuery {
     public Func<CustomEventRecord, bool>? ResultPredicate { get; set; }
     /// <summary>Optional per-machine and per-container exclusive record checkpoint.</summary>
     public Func<string?, string, long?>? MinimumRecordIdExclusiveResolver { get; set; }
+    /// <summary>
+    /// Optional per-machine and per-container bookmark checkpoint. The resolver receives the queried
+    /// machine or file path and the actual container channel or file path.
+    /// </summary>
+    public Func<string?, string, string?>? BookmarkXmlResolver { get; set; }
+    /// <summary>
+    /// Record offset relative to a resolved bookmark. The default of one resumes after the bookmarked event.
+    /// </summary>
+    public long BookmarkOffset { get; set; } = 1;
+    /// <summary>Fails the source when a resolved bookmark is no longer valid.</summary>
+    public bool StrictBookmark { get; set; } = true;
     /// <summary>Observer invoked in source order after custom projection completes.</summary>
     public Action<EventObject>? CandidateObserver { get; set; }
     /// <summary>Continues healthy remote targets after an expected remote-target failure.</summary>
