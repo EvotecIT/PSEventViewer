@@ -47,17 +47,18 @@ public static class EventDefinitionEngine {
             }
             info.EventsScanned++;
             var record = new CustomEventRecord(query.Definition, source, Project(query.Definition, source));
-            query.CandidateObserver?.Invoke(source);
             if (query.ResultPredicate != null && !query.ResultPredicate(record)) {
+                query.CandidateObserver?.Invoke(source);
                 continue;
             }
-            emitted++;
-            info.EventsEmitted = emitted;
-            yield return record;
             if (query.MaxEvents > 0 && emitted >= query.MaxEvents) {
                 info.ResultLimitReached = true;
                 yield break;
             }
+            query.CandidateObserver?.Invoke(source);
+            emitted++;
+            info.EventsEmitted = emitted;
+            yield return record;
         }
     }
 

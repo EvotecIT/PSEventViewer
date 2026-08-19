@@ -28,7 +28,12 @@ public sealed class GroupPolicyAuditRecord {
             ? source.GatheredLogName
             : source.ContainerLogName;
         BookmarkXml = source.BookmarkXml;
-        ObjectDistinguishedName = Value(record, "ObjectDistinguishedName");
+        OldObjectDistinguishedName = Value(record, "OldObjectDistinguishedName");
+        NewObjectDistinguishedName = Value(record, "NewObjectDistinguishedName");
+        ObjectDistinguishedName = FirstValue(
+            NewObjectDistinguishedName,
+            Value(record, "ObjectDistinguishedName"),
+            OldObjectDistinguishedName);
         ObjectGuid = ParseGuid(Value(record, "ObjectGuid"));
         ObjectClass = Value(record, "ObjectClass");
         AttributeName = Value(record, "AttributeName");
@@ -80,6 +85,12 @@ public sealed class GroupPolicyAuditRecord {
 
     /// <summary>Affected directory object distinguished name.</summary>
     public string ObjectDistinguishedName { get; }
+
+    /// <summary>Previous distinguished name for a moved directory object.</summary>
+    public string OldObjectDistinguishedName { get; }
+
+    /// <summary>New distinguished name for a moved directory object.</summary>
+    public string NewObjectDistinguishedName { get; }
 
     /// <summary>Affected directory object GUID, when supplied by the event.</summary>
     public Guid? ObjectGuid { get; }
@@ -149,6 +160,10 @@ public sealed class GroupPolicyAuditRecord {
         return match.Success && Guid.TryParse(match.Groups["id"].Value, out Guid result)
             ? result
             : null;
+    }
+
+    private static string FirstValue(params string[] values) {
+        return values.FirstOrDefault(static value => !string.IsNullOrWhiteSpace(value)) ?? string.Empty;
     }
 
     private static GroupPolicyAuditTargetKind ResolveTargetKind(string objectClass, string attributeName) {

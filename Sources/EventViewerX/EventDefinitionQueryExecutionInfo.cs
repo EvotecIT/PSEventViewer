@@ -16,7 +16,7 @@ public sealed class EventDefinitionQueryExecutionInfo {
     /// <summary>Whether another candidate existed after the configured scan cap.</summary>
     public bool ScanLimitReached { get; internal set; }
 
-    /// <summary>Whether the configured projected-result cap stopped the query.</summary>
+    /// <summary>Whether another projected result existed after the configured result cap.</summary>
     public bool ResultLimitReached { get; internal set; }
 
     /// <summary>Expected remote-target failures isolated while healthy targets continued.</summary>

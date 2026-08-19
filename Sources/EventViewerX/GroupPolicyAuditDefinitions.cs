@@ -20,6 +20,8 @@ public static class GroupPolicyAuditDefinitions {
         },
         Fields = new[] {
             Data("ObjectDistinguishedName", "ObjectDN"),
+            Data("OldObjectDistinguishedName", "OldObjectDN"),
+            Data("NewObjectDistinguishedName", "NewObjectDN"),
             Data("ObjectGuid", "ObjectGUID"),
             Data("ObjectClass", "ObjectClass"),
             Data("AttributeName", "AttributeLDAPDisplayName"),

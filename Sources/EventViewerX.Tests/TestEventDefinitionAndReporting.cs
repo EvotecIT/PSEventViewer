@@ -372,7 +372,7 @@ public sealed class TestEventDefinitionAndReporting {
     }
 
     [Fact]
-    public async Task CustomDefinitionAppliesResultLimitAfterProjectionPredicate() {
+    public async Task CustomDefinitionDoesNotReportResultTruncationAtNaturalCompletion() {
         string fixture = Path.GetFullPath(Path.Combine(
             AppContext.BaseDirectory, "..", "..", "..", "..", "..", "Tests", "Logs", "NamedFilterExamples.evtx"));
         EventDefinition definition = new() {
@@ -406,8 +406,42 @@ public sealed class TestEventDefinitionAndReporting {
 
         Assert.Single(actual);
         Assert.Equal(selectedRecordId, actual[0].SourceEvent.RecordId);
+        Assert.False(info.ResultLimitReached);
+        Assert.False(info.ScanLimitReached);
+    }
+
+    [Fact]
+    public async Task CustomDefinitionReportsResultTruncationOnlyWhenAnotherMatchExists() {
+        string fixture = Path.GetFullPath(Path.Combine(
+            AppContext.BaseDirectory, "..", "..", "..", "..", "..", "Tests", "Logs", "NamedFilterExamples.evtx"));
+        EventDefinition definition = new() {
+            Name = "ServiceStartTypeChange",
+            Sources = new[] {
+                new EventDefinitionSource {
+                    LogName = "System",
+                    EventIds = new[] { 7040 },
+                    ProviderNames = new[] { "Service Control Manager" }
+                }
+            }
+        };
+        var observed = new List<long?>();
+        var query = new EventDefinitionQuery(definition) {
+            Paths = new[] { fixture },
+            MaxEvents = 1,
+            CandidateObserver = source => observed.Add(source.RecordId)
+        };
+        var actual = new List<CustomEventRecord>();
+        var info = new EventDefinitionQueryExecutionInfo();
+
+        await foreach (CustomEventRecord record in EventDefinitionEngine.ReadAsync(query, info)) {
+            actual.Add(record);
+        }
+
+        CustomEventRecord onlyRecord = Assert.Single(actual);
         Assert.True(info.ResultLimitReached);
         Assert.False(info.ScanLimitReached);
+        Assert.Equal(2, info.EventsScanned);
+        Assert.Equal(onlyRecord.SourceEvent.RecordId, Assert.Single(observed));
     }
 
     [Fact]

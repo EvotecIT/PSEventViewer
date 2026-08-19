@@ -17,6 +17,9 @@ public sealed class GroupPolicyAuditCheckpoint {
     /// <summary>Creation time of the event at this checkpoint.</summary>
     public DateTime TimeCreatedUtc { get; set; }
 
+    /// <summary>Query ordering used when this checkpoint was captured.</summary>
+    public bool Oldest { get; set; } = true;
+
     /// <summary>Stable key for resolving the checkpoint in a subsequent query.</summary>
     public string SourceKey => CreateSourceKey(QueryTarget, ContainerLogName);
 
@@ -31,4 +34,13 @@ public sealed class GroupPolicyAuditCheckpoint {
         string container = containerLogName.Trim();
         return target.ToUpperInvariant() + "|" + container.ToUpperInvariant();
     }
+
+    internal GroupPolicyAuditCheckpoint Copy() => new() {
+        QueryTarget = QueryTarget,
+        ContainerLogName = ContainerLogName,
+        BookmarkXml = BookmarkXml,
+        RecordId = RecordId,
+        TimeCreatedUtc = TimeCreatedUtc,
+        Oldest = Oldest
+    };
 }

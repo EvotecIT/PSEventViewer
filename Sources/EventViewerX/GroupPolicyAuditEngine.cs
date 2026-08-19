@@ -27,7 +27,7 @@ public static class GroupPolicyAuditEngine {
         executionInfo.Reset();
         GroupPolicyAuditQuery snapshot = CreateSnapshot(query);
         IReadOnlyDictionary<string, GroupPolicyAuditCheckpoint> checkpoints =
-            CreateCheckpointIndex(snapshot.Checkpoints);
+            CreateCheckpointIndex(snapshot.Checkpoints, snapshot.Oldest);
         var definitionInfo = new EventDefinitionQueryExecutionInfo();
         var definitionQuery = new EventDefinitionQuery(GroupPolicyAuditDefinitions.CreateDirectoryChanges()) {
             Paths = snapshot.Paths,
@@ -52,7 +52,7 @@ public static class GroupPolicyAuditEngine {
             ContinueOnRemoteFailure = snapshot.ContinueOnRemoteFailure,
             StrictBookmark = snapshot.StrictCheckpoint,
             BookmarkXmlResolver = (target, container) => ResolveCheckpoint(checkpoints, target, container),
-            CandidateObserver = executionInfo.RecordCheckpoint,
+            CandidateObserver = source => executionInfo.RecordCheckpoint(source, snapshot.Oldest),
             ResultPredicate = IsGroupPolicyAuditEvent
         };
 
@@ -77,6 +77,11 @@ public static class GroupPolicyAuditEngine {
         if (source == null) {
             throw new ArgumentNullException(nameof(source));
         }
+        if (!IsSupportedSource(source)) {
+            throw new ArgumentException(
+                "The event must be Security event 5136, 5137, 5139, or 5141 from Microsoft-Windows-Security-Auditing.",
+                nameof(source));
+        }
         CustomEventRecord record = EventDefinitionEngine.CreateRecord(
             GroupPolicyAuditDefinitions.CreateDirectoryChanges(),
             source);
@@ -92,6 +97,9 @@ public static class GroupPolicyAuditEngine {
         }
         if (query.Checkpoints != null && query.Checkpoints.Any(static checkpoint => checkpoint == null)) {
             throw new ArgumentException("Checkpoints cannot contain null values.", nameof(query));
+        }
+        if (query.Checkpoints != null && query.Checkpoints.Any(checkpoint => checkpoint.Oldest != query.Oldest)) {
+            throw new ArgumentException("Every checkpoint must use the same Oldest ordering as the query.", nameof(query));
         }
         return new GroupPolicyAuditQuery {
             Paths = query.Paths?.ToArray(),
@@ -120,7 +128,8 @@ public static class GroupPolicyAuditEngine {
     }
 
     private static IReadOnlyDictionary<string, GroupPolicyAuditCheckpoint> CreateCheckpointIndex(
-        IReadOnlyList<GroupPolicyAuditCheckpoint>? checkpoints) {
+        IReadOnlyList<GroupPolicyAuditCheckpoint>? checkpoints,
+        bool oldest) {
 
         var result = new Dictionary<string, GroupPolicyAuditCheckpoint>(StringComparer.OrdinalIgnoreCase);
         foreach (GroupPolicyAuditCheckpoint checkpoint in checkpoints ?? Array.Empty<GroupPolicyAuditCheckpoint>()) {
@@ -133,6 +142,11 @@ public static class GroupPolicyAuditEngine {
             }
             if (result.ContainsKey(checkpoint.SourceKey)) {
                 throw new ArgumentException($"Duplicate checkpoint source '{checkpoint.SourceKey}'.", nameof(checkpoints));
+            }
+            if (checkpoint.Oldest != oldest) {
+                throw new ArgumentException(
+                    $"Checkpoint source '{checkpoint.SourceKey}' does not match the query ordering.",
+                    nameof(checkpoints));
             }
             result.Add(checkpoint.SourceKey, checkpoint);
         }
@@ -160,6 +174,15 @@ public static class GroupPolicyAuditEngine {
                string.Equals(attributeName, "gPCWQLFilter", StringComparison.OrdinalIgnoreCase);
     }
 
+    private static bool IsSupportedSource(EventObject source) {
+        return source.Id is 5136 or 5137 or 5139 or 5141 &&
+               string.Equals(
+                   source.ProviderName,
+                   "Microsoft-Windows-Security-Auditing",
+                   StringComparison.OrdinalIgnoreCase) &&
+               string.Equals(source.OriginalLogName, "Security", StringComparison.OrdinalIgnoreCase);
+    }
+
     private static string Value(CustomEventRecord record, string name) {
         return record.Values.TryGetValue(name, out object? value)
             ? value?.ToString() ?? string.Empty
@@ -171,6 +194,8 @@ public static class GroupPolicyAuditEngine {
         ContainerLogName = source.ContainerLogName.Trim(),
         BookmarkXml = source.BookmarkXml,
         RecordId = source.RecordId,
-        TimeCreatedUtc = source.TimeCreatedUtc
+        TimeCreatedUtc = source.TimeCreatedUtc,
+        Oldest = source.Oldest
     };
+
 }

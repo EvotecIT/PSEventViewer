@@ -16,7 +16,7 @@ public sealed class GroupPolicyAuditQueryExecutionInfo {
     /// <summary>Whether another candidate existed after the configured scan cap.</summary>
     public bool ScanLimitReached { get; internal set; }
 
-    /// <summary>Whether the configured matching-result cap stopped the query.</summary>
+    /// <summary>Whether another matching result existed after the configured result cap.</summary>
     public bool ResultLimitReached { get; internal set; }
 
     /// <summary>Whether either configured bound stopped the query before natural completion.</summary>
@@ -30,6 +30,7 @@ public sealed class GroupPolicyAuditQueryExecutionInfo {
     public IReadOnlyList<GroupPolicyAuditCheckpoint> Checkpoints => _checkpoints.Values
         .OrderBy(static checkpoint => checkpoint.QueryTarget, StringComparer.OrdinalIgnoreCase)
         .ThenBy(static checkpoint => checkpoint.ContainerLogName, StringComparer.OrdinalIgnoreCase)
+        .Select(static checkpoint => checkpoint.Copy())
         .ToArray();
 
     internal void Reset() {
@@ -41,7 +42,7 @@ public sealed class GroupPolicyAuditQueryExecutionInfo {
         _checkpoints.Clear();
     }
 
-    internal void RecordCheckpoint(EventObject source) {
+    internal void RecordCheckpoint(EventObject source, bool oldest) {
         if (string.IsNullOrWhiteSpace(source.BookmarkXml)) {
             return;
         }
@@ -58,7 +59,8 @@ public sealed class GroupPolicyAuditQueryExecutionInfo {
             RecordId = source.RecordId,
             TimeCreatedUtc = source.TimeCreated.Kind == DateTimeKind.Utc
                 ? source.TimeCreated
-                : source.TimeCreated.ToUniversalTime()
+                : source.TimeCreated.ToUniversalTime(),
+            Oldest = oldest
         };
         _checkpoints[checkpoint.SourceKey] = checkpoint;
     }
