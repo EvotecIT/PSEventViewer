@@ -548,6 +548,7 @@ Send-EmailMessage -Server 'smtp.contoso.com' -Port 587 `
 $env:EVX_SMTP_PASSWORD = '<secret supplied by the scheduler or secret store>'
 evx report --type ActiveDirectoryAuthentication --collector WEC01 `
     --since 1.00:00:00 --html .\Authentication.html `
+    --drawer-placement Auto `
     --excel .\Authentication.xlsx --mail-profile .\smtp.json
 ```
 
@@ -567,10 +568,17 @@ EventReport report = await EventReportEngine.QueryAsync(request);
 foreach (EventReportSection section in report.Sections) {
     Console.WriteLine($"{section.DisplayName}: {section.Rows.Count} rows");
 }
-EventReportHtmlRenderer.Save(report, "Authentication.html");
+EventReportHtmlRenderer.Save(report, "Authentication.html", new EventReportHtmlOptions {
+    RecordDrawerPlacement = HtmlForgeX.MonitoringRecordDrawerPlacement.Auto
+});
 EventReportExcelRenderer.Save(report, "Authentication.xlsx");
 EventEmailPackage email = await EventReportEmailRenderer.RenderAsync(report);
 ```
+
+Interactive HTML supports `Auto`, `Top`, and `Right` selected-record placement.
+`Auto` uses the available report width. `Right` prefers a split view but still
+falls back above the table below the narrow-screen safety breakpoint. PowerShell
+exposes the same contract through `Show-EVXEvent -DrawerPlacement`.
 
 ## Portable host and event-triggered automation
 

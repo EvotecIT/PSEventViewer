@@ -42,6 +42,7 @@ Describe 'Show-EVXEvent' {
         $Result = @($Event | Show-EVXEvent `
                 -Title 'System snapshot' `
                 -HtmlPath $HtmlPath `
+                -DrawerPlacement Top `
                 -ExcelPath $ExcelPath `
                 -EmailPackage `
                 -PassThru)
@@ -49,6 +50,7 @@ Describe 'Show-EVXEvent' {
         Test-Path -LiteralPath $HtmlPath | Should -BeTrue
         Test-Path -LiteralPath $ExcelPath | Should -BeTrue
         (Get-Content -LiteralPath $HtmlPath -Raw) | Should -Match 'System snapshot'
+        (Get-Content -LiteralPath $HtmlPath -Raw) | Should -Match 'data-hfx-monitoring-record-drawer-placement="top"'
         $Result.Count | Should -Be 4
         @($Result | Where-Object { $_ -is [EventViewerX.Reporting.EventEmailPackage] }).Count |
             Should -Be 1

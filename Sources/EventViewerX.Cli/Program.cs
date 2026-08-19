@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using EventViewerX.Providers;
 using EventViewerX.Reporting;
+using HtmlForgeX;
 
 namespace EventViewerX.Cli;
 
@@ -45,7 +46,10 @@ internal static partial class Program {
         bool written = false;
         EventEmailPackage? emailPackage = null;
         if (options.Get("html") is string html) {
-            Console.WriteLine(EventReportHtmlRenderer.Save(report, html));
+            var htmlOptions = new EventReportHtmlOptions {
+                RecordDrawerPlacement = ParseDrawerPlacement(options.Get("drawer-placement"))
+            };
+            Console.WriteLine(EventReportHtmlRenderer.Save(report, html, htmlOptions));
             written = true;
         }
         if (options.Get("excel") is string excel) {
@@ -119,6 +123,16 @@ internal static partial class Program {
         request.ResolveDns = options.Has("resolve-dns");
         request.Title = options.Get("title");
         return request;
+    }
+
+    private static MonitoringRecordDrawerPlacement ParseDrawerPlacement(string? value) {
+        if (string.IsNullOrWhiteSpace(value)) {
+            return MonitoringRecordDrawerPlacement.Auto;
+        }
+        return Enum.TryParse(value, ignoreCase: true, out MonitoringRecordDrawerPlacement placement) &&
+               Enum.IsDefined(typeof(MonitoringRecordDrawerPlacement), placement)
+            ? placement
+            : throw new ArgumentException("--drawer-placement must be Auto, Top, or Right.");
     }
 
     private static int Collector(CliArguments options) {
@@ -245,7 +259,7 @@ internal static partial class Program {
                     "type", "definition", "log", "path", "event-id", "record-id",
                     "machine", "collector", "start", "end", "since", "max",
                     "max-candidates", "concurrency", "oldest", "resolve-dns", "title",
-                    "html", "excel", "email-html", "mail-profile", "email-rows");
+                    "html", "excel", "email-html", "mail-profile", "email-rows", "drawer-placement");
                 break;
             case "watch":
                 options.ValidateAllowed(
@@ -291,7 +305,7 @@ internal static partial class Program {
         Console.WriteLine("EventViewerX 4.0\n\n" +
             "  evx types\n" +
             "  evx query  (--type TYPE[,TYPE] | --definition FILE | --log LOG | --path FILE[,FILE]) [--path FILE[,FILE] with type/definition] [--event-id ID] [--record-id ID] [--machine HOST | --collector WEC] [--since 01:00:00] [--max N]\n" +
-            "  evx report (--type TYPE[,TYPE] | --definition FILE | --log LOG | --path FILE[,FILE]) [--path FILE[,FILE] with type/definition] (--html FILE | --excel FILE | --email-html FILE | --mail-profile FILE)\n" +
+            "  evx report (--type TYPE[,TYPE] | --definition FILE | --log LOG | --path FILE[,FILE]) [--path FILE[,FILE] with type/definition] (--html FILE | --excel FILE | --email-html FILE | --mail-profile FILE) [--drawer-placement Auto|Top|Right]\n" +
             "  evx watch  (--type TYPE[,TYPE] | --definition FILE) [--machine HOST | --collector WEC] [--jsonl FILE] [--outbox DIR | --mail-profile FILE] [--interval 00:05:00] [--stop-after N] [--timeout 01:00:00] [--ready-file FILE] [--summary-file FILE]\n" +
             "  evx collector create --name NAME --type TYPE[,TYPE] (--source HOST[,HOST] | --source-initiated --collector-host WEC) [--allowed-source-sddl SDDL] [--output FILE] [--apply]\n" +
             "  evx collector readiness\n" +
