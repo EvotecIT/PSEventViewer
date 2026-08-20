@@ -478,14 +478,13 @@ FROM evx_events";
         if (values == null || values.Count == 0) {
             return;
         }
-        var names = new string[values.Count];
-        for (int index = 0; index < values.Count; index++) {
-            string name = $"${prefix}{index}";
-            names[index] = name;
-            parameters[name] = values[index];
+        string parameter = $"${prefix}";
+        if (parameters.ContainsKey(parameter)) {
+            throw new InvalidOperationException($"Stored selector parameter '{parameter}' is already defined.");
         }
+        parameters[parameter] = JsonSerializer.Serialize(values, JsonOptions);
         string expression = caseInsensitive ? $"{column} COLLATE NOCASE" : column;
-        where.Add($"{expression} IN ({string.Join(", ", names)})");
+        where.Add($"{expression} IN (SELECT value FROM json_each({parameter}))");
     }
 
     private static void AddSqliteNoCaseIn(

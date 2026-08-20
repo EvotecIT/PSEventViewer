@@ -242,6 +242,10 @@ internal static partial class Program {
         if (stored && options.Get("write-store") != null) {
             throw new ArgumentException("--write-store is only valid for live or offline event-log ingestion.");
         }
+        if (stored && (options.Has("resolve-dns") || options.Has("concurrency"))) {
+            throw new ArgumentException(
+                "--resolve-dns and --concurrency are live event-source options and cannot be combined with --store.");
+        }
         if (!stored && (options.Get("definition-name") != null || options.Get("source") != null ||
                         options.Get("provider") != null || options.Get("summary") != null)) {
             throw new ArgumentException(

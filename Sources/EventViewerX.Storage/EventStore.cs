@@ -34,17 +34,28 @@ public sealed partial class EventStore {
             }
             using var sqlite = new SQLite { BusyTimeoutMs = 10000 };
             using SQLiteSession session = sqlite.OpenSession(Path);
+            object? metadataTable = session.ExecuteScalar(
+                "SELECT 1 FROM sqlite_master " +
+                "WHERE type = 'table' AND name = 'evx_store_metadata' LIMIT 1;");
+            if (metadataTable != null) {
+                ValidateSchemaVersion(session.ExecuteScalar(
+                    "SELECT schema_version FROM evx_store_metadata WHERE singleton_id = 1;"));
+            }
             session.ExecuteNonQuery("PRAGMA journal_mode=WAL;");
             session.ExecuteNonQuery("PRAGMA synchronous=NORMAL;");
             session.ExecuteNonQuery(SchemaSql);
-            object? version = session.ExecuteScalar(
-                "SELECT schema_version FROM evx_store_metadata WHERE singleton_id = 1;");
-            if (Convert.ToInt32(version, CultureInfo.InvariantCulture) != SchemaVersion) {
-                throw new InvalidDataException(
-                    $"Event store schema version '{version}' is not supported by this EventViewerX build.");
-            }
+            ValidateSchemaVersion(session.ExecuteScalar(
+                "SELECT schema_version FROM evx_store_metadata WHERE singleton_id = 1;"));
             EnsureEventIdentitySchema(session);
             _initialized = true;
+        }
+    }
+
+    private static void ValidateSchemaVersion(object? version) {
+        if (version == null || version == DBNull.Value ||
+            Convert.ToInt32(version, CultureInfo.InvariantCulture) != SchemaVersion) {
+            throw new InvalidDataException(
+                $"Event store schema version '{version ?? "missing"}' is not supported by this EventViewerX build.");
         }
     }
 

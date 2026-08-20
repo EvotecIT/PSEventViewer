@@ -340,6 +340,28 @@ public sealed class TestEventPredicate {
     }
 
     [Fact]
+    public void PredicatesRejectNullArgumentsForValueBasedOperators() {
+        string value = null!;
+
+        InvalidDataException contains = Assert.Throws<InvalidDataException>(() =>
+            EventPredicate.FromExpression<ExampleRecord>(record => record.Who.Contains(value)));
+        InvalidDataException startsWith = Assert.Throws<InvalidDataException>(() =>
+            EventPredicate.FromExpression<ExampleRecord>(record => record.Who.StartsWith(value)));
+        InvalidDataException endsWith = Assert.Throws<InvalidDataException>(() =>
+            EventPredicate.FromExpression<ExampleRecord>(record => record.Who.EndsWith(value)));
+        InvalidDataException ordered = Assert.Throws<InvalidDataException>(() => new EventPredicate {
+            Kind = EventPredicateKind.Comparison,
+            Field = "Attempts",
+            Operator = EventPredicateOperator.GreaterThan,
+            Values = new string?[] { null }
+        }.Validate());
+
+        Assert.All(
+            new[] { contains, startsWith, endsWith, ordered },
+            static exception => Assert.Contains("cannot be null", exception.Message, StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void StronglyTypedExpressionsPreserveCSharpStringCaseSensitivity() {
         string[] users = { "ADMIN", "SERVICE" };
         EventPredicate equality = EventPredicate.FromExpression<ExampleRecord>(record => record.Who == "ADMIN");

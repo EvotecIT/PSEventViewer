@@ -142,6 +142,30 @@ Describe 'evx portable host' {
         Test-Path -LiteralPath $StorePath | Should -BeFalse
     }
 
+    It 'rejects live-only controls for stored queries before opening history' {
+        $StorePath = Join-Path $TestDrive 'stored-live-options-rejected.db'
+        $PreviousErrorActionPreference = $ErrorActionPreference
+        $ErrorActionPreference = 'Continue'
+        try {
+            $ResolveDnsOutput = & $script:CliPath query `
+                --store $StorePath `
+                --resolve-dns 2>&1
+            $ResolveDnsExitCode = $LASTEXITCODE
+            $ConcurrencyOutput = & $script:CliPath query `
+                --store $StorePath `
+                --concurrency 4 2>&1
+            $ConcurrencyExitCode = $LASTEXITCODE
+        } finally {
+            $ErrorActionPreference = $PreviousErrorActionPreference
+        }
+
+        $ResolveDnsExitCode | Should -Be 1
+        $ConcurrencyExitCode | Should -Be 1
+        [string] $ResolveDnsOutput | Should -Match 'live event-source options'
+        [string] $ConcurrencyOutput | Should -Match 'live event-source options'
+        Test-Path -LiteralPath $StorePath | Should -BeFalse
+    }
+
     It 'rejects mixed stored definition selector families before opening history' {
         $StorePath = Join-Path $TestDrive 'mixed-stored-selectors.db'
         $PreviousErrorActionPreference = $ErrorActionPreference

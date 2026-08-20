@@ -163,6 +163,15 @@ public sealed partial class EventPredicate {
                 requiredValues == 1 && predicate.Values.Count != 1) {
                 throw new InvalidDataException($"{path}.Values requires exactly one value for {predicate.Operator}.");
             }
+            if (predicate.Values.Count == 1 && predicate.Values[0] == null &&
+                predicate.Operator is not EventPredicateOperator.Equal and
+                not EventPredicateOperator.NotEqual and
+                not EventPredicateOperator.In and
+                not EventPredicateOperator.NotIn) {
+                throw new InvalidDataException(
+                    $"{path}.Values[0] cannot be null for {predicate.Operator}. " +
+                    "Use IsNull or IsNotNull for null selection.");
+            }
             if (predicate.Values.Count > 1024) {
                 throw new InvalidDataException($"{path}.Values cannot contain more than 1024 values.");
             }

@@ -7,6 +7,42 @@ namespace EventViewerX.Tests;
 
 public sealed partial class TestEventStore {
     [Fact]
+    public void FutureStoreVersionsAreRejectedBeforeCurrentSchemaDdlRuns() {
+        string path = CreateStorePath();
+        try {
+            using (var sqlite = new SQLite { BusyTimeoutMs = 10000 }) {
+                using SQLiteSession session = sqlite.OpenSession(path);
+                session.ExecuteNonQuery(@"
+CREATE TABLE evx_store_metadata (
+    singleton_id INTEGER NOT NULL PRIMARY KEY,
+    schema_version INTEGER NOT NULL,
+    created_utc TEXT NOT NULL
+);
+INSERT INTO evx_store_metadata (singleton_id, schema_version, created_utc)
+VALUES (1, 999, '2026-08-20T00:00:00Z');
+CREATE TABLE evx_events (future_only TEXT NOT NULL);");
+            }
+
+            InvalidDataException exception = Assert.Throws<InvalidDataException>(() =>
+                new EventStore(path).Initialize());
+
+            Assert.Contains("999", exception.Message, StringComparison.Ordinal);
+            Assert.Contains("not supported", exception.Message, StringComparison.OrdinalIgnoreCase);
+            using var verificationClient = new SQLite { BusyTimeoutMs = 10000 };
+            using SQLiteSession verification = verificationClient.OpenSession(path);
+            IReadOnlyList<string> columns = verification.QueryAsList(
+                "PRAGMA table_info(evx_events);",
+                static record => record.GetString(1));
+            object? currentIndex = verification.ExecuteScalar(
+                "SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'ix_evx_events_time';");
+            Assert.Equal(new[] { "future_only" }, columns);
+            Assert.Null(currentIndex);
+        } finally {
+            DeleteStore(path);
+        }
+    }
+
+    [Fact]
     public async Task GenericSchemaEvolutionPreservesStringValuesAndObservedColumns() {
         string path = CreateStorePath();
         try {
@@ -210,6 +246,29 @@ public sealed partial class TestEventStore {
 
             Assert.Equal(1, written.Inserted);
             Assert.Equal(8, Assert.IsType<int>(Assert.Single(stored.Rows).Values["AttemptCount"]));
+        } finally {
+            DeleteStore(path);
+        }
+    }
+
+    [Fact]
+    public async Task LargeStoredSelectorsUseBoundedJsonValueParameters() {
+        string path = CreateStorePath();
+        try {
+            var store = new EventStore(path);
+            await store.WriteAsync(CreateReport(
+                (new DateTime(2026, 8, 1, 1, 0, 0, DateTimeKind.Utc), 41, "alice"),
+                (new DateTime(2026, 8, 1, 2, 0, 0, DateTimeKind.Utc), 42, "bob")));
+            long[] recordIds = Enumerable.Range(1, 40000)
+                .Select(static value => (long)value)
+                .ToArray();
+
+            EventReport report = await store.ReadReportAsync(new EventStoreQuery {
+                RecordIds = recordIds,
+                Oldest = true
+            });
+
+            Assert.Equal(new long?[] { 41, 42 }, report.Rows.Select(static row => row.RecordId));
         } finally {
             DeleteStore(path);
         }
