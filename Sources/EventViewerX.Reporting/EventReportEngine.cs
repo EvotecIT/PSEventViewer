@@ -230,7 +230,8 @@ public static class EventReportEngine {
             Level = row.Level,
             LevelValue = row.LevelValue,
             Message = row.Message,
-            Values = row.Values.ToDictionary(
+            Values = (row.Values ?? throw new ArgumentException(
+                "Stored rows must provide a values collection.", nameof(row))).ToDictionary(
                 static item => item.Key,
                 static item => item.Value,
                 StringComparer.OrdinalIgnoreCase)

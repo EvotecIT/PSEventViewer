@@ -34,6 +34,7 @@ public sealed partial class EventStore {
                             !string.Equals(row.Type, "Generic", StringComparison.OrdinalIgnoreCase))) {
             throw new InvalidDataException("Every stored typed row must have a matching homogeneous report schema.");
         }
+        rows = EventReportEngine.CreateStored(rows, schemas).Rows.ToArray();
         EnsureInitialized();
 
         using var sqlite = new SQLite { BusyTimeoutMs = 10000 };

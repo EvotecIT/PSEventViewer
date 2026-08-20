@@ -361,8 +361,7 @@ public static class EventDefinitionEngine {
             string.Equals(candidate.Name, predicateField, StringComparison.OrdinalIgnoreCase) ||
             candidate.Aliases.Contains(predicateField, StringComparer.OrdinalIgnoreCase));
         if (field != null) {
-            if (field.Source != EventFieldSource.Metadata || field.DefaultValue != null ||
-                !EventFieldDefinition.IsNativeField(field.SourceName)) {
+            if (!CanUseNativeMetadataField(field)) {
                 return false;
             }
             nativeField = field.SourceName;
@@ -373,6 +372,32 @@ public static class EventDefinitionEngine {
         }
         nativeField = predicateField;
         return true;
+    }
+
+    internal static bool CanUseNativeMetadataField(EventDefinitionField field) {
+        if (field.Source != EventFieldSource.Metadata || field.DefaultValue != null ||
+            !EventFieldDefinition.IsNativeField(field.SourceName) ||
+            !TryResolveMetadataProperty(field.SourceName, out PropertyInfo? property)) {
+            return false;
+        }
+        Type sourceType = Nullable.GetUnderlyingType(property!.PropertyType) ?? property.PropertyType;
+        Type projectedType = Nullable.GetUnderlyingType(field.ValueType) ?? field.ValueType;
+        if (sourceType == projectedType) {
+            return true;
+        }
+        return string.Equals(field.SourceName, nameof(EventObject.Level), StringComparison.OrdinalIgnoreCase) &&
+               sourceType == typeof(byte) &&
+               projectedType == typeof(int);
+    }
+
+    private static bool TryResolveMetadataProperty(string name, out PropertyInfo? property) {
+        string canonicalName = name switch {
+            var value when value.Equals("EventId", StringComparison.OrdinalIgnoreCase) => nameof(EventObject.Id),
+            var value when value.Equals("EventRecordId", StringComparison.OrdinalIgnoreCase) => nameof(EventObject.RecordId),
+            var value when value.Equals("Provider", StringComparison.OrdinalIgnoreCase) => nameof(EventObject.ProviderName),
+            _ => name
+        };
+        return MetadataProperties.TryGetValue(canonicalName, out property);
     }
 
     /// <summary>Projects one previously read event through a custom definition.</summary>
@@ -393,7 +418,7 @@ public static class EventDefinitionEngine {
             object? value = field.Source switch {
                 EventFieldSource.Data => source.Data.TryGetValue(field.SourceName, out string? data) ? data : field.DefaultValue,
                 EventFieldSource.MessageData => source.MessageData.TryGetValue(field.SourceName, out string? messageData) ? messageData : field.DefaultValue,
-                EventFieldSource.Metadata => MetadataProperties.TryGetValue(field.SourceName, out PropertyInfo? property) ? property.GetValue(source) : field.DefaultValue,
+                EventFieldSource.Metadata => TryResolveMetadataProperty(field.SourceName, out PropertyInfo? property) ? property!.GetValue(source) : field.DefaultValue,
                 EventFieldSource.Message => source.Message,
                 EventFieldSource.Constant => field.SourceName,
                 _ => field.DefaultValue

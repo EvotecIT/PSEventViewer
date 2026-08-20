@@ -117,6 +117,31 @@ Describe 'evx portable host' {
         Test-Path -LiteralPath $StorePath | Should -BeFalse
     }
 
+    It 'rejects explanation combined with event-store ingestion before source access' {
+        $PredicatePath = Join-Path $TestDrive 'explain-write-store-predicate.json'
+        $StorePath = Join-Path $TestDrive 'explain-write-store-rejected.db'
+        @{
+            Field = 'EventId'
+            Operator = 'Equal'
+            Values = @('4625')
+        } | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $PredicatePath -Encoding UTF8
+        $PreviousErrorActionPreference = $ErrorActionPreference
+        $ErrorActionPreference = 'Continue'
+        try {
+            $Output = & $script:CliPath query `
+                --type ADUserLogonFailed `
+                --where $PredicatePath `
+                --explain `
+                --write-store $StorePath 2>&1
+        } finally {
+            $ErrorActionPreference = $PreviousErrorActionPreference
+        }
+
+        $LASTEXITCODE | Should -Be 1
+        [string] $Output | Should -Match '--explain cannot be combined with --write-store'
+        Test-Path -LiteralPath $StorePath | Should -BeFalse
+    }
+
     It 'rejects mixed stored definition selector families before opening history' {
         $StorePath = Join-Path $TestDrive 'mixed-stored-selectors.db'
         $PreviousErrorActionPreference = $ErrorActionPreference
@@ -227,6 +252,7 @@ Describe 'evx portable host' {
         $LASTEXITCODE | Should -Be 0
         $Rows.Count | Should -Be 2
         @($Rows.Type | Sort-Object -Unique) | Should -Be @('ServiceStartTypeChange')
+        @($Rows.ProjectedId | Sort-Object -Unique) | Should -Be @(7040)
         $Plan.NativeFilter.EventIds | Should -Be 7040
         $Plan.ManagedPredicate | Should -Not -BeNullOrEmpty
     }

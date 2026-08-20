@@ -490,6 +490,38 @@ public sealed class TestEventPredicate {
     }
 
     [Fact]
+    public void ConvertedCustomMetadataStaysManagedWhenNativeComparisonSemanticsDiffer() {
+        var definition = new EventDefinition {
+            Name = "GuidProvider",
+            Sources = new[] {
+                new EventDefinitionSource {
+                    LogName = "Application",
+                    EventIds = new[] { 1 },
+                    ProviderNames = new[] { "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee" }
+                }
+            },
+            Fields = new[] {
+                new EventDefinitionField {
+                    Name = "ProviderId",
+                    Source = EventFieldSource.Metadata,
+                    SourceName = nameof(EventObject.ProviderName),
+                    ValueKind = EventFieldValueKind.Guid
+                }
+            }
+        };
+        EventPredicateBuilder builder = EventPredicateBuilder.ForDefinition(definition);
+        EventPredicate predicate = builder.Field("ProviderId")
+            .Equal(Guid.Parse("AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE"));
+
+        EventPredicatePlan plan = EventDefinitionEngine.PlanPredicate(definition, predicate);
+
+        Assert.Equal(EventFieldFilterStage.Managed, builder.Field("ProviderId").FilterStage);
+        Assert.Null(plan.NativeFilter);
+        Assert.Equal("ProviderId", plan.ManagedPredicate!.Field);
+        Assert.Contains(plan.Steps, static step => step.Stage == EventPredicatePlanStage.Managed);
+    }
+
+    [Fact]
     public async Task CustomFieldNamedLikeNativeMetadataStaysManaged() {
         var definition = new EventDefinition {
             Name = "ServiceChangeWithProviderLabel",

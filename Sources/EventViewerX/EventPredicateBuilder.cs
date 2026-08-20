@@ -82,9 +82,7 @@ public sealed class EventPredicateBuilder {
                 isCommon: false,
                 field.Description,
                 field.Aliases,
-                field.Source == EventFieldSource.Metadata &&
-                field.DefaultValue == null &&
-                EventFieldDefinition.IsNativeField(field.SourceName)
+                EventDefinitionEngine.CanUseNativeMetadataField(field)
                     ? EventFieldFilterStage.Native
                     : EventFieldFilterStage.Managed)).ToArray();
         var claimedCommonNames = new HashSet<string>(

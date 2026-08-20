@@ -177,6 +177,45 @@ public sealed partial class TestEventStore {
     }
 
     [Fact]
+    public async Task StoreRevalidatesAndNormalizesMutableRowsAtThePersistenceBoundary() {
+        string path = CreateStorePath();
+        try {
+            EventReportSectionSchema schema = new() {
+                Name = "MutableValues",
+                Kind = EventReportSectionKind.Custom,
+                Columns = new[] { CreateColumn("AttemptCount", typeof(int)) }
+            };
+            EventReport report = EventReportEngine.CreateStored(
+                new[] {
+                    new EventReportRow {
+                        Type = "MutableValues",
+                        Values = new Dictionary<string, object?> { ["AttemptCount"] = "7" }
+                    }
+                },
+                new[] { schema });
+            report.Rows[0].Values = new Dictionary<string, object?> {
+                ["AttemptCount"] = "not-an-integer"
+            };
+            var store = new EventStore(path);
+
+            ArgumentException invalid = await Assert.ThrowsAsync<ArgumentException>(() =>
+                store.WriteAsync(report));
+
+            Assert.Contains("AttemptCount", invalid.Message, StringComparison.Ordinal);
+            Assert.False(File.Exists(path));
+
+            report.Rows[0].Values = new Dictionary<string, object?> { ["AttemptCount"] = "8" };
+            EventStoreWriteResult written = await store.WriteAsync(report);
+            EventReport stored = await store.ReadReportAsync(new EventStoreQuery());
+
+            Assert.Equal(1, written.Inserted);
+            Assert.Equal(8, Assert.IsType<int>(Assert.Single(stored.Rows).Values["AttemptCount"]));
+        } finally {
+            DeleteStore(path);
+        }
+    }
+
+    [Fact]
     public async Task DerivedSummaryReportsCannotBeWrittenBackIntoEventHistory() {
         string path = CreateStorePath();
         try {
