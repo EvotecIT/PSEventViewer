@@ -4,7 +4,7 @@ namespace EventViewerX;
 public enum EventPredicateOperator {
     /// <summary>The field equals one value.</summary>
     Equal,
-    /// <summary>The field does not equal one value.</summary>
+    /// <summary>A scalar differs from one value, or a collection contains at least one differing item.</summary>
     NotEqual,
     /// <summary>The field equals any supplied value.</summary>
     In,

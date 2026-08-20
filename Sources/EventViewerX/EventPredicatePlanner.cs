@@ -129,10 +129,10 @@ public static class EventPredicatePlanner {
             return true;
         }
         if (IsField(field, "ProviderName", "Provider") &&
-            predicate.IgnoreCase &&
+            !predicate.IgnoreCase &&
             TryReadStringSet(predicate, out string[]? providers)) {
-            native.ProviderNames = Intersect(native.ProviderNames, providers!, StringComparer.OrdinalIgnoreCase);
-            reason = "Provider equality is a native System predicate.";
+            native.ProviderNames = Intersect(native.ProviderNames, providers!, StringComparer.Ordinal);
+            reason = "Exact-case provider equality is a native System predicate.";
             return true;
         }
         if (IsField(field, "Level") &&

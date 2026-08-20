@@ -169,6 +169,56 @@ Describe 'evx portable host' {
         $SummaryOutput[-1] | Should -Be ([IO.Path]::GetFullPath($HtmlPath))
     }
 
+    It 'normalizes stored custom predicates with their definition metadata' {
+        $DefinitionPath = Join-Path $TestDrive 'stored-alias-definition.json'
+        $PredicatePath = Join-Path $TestDrive 'stored-alias-predicate.json'
+        $StorePath = Join-Path $TestDrive 'stored-alias-events.db'
+        @{
+            Name = 'StoredAliasDefinition'
+            Sources = @(@{
+                    LogName = 'System'
+                    EventIds = @(7040)
+                    ProviderNames = @('Service Control Manager')
+                })
+            Fields = @(@{
+                    Name = 'ServiceLabel'
+                    Aliases = @('ProviderName')
+                    Source = 'Data'
+                    SourceName = 'param4'
+                })
+        } | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $DefinitionPath -Encoding UTF8
+        @{
+            Kind = 'Comparison'
+            Field = 'ProviderName'
+            Operator = 'Equal'
+            Values = @('BITS')
+        } | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $PredicatePath -Encoding UTF8
+
+        $null = @(& $script:CliPath query `
+                --definition $DefinitionPath `
+                --path $script:FixturePath `
+                --max 10 `
+                --write-store $StorePath)
+        $Rows = @(& $script:CliPath query `
+                --store $StorePath `
+                --definition $DefinitionPath `
+                --where $PredicatePath `
+                --oldest |
+                ForEach-Object { $_ | ConvertFrom-Json })
+        $Plan = & $script:CliPath query `
+            --store $StorePath `
+            --definition $DefinitionPath `
+            --where $PredicatePath `
+            --explain |
+            ConvertFrom-Json
+
+        $LASTEXITCODE | Should -Be 0
+        $Rows | Should -Not -BeNullOrEmpty
+        @($Rows.ServiceLabel | Sort-Object -Unique) | Should -Be @('BITS')
+        $Plan.Steps.Expression | Should -Contain 'ServiceLabel Equal BITS'
+        $Plan.Steps.Stage | Should -Contain 'Managed'
+    }
+
     It 'removes an already absent collector subscription idempotently' {
         $Name = 'EVX-Cli-Absent-' + [guid]::NewGuid().ToString('N')
         $Result = & $script:CliPath collector remove --name $Name |

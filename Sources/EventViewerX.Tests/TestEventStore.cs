@@ -566,7 +566,9 @@ public sealed partial class TestEventStore {
         Assert.True(plan.HasSqlPredicatePrefilter);
         Assert.True(plan.HasManagedVerification);
         Assert.Contains(plan.Steps, static step =>
-            step.Stage == EventStoreQueryPlanStage.Sql && step.Expression.Contains("Provider", StringComparison.Ordinal));
+            step.Stage == EventStoreQueryPlanStage.Sql && step.Expression.Contains("EventId", StringComparison.Ordinal));
+        Assert.Contains(plan.Steps, static step =>
+            step.Stage == EventStoreQueryPlanStage.Managed && step.Expression.Contains("Provider", StringComparison.Ordinal));
         Assert.Contains(plan.Steps, static step =>
             step.Stage == EventStoreQueryPlanStage.Managed && step.Expression.Contains("User", StringComparison.Ordinal));
     }

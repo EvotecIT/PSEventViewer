@@ -126,6 +126,7 @@ public sealed partial class CmdletGetEVXEvent : AsyncPSCmdlet {
     [Parameter(Mandatory = false, ParameterSetName = "Channel")]
     [Parameter(Mandatory = false, ParameterSetName = "Type")]
     [Parameter(Mandatory = false, ParameterSetName = "Definition")]
+    [Parameter(Mandatory = false, ParameterSetName = "TypedFilter")]
     [Parameter(Mandatory = false, ParameterSetName = "Path")]
     [Parameter(Mandatory = false, ParameterSetName = "Provider")]
     public long[]? EventRecordId { get; set; }
@@ -136,6 +137,7 @@ public sealed partial class CmdletGetEVXEvent : AsyncPSCmdlet {
     [Parameter(Mandatory = false, ParameterSetName = "Channel")]
     [Parameter(Mandatory = false, ParameterSetName = "Type")]
     [Parameter(Mandatory = false, ParameterSetName = "Definition")]
+    [Parameter(Mandatory = false, ParameterSetName = "TypedFilter")]
     [Parameter(Mandatory = false, ParameterSetName = "Path")]
     [Parameter(Mandatory = false, ParameterSetName = "Hashtable")]
     [Parameter(Mandatory = false, ParameterSetName = "Xml")]
@@ -148,6 +150,7 @@ public sealed partial class CmdletGetEVXEvent : AsyncPSCmdlet {
     [Parameter(Mandatory = false, ParameterSetName = "Channel")]
     [Parameter(Mandatory = false, ParameterSetName = "Type")]
     [Parameter(Mandatory = false, ParameterSetName = "Definition")]
+    [Parameter(Mandatory = false, ParameterSetName = "TypedFilter")]
     [Parameter(Mandatory = false, ParameterSetName = "Path")]
     [Parameter(Mandatory = false, ParameterSetName = "Hashtable")]
     [Parameter(Mandatory = false, ParameterSetName = "Xml")]

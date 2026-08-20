@@ -123,6 +123,10 @@ internal static class PowerShellEventPredicateAstParser {
         if (expression is StringConstantExpressionAst text) {
             return text.Value;
         }
+        if (expression is UnaryExpressionAst unary &&
+            unary.TokenKind is TokenKind.Minus or TokenKind.Plus) {
+            return ApplyNumericSign(unary);
+        }
         if (expression is VariableExpressionAst variable) {
             return variable.VariablePath.UserPath.ToLowerInvariant() switch {
                 "null" => null,
@@ -137,6 +141,38 @@ internal static class PowerShellEventPredicateAstParser {
             $"Value expression '{expression.Extent.Text}' is not a literal. " +
             "Where is parsed and never executed.");
     }
+
+    private static object ApplyNumericSign(UnaryExpressionAst unary) {
+        ExpressionAst child = Unwrap(unary.Child);
+        if (child is not ConstantExpressionAst constant || !IsNumeric(constant.Value)) {
+            throw Unsupported(
+                $"Unary expression '{unary.Extent.Text}' can be applied only to a numeric literal.");
+        }
+        if (unary.TokenKind == TokenKind.Plus) {
+            return constant.Value;
+        }
+        try {
+            return constant.Value switch {
+                sbyte value => -value,
+                byte value => -value,
+                short value => -value,
+                ushort value => -value,
+                int value => checked(-value),
+                uint value => -(long)value,
+                long value => checked(-value),
+                ulong value => -(decimal)value,
+                float value => -value,
+                double value => -value,
+                decimal value => -value,
+                _ => throw Unsupported($"Value '{unary.Extent.Text}' is not a supported numeric literal.")
+            };
+        } catch (OverflowException) {
+            throw Unsupported($"Numeric literal '{unary.Extent.Text}' is outside the supported range.");
+        }
+    }
+
+    private static bool IsNumeric(object value) => value is
+        sbyte or byte or short or ushort or int or uint or long or ulong or float or double or decimal;
 
     private static EventPredicateOperator ResolveOperator(TokenKind token, bool reverse) {
         return (token, reverse) switch {

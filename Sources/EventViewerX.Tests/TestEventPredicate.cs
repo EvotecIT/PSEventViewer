@@ -71,6 +71,70 @@ public sealed class TestEventPredicate {
     }
 
     [Fact]
+    public void IgnoreCaseProviderPredicatesRemainManagedUntilExactVerification() {
+        EventPredicate ignoreCase = EventPredicate.Compare(
+            "ProviderName",
+            EventPredicateOperator.Equal,
+            "microsoft-windows-security-auditing");
+        EventPredicate exactCase = EventPredicate.Compare(
+            "ProviderName",
+            EventPredicateOperator.Equal,
+            "Microsoft-Windows-Security-Auditing");
+        exactCase.IgnoreCase = false;
+
+        EventPredicatePlan ignoreCasePlan = EventPredicatePlanner.Plan(ignoreCase);
+        EventPredicatePlan exactCasePlan = EventPredicatePlanner.Plan(exactCase);
+
+        Assert.Null(ignoreCasePlan.NativeFilter);
+        Assert.NotNull(ignoreCasePlan.ManagedPredicate);
+        Assert.Equal(
+            new[] { "Microsoft-Windows-Security-Auditing" },
+            exactCasePlan.NativeFilter!.ProviderNames);
+        Assert.NotNull(exactCasePlan.ManagedPredicate);
+    }
+
+    [Fact]
+    public void DateTimeComparisonsNormalizeLocalAndUtcValuesToOneTimeline() {
+        DateTime local = DateTime.SpecifyKind(
+            DateTime.Today.AddHours(12),
+            DateTimeKind.Local);
+        DateTime utc = local.ToUniversalTime();
+        var fields = new Dictionary<string, object?> { ["TimeCreated"] = local };
+
+        Assert.True(EventPredicateEvaluator.Matches(
+            EventPredicate.Compare("TimeCreated", EventPredicateOperator.Equal, utc),
+            fields));
+        Assert.True(EventPredicateEvaluator.Matches(
+            EventPredicate.Compare("TimeCreated", EventPredicateOperator.GreaterThan, utc.AddMinutes(-1)),
+            fields));
+        Assert.True(EventPredicateEvaluator.Matches(
+            EventPredicate.Compare("TimeCreated", EventPredicateOperator.LessThan, utc.AddMinutes(1)),
+            fields));
+    }
+
+    [Fact]
+    public void CollectionNotEqualMatchesWhenAnyItemDiffers() {
+        EventPredicate predicate = EventPredicate.Compare(
+            "Privileges",
+            EventPredicateOperator.NotEqual,
+            "SeDebugPrivilege");
+
+        Assert.True(EventPredicateEvaluator.Matches(
+            predicate,
+            new Dictionary<string, object?> {
+                ["Privileges"] = new[] { "SeDebugPrivilege", "SeBackupPrivilege" }
+            }));
+        Assert.False(EventPredicateEvaluator.Matches(
+            predicate,
+            new Dictionary<string, object?> {
+                ["Privileges"] = new[] { "SeDebugPrivilege", "SeDebugPrivilege" }
+            }));
+        Assert.False(EventPredicateEvaluator.Matches(
+            predicate,
+            new Dictionary<string, object?> { ["Privileges"] = Array.Empty<string>() }));
+    }
+
+    [Fact]
     public void TypedDomainWhenRemainsManagedWhileSourceTimestampStaysNative() {
         EventPredicateBuilder builder = EventPredicateBuilder.ForType(EventType.OSCrash);
         DateTime boundary = new(2026, 8, 1, 0, 0, 0, DateTimeKind.Utc);

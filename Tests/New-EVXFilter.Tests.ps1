@@ -257,6 +257,62 @@ Describe 'New-EVXFilter' {
         $Plan.ManagedPredicate.Kind.ToString() | Should -Be 'Not'
     }
 
+    It 'accepts signed numeric literals without evaluating arbitrary expressions' {
+        $DefinitionPath = Join-Path $TestDrive 'signed-number-definition.json'
+        @{
+            Name = 'SignedNumberDefinition'
+            Sources = @(@{
+                    LogName = 'System'
+                    EventIds = @(1)
+                })
+            Fields = @(@{
+                    Name = 'Attempts'
+                    ValueKind = 'Int32'
+                    Source = 'Data'
+                    SourceName = 'Attempts'
+                })
+        } | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $DefinitionPath -Encoding UTF8
+
+        $Negative = New-EVXFilter -Definition $DefinitionPath -Where {
+            $_.Attempts -eq -1
+        } -Explain
+        $Positive = New-EVXFilter -Definition $DefinitionPath -Where {
+            $_.Attempts -eq +1
+        } -Explain
+
+        $Negative.ManagedPredicate.Values[0] | Should -Be '-1'
+        $Positive.ManagedPredicate.Values[0] | Should -Be '1'
+        {
+            New-EVXFilter -Definition $DefinitionPath -Where {
+                $_.Attempts -eq -(Get-Random)
+            } -Explain
+        } | Should -Throw '*numeric literal*'
+    }
+
+    It 'preserves PowerShell inequality truthiness for collection fields' {
+        $Plan = Get-EVXEvent -Type ADUserPrivilegeUse -Where {
+            $_.Privileges -ne 'SeDebugPrivilege'
+        } -Explain
+        $Mixed = [Collections.Generic.Dictionary[string, object]]::new()
+        $Mixed['Privileges'] = [string[]] @('SeDebugPrivilege', 'SeBackupPrivilege')
+        $Equal = [Collections.Generic.Dictionary[string, object]]::new()
+        $Equal['Privileges'] = [string[]] @('SeDebugPrivilege', 'SeDebugPrivilege')
+
+        [EventViewerX.EventPredicateEvaluator]::Matches($Plan.ManagedPredicate, $Mixed) |
+            Should -BeTrue
+        [EventViewerX.EventPredicateEvaluator]::Matches($Plan.ManagedPredicate, $Equal) |
+            Should -BeFalse
+    }
+
+    It 'exposes record selectors and durable checkpoints on reusable typed filters' {
+        $Parameters = ((Get-Command Get-EVXEvent).ParameterSets |
+                Where-Object Name -EQ 'TypedFilter').Parameters.Name
+
+        $Parameters | Should -Contain 'EventRecordId'
+        $Parameters | Should -Contain 'RecordIdFile'
+        $Parameters | Should -Contain 'RecordIdKey'
+    }
+
     It 'preserves negative PowerShell operators as exact predicate negation' {
         $Plan = Get-EVXEvent -Type ADUserLogonFailed -Where {
             $_.Who -notlike 'svc-*' -and $_.Who -notmatch '^test'

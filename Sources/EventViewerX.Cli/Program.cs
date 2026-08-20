@@ -164,11 +164,23 @@ internal static partial class Program {
         if (options.Get("since") is string since) {
             start = DateTime.Now.Subtract(TimeSpan.Parse(since, CultureInfo.InvariantCulture));
         }
+        EventType[] types = ParseTypes(options.GetMany("type"));
+        EventDefinition? definition = options.Get("definition") is string definitionPath
+            ? EventDefinition.Load(definitionPath)
+            : null;
+        EventPredicate? predicate = ParsePredicate(options.Get("where"));
+        if (predicate != null) {
+            predicate = definition != null
+                ? EventPredicateBuilder.ForDefinition(definition).Normalize(predicate)
+                : types.Length > 0
+                    ? EventPredicateBuilder.ForTypes(types).Normalize(predicate)
+                    : predicate;
+        }
         return new EventStoreQuery {
-            Types = NullWhenEmpty(options.GetMany("type")) == null
-                ? null
-                : ParseTypes(options.GetMany("type")),
-            DefinitionNames = NullWhenEmpty(options.GetMany("definition-name")),
+            Types = types.Length == 0 ? null : types,
+            DefinitionNames = definition == null
+                ? NullWhenEmpty(options.GetMany("definition-name"))
+                : new[] { definition.Name },
             StartTime = start,
             EndTime = ParseDate(options.Get("end")),
             EventIds = ParseInts(options.GetMany("event-id")),
@@ -176,7 +188,7 @@ internal static partial class Program {
             SourceComputers = NullWhenEmpty(options.GetMany("source")),
             SourceLogs = NullWhenEmpty(options.GetMany("log")),
             Providers = NullWhenEmpty(options.GetMany("provider")),
-            Predicate = ParsePredicate(options.Get("where")),
+            Predicate = predicate,
             MaxEvents = options.GetLong("max"),
             MaxCandidates = options.GetLong("max-candidates", 100000),
             Oldest = options.Has("oldest")
@@ -199,11 +211,18 @@ internal static partial class Program {
 
     private static void ValidateQuerySource(CliArguments options, bool allowSummary) {
         bool stored = options.Get("store") != null;
-        if (stored && (options.Get("definition") != null || options.GetMany("path").Length > 0 ||
+        if (stored && (options.GetMany("path").Length > 0 ||
                        options.GetMany("machine").Length > 0 || options.GetMany("collector").Length > 0)) {
             throw new ArgumentException(
-                "--store cannot be combined with --definition, --path, --machine, or --collector. " +
-                "Use --type, --definition-name, --log, --source, and --provider to filter stored rows.");
+                "--store cannot be combined with --path, --machine, or --collector. " +
+                "Use --type, --definition, --definition-name, --log, --source, and --provider to filter stored rows.");
+        }
+        if (stored && options.Get("definition") != null && options.GetMany("type").Length > 0) {
+            throw new ArgumentException("--store accepts either --type or --definition metadata, not both.");
+        }
+        if (stored && options.Get("definition") != null && options.GetMany("definition-name").Length > 0) {
+            throw new ArgumentException(
+                "--definition selects its own stored definition and cannot be combined with --definition-name.");
         }
         if (stored && options.Get("write-store") != null) {
             throw new ArgumentException("--write-store is only valid for live or offline event-log ingestion.");
@@ -496,8 +515,8 @@ internal static partial class Program {
     private static int Help() {
         Console.WriteLine("EventViewerX 4.0\n\n" +
             "  evx types [--type TYPE[,TYPE] | --definition FILE]\n" +
-            "  evx query  (--type TYPE[,TYPE] | --definition FILE | --log LOG | --path FILE[,FILE] | --store FILE.db) [--where JSON_OR_FILE] [--write-store FILE.db] [--explain] [--since 01:00:00] [--max N]\n" +
-            "  evx report (--type TYPE[,TYPE] | --definition FILE | --log LOG | --path FILE[,FILE] | --store FILE.db) [--definition-name NAME] [--summary Hour|Day|Week|Month] [--where JSON_OR_FILE] [--write-store FILE.db] (--html FILE | --excel FILE | --csv FILE.csv|BUNDLE.zip | --email-html FILE | --mail-profile FILE) [--drawer-placement Auto|Top|Right]\n" +
+            "  evx query  (--type TYPE[,TYPE] | --definition FILE | --log LOG | --path FILE[,FILE] | --store FILE.db [--type TYPE[,TYPE] | --definition FILE | --definition-name NAME]) [--where JSON_OR_FILE] [--write-store FILE.db] [--explain] [--since 01:00:00] [--max N]\n" +
+            "  evx report (--type TYPE[,TYPE] | --definition FILE | --log LOG | --path FILE[,FILE] | --store FILE.db [--type TYPE[,TYPE] | --definition FILE | --definition-name NAME]) [--summary Hour|Day|Week|Month] [--where JSON_OR_FILE] [--write-store FILE.db] (--html FILE | --excel FILE | --csv FILE.csv|BUNDLE.zip | --email-html FILE | --mail-profile FILE) [--drawer-placement Auto|Top|Right]\n" +
             "  evx watch  (--type TYPE[,TYPE] | --definition FILE) [--machine HOST | --collector WEC] [--jsonl FILE] [--outbox DIR | --mail-profile FILE] [--interval 00:05:00] [--stop-after N] [--timeout 01:00:00] [--ready-file FILE] [--summary-file FILE]\n" +
             "  evx collector create --name NAME --type TYPE[,TYPE] (--source HOST[,HOST] | --source-initiated --collector-host WEC) [--allowed-source-sddl SDDL] [--output FILE] [--apply]\n" +
             "  evx collector readiness\n" +

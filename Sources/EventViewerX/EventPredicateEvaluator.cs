@@ -191,7 +191,7 @@ public static class EventPredicateEvaluator {
             case EventPredicateOperator.Equal:
                 return Equal(actual, expectedValue, ignoreCase);
             case EventPredicateOperator.NotEqual:
-                return !Equal(actual, expectedValue, ignoreCase);
+                return NotEqual(actual, expectedValue, ignoreCase);
             case EventPredicateOperator.Contains:
                 return Contains(actual, expectedValue, ignoreCase);
             case EventPredicateOperator.StartsWith:
@@ -245,11 +245,29 @@ public static class EventPredicateEvaluator {
             return expected == null;
         }
         object? converted = ConvertExpected(expected, actual.GetType(), ignoreCase);
+        if (actual is DateTime actualDateTime && converted is DateTime expectedDateTime) {
+            return actualDateTime.ToUniversalTime() == expectedDateTime.ToUniversalTime();
+        }
+        if (actual is DateTimeOffset actualOffset && converted is DateTimeOffset expectedOffset) {
+            return actualOffset.ToUniversalTime() == expectedOffset.ToUniversalTime();
+        }
         if (actual is string actualText) {
             return string.Equals(actualText, converted as string, TextComparison(ignoreCase));
         }
         return Equals(actual, converted) ||
                string.Equals(ToText(actual), expected, TextComparison(ignoreCase));
+    }
+
+    private static bool NotEqual(object actual, string? expected, bool ignoreCase) {
+        if (actual is IEnumerable enumerable && actual is not string) {
+            foreach (object? item in enumerable) {
+                if (!EqualScalar(item, expected, ignoreCase)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        return !EqualScalar(actual, expected, ignoreCase);
     }
 
     private static bool Contains(object? actual, string? expected, bool ignoreCase) {
@@ -326,6 +344,12 @@ public static class EventPredicateEvaluator {
 
     private static int CompareOrdered(object actual, string? expected, bool ignoreCase) {
         object? converted = ConvertExpected(expected, actual.GetType(), ignoreCase);
+        if (actual is DateTime actualDateTime && converted is DateTime expectedDateTime) {
+            return actualDateTime.ToUniversalTime().CompareTo(expectedDateTime.ToUniversalTime());
+        }
+        if (actual is DateTimeOffset actualOffset && converted is DateTimeOffset expectedOffset) {
+            return actualOffset.ToUniversalTime().CompareTo(expectedOffset.ToUniversalTime());
+        }
         if (actual is IComparable comparable && converted != null) {
             return comparable.CompareTo(converted);
         }

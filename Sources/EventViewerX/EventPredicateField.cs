@@ -34,7 +34,7 @@ public sealed class EventPredicateField {
     public EventPredicate Equal(object? value) =>
         EventPredicate.Compare(Name, EventPredicateOperator.Equal, value);
 
-    /// <summary>Creates an inequality comparison.</summary>
+    /// <summary>Creates scalar inequality or matches a collection containing at least one differing item.</summary>
     public EventPredicate NotEqual(object? value) =>
         EventPredicate.Compare(Name, EventPredicateOperator.NotEqual, value);
 
