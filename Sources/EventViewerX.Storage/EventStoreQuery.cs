@@ -2,9 +2,9 @@ namespace EventViewerX.Storage;
 
 /// <summary>Defines a bounded query over locally stored normalized event rows.</summary>
 public sealed class EventStoreQuery {
-    /// <summary>Built-in typed definitions to include.</summary>
+    /// <summary>Built-in typed definitions to include. Mutually exclusive with DefinitionNames.</summary>
     public IReadOnlyList<EventType>? Types { get; set; }
-    /// <summary>Built-in or custom stable definition names to include.</summary>
+    /// <summary>Built-in or custom stable definition names to include. Mutually exclusive with Types.</summary>
     public IReadOnlyList<string>? DefinitionNames { get; set; }
     /// <summary>Absolute lower timestamp boundary.</summary>
     public DateTime? StartTime { get; set; }
@@ -43,6 +43,11 @@ public sealed class EventStoreQuery {
             throw new ArgumentException("StartTime cannot be later than EndTime.");
         }
         EventType[]? types = Types?.Distinct().ToArray();
+        string[]? definitionNames = Normalize(DefinitionNames);
+        if (types is { Length: > 0 } && definitionNames is { Length: > 0 }) {
+            throw new ArgumentException(
+                "Types and DefinitionNames are mutually exclusive stored definition selectors.");
+        }
         EventPredicate? predicate = Predicate?.Clone();
         predicate?.Validate();
         if (predicate != null && types != null && types.Length > 0) {
@@ -50,7 +55,7 @@ public sealed class EventStoreQuery {
         }
         return new EventStoreQuery {
             Types = types,
-            DefinitionNames = Normalize(DefinitionNames),
+            DefinitionNames = definitionNames,
             StartTime = start,
             EndTime = end,
             EventIds = EventIds?.Distinct().ToArray(),

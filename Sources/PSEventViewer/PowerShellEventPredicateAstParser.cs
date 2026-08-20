@@ -68,6 +68,16 @@ internal static class PowerShellEventPredicateAstParser {
                 "Reversed -contains/-notcontains changes meaning for collection-valued fields. " +
                 "Use 'value' -in $_.Field for collection membership, or $_.Field -in @('value1', 'value2') for scalar selection.");
         }
+        if (fieldOnRight && builder != null && binary.Operator is
+                TokenKind.Ieq or TokenKind.Ceq or TokenKind.Ine or TokenKind.Cne) {
+            EventPredicateField field = builder.Field(rightField!);
+            if (field.ValueType != typeof(string) &&
+                typeof(System.Collections.IEnumerable).IsAssignableFrom(field.ValueType)) {
+                throw Unsupported(
+                    $"Field-right -eq/-ne treats collection field '{field.Name}' as one PowerShell value. " +
+                    "Use 'value' -in $_.Field or 'value' -notin $_.Field for collection membership.");
+            }
+        }
         if (fieldOnLeft && builder != null && binary.Operator is
                 TokenKind.Iin or TokenKind.Cin or
                 TokenKind.Inotin or TokenKind.Cnotin) {
@@ -81,6 +91,13 @@ internal static class PowerShellEventPredicateAstParser {
         }
         ExpressionAst valueAst = fieldOnLeft ? binary.Right : binary.Left;
         object?[] values = ReadValues(valueAst);
+        if (fieldOnRight && binary.Operator is
+                TokenKind.Iin or TokenKind.Cin or TokenKind.Inotin or TokenKind.Cnotin &&
+            values.Length != 1) {
+            throw Unsupported(
+                "Field-right -in/-notin requires one scalar value on the left. " +
+                "Use separate comparisons joined by -or when selecting more than one collection member.");
+        }
         EventPredicateOperator comparison = ResolveOperator(binary.Operator, reverse: fieldOnRight);
         if (comparison is EventPredicateOperator.IsNull or EventPredicateOperator.IsNotNull) {
             return EventPredicate.Compare(fieldOnLeft ? leftField! : rightField!, comparison);

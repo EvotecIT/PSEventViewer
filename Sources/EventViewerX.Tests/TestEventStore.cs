@@ -24,6 +24,18 @@ public sealed partial class TestEventStore {
     }
 
     [Fact]
+    public void StoreQueriesRejectMixedDefinitionSelectorFamilies() {
+        var query = new EventStoreQuery {
+            Types = new[] { EventType.ADUserLogonFailed },
+            DefinitionNames = new[] { "CustomLogon" }
+        };
+
+        ArgumentException exception = Assert.Throws<ArgumentException>(() => EventStore.Plan(query));
+
+        Assert.Contains("Types and DefinitionNames are mutually exclusive", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task WriteIsIdempotentAndCommitsCheckpointWithRows() {
         string path = CreateStorePath();
         try {
@@ -99,6 +111,28 @@ public sealed partial class TestEventStore {
 
             Assert.Equal(2, result.Inserted);
             Assert.Equal(new long?[] { 42, 43 }, stored.Rows.Select(static row => row.RecordId));
+        } finally {
+            DeleteStore(path);
+        }
+    }
+
+    [Fact]
+    public async Task OriginalEventIdentityDeduplicatesDifferentCollectors() {
+        string path = CreateStorePath();
+        try {
+            DateTime time = new(2026, 8, 1, 1, 0, 0, DateTimeKind.Utc);
+            var store = new EventStore(path);
+            EventStoreWriteResult first = await store.WriteAsync(
+                CreateReportFromTransport(time, 42, "alice", "WEC01", "ForwardedEvents"));
+            EventStoreWriteResult second = await store.WriteAsync(
+                CreateReportFromTransport(time, 9001, "alice", "WEC02", "ForwardedEvents"));
+
+            EventReport stored = await store.ReadReportAsync(new EventStoreQuery());
+
+            Assert.Equal(1, first.Inserted);
+            Assert.Equal(0, second.Inserted);
+            Assert.Equal(1, second.Duplicates);
+            Assert.Single(stored.Rows);
         } finally {
             DeleteStore(path);
         }

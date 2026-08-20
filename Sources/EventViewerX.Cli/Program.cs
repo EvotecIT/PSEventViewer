@@ -227,6 +227,11 @@ internal static partial class Program {
             throw new ArgumentException(
                 "--definition selects its own stored definition and cannot be combined with --definition-name.");
         }
+        if (stored && options.GetMany("type").Length > 0 &&
+            options.GetMany("definition-name").Length > 0) {
+            throw new ArgumentException(
+                "--type and --definition-name are mutually exclusive stored definition selectors.");
+        }
         if (stored && options.Get("write-store") != null) {
             throw new ArgumentException("--write-store is only valid for live or offline event-log ingestion.");
         }

@@ -357,7 +357,11 @@ WHERE $transportKind = 2 OR NOT EXISTS (
     FROM evx_events
     WHERE original_event_key = $originalKey
       AND transport_kind IN (0, 1)
-      AND transport_kind <> $transportKind
+      AND (
+          transport_kind <> $transportKind
+          OR ($transportKind = 1 AND
+              collector_computer <> $collectorComputer COLLATE NOCASE)
+      )
 );";
 
     private const string UpsertCheckpointSql = @"

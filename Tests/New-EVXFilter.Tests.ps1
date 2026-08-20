@@ -347,6 +347,14 @@ Describe 'New-EVXFilter' {
         $Excluded.ManagedPredicate.Operator.ToString() | Should -Be 'NotIn'
     }
 
+    It 'rejects a collection literal on the left of reversed membership' {
+        {
+            Get-EVXEvent -Type ADUserPrivilegeUse -Where {
+                @('SeDebugPrivilege', 'SeBackupPrivilege') -in $_.Privileges
+            } -Explain
+        } | Should -Throw '*Field-right*-in/-notin*one scalar value*'
+    }
+
     It 'rejects field-left membership for collection fields' {
         {
             Get-EVXEvent -Type ADUserPrivilegeUse -Where {
@@ -379,6 +387,29 @@ Describe 'New-EVXFilter' {
                 'SeDebugPrivilege' -contains $_.Privileges
             } -Explain
         } | Should -Throw '*Use*value*-in*$_.Field*'
+    }
+
+    It 'rejects reversed equality whose collection semantics cannot be preserved' {
+        {
+            Get-EVXEvent -Type ADUserPrivilegeUse -Where {
+                'SeDebugPrivilege' -eq $_.Privileges
+            } -Explain
+        } | Should -Throw '*Field-right*-eq/-ne*collection*'
+        {
+            New-EVXFilter -Type ADUserPrivilegeUse -Where {
+                'SeDebugPrivilege' -cne $_.Privileges
+            } -Explain
+        } | Should -Throw '*Field-right*-eq/-ne*collection*'
+    }
+
+    It 'preserves reversed equality for scalar fields' {
+        $Plan = Get-EVXEvent -Type ADUserLogonFailed -Where {
+            'EVOTEC\Alice' -eq $_.Who
+        } -Explain
+
+        $Plan.ManagedPredicate.Field | Should -Be 'Who'
+        $Plan.ManagedPredicate.Operator.ToString() | Should -Be 'Equal'
+        $Plan.ManagedPredicate.Values | Should -Be 'EVOTEC\Alice'
     }
 
     It 'describes the expanded domain fields of composite event types' {

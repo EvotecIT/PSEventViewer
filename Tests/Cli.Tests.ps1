@@ -117,6 +117,24 @@ Describe 'evx portable host' {
         Test-Path -LiteralPath $StorePath | Should -BeFalse
     }
 
+    It 'rejects mixed stored definition selector families before opening history' {
+        $StorePath = Join-Path $TestDrive 'mixed-stored-selectors.db'
+        $PreviousErrorActionPreference = $ErrorActionPreference
+        $ErrorActionPreference = 'Continue'
+        try {
+            $Output = & $script:CliPath query `
+                --store $StorePath `
+                --type ADUserLogonFailed `
+                --definition-name CustomLogon 2>&1
+        } finally {
+            $ErrorActionPreference = $PreviousErrorActionPreference
+        }
+
+        $LASTEXITCODE | Should -Be 1
+        [string] $Output | Should -Match '--type and --definition-name are mutually exclusive'
+        Test-Path -LiteralPath $StorePath | Should -BeFalse
+    }
+
     It 'normalizes built-in predicates before producing an explanation' {
         $PredicatePath = Join-Path $TestDrive 'invalid-built-in-predicate.json'
         @{
