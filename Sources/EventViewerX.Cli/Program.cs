@@ -64,6 +64,9 @@ internal static partial class Program {
         if (options.Has("explain")) {
             EventPredicate predicate = request.Predicate ??
                 throw new ArgumentException("--explain requires --where.");
+            if (request.Types != null && request.Types.Count > 0) {
+                predicate = EventPredicateBuilder.ForTypes(request.Types).Normalize(predicate);
+            }
             EventPredicatePlan plan = request.Definition != null
                 ? EventDefinitionEngine.PlanPredicate(
                     request.Definition,
@@ -231,6 +234,12 @@ internal static partial class Program {
                         options.Get("provider") != null || options.Get("summary") != null)) {
             throw new ArgumentException(
                 "--definition-name, --source, --provider, and --summary require --store.");
+        }
+        bool typedSource = options.Get("definition") != null || options.GetMany("type").Length > 0;
+        if (!stored && !typedSource && options.Get("where") != null) {
+            throw new ArgumentException(
+                "--where requires --type or --definition for live and offline event-log queries. " +
+                "Use --event-id and --record-id for generic --log or standalone --path queries.");
         }
         if (!allowSummary && options.Get("summary") != null) {
             throw new ArgumentException("--summary is available through the report command.");
@@ -515,8 +524,8 @@ internal static partial class Program {
     private static int Help() {
         Console.WriteLine("EventViewerX 4.0\n\n" +
             "  evx types [--type TYPE[,TYPE] | --definition FILE]\n" +
-            "  evx query  (--type TYPE[,TYPE] | --definition FILE | --log LOG | --path FILE[,FILE] | --store FILE.db [--type TYPE[,TYPE] | --definition FILE | --definition-name NAME]) [--where JSON_OR_FILE] [--write-store FILE.db] [--explain] [--since 01:00:00] [--max N]\n" +
-            "  evx report (--type TYPE[,TYPE] | --definition FILE | --log LOG | --path FILE[,FILE] | --store FILE.db [--type TYPE[,TYPE] | --definition FILE | --definition-name NAME]) [--summary Hour|Day|Week|Month] [--where JSON_OR_FILE] [--write-store FILE.db] (--html FILE | --excel FILE | --csv FILE.csv|BUNDLE.zip | --email-html FILE | --mail-profile FILE) [--drawer-placement Auto|Top|Right]\n" +
+            "  evx query  (--type TYPE[,TYPE] | --definition FILE | --log LOG | --path FILE[,FILE] | --store FILE.db [--type TYPE[,TYPE] | --definition FILE | --definition-name NAME]) [--where JSON_OR_FILE (typed/store)] [--write-store FILE.db] [--explain] [--since 01:00:00] [--max N]\n" +
+            "  evx report (--type TYPE[,TYPE] | --definition FILE | --log LOG | --path FILE[,FILE] | --store FILE.db [--type TYPE[,TYPE] | --definition FILE | --definition-name NAME]) [--summary Hour|Day|Week|Month] [--where JSON_OR_FILE (typed/store)] [--write-store FILE.db] (--html FILE | --excel FILE | --csv FILE.csv|BUNDLE.zip | --email-html FILE | --mail-profile FILE) [--drawer-placement Auto|Top|Right]\n" +
             "  evx watch  (--type TYPE[,TYPE] | --definition FILE) [--machine HOST | --collector WEC] [--jsonl FILE] [--outbox DIR | --mail-profile FILE] [--interval 00:05:00] [--stop-after N] [--timeout 01:00:00] [--ready-file FILE] [--summary-file FILE]\n" +
             "  evx collector create --name NAME --type TYPE[,TYPE] (--source HOST[,HOST] | --source-initiated --collector-host WEC) [--allowed-source-sddl SDDL] [--output FILE] [--apply]\n" +
             "  evx collector readiness\n" +

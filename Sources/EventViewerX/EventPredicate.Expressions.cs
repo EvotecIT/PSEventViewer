@@ -51,7 +51,7 @@ public sealed partial class EventPredicate {
             Expression valueExpression = memberOnLeft ? binary.Right : binary.Left;
             object? value = ReadCapturedValue(valueExpression);
             EventPredicateOperator comparison = ToOperator(binary.NodeType, reverse: memberOnRight);
-            return Compare(memberOnLeft ? field! : rightField!, comparison, value);
+            return CompareExpression(memberOnLeft ? field! : rightField!, comparison, value);
         }
 
         private static EventPredicate TranslateCall(MethodCallExpression call, ParameterExpression parameter) {
@@ -65,7 +65,7 @@ public sealed partial class EventPredicate {
                 if (call.Arguments.Count != 1) {
                     throw Unsupported(call);
                 }
-                return Compare(field!, comparison, ReadCapturedValue(call.Arguments[0]));
+                return CompareExpression(field!, comparison, ReadCapturedValue(call.Arguments[0]));
             }
 
             Expression? collectionExpression = null;
@@ -89,9 +89,19 @@ public sealed partial class EventPredicate {
                 foreach (object? item in values) {
                     items.Add(item);
                 }
-                return Compare(inField!, EventPredicateOperator.In, items.ToArray());
+                return CompareExpression(inField!, EventPredicateOperator.In, items.ToArray());
             }
             throw Unsupported(call);
+        }
+
+        private static EventPredicate CompareExpression(
+            string field,
+            EventPredicateOperator comparison,
+            object? value) {
+
+            EventPredicate predicate = Compare(field, comparison, value);
+            predicate.IgnoreCase = false;
+            return predicate;
         }
 
         private static bool TryGetField(

@@ -49,6 +49,13 @@ internal static class PowerShellEventPredicateAstParser {
         if (fieldOnLeft == fieldOnRight) {
             throw Unsupported("Each comparison must contain exactly one $_.Field member.");
         }
+        if (fieldOnRight && binary.Operator is
+                TokenKind.Icontains or TokenKind.Ccontains or
+                TokenKind.Inotcontains or TokenKind.Cnotcontains) {
+            throw Unsupported(
+                "Reversed -contains/-notcontains changes meaning for collection-valued fields. " +
+                "Use 'value' -in $_.Field for collection membership, or $_.Field -in @('value1', 'value2') for scalar selection.");
+        }
         ExpressionAst valueAst = fieldOnLeft ? binary.Right : binary.Left;
         object?[] values = ReadValues(valueAst);
         EventPredicateOperator comparison = ResolveOperator(binary.Operator, reverse: fieldOnRight);
@@ -192,8 +199,6 @@ internal static class PowerShellEventPredicateAstParser {
             (TokenKind.Ile or TokenKind.Cle, false) => EventPredicateOperator.LessThanOrEqual,
             (TokenKind.Icontains or TokenKind.Ccontains, false) => EventPredicateOperator.Equal,
             (TokenKind.Inotcontains or TokenKind.Cnotcontains, false) => EventPredicateOperator.Equal,
-            (TokenKind.Icontains or TokenKind.Ccontains, true) => EventPredicateOperator.In,
-            (TokenKind.Inotcontains or TokenKind.Cnotcontains, true) => EventPredicateOperator.In,
             (TokenKind.Ieq or TokenKind.Ceq, true) => EventPredicateOperator.Equal,
             (TokenKind.Ine or TokenKind.Cne, true) => EventPredicateOperator.NotEqual,
             (TokenKind.Igt or TokenKind.Cgt, true) => EventPredicateOperator.LessThan,

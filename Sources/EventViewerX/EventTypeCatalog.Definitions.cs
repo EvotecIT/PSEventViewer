@@ -187,7 +187,12 @@ public static partial class EventTypeCatalog {
             ? GetEventRuleType(type)
             : null;
         IReadOnlyList<EventFieldDefinition> fields = recordType == null
-            ? GetCommonFields()
+            ? Expand(new[] { type })
+                .Select(GetDefinition)
+                .SelectMany(static definition => definition.Fields)
+                .GroupBy(static field => field.Name, StringComparer.OrdinalIgnoreCase)
+                .Select(static group => group.First())
+                .ToArray()
             : GetFields(recordType);
         string description = includedTypes.Length == 0
             ? $"Typed projection for {displayName} events."

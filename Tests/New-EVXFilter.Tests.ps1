@@ -360,6 +360,23 @@ Describe 'New-EVXFilter' {
         $Excluded.ManagedPredicate.Children[0].Operator.ToString() | Should -Be 'Equal'
     }
 
+    It 'rejects reversed containment whose collection semantics cannot be preserved' {
+        {
+            Get-EVXEvent -Type ADUserPrivilegeUse -Where {
+                'SeDebugPrivilege' -contains $_.Privileges
+            } -Explain
+        } | Should -Throw '*Use*value*-in*$_.Field*'
+    }
+
+    It 'describes the expanded domain fields of composite event types' {
+        $Description = Get-EVXEvent -Type ActiveDirectoryAuthentication -Describe
+        $FieldNames = @($Description.Fields.Name)
+
+        $Description.IsComposite | Should -BeTrue
+        $FieldNames | Should -Contain 'Who'
+        $FieldNames | Should -Contain 'IpAddress'
+    }
+
     It 'exposes native event levels through every typed filter builder' {
         $Filter = New-EVXFilter -Type ADUserLogonFailed
         $Filter.Fields.PSObject.Properties.Name | Should -Contain 'Level'

@@ -340,6 +340,29 @@ public sealed class TestEventPredicate {
     }
 
     [Fact]
+    public void StronglyTypedExpressionsPreserveCSharpStringCaseSensitivity() {
+        string[] users = { "ADMIN", "SERVICE" };
+        EventPredicate equality = EventPredicate.FromExpression<ExampleRecord>(record => record.Who == "ADMIN");
+        EventPredicate membership = EventPredicate.FromExpression<ExampleRecord>(record => users.Contains(record.Who));
+        EventPredicate prefix = EventPredicate.FromExpression<ExampleRecord>(record => record.IpAddress.StartsWith("ABC"));
+        var record = new ExampleRecord(new EventObject(
+            new SyntheticEventRecord(),
+            Environment.MachineName,
+            EventReadMode.StructuredDataAndMessage)) {
+            Who = "admin",
+            IpAddress = "abc-value"
+        };
+
+        Assert.All(
+            new[] { equality, membership, prefix }.SelectMany(Flatten)
+                .Where(static predicate => predicate.Kind == EventPredicateKind.Comparison),
+            static predicate => Assert.False(predicate.IgnoreCase));
+        Assert.False(EventPredicateEvaluator.Matches(equality, record));
+        Assert.False(EventPredicateEvaluator.Matches(membership, record));
+        Assert.False(EventPredicateEvaluator.Matches(prefix, record));
+    }
+
+    [Fact]
     public async Task CustomMetadataPredicateUsesNativePrefilterAndExactProjectionCheck() {
         var definition = new EventDefinition {
             Name = "ServiceChange",

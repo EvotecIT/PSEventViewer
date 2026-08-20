@@ -74,6 +74,54 @@ Describe 'evx portable host' {
         [string] $Output | Should -Match 'standalone --path'
     }
 
+    It 'rejects typed predicates on generic live or offline sources before ingestion' {
+        $PredicatePath = Join-Path $TestDrive 'generic-predicate.json'
+        $StorePath = Join-Path $TestDrive 'generic-rejected.db'
+        @{
+            Kind = 'Comparison'
+            Field = 'EventId'
+            Operator = 'Equal'
+            Values = @('7040')
+        } | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $PredicatePath -Encoding UTF8
+        $PreviousErrorActionPreference = $ErrorActionPreference
+        $ErrorActionPreference = 'Continue'
+        try {
+            $Output = & $script:CliPath query `
+                --path $script:FixturePath `
+                --where $PredicatePath `
+                --write-store $StorePath 2>&1
+        } finally {
+            $ErrorActionPreference = $PreviousErrorActionPreference
+        }
+
+        $LASTEXITCODE | Should -Be 1
+        [string] $Output | Should -Match '--where requires --type or --definition'
+        Test-Path -LiteralPath $StorePath | Should -BeFalse
+    }
+
+    It 'normalizes built-in predicates before producing an explanation' {
+        $PredicatePath = Join-Path $TestDrive 'invalid-built-in-predicate.json'
+        @{
+            Kind = 'Comparison'
+            Field = 'EventId'
+            Operator = 'Equal'
+            Values = @('not-an-event-id')
+        } | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $PredicatePath -Encoding UTF8
+        $PreviousErrorActionPreference = $ErrorActionPreference
+        $ErrorActionPreference = 'Continue'
+        try {
+            $Output = & $script:CliPath query `
+                --type ADUserLogonFailed `
+                --where $PredicatePath `
+                --explain 2>&1
+        } finally {
+            $ErrorActionPreference = $PreviousErrorActionPreference
+        }
+
+        $LASTEXITCODE | Should -Be 1
+        [string] $Output | Should -Match "not valid for field 'EventId'"
+    }
+
     It 'rejects unknown options instead of silently running an unbounded query' {
         $PreviousErrorActionPreference = $ErrorActionPreference
         $ErrorActionPreference = 'Continue'
