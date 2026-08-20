@@ -511,11 +511,17 @@ public sealed partial class CmdletGetEVXEvent : AsyncPSCmdlet {
                 nameof(ReadMode))) {
             ReadMode = EventReadMode.StructuredDataAndMessage;
         }
-        EventPredicate? predicate = PowerShellEventPredicateAdapter.Resolve(Where, nameof(Where));
-        if (predicate != null && UsesBuiltInTypeQuery) {
-            predicate = EventPredicateBuilder.ForTypes(Type).Normalize(predicate);
-        } else if (predicate != null && UsesCustomDefinitionQuery) {
-            predicate = EventPredicateBuilder.ForDefinition(ResolveEventDefinition()).Normalize(predicate);
+        EventPredicateBuilder? predicateBuilder = UsesBuiltInTypeQuery
+            ? EventPredicateBuilder.ForTypes(Type)
+            : UsesCustomDefinitionQuery
+                ? EventPredicateBuilder.ForDefinition(ResolveEventDefinition())
+                : null;
+        EventPredicate? predicate = PowerShellEventPredicateAdapter.Resolve(
+            Where,
+            nameof(Where),
+            predicateBuilder);
+        if (predicate != null && predicateBuilder != null) {
+            predicate = predicateBuilder.Normalize(predicate);
         }
         if (Explain.IsPresent) {
             if (predicate == null) {

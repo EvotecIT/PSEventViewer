@@ -507,27 +507,7 @@ public static class EventDefinitionEngine {
     };
 
     private static object? ConvertFieldValue(EventDefinitionField field, object? value) {
-        if (value == null) {
-            return null;
-        }
-        string text = Convert.ToString(value, CultureInfo.InvariantCulture) ?? string.Empty;
-        try {
-            return field.ValueKind switch {
-                EventFieldValueKind.Int32 => Convert.ToInt32(value, CultureInfo.InvariantCulture),
-                EventFieldValueKind.Int64 => Convert.ToInt64(value, CultureInfo.InvariantCulture),
-                EventFieldValueKind.Boolean => Convert.ToBoolean(value, CultureInfo.InvariantCulture),
-                EventFieldValueKind.DateTime => value is DateTime dateTime
-                    ? dateTime
-                    : DateTime.Parse(text, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
-                EventFieldValueKind.Guid => value is Guid guid ? guid : Guid.Parse(text),
-                EventFieldValueKind.IpAddress => value is IPAddress address ? address : IPAddress.Parse(text),
-                _ => text
-            };
-        } catch (Exception exception) when (exception is FormatException or InvalidCastException or OverflowException) {
-            throw new InvalidDataException(
-                $"Field '{field.Name}' value '{text}' cannot be converted to {field.ValueKind}.",
-                exception);
-        }
+        return field.ConvertValue(value);
     }
 
     private static string?[] NormalizeTargets(IReadOnlyList<string?>? machineNames) {

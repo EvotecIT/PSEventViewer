@@ -50,6 +50,15 @@ public sealed partial class EventPredicate {
             }
             Expression valueExpression = memberOnLeft ? binary.Right : binary.Left;
             object? value = ReadCapturedValue(valueExpression);
+            if (value == null && binary.NodeType is ExpressionType.Equal or ExpressionType.NotEqual) {
+                EventPredicate nullPredicate = Compare(
+                    memberOnLeft ? field! : rightField!,
+                    binary.NodeType == ExpressionType.Equal
+                        ? EventPredicateOperator.IsNull
+                        : EventPredicateOperator.IsNotNull);
+                nullPredicate.IgnoreCase = false;
+                return nullPredicate;
+            }
             EventPredicateOperator comparison = ToOperator(binary.NodeType, reverse: memberOnRight);
             return CompareExpression(memberOnLeft ? field! : rightField!, comparison, value);
         }

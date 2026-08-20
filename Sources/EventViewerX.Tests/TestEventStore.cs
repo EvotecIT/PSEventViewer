@@ -9,6 +9,21 @@ namespace EventViewerX.Tests;
 
 public sealed partial class TestEventStore {
     [Fact]
+    public void BuiltInStoreQueriesNormalizePredicatesBeforePlanning() {
+        var query = new EventStoreQuery {
+            Types = new[] { EventType.ADUserLogonFailed },
+            Predicate = EventPredicate.Compare(
+                "Who",
+                EventPredicateOperator.GreaterThan,
+                "M")
+        };
+
+        ArgumentException exception = Assert.Throws<ArgumentException>(() => EventStore.Plan(query));
+
+        Assert.Contains("Operator 'GreaterThan' is not supported by field 'Who'", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task WriteIsIdempotentAndCommitsCheckpointWithRows() {
         string path = CreateStorePath();
         try {

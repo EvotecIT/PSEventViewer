@@ -171,4 +171,17 @@ Describe 'Show-EVXEvent' {
         $Summary.Sections[0].Name | Should -Be 'EventStoreSummary'
         $Summary.Sections[0].Columns.Name | Should -Contain 'Count'
     }
+
+    It 'normalizes built-in typed predicates before opening stored history' {
+        $StorePath = Join-Path $TestDrive 'not-opened.db'
+
+        {
+            Show-EVXEvent `
+                -FromStore $StorePath `
+                -Type ADUserLogonFailed `
+                -Where { $_.Who -gt 'M' } `
+                -PassThru
+        } | Should -Throw "*Operator 'GreaterThan' is not supported by field 'Who'*"
+        Test-Path -LiteralPath $StorePath | Should -BeFalse
+    }
 }

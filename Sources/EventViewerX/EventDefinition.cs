@@ -91,6 +91,27 @@ public sealed class EventDefinition {
             if (field.Source != EventFieldSource.Message && string.IsNullOrWhiteSpace(field.SourceName)) {
                 throw new InvalidDataException($"Fields[{index}].SourceName is required for {field.Source} fields.");
             }
+            if (field.Source == EventFieldSource.Constant) {
+                ValidateConfiguredLiteral(field, field.SourceName, nameof(field.SourceName), index);
+            }
+            if (field.DefaultValue != null) {
+                ValidateConfiguredLiteral(field, field.DefaultValue, nameof(field.DefaultValue), index);
+            }
+        }
+    }
+
+    private static void ValidateConfiguredLiteral(
+        EventDefinitionField field,
+        string value,
+        string propertyName,
+        int index) {
+
+        try {
+            field.ConvertValue(value);
+        } catch (InvalidDataException exception) {
+            throw new InvalidDataException(
+                $"Fields[{index}].{propertyName} is not valid for {field.ValueKind}.",
+                exception);
         }
     }
 

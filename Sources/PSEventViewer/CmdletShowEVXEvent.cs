@@ -234,11 +234,17 @@ public sealed class CmdletShowEVXEvent : AsyncPSCmdlet {
             report = EventReportEngine.Create(_input, Title);
         } else if (ParameterSetName == "Store") {
             EventDefinition? storedDefinition = ResolveStoredDefinition(Definition);
-            EventPredicate? storedPredicate = PowerShellEventPredicateAdapter.Resolve(Where, nameof(Where));
-            if (storedDefinition != null && storedPredicate != null) {
-                storedPredicate = EventPredicateBuilder
-                    .ForDefinition(storedDefinition)
-                    .Normalize(storedPredicate);
+            EventPredicateBuilder? storedBuilder = storedDefinition != null
+                ? EventPredicateBuilder.ForDefinition(storedDefinition)
+                : Type.Length > 0
+                    ? EventPredicateBuilder.ForTypes(Type)
+                    : null;
+            EventPredicate? storedPredicate = PowerShellEventPredicateAdapter.Resolve(
+                Where,
+                nameof(Where),
+                storedBuilder);
+            if (storedPredicate != null && storedBuilder != null) {
+                storedPredicate = storedBuilder.Normalize(storedPredicate);
             }
             var query = new EventStoreQuery {
                 Types = Type.Length == 0 ? null : Type,
@@ -299,7 +305,15 @@ public sealed class CmdletShowEVXEvent : AsyncPSCmdlet {
             request.Credential = Credential?.GetNetworkCredential();
             request.Authentication = Authentication;
             request.Title = Title;
-            request.Predicate = PowerShellEventPredicateAdapter.Resolve(Where, nameof(Where));
+            EventPredicateBuilder? requestBuilder = request.Definition != null
+                ? EventPredicateBuilder.ForDefinition(request.Definition)
+                : request.Types != null && request.Types.Count > 0
+                    ? EventPredicateBuilder.ForTypes(request.Types)
+                    : null;
+            request.Predicate = PowerShellEventPredicateAdapter.Resolve(
+                Where,
+                nameof(Where),
+                requestBuilder);
             report = await EventReportEngine.QueryAsync(request, CancelToken).ConfigureAwait(false);
         }
 

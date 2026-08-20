@@ -42,9 +42,14 @@ public sealed class EventStoreQuery {
         if (start.HasValue && end.HasValue && start > end) {
             throw new ArgumentException("StartTime cannot be later than EndTime.");
         }
-        Predicate?.Validate();
+        EventType[]? types = Types?.Distinct().ToArray();
+        EventPredicate? predicate = Predicate?.Clone();
+        predicate?.Validate();
+        if (predicate != null && types != null && types.Length > 0) {
+            predicate = EventPredicateBuilder.ForTypes(types).Normalize(predicate);
+        }
         return new EventStoreQuery {
-            Types = Types?.Distinct().ToArray(),
+            Types = types,
             DefinitionNames = Normalize(DefinitionNames),
             StartTime = start,
             EndTime = end,
@@ -53,7 +58,7 @@ public sealed class EventStoreQuery {
             SourceComputers = Normalize(SourceComputers),
             SourceLogs = Normalize(SourceLogs),
             Providers = Normalize(Providers),
-            Predicate = Predicate?.Clone(),
+            Predicate = predicate,
             MaxEvents = MaxEvents,
             MaxCandidates = MaxCandidates,
             Oldest = Oldest

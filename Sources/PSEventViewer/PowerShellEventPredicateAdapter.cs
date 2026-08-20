@@ -2,7 +2,11 @@ namespace PSEventViewer;
 
 /// <summary>Converts PowerShell predicate inputs into the canonical EventViewerX model.</summary>
 internal static class PowerShellEventPredicateAdapter {
-    internal static EventPredicate? Resolve(object? value, string parameterName) {
+    internal static EventPredicate? Resolve(
+        object? value,
+        string parameterName,
+        EventPredicateBuilder? builder = null) {
+
         while (value is PSObject wrapper && wrapper.BaseObject != value) {
             value = wrapper.BaseObject;
         }
@@ -11,8 +15,8 @@ internal static class PowerShellEventPredicateAdapter {
         }
         EventPredicate predicate = value switch {
             EventPredicate typed => typed,
-            PowerShellEventPredicateBuilder builder => builder.Build(),
-            ScriptBlock scriptBlock => PowerShellEventPredicateAstParser.Parse(scriptBlock),
+            PowerShellEventPredicateBuilder filterBuilder => filterBuilder.Build(),
+            ScriptBlock scriptBlock => PowerShellEventPredicateAstParser.Parse(scriptBlock, builder),
             string text when File.Exists(text) => EventPredicate.Load(text),
             string text => EventPredicate.ParseJson(text),
             _ => throw new PSArgumentException(

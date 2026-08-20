@@ -346,6 +346,69 @@ public sealed class TestEventDefinitionAndReporting {
     }
 
     [Fact]
+    public void DefinitionRejectsInvalidConfiguredTypedLiteralsBeforeReadingEvents() {
+        EventDefinition constant = CreateDefinition();
+        constant.Fields = new[] {
+            new EventDefinitionField {
+                Name = "Attempts",
+                Source = EventFieldSource.Constant,
+                SourceName = "not-a-number",
+                ValueKind = EventFieldValueKind.Int32
+            }
+        };
+        EventDefinition fallback = CreateDefinition();
+        fallback.Fields = new[] {
+            new EventDefinitionField {
+                Name = "OccurredAt",
+                Source = EventFieldSource.Data,
+                SourceName = "OccurredAt",
+                DefaultValue = "not-a-date",
+                ValueKind = EventFieldValueKind.DateTime
+            }
+        };
+
+        InvalidDataException constantError = Assert.Throws<InvalidDataException>(constant.Validate);
+        InvalidDataException fallbackError = Assert.Throws<InvalidDataException>(fallback.Validate);
+
+        Assert.Contains("Fields[0].SourceName", constantError.Message, StringComparison.Ordinal);
+        Assert.Contains("Fields[0].DefaultValue", fallbackError.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void CsvBundleReservesMetadataEntryNamesFromCustomSections() {
+        EventDefinition coverage = CreateDefinition();
+        coverage.Name = "coverage";
+        coverage.DisplayName = "Coverage events";
+        EventDefinition provenance = CreateDefinition();
+        provenance.Name = "event-provenance";
+        provenance.DisplayName = "Provenance events";
+        var source = new EventObject(
+            new SyntheticEventRecord(),
+            "WEC01",
+            EventReadMode.StructuredDataAndMessage);
+        source.Data["TargetUserName"] = "alice";
+        EventReport report = EventReportEngine.Create(new object[] {
+            EventDefinitionEngine.CreateRecord(coverage, source),
+            EventDefinitionEngine.CreateRecord(provenance, source)
+        });
+        string path = Path.Combine(Path.GetTempPath(), $"evx-reserved-csv-{Guid.NewGuid():N}.zip");
+
+        try {
+            EventReportCsvRenderer.Save(report, path);
+            using ZipArchive archive = ZipFile.OpenRead(path);
+            string[] names = archive.Entries.Select(static entry => entry.FullName).ToArray();
+
+            Assert.Equal(names.Length, names.Distinct(StringComparer.OrdinalIgnoreCase).Count());
+            Assert.Contains("coverage.csv", names);
+            Assert.Contains("event-provenance.csv", names);
+            Assert.Contains("coverage-2.csv", names);
+            Assert.Contains("event-provenance-2.csv", names);
+        } finally {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
     public void DefinitionSnapshotFreezesMutableSourcesFieldsAndRecordIds() {
         EventDefinition definition = CreateDefinition();
         var query = new EventDefinitionQuery(definition) {

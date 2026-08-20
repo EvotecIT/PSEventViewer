@@ -73,6 +73,13 @@ public static class EventReportCsvRenderer {
         string temporaryPath = CreateTemporaryPath(fullPath);
         try {
             var usedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (options.IncludeProvenance &&
+                report.Sections.Any(static section => section.Kind != EventReportSectionKind.Generic)) {
+                usedNames.Add("event-provenance.csv");
+            }
+            if (options.IncludeCoverage) {
+                usedNames.Add("coverage.csv");
+            }
             var sectionFiles = new List<(EventReportSection Section, string FileName)>();
             foreach (EventReportSection section in report.Sections) {
                 string fileName = CreateUniqueFileName(section.Name, usedNames);

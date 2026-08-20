@@ -228,7 +228,10 @@ public sealed class CmdletNewEVXFilter : PSCmdlet {
             ? EventPredicateBuilder.ForType(Type!.Value)
             : EventPredicateBuilder.ForDefinition(definition);
         var filter = new PowerShellEventPredicateBuilder(builder, Type, definition);
-        EventPredicate? predicate = PowerShellEventPredicateAdapter.Resolve(Where, nameof(Where));
+        EventPredicate? predicate = PowerShellEventPredicateAdapter.Resolve(
+            Where,
+            nameof(Where),
+            builder);
         if (predicate != null) {
             filter.Use(predicate);
         }

@@ -363,6 +363,25 @@ public sealed class TestEventPredicate {
     }
 
     [Fact]
+    public void StronglyTypedExpressionsPreserveReferenceNullChecksForCollections() {
+        EventPredicate isNull = EventPredicate.FromExpression<Rules.ActiveDirectory.ADUserPrivilegeUse>(
+            record => record.Privileges == null);
+        EventPredicate isNotNull = EventPredicate.FromExpression<Rules.ActiveDirectory.ADUserPrivilegeUse>(
+            record => record.Privileges != null);
+        var record = new Rules.ActiveDirectory.ADUserPrivilegeUse(new EventObject(
+            new SyntheticEventRecord(),
+            Environment.MachineName,
+            EventReadMode.StructuredDataAndMessage));
+
+        Assert.Equal(EventPredicateOperator.IsNull, isNull.Operator);
+        Assert.Equal(EventPredicateOperator.IsNotNull, isNotNull.Operator);
+        Assert.Empty(isNull.Values);
+        Assert.Empty(isNotNull.Values);
+        Assert.False(EventPredicateEvaluator.Matches(isNull, record));
+        Assert.True(EventPredicateEvaluator.Matches(isNotNull, record));
+    }
+
+    [Fact]
     public async Task CustomMetadataPredicateUsesNativePrefilterAndExactProjectionCheck() {
         var definition = new EventDefinition {
             Name = "ServiceChange",

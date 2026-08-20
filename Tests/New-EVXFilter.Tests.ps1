@@ -347,6 +347,19 @@ Describe 'New-EVXFilter' {
         $Excluded.ManagedPredicate.Operator.ToString() | Should -Be 'NotIn'
     }
 
+    It 'rejects field-left membership for collection fields' {
+        {
+            Get-EVXEvent -Type ADUserPrivilegeUse -Where {
+                $_.Privileges -in @('SeDebugPrivilege')
+            } -Explain
+        } | Should -Throw '*Field-left*-in/-notin*collection*'
+        {
+            New-EVXFilter -Type ADUserPrivilegeUse -Where {
+                $_.Privileges -notin @('SeDebugPrivilege')
+            } -Explain
+        } | Should -Throw '*Field-left*-in/-notin*collection*'
+    }
+
     It 'preserves scalar PowerShell containment as whole-value equality' {
         $Included = Get-EVXEvent -Type ADUserLogonFailed -Where {
             $_.Who -contains 'EVOTEC\alice'

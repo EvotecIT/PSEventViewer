@@ -4,7 +4,9 @@ namespace PSEventViewer;
 
 /// <summary>Translates a restricted, non-executing PowerShell filter AST into EventPredicate.</summary>
 internal static class PowerShellEventPredicateAstParser {
-    internal static EventPredicate Parse(ScriptBlock scriptBlock) {
+    internal static EventPredicate Parse(
+        ScriptBlock scriptBlock,
+        EventPredicateBuilder? builder = null) {
         if (scriptBlock == null) {
             throw new ArgumentNullException(nameof(scriptBlock));
         }
@@ -20,30 +22,40 @@ internal static class PowerShellEventPredicateAstParser {
             pipeline.PipelineElements[0] is not CommandExpressionAst commandExpression) {
             throw Unsupported("Where must contain one comparison expression, not commands or pipelines.");
         }
-        EventPredicate predicate = Translate(commandExpression.Expression);
+        EventPredicate predicate = Translate(commandExpression.Expression, builder);
         predicate.Validate();
         return predicate;
     }
 
-    private static EventPredicate Translate(ExpressionAst expression) {
+    private static EventPredicate Translate(
+        ExpressionAst expression,
+        EventPredicateBuilder? builder) {
+
         expression = Unwrap(expression);
         if (expression is BinaryExpressionAst binary) {
             if (binary.Operator == TokenKind.And) {
-                return EventPredicate.AllOf(Translate(binary.Left), Translate(binary.Right));
+                return EventPredicate.AllOf(
+                    Translate(binary.Left, builder),
+                    Translate(binary.Right, builder));
             }
             if (binary.Operator == TokenKind.Or) {
-                return EventPredicate.AnyOf(Translate(binary.Left), Translate(binary.Right));
+                return EventPredicate.AnyOf(
+                    Translate(binary.Left, builder),
+                    Translate(binary.Right, builder));
             }
-            return TranslateComparison(binary);
+            return TranslateComparison(binary, builder);
         }
         if (expression is UnaryExpressionAst unary &&
             unary.TokenKind is TokenKind.Not or TokenKind.Exclaim) {
-            return EventPredicate.Not(Translate(unary.Child));
+            return EventPredicate.Not(Translate(unary.Child, builder));
         }
         throw Unsupported($"Expression '{expression.Extent.Text}' is not a supported typed filter.");
     }
 
-    private static EventPredicate TranslateComparison(BinaryExpressionAst binary) {
+    private static EventPredicate TranslateComparison(
+        BinaryExpressionAst binary,
+        EventPredicateBuilder? builder) {
+
         bool fieldOnLeft = TryReadField(binary.Left, out string? leftField);
         bool fieldOnRight = TryReadField(binary.Right, out string? rightField);
         if (fieldOnLeft == fieldOnRight) {
@@ -55,6 +67,17 @@ internal static class PowerShellEventPredicateAstParser {
             throw Unsupported(
                 "Reversed -contains/-notcontains changes meaning for collection-valued fields. " +
                 "Use 'value' -in $_.Field for collection membership, or $_.Field -in @('value1', 'value2') for scalar selection.");
+        }
+        if (fieldOnLeft && builder != null && binary.Operator is
+                TokenKind.Iin or TokenKind.Cin or
+                TokenKind.Inotin or TokenKind.Cnotin) {
+            EventPredicateField field = builder.Field(leftField!);
+            if (field.ValueType != typeof(string) &&
+                typeof(System.Collections.IEnumerable).IsAssignableFrom(field.ValueType)) {
+                throw Unsupported(
+                    $"Field-left -in/-notin treats collection field '{field.Name}' as one PowerShell value. " +
+                    "Use 'value' -in $_.Field for collection membership, or use the typed field Contains method.");
+            }
         }
         ExpressionAst valueAst = fieldOnLeft ? binary.Right : binary.Left;
         object?[] values = ReadValues(valueAst);
