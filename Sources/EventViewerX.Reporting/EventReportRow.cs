@@ -2,6 +2,10 @@ namespace EventViewerX.Reporting;
 
 /// <summary>A normalized event row shared by HTML, Excel, email, and transport adapters.</summary>
 public sealed class EventReportRow {
+    private static readonly HashSet<string> CommonFieldNames = new(
+        typeof(EventReportRow).GetProperties().Select(static property => property.Name),
+        StringComparer.OrdinalIgnoreCase);
+
     /// <summary>Event timestamp.</summary>
     public DateTime TimeCreated { get; set; }
     /// <summary>Built-in type name or Generic.</summary>
@@ -42,6 +46,7 @@ public sealed class EventReportRow {
             [nameof(SourceComputer)] = SourceComputer,
             [nameof(CollectorComputer)] = CollectorComputer,
             [nameof(Level)] = Level,
+            [nameof(LevelValue)] = LevelValue,
             [nameof(Message)] = Message
         };
         foreach (KeyValuePair<string, object?> value in Values) {
@@ -73,8 +78,14 @@ public sealed class EventReportRow {
             : null;
         result["LevelDisplayName"] = Level;
         foreach (KeyValuePair<string, object?> value in Values) {
+            if (string.Equals(Type, "Generic", StringComparison.OrdinalIgnoreCase) &&
+                IsCommonFieldName(value.Key)) {
+                continue;
+            }
             result[value.Key] = value.Value;
         }
         return result;
     }
+
+    internal static bool IsCommonFieldName(string name) => CommonFieldNames.Contains(name);
 }

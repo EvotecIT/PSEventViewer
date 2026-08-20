@@ -117,6 +117,33 @@ public static class EventReportEngine {
         if (schemaSnapshot.Length == 0 && rowSnapshot.Length > 0) {
             throw new ArgumentException("At least one stored section schema is required when rows are present.", nameof(schemas));
         }
+        string[] duplicateSchemas = schemaSnapshot
+            .GroupBy(static schema => schema.Name, StringComparer.OrdinalIgnoreCase)
+            .Where(static group => group.Count() > 1)
+            .Select(static group => group.Key)
+            .ToArray();
+        if (duplicateSchemas.Length > 0) {
+            throw new ArgumentException(
+                "Stored schemas contain duplicate case-insensitive names: " +
+                string.Join(", ", duplicateSchemas) + ".",
+                nameof(schemas));
+        }
+        if (schemaSnapshot.Any(static schema =>
+                schema.Kind == EventReportSectionKind.Generic &&
+                !string.Equals(schema.Name, "Generic", StringComparison.OrdinalIgnoreCase))) {
+            throw new ArgumentException("The generic stored schema must use the stable name 'Generic'.", nameof(schemas));
+        }
+        foreach (EventReportRow row in rowSnapshot) {
+            int matchingSchemas = schemaSnapshot.Count(schema => string.Equals(
+                schema.Kind == EventReportSectionKind.Generic ? "Generic" : schema.Name,
+                row.Type,
+                StringComparison.OrdinalIgnoreCase));
+            if (matchingSchemas != 1) {
+                throw new ArgumentException(
+                    $"Stored row type '{row.Type}' must match exactly one homogeneous schema.",
+                    nameof(rows));
+            }
+        }
         var sections = new List<EventReportSection>();
         foreach (EventReportSectionSchema schema in schemaSnapshot) {
             EventReportRow[] sectionRows = rowSnapshot
@@ -209,6 +236,17 @@ public static class EventReportEngine {
             throw new ArgumentException($"Stored schema '{schema.Name}' must declare Columns.", nameof(schema));
         if (columns.Any(static column => column == null || string.IsNullOrWhiteSpace(column.Name))) {
             throw new ArgumentException($"Stored schema '{schema.Name}' contains an invalid column.", nameof(schema));
+        }
+        string[] duplicateColumns = columns
+            .GroupBy(static column => column.Name.Trim(), StringComparer.OrdinalIgnoreCase)
+            .Where(static group => group.Count() > 1)
+            .Select(static group => group.Key)
+            .ToArray();
+        if (duplicateColumns.Length > 0) {
+            throw new ArgumentException(
+                $"Stored schema '{schema.Name}' contains duplicate case-insensitive columns: " +
+                string.Join(", ", duplicateColumns) + ".",
+                nameof(schema));
         }
         return new EventReportSectionSchema {
             Name = schema.Name.Trim(),

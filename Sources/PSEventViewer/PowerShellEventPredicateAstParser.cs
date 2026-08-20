@@ -36,7 +36,8 @@ internal static class PowerShellEventPredicateAstParser {
             }
             return TranslateComparison(binary);
         }
-        if (expression is UnaryExpressionAst unary && unary.TokenKind == TokenKind.Not) {
+        if (expression is UnaryExpressionAst unary &&
+            unary.TokenKind is TokenKind.Not or TokenKind.Exclaim) {
             return EventPredicate.Not(Translate(unary.Child));
         }
         throw Unsupported($"Expression '{expression.Extent.Text}' is not a supported typed filter.");
@@ -93,13 +94,23 @@ internal static class PowerShellEventPredicateAstParser {
         if (expression is ArrayLiteralAst array) {
             return array.Elements.Select(ReadValue).ToArray();
         }
-        if (expression is ArrayExpressionAst arrayExpression &&
-            arrayExpression.SubExpression.Statements.Count == 1 &&
-            arrayExpression.SubExpression.Statements[0] is PipelineAst pipeline &&
-            pipeline.PipelineElements.Count == 1 &&
-            pipeline.PipelineElements[0] is CommandExpressionAst command &&
-            Unwrap(command.Expression) is ArrayLiteralAst nested) {
-            return nested.Elements.Select(ReadValue).ToArray();
+        if (expression is ArrayExpressionAst arrayExpression) {
+            var values = new List<object?>();
+            foreach (StatementAst statement in arrayExpression.SubExpression.Statements) {
+                if (statement is not PipelineAst pipeline ||
+                    pipeline.PipelineElements.Count != 1 ||
+                    pipeline.PipelineElements[0] is not CommandExpressionAst command) {
+                    throw Unsupported(
+                        $"Array expression '{expression.Extent.Text}' can contain only literal values.");
+                }
+                ExpressionAst nestedExpression = Unwrap(command.Expression);
+                if (nestedExpression is ArrayLiteralAst nested) {
+                    values.AddRange(nested.Elements.Select(ReadValue));
+                } else {
+                    values.Add(ReadValue(nestedExpression));
+                }
+            }
+            return values.ToArray();
         }
         return new[] { ReadValue(expression) };
     }

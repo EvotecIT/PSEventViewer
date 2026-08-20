@@ -7,7 +7,7 @@ using Xunit;
 
 namespace EventViewerX.Tests;
 
-public sealed class TestEventStore {
+public sealed partial class TestEventStore {
     [Fact]
     public async Task WriteIsIdempotentAndCommitsCheckpointWithRows() {
         string path = CreateStorePath();

@@ -226,6 +226,37 @@ Describe 'New-EVXFilter' {
         } | Should -Throw '*commands or pipelines*'
     }
 
+    It 'accepts singleton explicit arrays in restricted PowerShell expressions' {
+        $Plan = Get-EVXEvent -Type ADUserLogonFailed -Where {
+            $_.Who -in @('EVOTEC\alice')
+        } -Explain
+
+        $Plan.ManagedPredicate.Operator.ToString() | Should -Be 'In'
+        @($Plan.ManagedPredicate.Values).Count | Should -Be 1
+        $Plan.ManagedPredicate.Values[0] | Should -Be 'EVOTEC\alice'
+    }
+
+    It 'accepts literal statement arrays and rejects empty membership without executing them' {
+        $Plan = Get-EVXEvent -Type ADUserLogonFailed -Where {
+            $_.Who -in @('EVOTEC\alice'; 'EVOTEC\bob')
+        } -Explain
+
+        @($Plan.ManagedPredicate.Values) | Should -Be @('EVOTEC\alice', 'EVOTEC\bob')
+        {
+            Get-EVXEvent -Type ADUserLogonFailed -Where {
+                $_.Who -in @()
+            } -Explain
+        } | Should -Throw '*requires at least one value*'
+    }
+
+    It 'accepts the safe PowerShell exclamation alias for predicate negation' {
+        $Plan = Get-EVXEvent -Type ADUserLogonFailed -Where {
+            !($_.Who -eq 'EVOTEC\alice')
+        } -Explain
+
+        $Plan.ManagedPredicate.Kind.ToString() | Should -Be 'Not'
+    }
+
     It 'preserves negative PowerShell operators as exact predicate negation' {
         $Plan = Get-EVXEvent -Type ADUserLogonFailed -Where {
             $_.Who -notlike 'svc-*' -and $_.Who -notmatch '^test'

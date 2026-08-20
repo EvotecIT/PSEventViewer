@@ -205,15 +205,14 @@ FROM evx_events";
         var where = new List<string>();
         var parameters = new Dictionary<string, object?>();
         AddSqliteNoCaseIn(where, parameters, "definition_name", "pushdownSchema", definitionNames);
-        string sql = "SELECT schema_json FROM evx_definitions";
+        string sql = "SELECT definition_name, schema_json FROM evx_definitions";
         if (where.Count > 0) {
             sql += " WHERE " + where[0];
         }
         sql += ";";
         IReadOnlyList<EventReportSectionSchema> schemas = await session.QueryAsListAsync(
             sql,
-            static record => JsonSerializer.Deserialize<EventReportSectionSchema>(record.GetString(0), JsonOptions)
-                ?? throw new InvalidDataException("A stored report schema is invalid."),
+            static record => DeserializeStoredSchema(record.GetString(0), record.GetString(1)),
             parameters,
             cancellationToken: cancellationToken).ConfigureAwait(false);
         PredicatePushdownPolicy pushdown = schemas.Any(static schema => schema.Kind == EventReportSectionKind.Generic)
@@ -255,15 +254,35 @@ FROM evx_events";
         if (values == null) {
             return new Dictionary<string, object?>();
         }
-        IReadOnlyDictionary<string, Type> declaredTypes = schema?.Columns.ToDictionary(
-            static column => column.Name,
-            static column => EventReportColumnSchema.ResolveValueTypeName(column.ValueTypeName),
-            StringComparer.OrdinalIgnoreCase) ?? new Dictionary<string, Type>();
+        if (schema?.Kind == EventReportSectionKind.Generic) {
+            return values.ToDictionary(
+                static item => item.Key,
+                static item => ConvertGenericJson(item.Value),
+                StringComparer.OrdinalIgnoreCase);
+        }
+        IReadOnlyDictionary<string, Type> declaredTypes = CreateDeclaredTypes(schema);
         var result = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
         foreach (KeyValuePair<string, JsonElement> item in values) {
             result[item.Key] = declaredTypes.TryGetValue(item.Key, out Type? declaredType) && declaredType != typeof(object)
                 ? ConvertDeclaredJson(item.Value, declaredType, schema!.Name, item.Key)
                 : ConvertJson(item.Value);
+        }
+        return result;
+    }
+
+    private static IReadOnlyDictionary<string, Type> CreateDeclaredTypes(EventReportSectionSchema? schema) {
+        if (schema == null) {
+            return new Dictionary<string, Type>();
+        }
+        var result = new Dictionary<string, Type>(StringComparer.OrdinalIgnoreCase);
+        foreach (EventReportColumnSchema column in schema.Columns) {
+            if (result.ContainsKey(column.Name)) {
+                throw new InvalidDataException(
+                    $"Stored definition '{schema.Name}' contains duplicate case-insensitive column '{column.Name}'.");
+            }
+            result.Add(
+                column.Name,
+                EventReportColumnSchema.ResolveValueTypeName(column.ValueTypeName));
         }
         return result;
     }
@@ -302,6 +321,21 @@ FROM evx_events";
         JsonValueKind.Object => value.EnumerateObject().ToDictionary(
             static property => property.Name,
             static property => ConvertJson(property.Value),
+            StringComparer.OrdinalIgnoreCase),
+        _ => value.GetRawText()
+    };
+
+    private static object? ConvertGenericJson(JsonElement value) => value.ValueKind switch {
+        JsonValueKind.Null or JsonValueKind.Undefined => null,
+        JsonValueKind.String => value.GetString(),
+        JsonValueKind.Number when value.TryGetInt64(out long integer) => integer,
+        JsonValueKind.Number => value.GetDouble(),
+        JsonValueKind.True => true,
+        JsonValueKind.False => false,
+        JsonValueKind.Array => value.EnumerateArray().Select(ConvertGenericJson).ToArray(),
+        JsonValueKind.Object => value.EnumerateObject().ToDictionary(
+            static property => property.Name,
+            static property => ConvertGenericJson(property.Value),
             StringComparer.OrdinalIgnoreCase),
         _ => value.GetRawText()
     };

@@ -16,17 +16,25 @@ public sealed partial class EventStore {
             throw new ArgumentNullException(nameof(report));
         }
         ValidateCheckpoint(checkpoint);
-        EnsureInitialized();
         EventReportRow[] rows = report.Rows.ToArray();
-        EventReportSectionSchema[] schemas = report.Sections
+        if (rows.Any(static row => string.Equals(
+                row.Type,
+                "EventStoreSummary",
+                StringComparison.OrdinalIgnoreCase))) {
+            throw new InvalidDataException(
+                "Derived summary reports cannot be written back into EventStore history. " +
+                "Store source events and regenerate summaries from them.");
+        }
+        EventReportSectionSchema[] schemas = NormalizeIncomingSchemas(report.Sections
             .Select(EventReportSectionSchema.FromSection)
-            .ToArray();
+            .ToArray());
         var schemaNames = new HashSet<string>(schemas.Select(static schema => schema.Name),
             StringComparer.OrdinalIgnoreCase);
         if (rows.Any(row => !schemaNames.Contains(row.Type) &&
                             !string.Equals(row.Type, "Generic", StringComparison.OrdinalIgnoreCase))) {
             throw new InvalidDataException("Every stored typed row must have a matching homogeneous report schema.");
         }
+        EnsureInitialized();
 
         using var sqlite = new SQLite { BusyTimeoutMs = 10000 };
         await using SQLiteAsyncSession session = await sqlite
@@ -52,11 +60,21 @@ public sealed partial class EventStore {
                     string.Join(", ", ambiguousDefinitions) + ".");
             }
             var canonicalNames = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            foreach (EventReportSectionSchema schema in schemas) {
-                string requestedName = schema.Name;
+            foreach (EventReportSectionSchema incomingSchema in schemas) {
+                string requestedName = incomingSchema.Name;
                 StoredDefinitionSchema? existingDefinition = storedDefinitions.FirstOrDefault(definition =>
                     string.Equals(definition.Name, requestedName, StringComparison.OrdinalIgnoreCase));
+                EventReportSectionSchema schema = incomingSchema;
                 if (existingDefinition != null) {
+                    EventReportSectionSchema storedSchema = DeserializeStoredSchema(existingDefinition);
+                    if (storedSchema.Kind != schema.Kind) {
+                        throw new InvalidDataException(
+                            $"Stored definition '{existingDefinition.Name}' cannot change from " +
+                            $"{storedSchema.Kind} to {schema.Kind}.");
+                    }
+                    schema = schema.Kind == EventReportSectionKind.Generic
+                        ? MergeGenericSchemas(storedSchema, schema)
+                        : schema;
                     schema.Name = existingDefinition.Name;
                 }
                 canonicalNames[requestedName] = schema.Name;
@@ -204,31 +222,6 @@ public sealed partial class EventStore {
         return new string(characters);
     }
 
-    private static string CreateSchemaHash(EventReportSectionSchema schema) {
-        if (schema.Kind == EventReportSectionKind.Generic) {
-            return "generic-dynamic-v1";
-        }
-        string identity = string.Join("\0", new[] {
-            ((int)schema.Kind).ToString(CultureInfo.InvariantCulture)
-        }.Concat(schema.Columns.SelectMany(static column => new[] {
-            column.Name,
-            EventReportColumnSchema.NormalizeValueTypeName(column.ValueTypeName)
-        })));
-        using SHA256 sha256 = SHA256.Create();
-        byte[] hash = sha256.ComputeHash(Encoding.UTF8.GetBytes(identity));
-        return string.Concat(hash.Select(static value => value.ToString("x2", CultureInfo.InvariantCulture)));
-    }
-
-    private static bool HasEquivalentSchema(string json, string expectedHash) {
-        try {
-            EventReportSectionSchema? schema = JsonSerializer.Deserialize<EventReportSectionSchema>(json, JsonOptions);
-            return schema != null &&
-                   string.Equals(CreateSchemaHash(schema), expectedHash, StringComparison.Ordinal);
-        } catch (JsonException) {
-            return false;
-        }
-    }
-
     private static void ValidateCheckpoint(EventStoreCheckpoint? checkpoint) {
         if (checkpoint == null) {
             return;
@@ -271,15 +264,4 @@ ON CONFLICT(consumer, computer, container) DO UPDATE SET
     bookmark_xml = excluded.bookmark_xml,
     updated_utc = excluded.updated_utc;";
 
-    private sealed class StoredDefinitionSchema {
-        internal StoredDefinitionSchema(string name, string hash, string json) {
-            Name = name;
-            Hash = hash;
-            Json = json;
-        }
-
-        internal string Name { get; }
-        internal string Hash { get; }
-        internal string Json { get; }
-    }
 }

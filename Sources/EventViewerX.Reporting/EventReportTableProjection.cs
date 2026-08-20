@@ -32,6 +32,7 @@ internal static class EventReportTableProjection {
         string[] valueColumns = rows
             .SelectMany(static row => row.Values.Keys)
             .Where(static key => !string.IsNullOrWhiteSpace(key))
+            .Where(static key => !EventReportRow.IsCommonFieldName(key))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .Take(expandedValueColumnLimit + 1)
             .ToArray();
