@@ -198,15 +198,27 @@ public sealed partial class EventStore {
         string identity = string.Join("\0", new[] {
             NormalizeSqliteNoCaseIdentity(row.SourceComputer),
             NormalizeSqliteNoCaseIdentity(row.SourceLog),
-            row.RecordId?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
             row.EventId.ToString(CultureInfo.InvariantCulture),
             NormalizeSqliteNoCaseIdentity(row.Provider),
             row.TimeCreated.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture),
-            NormalizeSqliteNoCaseIdentity(definitionName)
+            NormalizeSqliteNoCaseIdentity(definitionName),
+            CreateSemanticIdentity(row.Values)
         });
         using SHA256 sha256 = SHA256.Create();
         byte[] hash = sha256.ComputeHash(Encoding.UTF8.GetBytes(identity));
         return string.Concat(hash.Select(static value => value.ToString("x2", CultureInfo.InvariantCulture)));
+    }
+
+    private static string CreateSemanticIdentity(IReadOnlyDictionary<string, object?> values) {
+        return string.Join(
+            "\u001e",
+            values
+                .OrderBy(static item => item.Key, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(static item => item.Key, StringComparer.Ordinal)
+                .Select(static item =>
+                    NormalizeSqliteNoCaseIdentity(item.Key) +
+                    "\u001f" +
+                    JsonSerializer.Serialize(item.Value, JsonOptions)));
     }
 
     private static string NormalizeSqliteNoCaseIdentity(string? value) {

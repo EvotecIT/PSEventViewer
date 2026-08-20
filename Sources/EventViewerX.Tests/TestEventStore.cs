@@ -64,14 +64,17 @@ public sealed partial class TestEventStore {
             EventStoreWriteResult forwarded = await store.WriteAsync(
                 CreateReportFromTransport(time, 42, "alice", "WEC01", "ForwardedEvents"));
             EventStoreWriteResult direct = await store.WriteAsync(
-                CreateReportFromTransport(time, 42, "alice", "source.ad.evotec.xyz", "Security"));
+                CreateReportFromTransport(time, 9001, "alice", "source.ad.evotec.xyz", "Security"));
+            EventStoreWriteResult distinct = await store.WriteAsync(
+                CreateReportFromTransport(time, 9002, "bob", "source.ad.evotec.xyz", "Security"));
 
             EventReport report = await store.ReadReportAsync(new EventStoreQuery());
 
             Assert.Equal(1, forwarded.Inserted);
             Assert.Equal(0, direct.Inserted);
             Assert.Equal(1, direct.Duplicates);
-            Assert.Single(report.Rows);
+            Assert.Equal(1, distinct.Inserted);
+            Assert.Equal(2, report.Rows.Count);
         } finally {
             DeleteStore(path);
         }
@@ -238,7 +241,7 @@ public sealed partial class TestEventStore {
     }
 
     [Fact]
-    public async Task StoredCustomFieldsShadowNativeSqlColumnsWithoutLosingMatches() {
+    public async Task StoredTypedFieldsCanShadowNativeColumnsWhileGenericAliasesStayAuthoritative() {
         string path = CreateStorePath();
         try {
             var store = new EventStore(path);
@@ -274,19 +277,29 @@ public sealed partial class TestEventStore {
                 43,
                 "ProviderName",
                 "generic-provider"));
-            EventReport genericMatch = await store.ReadReportAsync(new EventStoreQuery {
+            EventReport genericAliasDoesNotMatch = await store.ReadReportAsync(new EventStoreQuery {
                 DefinitionNames = new[] { "Generic" },
                 Predicate = EventPredicate.Compare(
                     "ProviderName",
                     EventPredicateOperator.Equal,
                     "generic-provider")
             });
+            EventReport genericNativeMatch = await store.ReadReportAsync(new EventStoreQuery {
+                DefinitionNames = new[] { "Generic" },
+                Predicate = EventPredicate.Compare(
+                    "ProviderName",
+                    EventPredicateOperator.Equal,
+                    "Microsoft-Windows-Security-Auditing")
+            });
 
             EventReportRow row = Assert.Single(customMatch.Rows);
             Assert.Equal("custom-provider", row.Values["ProviderName"]);
             Assert.Empty(nativeValueDoesNotMatch.Rows);
             Assert.Equal(1, Assert.Single(summary.Rows).Count);
-            Assert.Equal("generic-provider", Assert.Single(genericMatch.Rows).Values["ProviderName"]);
+            Assert.Empty(genericAliasDoesNotMatch.Rows);
+            Assert.Equal(
+                "generic-provider",
+                Assert.Single(genericNativeMatch.Rows).Values["ProviderName"]);
         } finally {
             DeleteStore(path);
         }

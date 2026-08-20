@@ -352,11 +352,19 @@ public sealed class TestEventPredicate {
             Who = "admin",
             IpAddress = "abc-value"
         };
+        var exactMember = new ExampleRecord(new EventObject(
+            new SyntheticEventRecord(),
+            Environment.MachineName,
+            EventReadMode.StructuredDataAndMessage)) {
+            Who = "ADMIN"
+        };
 
         Assert.All(
             new[] { equality, membership, prefix }.SelectMany(Flatten)
                 .Where(static predicate => predicate.Kind == EventPredicateKind.Comparison),
             static predicate => Assert.False(predicate.IgnoreCase));
+        Assert.Equal(users, membership.Values);
+        Assert.True(EventPredicateEvaluator.Matches(membership, exactMember));
         Assert.False(EventPredicateEvaluator.Matches(equality, record));
         Assert.False(EventPredicateEvaluator.Matches(membership, record));
         Assert.False(EventPredicateEvaluator.Matches(prefix, record));

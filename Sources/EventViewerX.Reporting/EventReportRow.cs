@@ -3,7 +3,21 @@ namespace EventViewerX.Reporting;
 /// <summary>A normalized event row shared by HTML, Excel, email, and transport adapters.</summary>
 public sealed class EventReportRow {
     private static readonly HashSet<string> CommonFieldNames = new(
-        typeof(EventReportRow).GetProperties().Select(static property => property.Name),
+        typeof(EventReportRow).GetProperties()
+            .Select(static property => property.Name)
+            .Concat(new[] {
+                "TypeName",
+                "Id",
+                "EventRecordId",
+                "ProviderName",
+                "SourceLogName",
+                "LogName",
+                "ContainerLogName",
+                "MachineName",
+                "Computer",
+                "When",
+                "LevelDisplayName"
+            }),
         StringComparer.OrdinalIgnoreCase);
 
     /// <summary>Event timestamp.</summary>

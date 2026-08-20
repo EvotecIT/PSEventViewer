@@ -103,6 +103,23 @@ public sealed partial class TestEventStore {
     }
 
     [Fact]
+    public void StoredReportsRejectUndefinedSectionKinds() {
+        var row = new EventReportRow {
+            Type = "InvalidKind"
+        };
+        EventReportSectionSchema schema = new() {
+            Name = "InvalidKind",
+            Kind = (EventReportSectionKind)999,
+            Columns = Array.Empty<EventReportColumnSchema>()
+        };
+
+        ArgumentException exception = Assert.Throws<ArgumentException>(() =>
+            EventReportEngine.CreateStored(new[] { row }, new[] { schema }));
+
+        Assert.Contains("undefined", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task DerivedSummaryReportsCannotBeWrittenBackIntoEventHistory() {
         string path = CreateStorePath();
         try {

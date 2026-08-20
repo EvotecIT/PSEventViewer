@@ -70,7 +70,7 @@ namespace PSEventViewer;
 [OutputType(typeof(CustomEventRecord), ParameterSetName = new string[] { "Definition" })]
 [OutputType(typeof(EventTypeRecord), ParameterSetName = new string[] { "TypedFilter" })]
 [OutputType(typeof(CustomEventRecord), ParameterSetName = new string[] { "TypedFilter" })]
-[Cmdlet(VerbsCommon.Get, "EVXEvent", DefaultParameterSetName = "Channel")]
+[Cmdlet(VerbsCommon.Get, "EVXEvent", DefaultParameterSetName = "TypedFilter")]
 [Alias("Find-WinEvent")]
 public sealed partial class CmdletGetEVXEvent : AsyncPSCmdlet {
     private string _recordIdKey = string.Empty;

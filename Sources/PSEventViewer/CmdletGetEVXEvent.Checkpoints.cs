@@ -402,6 +402,7 @@ public sealed partial class CmdletGetEVXEvent {
     private bool UsesDerivedCheckpointKeys() {
         return ParameterSetName == "Type" ||
                ParameterSetName == "Definition" ||
+               ParameterSetName == "TypedFilter" ||
                GetCheckpointSourceCount() > 1 ||
                GetEffectiveCheckpointMachines().Count > 1 ||
                (ParameterSetName == "Channel" &&

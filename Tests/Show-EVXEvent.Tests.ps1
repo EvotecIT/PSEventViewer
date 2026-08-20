@@ -184,4 +184,17 @@ Describe 'Show-EVXEvent' {
         } | Should -Throw "*Operator 'GreaterThan' is not supported by field 'Who'*"
         Test-Path -LiteralPath $StorePath | Should -BeFalse
     }
+
+    It 'rejects simultaneous built-in and custom stored selectors before opening history' {
+        $StorePath = Join-Path $TestDrive 'not-opened-mixed-selectors.db'
+
+        {
+            Show-EVXEvent `
+                -FromStore $StorePath `
+                -Type ADUserLogonFailed `
+                -Definition ServiceStartTypeChange `
+                -PassThru
+        } | Should -Throw '*Type and Definition are mutually exclusive*'
+        Test-Path -LiteralPath $StorePath | Should -BeFalse
+    }
 }

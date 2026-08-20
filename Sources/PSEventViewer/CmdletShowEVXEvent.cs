@@ -233,6 +233,11 @@ public sealed class CmdletShowEVXEvent : AsyncPSCmdlet {
         if (ParameterSetName == "Input") {
             report = EventReportEngine.Create(_input, Title);
         } else if (ParameterSetName == "Store") {
+            if (Type.Length > 0 && Definition != null) {
+                throw new PSArgumentException(
+                    "Type and Definition are mutually exclusive when reading stored reports.",
+                    nameof(Definition));
+            }
             EventDefinition? storedDefinition = ResolveStoredDefinition(Definition);
             EventPredicateBuilder? storedBuilder = storedDefinition != null
                 ? EventPredicateBuilder.ForDefinition(storedDefinition)

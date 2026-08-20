@@ -98,7 +98,10 @@ public sealed partial class EventPredicate {
                 foreach (object? item in values) {
                     items.Add(item);
                 }
-                return CompareExpression(inField!, EventPredicateOperator.In, items.ToArray());
+                return CompareExpressionValues(
+                    inField!,
+                    EventPredicateOperator.In,
+                    items);
             }
             throw Unsupported(call);
         }
@@ -109,6 +112,16 @@ public sealed partial class EventPredicate {
             object? value) {
 
             EventPredicate predicate = Compare(field, comparison, value);
+            predicate.IgnoreCase = false;
+            return predicate;
+        }
+
+        private static EventPredicate CompareExpressionValues(
+            string field,
+            EventPredicateOperator comparison,
+            IReadOnlyCollection<object?> values) {
+
+            EventPredicate predicate = Compare(field, comparison, values.ToArray());
             predicate.IgnoreCase = false;
             return predicate;
         }

@@ -114,6 +114,12 @@ public static class EventReportEngine {
         }
         EventReportRow[] rowSnapshot = rows.Select(CloneRow).ToArray();
         EventReportSectionSchema[] schemaSnapshot = schemas.Select(CloneSchema).ToArray();
+        if (schemaSnapshot.Any(static schema =>
+                !Enum.IsDefined(typeof(EventReportSectionKind), schema.Kind))) {
+            throw new ArgumentException(
+                "Stored schemas contain an undefined EventReportSectionKind value.",
+                nameof(schemas));
+        }
         if (schemaSnapshot.Length == 0 && rowSnapshot.Length > 0) {
             throw new ArgumentException("At least one stored section schema is required when rows are present.", nameof(schemas));
         }

@@ -391,6 +391,32 @@ public sealed class TestEventDefinitionAndReporting {
     }
 
     [Fact]
+    public void GenericPredicateRowsReserveNativeMetadataAliases() {
+        DateTime time = new(2026, 8, 20, 18, 0, 0, DateTimeKind.Utc);
+        var row = new EventReportRow {
+            Type = "Generic",
+            EventId = 4624,
+            RecordId = 42,
+            Provider = "Microsoft-Windows-Security-Auditing",
+            SourceLog = "Security",
+            TimeCreated = time,
+            Values = new Dictionary<string, object?> {
+                ["Id"] = "untrusted-id",
+                ["ProviderName"] = "untrusted-provider",
+                ["LogName"] = "untrusted-log",
+                ["When"] = "untrusted-time"
+            }
+        };
+
+        IReadOnlyDictionary<string, object?> values = row.ToPredicateDictionary();
+
+        Assert.Equal(4624, values["Id"]);
+        Assert.Equal("Microsoft-Windows-Security-Auditing", values["ProviderName"]);
+        Assert.Equal("Security", values["LogName"]);
+        Assert.Equal(time, values["When"]);
+    }
+
+    [Fact]
     public void CsvBundleReservesMetadataEntryNamesFromCustomSections() {
         EventDefinition coverage = CreateDefinition();
         coverage.Name = "coverage";

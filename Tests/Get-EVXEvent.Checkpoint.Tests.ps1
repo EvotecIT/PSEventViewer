@@ -234,6 +234,31 @@ Describe 'Get-EVXEvent checkpoint compatibility' {
         $Events.Count | Should -Be 1
     }
 
+    It 'derives source-specific checkpoint keys from reusable typed filters' {
+        $Filter = New-EVXFilter -Type OSStartup
+        $Filter.Use($Filter.Fields.EventId.IsNotNull())
+        $Baseline = @(Get-EVXEvent -Filter $Filter -MaxEvents 1)
+        if ($Baseline.Count -eq 0) {
+            Set-ItResult -Skipped -Because 'The local logs contained no OSStartup event-type match.'
+            return
+        }
+
+        $CheckpointPath = Join-Path $TestDrive 'typed-filter-checkpoint.json'
+        $Events = @(Get-EVXEvent `
+                -Filter $Filter `
+                -RecordIdFile $CheckpointPath `
+                -RecordIdKey 'typed-filter' `
+                -MaxEvents 1)
+
+        $Events.Count | Should -Be 1
+        $Persisted = Get-Content -LiteralPath $CheckpointPath -Raw |
+            ConvertFrom-Json
+        $Keys = @($Persisted.PSObject.Properties.Name)
+        @($Keys | Where-Object { $_ -like 'typed-filter|*|System' }).Count |
+            Should -Be 1
+        $Keys | Should -Not -Contain 'typed-filter'
+    }
+
     It 'uses the same checkpoint layout for equivalent duplicate targets' {
         $CheckpointPath = Join-Path $TestDrive 'normalized-target-checkpoint.json'
         $First = @(Get-EVXEvent -LogName System -MachineName $env:COMPUTERNAME -RecordIdFile $CheckpointPath -RecordIdKey normalized -MaxEvents 1 -ReadMode Metadata)
