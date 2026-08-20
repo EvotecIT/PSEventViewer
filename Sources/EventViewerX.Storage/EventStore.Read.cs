@@ -12,12 +12,12 @@ public sealed partial class EventStore {
         }
         EventStoreQuery snapshot = query.Snapshot();
         var steps = new List<EventStoreQueryPlanStep>();
-        AddDirectPlanStep(steps, "Definition", snapshot.ResolveDefinitionNames());
+        AddDirectPlanStep(steps, "Definition", snapshot.ResolveDefinitionNames(), caseInsensitive: true);
         AddDirectPlanStep(steps, "EventId", snapshot.EventIds);
         AddDirectPlanStep(steps, "RecordId", snapshot.RecordIds);
-        AddDirectPlanStep(steps, "SourceComputer", snapshot.SourceComputers);
-        AddDirectPlanStep(steps, "SourceLog", snapshot.SourceLogs);
-        AddDirectPlanStep(steps, "Provider", snapshot.Providers);
+        AddDirectPlanStep(steps, "SourceComputer", snapshot.SourceComputers, caseInsensitive: true);
+        AddDirectPlanStep(steps, "SourceLog", snapshot.SourceLogs, caseInsensitive: true);
+        AddDirectPlanStep(steps, "Provider", snapshot.Providers, caseInsensitive: true);
         if (snapshot.StartTime.HasValue || snapshot.EndTime.HasValue) {
             steps.Add(new EventStoreQueryPlanStep(
                 "TimeCreated boundary",
@@ -26,19 +26,24 @@ public sealed partial class EventStore {
         }
         if (snapshot.Predicate != null) {
             EventPredicatePlan predicatePlan = EventPredicatePlanner.Plan(snapshot.Predicate);
+            bool providerPushdownSafe = CanUseSqliteNoCase(predicatePlan.NativeFilter?.ProviderNames);
             steps.AddRange(predicatePlan.Steps
                 .Where(static step => !string.Equals(
                     step.Expression,
                     "Exact predicate verification",
                     StringComparison.Ordinal))
-                .Select(static step => new EventStoreQueryPlanStep(
-                step.Expression,
-                step.Stage == EventPredicatePlanStage.Native
-                    ? EventStoreQueryPlanStage.Sql
-                    : EventStoreQueryPlanStage.Managed,
-                step.Stage == EventPredicatePlanStage.Native
-                    ? "The common event dimension is eligible for indexed SQLite pushdown when selected stored schemas do not shadow that field."
-                    : step.Reason)));
+                .Select(step => new EventStoreQueryPlanStep(
+                    step.Expression,
+                    step.Stage == EventPredicatePlanStage.Native &&
+                    (providerPushdownSafe || !step.Expression.Contains("Provider", StringComparison.OrdinalIgnoreCase))
+                        ? EventStoreQueryPlanStage.Sql
+                        : EventStoreQueryPlanStage.Managed,
+                    step.Stage == EventPredicatePlanStage.Native &&
+                    !providerPushdownSafe && step.Expression.Contains("Provider", StringComparison.OrdinalIgnoreCase)
+                        ? "Unicode-insensitive provider matching is verified in managed code because SQLite NOCASE folds ASCII only."
+                        : step.Stage == EventPredicatePlanStage.Native
+                            ? "The common event dimension is eligible for indexed SQLite pushdown when selected stored schemas do not shadow that field."
+                            : step.Reason)));
             steps.Add(new EventStoreQueryPlanStep(
                 "Exact predicate verification",
                 EventStoreQueryPlanStage.Managed,
@@ -83,6 +88,9 @@ public sealed partial class EventStore {
             foreach (EventReportRow row in boundedCandidates) {
                 token.ThrowIfCancellationRequested();
                 scanned++;
+                if (!MatchesDirectTextSelection(snapshot, row)) {
+                    continue;
+                }
                 if (snapshot.Predicate != null &&
                     !EventPredicateEvaluator.Matches(snapshot.Predicate, row.ToPredicateDictionary())) {
                     continue;
@@ -128,10 +136,11 @@ public sealed partial class EventStore {
 
         WhereCommand filter = BuildWhere(query, includePredicateNative: true, pushdown: pushdown);
 
-        int candidateLimit = query.Predicate != null && query.MaxCandidates > 0
+        bool requiresManagedFiltering = query.Predicate != null || RequiresManagedTextMatching(query);
+        int candidateLimit = requiresManagedFiltering && query.MaxCandidates > 0
             ? checked((int)Math.Min(query.MaxCandidates, int.MaxValue - 1))
             : 0;
-        long directLimit = query.Predicate == null ? query.MaxEvents : 0;
+        long directLimit = !requiresManagedFiltering ? query.MaxEvents : 0;
         long sqlLimit = candidateLimit > 0 ? candidateLimit + 1L : directLimit;
         string sql = @"SELECT definition_name, event_time_utc, event_id, record_id, provider,
 source_log, container_log, source_computer, collector_computer, level, level_value, message, values_json
@@ -155,14 +164,14 @@ FROM evx_events";
 
         var where = new List<string>();
         var parameters = new Dictionary<string, object?>();
-        AddIn(where, parameters, "definition_name", "definition", query.ResolveDefinitionNames(), caseInsensitive: true);
+        AddSqliteNoCaseIn(where, parameters, "definition_name", "definition", query.ResolveDefinitionNames());
         AddBoundary(where, parameters, "event_time_utc", "$start", ">=", ToUtcText(query.StartTime));
         AddBoundary(where, parameters, "event_time_utc", "$end", "<=", ToUtcText(query.EndTime));
         AddIn(where, parameters, "event_id", "eventId", query.EventIds);
         AddIn(where, parameters, "record_id", "recordId", query.RecordIds);
-        AddIn(where, parameters, "source_computer", "sourceComputer", query.SourceComputers, caseInsensitive: true);
-        AddIn(where, parameters, "source_log", "sourceLog", query.SourceLogs, caseInsensitive: true);
-        AddIn(where, parameters, "provider", "provider", query.Providers, caseInsensitive: true);
+        AddSqliteNoCaseIn(where, parameters, "source_computer", "sourceComputer", query.SourceComputers);
+        AddSqliteNoCaseIn(where, parameters, "source_log", "sourceLog", query.SourceLogs);
+        AddSqliteNoCaseIn(where, parameters, "provider", "provider", query.Providers);
         if (includePredicateNative && query.Predicate != null) {
             EventFilter? native = EventPredicatePlanner.Plan(query.Predicate).NativeFilter;
             if (native != null) {
@@ -174,7 +183,7 @@ FROM evx_events";
                     AddIn(where, parameters, "record_id", "predicateRecordId", native.RecordIds);
                 }
                 if (pushdown.CanPush(query.Predicate, "ProviderName", "Provider")) {
-                    AddIn(where, parameters, "provider", "predicateProvider", native.ProviderNames, caseInsensitive: true);
+                    AddSqliteNoCaseIn(where, parameters, "provider", "predicateProvider", native.ProviderNames);
                 }
                 if (pushdown.CanPush(query.Predicate, "Level")) {
                     AddIn(where, parameters, "level_value", "predicateLevel", native.Levels);
@@ -195,7 +204,7 @@ FROM evx_events";
 
         var where = new List<string>();
         var parameters = new Dictionary<string, object?>();
-        AddIn(where, parameters, "definition_name", "pushdownSchema", definitionNames, caseInsensitive: true);
+        AddSqliteNoCaseIn(where, parameters, "definition_name", "pushdownSchema", definitionNames);
         string sql = "SELECT schema_json FROM evx_definitions";
         if (where.Count > 0) {
             sql += " WHERE " + where[0];
@@ -341,18 +350,54 @@ FROM evx_events";
         where.Add($"{expression} IN ({string.Join(", ", names)})");
     }
 
+    private static void AddSqliteNoCaseIn(
+        ICollection<string> where,
+        IDictionary<string, object?> parameters,
+        string column,
+        string prefix,
+        IReadOnlyList<string>? values) {
+
+        if (!CanUseSqliteNoCase(values)) {
+            return;
+        }
+        AddIn(where, parameters, column, prefix, values, caseInsensitive: true);
+    }
+
+    private static bool CanUseSqliteNoCase(IReadOnlyList<string>? values) =>
+        values == null || values.All(static value => value.All(static character => character <= 0x7F));
+
+    private static bool RequiresManagedTextMatching(EventStoreQuery query) =>
+        !CanUseSqliteNoCase(query.ResolveDefinitionNames()) ||
+        !CanUseSqliteNoCase(query.SourceComputers) ||
+        !CanUseSqliteNoCase(query.SourceLogs) ||
+        !CanUseSqliteNoCase(query.Providers);
+
+    private static bool MatchesDirectTextSelection(EventStoreQuery query, EventReportRow row) =>
+        MatchesText(query.ResolveDefinitionNames(), row.Type) &&
+        MatchesText(query.SourceComputers, row.SourceComputer) &&
+        MatchesText(query.SourceLogs, row.SourceLog) &&
+        MatchesText(query.Providers, row.Provider);
+
+    private static bool MatchesText(IReadOnlyList<string>? expected, string actual) =>
+        expected == null || expected.Count == 0 ||
+        expected.Contains(actual, StringComparer.OrdinalIgnoreCase);
+
     private static void AddDirectPlanStep<T>(
         ICollection<EventStoreQueryPlanStep> steps,
         string name,
-        IReadOnlyList<T>? values) {
+        IReadOnlyList<T>? values,
+        bool caseInsensitive = false) {
 
         if (values == null || values.Count == 0) {
             return;
         }
+        bool sql = !caseInsensitive || values is not IReadOnlyList<string> text || CanUseSqliteNoCase(text);
         steps.Add(new EventStoreQueryPlanStep(
             $"{name} ({values.Count})",
-            EventStoreQueryPlanStage.Sql,
-            $"{name} selection uses an indexed normalized SQLite column."));
+            sql ? EventStoreQueryPlanStage.Sql : EventStoreQueryPlanStage.Managed,
+            sql
+                ? $"{name} selection uses an indexed normalized SQLite column."
+                : $"{name} uses managed ordinal-ignore-case verification because SQLite NOCASE folds ASCII only."));
     }
 
     private sealed class QueryCommand {

@@ -174,7 +174,12 @@ public static class EventPredicatePlanner {
         TryReadSet(predicate, static value => long.Parse(value!, CultureInfo.InvariantCulture), out values);
 
     private static bool TryReadByteSet(EventPredicate predicate, out byte[]? values) =>
-        TryReadSet(predicate, static value => byte.Parse(value!, CultureInfo.InvariantCulture), out values);
+        TryReadSet(predicate, static value => {
+            if (byte.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out byte numeric)) {
+                return numeric;
+            }
+            return checked((byte)(Level)Enum.Parse(typeof(Level), value!, ignoreCase: true));
+        }, out values);
 
     private static bool TryReadStringSet(EventPredicate predicate, out string[]? values) =>
         TryReadSet(predicate, static value => value ?? string.Empty, out values);
@@ -192,6 +197,8 @@ public static class EventPredicatePlanner {
         try {
             values = predicate.Values.Select(convert).Distinct().ToArray();
             return values.Length > 0;
+        } catch (ArgumentException) {
+            return false;
         } catch (FormatException) {
             return false;
         } catch (OverflowException) {

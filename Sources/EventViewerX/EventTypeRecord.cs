@@ -55,6 +55,11 @@ public class EventTypeRecord {
     /// <summary>Provider that emitted the source event.</summary>
     public string ProviderName => SourceEvent.ProviderName;
 
+    /// <summary>Native Windows event severity level.</summary>
+    public Level? Level => SourceEvent.Level.HasValue
+        ? (EventViewerX.Level?)SourceEvent.Level.Value
+        : null;
+
     /// <summary>Rendered source-event message.</summary>
     public string Message => SourceEvent.Message;
 

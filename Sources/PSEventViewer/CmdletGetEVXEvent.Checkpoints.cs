@@ -38,15 +38,16 @@ public sealed partial class CmdletGetEVXEvent {
         return Task.CompletedTask;
     }
 
-    private void InitializeCheckpointKey() {
+    private void InitializeCheckpointKey(EventPredicate? typedPredicate) {
         if (!UsesCheckpoint) {
             _recordIdKey = string.Empty;
             return;
         }
         _recordIdKey = !string.IsNullOrEmpty(RecordIdKey)
             ? RecordIdKey!
-            : BuildDefaultCheckpointKey();
-        if (!string.IsNullOrEmpty(RecordIdKey) || _typedFilter != null) {
+            : BuildDefaultCheckpointKey(typedPredicate);
+        if (!string.IsNullOrEmpty(RecordIdKey) || _typedFilter != null ||
+            typedPredicate != null && (UsesBuiltInTypeQuery || UsesCustomDefinitionQuery)) {
             return;
         }
         string legacyKey = BuildLegacyCheckpointKey();
@@ -65,7 +66,7 @@ public sealed partial class CmdletGetEVXEvent {
         }
     }
 
-    private string BuildDefaultCheckpointKey() {
+    private string BuildDefaultCheckpointKey(EventPredicate? typedPredicate) {
         IReadOnlyList<string?> checkpointMachines = GetEffectiveCheckpointMachines();
         string sourceIdentity = ParameterSetName switch {
             "Type" => "Named:" +
@@ -149,6 +150,8 @@ public sealed partial class CmdletGetEVXEvent {
         AddHashtableIdentity(identity, "FilterHashtable", FilterHashtable);
         if (_typedFilter != null) {
             AddTypedFilterIdentity(identity, _typedFilter);
+        } else if (UsesBuiltInTypeQuery || UsesCustomDefinitionQuery) {
+            AddTypedPredicateIdentity(identity, typedPredicate);
         } else {
             AddFilterIdentity(identity, ResolveNativeFilter());
         }
@@ -203,6 +206,16 @@ public sealed partial class CmdletGetEVXEvent {
         identity.Add(filter.Predicate == null
             ? "Predicate:null"
             : "Predicate:" + filter.Predicate.ToJson(indented: false));
+    }
+
+    private static void AddTypedPredicateIdentity(
+        List<string> identity,
+        EventPredicate? predicate) {
+
+        identity.Add("InlineTypedPredicate");
+        identity.Add(predicate == null
+            ? "Predicate:null"
+            : "Predicate:" + predicate.ToJson(indented: false));
     }
 
     private static void AddCheckpointIdentityValue(

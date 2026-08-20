@@ -64,13 +64,18 @@ internal static partial class Program {
         if (options.Has("explain")) {
             EventPredicate predicate = request.Predicate ??
                 throw new ArgumentException("--explain requires --where.");
-            EventPredicatePlan plan = request.Collectors != null && request.Collectors.Count > 0 || request.Definition != null
-                ? EventPredicatePlanner.PlanManaged(
+            EventPredicatePlan plan = request.Definition != null
+                ? EventDefinitionEngine.PlanPredicate(
+                    request.Definition,
                     predicate,
                     request.Collectors != null && request.Collectors.Count > 0
-                        ? "ForwardedEvents uses the Windows Server 2025 safe '*' reader, so typed filtering is bounded and managed."
-                        : "Custom definition fields are evaluated after declarative projection.")
-                : EventPredicatePlanner.Plan(predicate);
+                        ? "ForwardedEvents"
+                        : null)
+                : request.Collectors != null && request.Collectors.Count > 0
+                    ? EventPredicatePlanner.PlanManaged(
+                        predicate,
+                        "ForwardedEvents uses the Windows Server 2025 safe '*' reader, so typed filtering is bounded and managed.")
+                    : EventPredicatePlanner.Plan(predicate);
             return WriteJson(plan);
         }
         EventReport report = await EventReportEngine.QueryAsync(request).ConfigureAwait(false);

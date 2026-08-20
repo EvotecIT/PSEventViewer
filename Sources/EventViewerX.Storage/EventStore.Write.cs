@@ -34,16 +34,33 @@ public sealed partial class EventStore {
             .ConfigureAwait(false);
         return await session.RunInTransactionAsync(async (transaction, token) => {
             string updatedAt = DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture);
+            IReadOnlyList<StoredDefinitionSchema> storedDefinitions = await transaction.QueryAsListAsync(
+                "SELECT definition_name, schema_hash, schema_json FROM evx_definitions;",
+                static record => new StoredDefinitionSchema(
+                    record.GetString(0),
+                    record.GetString(1),
+                    record.GetString(2)),
+                cancellationToken: token).ConfigureAwait(false);
+            string[] ambiguousDefinitions = storedDefinitions
+                .GroupBy(static definition => definition.Name, StringComparer.OrdinalIgnoreCase)
+                .Where(static group => group.Count() > 1)
+                .Select(static group => group.Key)
+                .ToArray();
+            if (ambiguousDefinitions.Length > 0) {
+                throw new InvalidDataException(
+                    "Stored definitions contain Unicode case-equivalent names that cannot be selected unambiguously: " +
+                    string.Join(", ", ambiguousDefinitions) + ".");
+            }
+            var canonicalNames = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             foreach (EventReportSectionSchema schema in schemas) {
+                string requestedName = schema.Name;
+                StoredDefinitionSchema? existingDefinition = storedDefinitions.FirstOrDefault(definition =>
+                    string.Equals(definition.Name, requestedName, StringComparison.OrdinalIgnoreCase));
+                if (existingDefinition != null) {
+                    schema.Name = existingDefinition.Name;
+                }
+                canonicalNames[requestedName] = schema.Name;
                 string schemaHash = CreateSchemaHash(schema);
-                IReadOnlyList<StoredDefinitionSchema> existingDefinitions = await transaction.QueryAsListAsync(
-                    "SELECT schema_hash, schema_json FROM evx_definitions WHERE definition_name = $name;",
-                    static record => new StoredDefinitionSchema(record.GetString(0), record.GetString(1)),
-                    new Dictionary<string, object?> { ["$name"] = schema.Name },
-                    cancellationToken: token).ConfigureAwait(false);
-                StoredDefinitionSchema? existingDefinition = existingDefinitions.Count == 0
-                    ? null
-                    : existingDefinitions[0];
                 if (existingDefinition != null &&
                     !string.Equals(existingDefinition.Hash, schemaHash, StringComparison.Ordinal) &&
                     !HasEquivalentSchema(existingDefinition.Json, schemaHash)) {
@@ -73,9 +90,12 @@ public sealed partial class EventStore {
             int inserted = 0;
             foreach (EventReportRow row in rows) {
                 token.ThrowIfCancellationRequested();
+                string definitionName = canonicalNames.TryGetValue(row.Type, out string? canonicalName)
+                    ? canonicalName
+                    : row.Type;
                 inserted += await transaction.ExecuteNonQueryAsync(
                     InsertEventSql,
-                    CreateEventParameters(row, updatedAt),
+                    CreateEventParameters(row, definitionName, updatedAt),
                     token).ConfigureAwait(false);
             }
             if (checkpoint != null) {
@@ -137,9 +157,10 @@ public sealed partial class EventStore {
 
     private static Dictionary<string, object?> CreateEventParameters(
         EventReportRow row,
+        string definitionName,
         string insertedAt) => new() {
-            ["$key"] = CreateEventKey(row),
-            ["$definition"] = row.Type,
+            ["$key"] = CreateEventKey(row, definitionName),
+            ["$definition"] = definitionName,
             ["$time"] = row.TimeCreated.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture),
             ["$eventId"] = row.EventId,
             ["$recordId"] = row.RecordId,
@@ -155,7 +176,7 @@ public sealed partial class EventStore {
             ["$inserted"] = insertedAt
         };
 
-    private static string CreateEventKey(EventReportRow row) {
+    private static string CreateEventKey(EventReportRow row, string definitionName) {
         string identity = string.Join("\0", new[] {
             NormalizeSqliteNoCaseIdentity(row.SourceComputer),
             NormalizeSqliteNoCaseIdentity(row.SourceLog),
@@ -163,7 +184,7 @@ public sealed partial class EventStore {
             row.EventId.ToString(CultureInfo.InvariantCulture),
             NormalizeSqliteNoCaseIdentity(row.Provider),
             row.TimeCreated.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture),
-            NormalizeSqliteNoCaseIdentity(row.Type)
+            NormalizeSqliteNoCaseIdentity(definitionName)
         });
         using SHA256 sha256 = SHA256.Create();
         byte[] hash = sha256.ComputeHash(Encoding.UTF8.GetBytes(identity));
@@ -251,11 +272,13 @@ ON CONFLICT(consumer, computer, container) DO UPDATE SET
     updated_utc = excluded.updated_utc;";
 
     private sealed class StoredDefinitionSchema {
-        internal StoredDefinitionSchema(string hash, string json) {
+        internal StoredDefinitionSchema(string name, string hash, string json) {
+            Name = name;
             Hash = hash;
             Json = json;
         }
 
+        internal string Name { get; }
         internal string Hash { get; }
         internal string Json { get; }
     }

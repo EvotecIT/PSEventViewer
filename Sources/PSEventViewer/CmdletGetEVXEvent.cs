@@ -511,6 +511,8 @@ public sealed partial class CmdletGetEVXEvent : AsyncPSCmdlet {
         EventPredicate? predicate = PowerShellEventPredicateAdapter.Resolve(Where, nameof(Where));
         if (predicate != null && UsesBuiltInTypeQuery) {
             predicate = EventPredicateBuilder.ForTypes(Type).Normalize(predicate);
+        } else if (predicate != null && UsesCustomDefinitionQuery) {
+            predicate = EventPredicateBuilder.ForDefinition(ResolveEventDefinition()).Normalize(predicate);
         }
         if (Explain.IsPresent) {
             if (predicate == null) {
@@ -530,7 +532,7 @@ public sealed partial class CmdletGetEVXEvent : AsyncPSCmdlet {
             return;
         }
         ValidateRecordOptions();
-        InitializeCheckpointKey();
+        InitializeCheckpointKey(predicate);
 
         CancellationToken token;
 #if NET8_0_OR_GREATER
@@ -543,7 +545,7 @@ public sealed partial class CmdletGetEVXEvent : AsyncPSCmdlet {
 
         PrepareRecordProcessing(token);
         if (UsesCustomDefinitionQuery) {
-            await ProcessDefinitionAsync(token);
+            await ProcessDefinitionAsync(token, predicate);
         } else if (UsesBuiltInTypeQuery) {
                 // let's find the events prepared for search
                 List<EventType> typeList = Type.ToList();
@@ -708,7 +710,7 @@ public sealed partial class CmdletGetEVXEvent : AsyncPSCmdlet {
         }
     }
 
-    private async Task ProcessDefinitionAsync(CancellationToken token) {
+    private async Task ProcessDefinitionAsync(CancellationToken token, EventPredicate? predicate) {
         EventDefinition definition = ResolveEventDefinition();
         if (Collector != null && MachineName != null) {
             throw new PSArgumentException(
@@ -735,7 +737,7 @@ public sealed partial class CmdletGetEVXEvent : AsyncPSCmdlet {
             BufferCapacity = BufferCapacity > 0 ? BufferCapacity : 64,
             MessageCulture = MessageCulture,
             FallbackMessageCulture = FallbackMessageCulture,
-            Predicate = PowerShellEventPredicateAdapter.Resolve(Where, nameof(Where)),
+            Predicate = predicate,
             ResultPredicate = MessageRegex == null ? null : record => MessageMatches(record.SourceEvent),
             MinimumRecordIdExclusiveResolver = GetCheckpointLowerBound,
             CandidateObserver = candidate => TrackCheckpointProgress(candidate),

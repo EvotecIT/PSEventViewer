@@ -116,12 +116,46 @@ public sealed class TestEventPredicate {
         Assert.Equal(EventFieldFilterStage.Managed, who.FilterStage);
         Assert.Contains(EventPredicateOperator.MatchesWildcard, who.SupportedOperators);
         Assert.False(who.IsCommon);
+        EventPredicateField level = builder.Field("Level");
+        Assert.Equal(typeof(Level?), level.ValueType);
+        Assert.Equal(EventFieldFilterStage.Native, level.FilterStage);
         EventPredicate predicate = builder.AllOf(
             who.StartsWith("EVOTEC\\"),
             builder.Field("IpAddress").MatchesSubnet("10.0.0.0/8"));
 
         Assert.Equal(EventPredicateKind.All, predicate.Kind);
         Assert.Throws<ArgumentException>(() => builder.Field("DefinitelyMissing"));
+    }
+
+    [Fact]
+    public void LevelNamesRemainTypedAndPushToNativeNumericValues() {
+        EventPredicateBuilder builder = EventPredicateBuilder.ForType(EventType.ADUserLogonFailed);
+        EventPredicate predicate = builder.Normalize(builder.Field("Level").Equal(Level.LogAlways));
+        EventPredicatePlan plan = EventPredicatePlanner.Plan(predicate);
+        var source = new EventObject(
+            new SyntheticEventRecord(),
+            "WEC01",
+            EventReadMode.StructuredDataAndMessage);
+        var record = new ExampleRecord(source);
+
+        Assert.Equal(new byte[] { 0 }, plan.NativeFilter!.Levels);
+        Assert.True(EventPredicateEvaluator.Matches(predicate, record));
+        Assert.True(EventPredicateEvaluator.Matches(
+            predicate,
+            new Dictionary<string, object?> { ["Level"] = Level.LogAlways }));
+    }
+
+    [Fact]
+    public void InvalidLevelLiteralFallsBackWithoutPlannerFailure() {
+        EventPredicate predicate = EventPredicate.Compare(
+            "Level",
+            EventPredicateOperator.Equal,
+            "NotAWindowsLevel");
+
+        EventPredicatePlan plan = EventPredicatePlanner.Plan(predicate);
+
+        Assert.False(plan.HasNativeFilter);
+        Assert.NotNull(plan.ManagedPredicate);
     }
 
     [Fact]

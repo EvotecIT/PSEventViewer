@@ -145,7 +145,9 @@ public static class EventPredicateEvaluator {
             return source.ProviderName;
         }
         if (string.Equals(field, "Level", StringComparison.OrdinalIgnoreCase)) {
-            return source.Level;
+            return source.Level.HasValue
+                ? (Level?)source.Level.Value
+                : null;
         }
         if (string.Equals(field, "Message", StringComparison.OrdinalIgnoreCase)) {
             return source.Message;

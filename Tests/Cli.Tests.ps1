@@ -102,6 +102,7 @@ Describe 'evx portable host' {
 
     It 'applies a custom definition to an offline file' {
         $DefinitionPath = Join-Path $TestDrive 'service-change.json'
+        $PredicatePath = Join-Path $TestDrive 'service-change-predicate.json'
         @{
             Name = 'ServiceStartTypeChange'
             Sources = @(@{
@@ -109,19 +110,41 @@ Describe 'evx portable host' {
                     EventIds = @(7040)
                     ProviderNames = @('Service Control Manager')
                 })
-            Fields = @(@{
+            Fields = @(
+                @{
+                    Name = 'ProjectedId'
+                    ValueKind = 'Int32'
+                    Source = 'Metadata'
+                    SourceName = 'EventId'
+                }
+                @{
                     Name = 'ServiceName'
                     Source = 'Data'
                     SourceName = 'param1'
-                })
+                }
+            )
         } | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $DefinitionPath -Encoding UTF8
+        @{
+            Kind = 'Comparison'
+            Field = 'ProjectedId'
+            Operator = 'Equal'
+            Values = @('7040')
+        } | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $PredicatePath -Encoding UTF8
 
         $Rows = @(& $script:CliPath query --definition $DefinitionPath --path $script:FixturePath --max 2 |
                 ForEach-Object { $_ | ConvertFrom-Json })
+        $Plan = & $script:CliPath query `
+            --definition $DefinitionPath `
+            --path $script:FixturePath `
+            --where $PredicatePath `
+            --explain |
+            ConvertFrom-Json
 
         $LASTEXITCODE | Should -Be 0
         $Rows.Count | Should -Be 2
         @($Rows.Type | Sort-Object -Unique) | Should -Be @('ServiceStartTypeChange')
+        $Plan.NativeFilter.EventIds | Should -Be 7040
+        $Plan.ManagedPredicate | Should -Not -BeNullOrEmpty
     }
 
     It 'stores an offline report and renders a calendar summary without rereading EVTX' {

@@ -260,6 +260,69 @@ Describe 'New-EVXFilter' {
         $Excluded.ManagedPredicate.Operator.ToString() | Should -Be 'NotIn'
     }
 
+    It 'preserves scalar PowerShell containment as whole-value equality' {
+        $Included = Get-EVXEvent -Type ADUserLogonFailed -Where {
+            $_.Who -contains 'EVOTEC\alice'
+        } -Explain
+        $Excluded = Get-EVXEvent -Type ADUserLogonFailed -Where {
+            $_.Who -notcontains 'alice'
+        } -Explain
+
+        $Included.ManagedPredicate.Operator.ToString() | Should -Be 'Equal'
+        $Excluded.ManagedPredicate.Kind.ToString() | Should -Be 'Not'
+        $Excluded.ManagedPredicate.Children[0].Operator.ToString() | Should -Be 'Equal'
+    }
+
+    It 'exposes native event levels through every typed filter builder' {
+        $Filter = New-EVXFilter -Type ADUserLogonFailed
+        $Filter.Fields.PSObject.Properties.Name | Should -Contain 'Level'
+        $Filter.Use($Filter.Fields.Level.Equal([EventViewerX.Level]::Error)) | Out-Null
+
+        $Plan = Get-EVXEvent -Filter $Filter -Explain
+
+        $Plan.NativeFilter.Levels | Should -Be 2
+        $Plan.ManagedPredicate.Field | Should -Be 'Level'
+        $Plan.Steps.Expression | Should -Contain 'Exact predicate verification'
+    }
+
+    It 'isolates default checkpoints for different inline typed predicates' {
+        $FilePath = Join-Path $PSScriptRoot 'Logs\NamedFilterExamples.evtx'
+        $DefinitionPath = Join-Path $TestDrive 'inline-checkpoint-definition.json'
+        $CheckpointPath = Join-Path $TestDrive 'inline-checkpoints.json'
+        @{
+            Name = 'InlineCheckpointServiceChange'
+            Sources = @(@{
+                    LogName = 'System'
+                    EventIds = @(7040)
+                    ProviderNames = @('Service Control Manager')
+                })
+            Fields = @(@{
+                    Name = 'ServiceName'
+                    Source = 'Data'
+                    SourceName = 'param4'
+                })
+        } | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $DefinitionPath -Encoding UTF8
+
+        $Bits = @(Get-EVXEvent `
+                -Definition $DefinitionPath `
+                -Path $FilePath `
+                -Where { $_.ServiceName -eq 'BITS' } `
+                -RecordIdFile $CheckpointPath `
+                -Oldest)
+        $TrustedInstaller = @(Get-EVXEvent `
+                -Definition $DefinitionPath `
+                -Path $FilePath `
+                -Where { $_.ServiceName -eq 'TrustedInstaller' } `
+                -RecordIdFile $CheckpointPath `
+                -Oldest)
+
+        $Bits | Should -Not -BeNullOrEmpty
+        $TrustedInstaller | Should -Not -BeNullOrEmpty
+        @($Bits.ServiceName | Sort-Object -Unique) | Should -Be @('BITS')
+        @($TrustedInstaller.ServiceName | Sort-Object -Unique) |
+            Should -Be @('TrustedInstaller')
+    }
+
     It 'explains custom aliases from definition metadata rather than native names' {
         $DefinitionPath = Join-Path $TestDrive 'custom-explain.json'
         @{

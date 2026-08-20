@@ -571,6 +571,60 @@ public sealed class TestEventStore {
             step.Stage == EventStoreQueryPlanStage.Managed && step.Expression.Contains("User", StringComparison.Ordinal));
     }
 
+    [Fact]
+    public async Task UnicodeCaseInsensitiveSelectionsFallBackToExactManagedMatching() {
+        string path = CreateStorePath();
+        try {
+            var store = new EventStore(path);
+            await store.WriteAsync(CreateReportFromTransport(
+                new[] { (new DateTime(2026, 8, 20, 12, 0, 0, DateTimeKind.Utc), 91L, "alice") },
+                "WEC01",
+                "ForwardedEvents",
+                definitionName: "MÜNCHEN-TYPE",
+                providerName: "MÜNCHEN-PROVIDER"));
+            EventStoreWriteResult duplicate = await store.WriteAsync(CreateReportFromTransport(
+                new[] { (new DateTime(2026, 8, 20, 12, 0, 0, DateTimeKind.Utc), 91L, "alice") },
+                "WEC01",
+                "ForwardedEvents",
+                definitionName: "münchen-type",
+                providerName: "MÜNCHEN-PROVIDER"));
+
+            EventReport direct = await store.ReadReportAsync(new EventStoreQuery {
+                DefinitionNames = new[] { "münchen-type" },
+                Providers = new[] { "münchen-provider" }
+            });
+            EventPredicate providerPredicate = EventPredicate.Compare(
+                "ProviderName",
+                EventPredicateOperator.Equal,
+                "münchen-provider");
+            EventReport predicate = await store.ReadReportAsync(new EventStoreQuery {
+                Predicate = providerPredicate
+            });
+            EventStoreSummaryResult summary = await store.SummarizeAsync(new EventStoreQuery {
+                DefinitionNames = new[] { "münchen-type" }
+            }, EventStoreSummaryPeriod.Day);
+            EventStoreQueryPlan plan = EventStore.Plan(new EventStoreQuery {
+                Predicate = providerPredicate
+            });
+
+            Assert.Single(direct.Rows);
+            Assert.Single(predicate.Rows);
+            Assert.Equal(0, duplicate.Inserted);
+            Assert.Equal(1, Assert.Single(summary.Rows).Count);
+            Assert.Contains(plan.Steps, static step =>
+                step.Stage == EventStoreQueryPlanStage.Managed &&
+                step.Expression.Contains("Provider", StringComparison.OrdinalIgnoreCase));
+
+            int pruned = await store.PruneBeforeAsync(
+                new DateTime(2026, 8, 21, 0, 0, 0, DateTimeKind.Utc),
+                new[] { "münchen-type" });
+            Assert.Equal(1, pruned);
+            Assert.Empty((await store.ReadReportAsync(new EventStoreQuery())).Rows);
+        } finally {
+            DeleteStore(path);
+        }
+    }
+
     private static EventReport CreateReport(params (DateTime Time, long RecordId, string User)[] events) {
         return CreateReportFromTransport(events, "WEC01", "ForwardedEvents");
     }
@@ -596,7 +650,8 @@ public sealed class TestEventStore {
         IReadOnlyList<(DateTime Time, long RecordId, string User)> events,
         string queriedMachine,
         string container,
-        string definitionName = "StoredLogon") {
+        string definitionName = "StoredLogon",
+        string providerName = "Microsoft-Windows-Security-Auditing") {
 
         EventDefinition definition = new() {
             Name = definitionName,
@@ -612,7 +667,7 @@ public sealed class TestEventStore {
         };
         object[] records = events.Select(item => {
             var source = new EventObject(
-                new SyntheticEventRecord(item.Time, item.RecordId),
+                new SyntheticEventRecord(item.Time, item.RecordId, providerName),
                 queriedMachine,
                 EventReadMode.StructuredDataAndMessage) {
                 ContainerLog = container,
@@ -751,13 +806,19 @@ public sealed class TestEventStore {
     private sealed class SyntheticEventRecord : EventRecord {
         private readonly DateTime _time;
         private readonly long _recordId;
+        private readonly string _providerName;
 
-        internal SyntheticEventRecord(DateTime time, long recordId) {
+        internal SyntheticEventRecord(
+            DateTime time,
+            long recordId,
+            string providerName = "Microsoft-Windows-Security-Auditing") {
+
             _time = time;
             _recordId = recordId;
+            _providerName = providerName;
         }
 
-        public override string ProviderName => "Microsoft-Windows-Security-Auditing";
+        public override string ProviderName => _providerName;
         public override string LogName => "Security";
         public override string MachineName => "source.ad.evotec.xyz";
         public override int Id => 4624;

@@ -68,7 +68,9 @@ public sealed class EventReportRow {
         result["MachineName"] = SourceComputer;
         result["Computer"] = SourceComputer;
         result["When"] = TimeCreated;
-        result["Level"] = LevelValue;
+        result["Level"] = LevelValue.HasValue
+            ? (EventViewerX.Level?)LevelValue.Value
+            : null;
         result["LevelDisplayName"] = Level;
         foreach (KeyValuePair<string, object?> value in Values) {
             result[value.Key] = value.Value;

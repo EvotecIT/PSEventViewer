@@ -63,7 +63,7 @@ public sealed partial class EventStore {
                 "Calendar summaries must be exhaustive. Leave MaxEvents at zero and use MaxCandidates to bound managed predicate evaluation.",
                 nameof(query));
         }
-        if (snapshot.Predicate != null) {
+        if (snapshot.Predicate != null || RequiresManagedTextMatching(snapshot)) {
             EventReport report = await ReadReportAsync(snapshot, cancellationToken: cancellationToken)
                 .ConfigureAwait(false);
             EventStoreSummaryRow[] managed = report.Rows
@@ -127,11 +127,49 @@ FROM evx_events";
         var parameters = new Dictionary<string, object?> {
             ["$before"] = before.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture)
         };
-        AddIn(where, parameters, "definition_name", "pruneDefinition", definitionNames, caseInsensitive: true);
         using var sqlite = new SQLite { BusyTimeoutMs = 10000 };
         await using SQLiteAsyncSession session = await sqlite
             .OpenSessionAsync(Path, cancellationToken)
             .ConfigureAwait(false);
+        if (!CanUseSqliteNoCase(definitionNames)) {
+            string[] selectedDefinitions = definitionNames!
+                .Where(static value => !string.IsNullOrWhiteSpace(value))
+                .Select(static value => value.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            if (selectedDefinitions.Length == 0) {
+                return 0;
+            }
+            return await session.RunInTransactionAsync(async (transaction, token) => {
+                IReadOnlyList<StoredPruneCandidate> candidates = await transaction.QueryAsListAsync(
+                    "SELECT rowid, definition_name FROM evx_events WHERE event_time_utc < $before;",
+                    static record => new StoredPruneCandidate(record.GetInt64(0), record.GetString(1)),
+                    parameters,
+                    cancellationToken: token).ConfigureAwait(false);
+                long[] rowIds = candidates
+                    .Where(candidate => selectedDefinitions.Contains(
+                        candidate.DefinitionName,
+                        StringComparer.OrdinalIgnoreCase))
+                    .Select(static candidate => candidate.RowId)
+                    .ToArray();
+                int deleted = 0;
+                for (int offset = 0; offset < rowIds.Length; offset += 500) {
+                    long[] batch = rowIds.Skip(offset).Take(500).ToArray();
+                    var deleteParameters = new Dictionary<string, object?>();
+                    string[] names = new string[batch.Length];
+                    for (int index = 0; index < batch.Length; index++) {
+                        names[index] = "$rowId" + index.ToString(CultureInfo.InvariantCulture);
+                        deleteParameters[names[index]] = batch[index];
+                    }
+                    deleted += await transaction.ExecuteNonQueryAsync(
+                        "DELETE FROM evx_events WHERE rowid IN (" + string.Join(", ", names) + ");",
+                        deleteParameters,
+                        token).ConfigureAwait(false);
+                }
+                return deleted;
+            }, cancellationToken).ConfigureAwait(false);
+        }
+        AddIn(where, parameters, "definition_name", "pruneDefinition", definitionNames, caseInsensitive: true);
         return await session.ExecuteNonQueryAsync(
             "DELETE FROM evx_events WHERE " + string.Join(" AND ", where) + ";",
             parameters,
@@ -177,5 +215,15 @@ FROM evx_events";
                        StringComparer.OrdinalIgnoreCase.GetHashCode(DefinitionName);
             }
         }
+    }
+
+    private sealed class StoredPruneCandidate {
+        internal StoredPruneCandidate(long rowId, string definitionName) {
+            RowId = rowId;
+            DefinitionName = definitionName;
+        }
+
+        internal long RowId { get; }
+        internal string DefinitionName { get; }
     }
 }
