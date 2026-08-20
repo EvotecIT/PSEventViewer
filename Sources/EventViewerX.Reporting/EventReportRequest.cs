@@ -119,6 +119,11 @@ public sealed class EventReportRequest {
         if (Predicate != null && !hasTypes && !hasDefinition) {
             throw new InvalidOperationException("Predicate requires Types or Definition.");
         }
+        if (EventIds != null && EventIds.Count > 0 && (hasTypes || hasDefinition)) {
+            throw new InvalidOperationException(
+                "EventIds are available only for generic LogName or standalone Paths queries because typed definitions own source event IDs. " +
+                "Use a typed EventId predicate to further restrict typed events.");
+        }
         Predicate?.Validate();
         Definition?.Validate();
     }

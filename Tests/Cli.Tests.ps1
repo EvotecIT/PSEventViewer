@@ -99,6 +99,24 @@ Describe 'evx portable host' {
         Test-Path -LiteralPath $StorePath | Should -BeFalse
     }
 
+    It 'rejects generic event ID selectors on typed sources before ingestion' {
+        $StorePath = Join-Path $TestDrive 'typed-event-id-rejected.db'
+        $PreviousErrorActionPreference = $ErrorActionPreference
+        $ErrorActionPreference = 'Continue'
+        try {
+            $Output = & $script:CliPath query `
+                --type ADUserLogonFailed `
+                --event-id 4625 `
+                --write-store $StorePath 2>&1
+        } finally {
+            $ErrorActionPreference = $PreviousErrorActionPreference
+        }
+
+        $LASTEXITCODE | Should -Be 1
+        [string] $Output | Should -Match '--event-id is available only for generic'
+        Test-Path -LiteralPath $StorePath | Should -BeFalse
+    }
+
     It 'normalizes built-in predicates before producing an explanation' {
         $PredicatePath = Join-Path $TestDrive 'invalid-built-in-predicate.json'
         @{

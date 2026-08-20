@@ -241,6 +241,11 @@ internal static partial class Program {
                 "--where requires --type or --definition for live and offline event-log queries. " +
                 "Use --event-id and --record-id for generic --log or standalone --path queries.");
         }
+        if (!stored && typedSource && options.GetMany("event-id").Length > 0) {
+            throw new ArgumentException(
+                "--event-id is available only for generic --log or standalone --path queries because typed sources own event IDs. " +
+                "Use a typed EventId --where predicate to further restrict typed events.");
+        }
         if (!allowSummary && options.Get("summary") != null) {
             throw new ArgumentException("--summary is available through the report command.");
         }

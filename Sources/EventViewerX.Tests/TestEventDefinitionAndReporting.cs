@@ -375,6 +375,22 @@ public sealed class TestEventDefinitionAndReporting {
     }
 
     [Fact]
+    public async Task TypedReportRequestsRejectGenericEventIdSelectorsBeforeReadingEvents() {
+        EventReportRequest builtIn = EventReportRequest.ForTypes(EventType.ADUserLogonFailed);
+        builtIn.EventIds = new[] { 4625 };
+        EventReportRequest custom = EventReportRequest.ForDefinition(CreateDefinition());
+        custom.EventIds = new[] { 4625 };
+
+        InvalidOperationException builtInError = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => EventReportEngine.QueryAsync(builtIn));
+        InvalidOperationException customError = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => EventReportEngine.QueryAsync(custom));
+
+        Assert.Contains("typed definitions own source event IDs", builtInError.Message, StringComparison.Ordinal);
+        Assert.Contains("typed definitions own source event IDs", customError.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void CsvBundleReservesMetadataEntryNamesFromCustomSections() {
         EventDefinition coverage = CreateDefinition();
         coverage.Name = "coverage";
