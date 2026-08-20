@@ -1,3 +1,4 @@
+using System.Net;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using DBAClientX;
@@ -42,6 +43,7 @@ public sealed partial class EventStore {
                 throw new InvalidDataException(
                     $"Event store schema version '{version}' is not supported by this EventViewerX build.");
             }
+            EnsureEventIdentitySchema(session);
             _initialized = true;
         }
     }
@@ -57,10 +59,98 @@ public sealed partial class EventStore {
             PropertyNameCaseInsensitive = true
         };
         options.Converters.Add(new JsonStringEnumConverter());
+        options.Converters.Add(new IPAddressJsonConverter());
         return options;
     }
 
     private static readonly JsonSerializerOptions JsonOptions = CreateJsonOptions();
+
+    private static void EnsureEventIdentitySchema(SQLiteSession session) {
+        IReadOnlyList<string> columns = session.QueryAsList(
+            "PRAGMA table_info(evx_events);",
+            static record => record.GetString(1));
+        bool originalKeyMissing = !columns.Contains("original_event_key", StringComparer.OrdinalIgnoreCase);
+        bool transportKindMissing = !columns.Contains("transport_kind", StringComparer.OrdinalIgnoreCase);
+        if (originalKeyMissing || transportKindMissing) {
+            session.RunInTransaction(transaction => {
+                if (originalKeyMissing) {
+                    transaction.ExecuteNonQuery(
+                        "ALTER TABLE evx_events ADD COLUMN original_event_key TEXT NOT NULL DEFAULT ''; ");
+                }
+                if (transportKindMissing) {
+                    transaction.ExecuteNonQuery(
+                        "ALTER TABLE evx_events ADD COLUMN transport_kind INTEGER NOT NULL DEFAULT 2;");
+                }
+                MigrateEventIdentity(transaction);
+            });
+        }
+        session.ExecuteNonQuery(
+            "CREATE INDEX IF NOT EXISTS ix_evx_events_original_transport " +
+            "ON evx_events (original_event_key, transport_kind);");
+    }
+
+    private static void MigrateEventIdentity(SQLiteSession session) {
+        IReadOnlyList<LegacyIdentityRow> rows = session.QueryAsList(
+            @"SELECT event_key, definition_name, event_time_utc, event_id, record_id, provider,
+                     source_log, container_log, source_computer, collector_computer, values_json
+              FROM evx_events;",
+            static record => new LegacyIdentityRow(
+                record.GetString(0),
+                record.GetString(1),
+                record.GetString(2),
+                record.GetInt32(3),
+                record.IsDBNull(4) ? null : record.GetInt64(4),
+                record.GetString(5),
+                record.GetString(6),
+                record.GetString(7),
+                record.GetString(8),
+                record.GetString(9),
+                JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(record.GetString(10), JsonOptions) ??
+                    new Dictionary<string, JsonElement>()));
+        foreach (LegacyIdentityRow row in rows) {
+            var candidate = new StoredIdentityCandidate(
+                row.TimeCreatedUtc,
+                row.EventId,
+                row.Provider,
+                row.SourceLog,
+                row.ContainerLog,
+                row.SourceComputer,
+                row.CollectorComputer,
+                row.Values);
+            string originalKey = CreateOriginalEventKey(candidate, row.DefinitionName);
+            EventTransportKind transport = GetTransportKind(
+                row.SourceComputer,
+                row.CollectorComputer,
+                row.SourceLog,
+                row.ContainerLog);
+            session.ExecuteNonQuery(
+                @"UPDATE evx_events
+                  SET event_key = $newKey,
+                      original_event_key = $originalKey,
+                      transport_kind = $transportKind
+                  WHERE event_key = $oldKey;",
+                new Dictionary<string, object?> {
+                    ["$newKey"] = CreateEventKey(candidate, row.DefinitionName, row.RecordId),
+                    ["$originalKey"] = originalKey,
+                    ["$transportKind"] = (int)transport,
+                    ["$oldKey"] = row.EventKey
+                });
+        }
+    }
+
+    private sealed class IPAddressJsonConverter : JsonConverter<IPAddress> {
+        public override IPAddress Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) {
+            string? value = reader.GetString();
+            if (string.IsNullOrWhiteSpace(value) || !IPAddress.TryParse(value, out IPAddress? address)) {
+                throw new JsonException($"'{value}' is not a valid IP address.");
+            }
+            return address;
+        }
+
+        public override void Write(Utf8JsonWriter writer, IPAddress value, JsonSerializerOptions options) {
+            writer.WriteStringValue(value.ToString());
+        }
+    }
 
     private const string SchemaSql = @"
 CREATE TABLE IF NOT EXISTS evx_store_metadata (
@@ -83,6 +173,8 @@ CREATE TABLE IF NOT EXISTS evx_definitions (
 
 CREATE TABLE IF NOT EXISTS evx_events (
     event_key TEXT NOT NULL PRIMARY KEY,
+    original_event_key TEXT NOT NULL,
+    transport_kind INTEGER NOT NULL,
     definition_name TEXT NOT NULL COLLATE NOCASE,
     event_time_utc TEXT NOT NULL,
     event_id INTEGER NOT NULL,
@@ -121,4 +213,44 @@ CREATE TABLE IF NOT EXISTS evx_checkpoints (
     updated_utc TEXT NOT NULL,
     PRIMARY KEY (consumer, computer, container)
 );";
+
+    private sealed class LegacyIdentityRow {
+        internal LegacyIdentityRow(
+            string eventKey,
+            string definitionName,
+            string timeCreatedUtc,
+            int eventId,
+            long? recordId,
+            string provider,
+            string sourceLog,
+            string containerLog,
+            string sourceComputer,
+            string collectorComputer,
+            IReadOnlyDictionary<string, JsonElement> values) {
+
+            EventKey = eventKey;
+            DefinitionName = definitionName;
+            TimeCreatedUtc = timeCreatedUtc;
+            EventId = eventId;
+            RecordId = recordId;
+            Provider = provider;
+            SourceLog = sourceLog;
+            ContainerLog = containerLog;
+            SourceComputer = sourceComputer;
+            CollectorComputer = collectorComputer;
+            Values = values;
+        }
+
+        internal string EventKey { get; }
+        internal string DefinitionName { get; }
+        internal string TimeCreatedUtc { get; }
+        internal int EventId { get; }
+        internal long? RecordId { get; }
+        internal string Provider { get; }
+        internal string SourceLog { get; }
+        internal string ContainerLog { get; }
+        internal string SourceComputer { get; }
+        internal string CollectorComputer { get; }
+        internal IReadOnlyDictionary<string, JsonElement> Values { get; }
+    }
 }

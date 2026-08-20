@@ -81,6 +81,30 @@ public sealed partial class TestEventStore {
     }
 
     [Fact]
+    public async Task SameTransportRecordsWithDistinctRecordIdsRemainDistinct() {
+        string path = CreateStorePath();
+        try {
+            DateTime time = new(2026, 8, 1, 1, 0, 0, DateTimeKind.Utc);
+            var store = new EventStore(path);
+            EventReport report = CreateReportFromTransport(
+                new[] {
+                    (time, 42L, "alice"),
+                    (time, 43L, "alice")
+                },
+                "WEC01",
+                "ForwardedEvents");
+
+            EventStoreWriteResult result = await store.WriteAsync(report);
+            EventReport stored = await store.ReadReportAsync(new EventStoreQuery { Oldest = true });
+
+            Assert.Equal(2, result.Inserted);
+            Assert.Equal(new long?[] { 42, 43 }, stored.Rows.Select(static row => row.RecordId));
+        } finally {
+            DeleteStore(path);
+        }
+    }
+
+    [Fact]
     public async Task EventIdentityUsesTheSameCaseInsensitiveSemanticsAsStoredDimensions() {
         string path = CreateStorePath();
         try {
@@ -193,6 +217,9 @@ public sealed partial class TestEventStore {
             Assert.Equal(
                 new DateTime(2026, 8, 20, 10, 0, 0, DateTimeKind.Utc),
                 ((DateTime)row.Values["OccurredAt"]!).ToUniversalTime());
+            Assert.Equal(
+                System.Net.IPAddress.Parse("2001:db8::1"),
+                Assert.IsType<System.Net.IPAddress>(row.Values["ClientAddress"]));
         } finally {
             DeleteStore(path);
         }
@@ -756,6 +783,12 @@ public sealed partial class TestEventStore {
                     ValueKind = EventFieldValueKind.DateTime,
                     Source = EventFieldSource.Data,
                     SourceName = "OccurredAt"
+                },
+                new EventDefinitionField {
+                    Name = "ClientAddress",
+                    ValueKind = EventFieldValueKind.IpAddress,
+                    Source = EventFieldSource.Data,
+                    SourceName = "ClientAddress"
                 }
             }
         };
@@ -771,6 +804,7 @@ public sealed partial class TestEventStore {
         source.Data["IsoText"] = "2026-08-20T10:00:00Z";
         source.Data["AttemptCount"] = "7";
         source.Data["OccurredAt"] = "2026-08-20T10:00:00Z";
+        source.Data["ClientAddress"] = "2001:db8::1";
         return EventReportEngine.Create(new object[] {
             EventDefinitionEngine.CreateRecord(definition, source)
         });

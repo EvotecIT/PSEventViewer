@@ -42,6 +42,38 @@ public sealed partial class TestEventStore {
     }
 
     [Fact]
+    public async Task ExistingStoresAcquireIndexedTransportIdentityWithoutLosingIdempotence() {
+        string path = CreateStorePath();
+        try {
+            EventReport report = CreateReport(
+                (new DateTime(2026, 8, 1, 1, 0, 0, DateTimeKind.Utc), 42, "alice"));
+            await new EventStore(path).WriteAsync(report);
+            using (var sqlite = new SQLite { BusyTimeoutMs = 10000 }) {
+                using SQLiteSession session = sqlite.OpenSession(path);
+                session.ExecuteNonQuery("DROP INDEX ix_evx_events_original_transport;");
+                session.ExecuteNonQuery("ALTER TABLE evx_events DROP COLUMN original_event_key;");
+                session.ExecuteNonQuery("ALTER TABLE evx_events DROP COLUMN transport_kind;");
+            }
+
+            var migratedStore = new EventStore(path);
+            EventStoreWriteResult duplicate = await migratedStore.WriteAsync(report);
+            EventReport stored = await migratedStore.ReadReportAsync(new EventStoreQuery());
+
+            Assert.Equal(0, duplicate.Inserted);
+            Assert.Single(stored.Rows);
+            using var verificationClient = new SQLite { BusyTimeoutMs = 10000 };
+            using SQLiteSession verification = verificationClient.OpenSession(path);
+            IReadOnlyList<string> columns = verification.QueryAsList(
+                "PRAGMA table_info(evx_events);",
+                static record => record.GetString(1));
+            Assert.Contains("original_event_key", columns);
+            Assert.Contains("transport_kind", columns);
+        } finally {
+            DeleteStore(path);
+        }
+    }
+
+    [Fact]
     public async Task GenericEventDataCannotDuplicateCommonReportColumns() {
         string path = CreateStorePath();
         try {
@@ -117,6 +149,31 @@ public sealed partial class TestEventStore {
             EventReportEngine.CreateStored(new[] { row }, new[] { schema }));
 
         Assert.Contains("undefined", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void StoredReportsNormalizeCompatibleValuesAndRejectIncompatibleSchemaValues() {
+        EventReportSectionSchema schema = new() {
+            Name = "TypedValues",
+            Kind = EventReportSectionKind.Custom,
+            Columns = new[] { CreateColumn("AttemptCount", typeof(int)) }
+        };
+        var compatible = new EventReportRow {
+            Type = "TypedValues",
+            Values = new Dictionary<string, object?> { ["AttemptCount"] = "7" }
+        };
+        var incompatible = new EventReportRow {
+            Type = "TypedValues",
+            Values = new Dictionary<string, object?> { ["AttemptCount"] = "not-an-integer" }
+        };
+
+        EventReport normalized = EventReportEngine.CreateStored(new[] { compatible }, new[] { schema });
+        ArgumentException exception = Assert.Throws<ArgumentException>(() =>
+            EventReportEngine.CreateStored(new[] { incompatible }, new[] { schema }));
+
+        Assert.Equal(7, Assert.IsType<int>(Assert.Single(normalized.Rows).Values["AttemptCount"]));
+        Assert.Contains("AttemptCount", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("System.Int32", exception.Message, StringComparison.Ordinal);
     }
 
     [Fact]

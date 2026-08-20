@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace EventViewerX.Reporting;
 
 /// <summary>Runs one optimized query and produces a reusable report snapshot.</summary>
@@ -140,15 +142,16 @@ public static class EventReportEngine {
             throw new ArgumentException("The generic stored schema must use the stable name 'Generic'.", nameof(schemas));
         }
         foreach (EventReportRow row in rowSnapshot) {
-            int matchingSchemas = schemaSnapshot.Count(schema => string.Equals(
+            EventReportSectionSchema[] matchingSchemas = schemaSnapshot.Where(schema => string.Equals(
                 schema.Kind == EventReportSectionKind.Generic ? "Generic" : schema.Name,
                 row.Type,
-                StringComparison.OrdinalIgnoreCase));
-            if (matchingSchemas != 1) {
+                StringComparison.OrdinalIgnoreCase)).ToArray();
+            if (matchingSchemas.Length != 1) {
                 throw new ArgumentException(
                     $"Stored row type '{row.Type}' must match exactly one homogeneous schema.",
                     nameof(rows));
             }
+            NormalizeStoredValues(row, matchingSchemas[0]);
         }
         var sections = new List<EventReportSection>();
         foreach (EventReportSectionSchema schema in schemaSnapshot) {
@@ -232,6 +235,73 @@ public static class EventReportEngine {
                 static item => item.Value,
                 StringComparer.OrdinalIgnoreCase)
         };
+    }
+
+    private static void NormalizeStoredValues(EventReportRow row, EventReportSectionSchema schema) {
+        if (schema.Kind == EventReportSectionKind.Generic) {
+            return;
+        }
+        var columns = schema.Columns.ToDictionary(
+            static column => column.Name,
+            StringComparer.OrdinalIgnoreCase);
+        var normalized = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+        foreach (KeyValuePair<string, object?> value in row.Values) {
+            if (!columns.TryGetValue(value.Key, out EventReportColumnSchema? column)) {
+                throw new ArgumentException(
+                    $"Stored row '{row.Type}' contains field '{value.Key}' that is not declared by its schema.",
+                    nameof(row));
+            }
+            Type targetType = EventReportColumnSchema.ResolveValueTypeName(column.ValueTypeName);
+            string normalizedTypeName = EventReportColumnSchema.NormalizeValueTypeName(column.ValueTypeName);
+            if (targetType == typeof(object) &&
+                !string.Equals(
+                    normalizedTypeName,
+                    EventReportColumnSchema.GetStableTypeName(typeof(object)),
+                    StringComparison.Ordinal)) {
+                throw new ArgumentException(
+                    $"Stored schema field '{schema.Name}.{column.Name}' declares unknown type '{column.ValueTypeName}'.",
+                    nameof(schema));
+            }
+            normalized[value.Key] = ConvertStoredValue(value.Value, targetType, schema.Name, column.Name);
+        }
+        row.Values = normalized;
+    }
+
+    private static object? ConvertStoredValue(object? value, Type targetType, string schemaName, string fieldName) {
+        if (value == null || targetType == typeof(object)) {
+            return value;
+        }
+        Type effectiveType = Nullable.GetUnderlyingType(targetType) ?? targetType;
+        if (effectiveType.IsInstanceOfType(value)) {
+            return value;
+        }
+        string text = Convert.ToString(value, CultureInfo.InvariantCulture) ?? string.Empty;
+        try {
+            if (effectiveType == typeof(string)) {
+                return text;
+            }
+            if (effectiveType == typeof(Guid)) {
+                return Guid.Parse(text);
+            }
+            if (effectiveType == typeof(System.Net.IPAddress)) {
+                return System.Net.IPAddress.Parse(text);
+            }
+            if (effectiveType == typeof(DateTime)) {
+                return DateTime.Parse(text, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind);
+            }
+            if (effectiveType == typeof(DateTimeOffset)) {
+                return DateTimeOffset.Parse(text, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind);
+            }
+            if (effectiveType.IsEnum) {
+                return Enum.Parse(effectiveType, text, ignoreCase: false);
+            }
+            return Convert.ChangeType(value, effectiveType, CultureInfo.InvariantCulture);
+        } catch (Exception exception) when (exception is FormatException or InvalidCastException or OverflowException or ArgumentException) {
+            throw new ArgumentException(
+                $"Stored field '{schemaName}.{fieldName}' value '{text}' cannot be converted to '{effectiveType.FullName}'.",
+                nameof(value),
+                exception);
+        }
     }
 
     private static EventReportSectionSchema CloneSchema(EventReportSectionSchema schema) {

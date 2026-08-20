@@ -176,8 +176,17 @@ public sealed partial class EventStore {
     private static Dictionary<string, object?> CreateEventParameters(
         EventReportRow row,
         string definitionName,
-        string insertedAt) => new() {
+        string insertedAt) {
+
+        EventTransportKind transport = GetTransportKind(
+            row.SourceComputer,
+            row.CollectorComputer,
+            row.SourceLog,
+            row.ContainerLog);
+        return new Dictionary<string, object?> {
             ["$key"] = CreateEventKey(row, definitionName),
+            ["$originalKey"] = CreateOriginalEventKey(row, definitionName),
+            ["$transportKind"] = (int)transport,
             ["$definition"] = definitionName,
             ["$time"] = row.TimeCreated.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture),
             ["$eventId"] = row.EventId,
@@ -193,8 +202,33 @@ public sealed partial class EventStore {
             ["$values"] = JsonSerializer.Serialize(row.Values, JsonOptions),
             ["$inserted"] = insertedAt
         };
+    }
 
     private static string CreateEventKey(EventReportRow row, string definitionName) {
+        string identity = string.Join("\0", new[] {
+            CreateOriginalEventKey(row, definitionName),
+            row.RecordId?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
+            NormalizeSqliteNoCaseIdentity(row.ContainerLog),
+            NormalizeSqliteNoCaseIdentity(row.CollectorComputer)
+        });
+        return CreateSha256(identity);
+    }
+
+    private static string CreateEventKey(
+        StoredIdentityCandidate candidate,
+        string definitionName,
+        long? recordId) {
+
+        string identity = string.Join("\0", new[] {
+            CreateOriginalEventKey(candidate, definitionName),
+            recordId?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
+            NormalizeSqliteNoCaseIdentity(candidate.ContainerLog),
+            NormalizeSqliteNoCaseIdentity(candidate.CollectorComputer)
+        });
+        return CreateSha256(identity);
+    }
+
+    private static string CreateOriginalEventKey(EventReportRow row, string definitionName) {
         string identity = string.Join("\0", new[] {
             NormalizeSqliteNoCaseIdentity(row.SourceComputer),
             NormalizeSqliteNoCaseIdentity(row.SourceLog),
@@ -204,6 +238,23 @@ public sealed partial class EventStore {
             NormalizeSqliteNoCaseIdentity(definitionName),
             CreateSemanticIdentity(row.Values)
         });
+        return CreateSha256(identity);
+    }
+
+    private static string CreateOriginalEventKey(StoredIdentityCandidate candidate, string definitionName) {
+        string identity = string.Join("\0", new[] {
+            NormalizeSqliteNoCaseIdentity(candidate.SourceComputer),
+            NormalizeSqliteNoCaseIdentity(candidate.SourceLog),
+            candidate.EventId.ToString(CultureInfo.InvariantCulture),
+            NormalizeSqliteNoCaseIdentity(candidate.Provider),
+            candidate.TimeCreatedUtc,
+            NormalizeSqliteNoCaseIdentity(definitionName),
+            CreateSemanticIdentity(candidate.Values)
+        });
+        return CreateSha256(identity);
+    }
+
+    private static string CreateSha256(string identity) {
         using SHA256 sha256 = SHA256.Create();
         byte[] hash = sha256.ComputeHash(Encoding.UTF8.GetBytes(identity));
         return string.Concat(hash.Select(static value => value.ToString("x2", CultureInfo.InvariantCulture)));
@@ -219,6 +270,41 @@ public sealed partial class EventStore {
                     NormalizeSqliteNoCaseIdentity(item.Key) +
                     "\u001f" +
                     JsonSerializer.Serialize(item.Value, JsonOptions)));
+    }
+
+    private static string CreateSemanticIdentity(IReadOnlyDictionary<string, JsonElement> values) {
+        return string.Join(
+            "\u001e",
+            values
+                .OrderBy(static item => item.Key, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(static item => item.Key, StringComparer.Ordinal)
+                .Select(static item =>
+                    NormalizeSqliteNoCaseIdentity(item.Key) +
+                    "\u001f" +
+                    item.Value.GetRawText()));
+    }
+
+    private static EventTransportKind GetTransportKind(
+        string? sourceComputer,
+        string? collectorComputer,
+        string? sourceLog,
+        string? containerLog) {
+
+        if (!string.IsNullOrWhiteSpace(containerLog) &&
+            containerLog!.EndsWith(".evtx", StringComparison.OrdinalIgnoreCase)) {
+            return EventTransportKind.File;
+        }
+        bool differentComputer = !string.Equals(
+            sourceComputer,
+            collectorComputer,
+            StringComparison.OrdinalIgnoreCase);
+        bool differentContainer = !string.Equals(
+            sourceLog,
+            containerLog,
+            StringComparison.OrdinalIgnoreCase);
+        return differentComputer && differentContainer
+            ? EventTransportKind.Collector
+            : EventTransportKind.Direct;
     }
 
     private static string NormalizeSqliteNoCaseIdentity(string? value) {
@@ -259,13 +345,20 @@ ON CONFLICT(definition_name) DO UPDATE SET
 
     private const string InsertEventSql = @"
 INSERT OR IGNORE INTO evx_events
-    (event_key, definition_name, event_time_utc, event_id, record_id, provider,
+    (event_key, original_event_key, transport_kind, definition_name, event_time_utc, event_id, record_id, provider,
      source_log, container_log, source_computer, collector_computer, level,
      level_value, message, values_json, inserted_utc)
-VALUES
-    ($key, $definition, $time, $eventId, $recordId, $provider,
+SELECT
+    $key, $originalKey, $transportKind, $definition, $time, $eventId, $recordId, $provider,
      $sourceLog, $containerLog, $sourceComputer, $collectorComputer, $level,
-     $levelValue, $message, $values, $inserted);";
+     $levelValue, $message, $values, $inserted
+WHERE $transportKind = 2 OR NOT EXISTS (
+    SELECT 1
+    FROM evx_events
+    WHERE original_event_key = $originalKey
+      AND transport_kind IN (0, 1)
+      AND transport_kind <> $transportKind
+);";
 
     private const string UpsertCheckpointSql = @"
 INSERT INTO evx_checkpoints
@@ -275,5 +368,42 @@ ON CONFLICT(consumer, computer, container) DO UPDATE SET
     record_id = excluded.record_id,
     bookmark_xml = excluded.bookmark_xml,
     updated_utc = excluded.updated_utc;";
+
+    private sealed class StoredIdentityCandidate {
+        internal StoredIdentityCandidate(
+            string timeCreatedUtc,
+            int eventId,
+            string provider,
+            string sourceLog,
+            string containerLog,
+            string sourceComputer,
+            string collectorComputer,
+            IReadOnlyDictionary<string, JsonElement> values) {
+
+            TimeCreatedUtc = timeCreatedUtc;
+            EventId = eventId;
+            Provider = provider;
+            SourceLog = sourceLog;
+            ContainerLog = containerLog;
+            SourceComputer = sourceComputer;
+            CollectorComputer = collectorComputer;
+            Values = values;
+        }
+
+        internal string TimeCreatedUtc { get; }
+        internal int EventId { get; }
+        internal string Provider { get; }
+        internal string SourceLog { get; }
+        internal string ContainerLog { get; }
+        internal string SourceComputer { get; }
+        internal string CollectorComputer { get; }
+        internal IReadOnlyDictionary<string, JsonElement> Values { get; }
+    }
+
+    private enum EventTransportKind {
+        Direct,
+        Collector,
+        File
+    }
 
 }
