@@ -127,7 +127,7 @@ FROM evx_events";
         var parameters = new Dictionary<string, object?> {
             ["$before"] = before.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture)
         };
-        AddIn(where, parameters, "definition_name", "pruneDefinition", definitionNames);
+        AddIn(where, parameters, "definition_name", "pruneDefinition", definitionNames, caseInsensitive: true);
         using var sqlite = new SQLite { BusyTimeoutMs = 10000 };
         await using SQLiteAsyncSession session = await sqlite
             .OpenSessionAsync(Path, cancellationToken)

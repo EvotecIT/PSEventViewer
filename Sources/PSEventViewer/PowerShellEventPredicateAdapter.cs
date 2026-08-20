@@ -11,11 +11,12 @@ internal static class PowerShellEventPredicateAdapter {
         }
         EventPredicate predicate = value switch {
             EventPredicate typed => typed,
+            PowerShellEventPredicateBuilder builder => builder.Build(),
             ScriptBlock scriptBlock => PowerShellEventPredicateAstParser.Parse(scriptBlock),
             string text when File.Exists(text) => EventPredicate.Load(text),
             string text => EventPredicate.ParseJson(text),
             _ => throw new PSArgumentException(
-                $"{parameterName} must be an EventPredicate, a restricted ScriptBlock, predicate JSON, or a predicate JSON file path.",
+                $"{parameterName} must be a typed filter builder, EventPredicate, restricted ScriptBlock, predicate JSON, or predicate JSON file path.",
                 parameterName)
         };
         predicate.Validate();

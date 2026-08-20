@@ -29,8 +29,10 @@
     <PackageReference Include="Microsoft.Bcl.AsyncInterfaces" Version="10.0.11" />
   </ItemGroup>
   <PropertyGroup Condition="'$(TargetFramework)' == 'net472'">
+    <!-- Restore one native asset for build tooling while keeping the reusable library architecture-neutral. -->
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
-    <PlatformTarget>x64</PlatformTarget>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
   </PropertyGroup>
   <ItemGroup>
     <Using Include="System" />

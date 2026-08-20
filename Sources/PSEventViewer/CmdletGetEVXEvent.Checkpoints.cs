@@ -147,7 +147,7 @@ public sealed partial class CmdletGetEVXEvent {
         AddHashtableIdentity(identity, "NamedDataFilter", NamedDataFilter);
         AddHashtableIdentity(identity, "NamedDataExcludeFilter", NamedDataExcludeFilter);
         AddHashtableIdentity(identity, "FilterHashtable", FilterHashtable);
-        AddFilterIdentity(identity, Filter);
+        AddFilterIdentity(identity, ResolveNativeFilter());
 
         using SHA256 sha256 = SHA256.Create();
         byte[] hash = sha256.ComputeHash(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(identity)));
@@ -266,7 +266,7 @@ public sealed partial class CmdletGetEVXEvent {
     /// Executes the event query based on provided parameters.
     /// </summary>
     private void ValidateRecordOptions() {
-        if ((ParameterSetName == "Type" || ParameterSetName == "Definition") &&
+        if ((UsesBuiltInTypeQuery || UsesCustomDefinitionQuery) &&
             Collector != null &&
             MachineName != null) {
             throw new PSArgumentException(

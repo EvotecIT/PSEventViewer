@@ -133,6 +133,8 @@ internal static class PowerShellEventPredicateAstParser {
             (TokenKind.Ine or TokenKind.Cne, false) => EventPredicateOperator.NotEqual,
             (TokenKind.Iin or TokenKind.Cin, false) => EventPredicateOperator.In,
             (TokenKind.Inotin or TokenKind.Cnotin, false) => EventPredicateOperator.NotIn,
+            (TokenKind.Iin or TokenKind.Cin, true) => EventPredicateOperator.In,
+            (TokenKind.Inotin or TokenKind.Cnotin, true) => EventPredicateOperator.NotIn,
             (TokenKind.Ilike or TokenKind.Clike, false) => EventPredicateOperator.MatchesWildcard,
             (TokenKind.Inotlike or TokenKind.Cnotlike, false) => EventPredicateOperator.MatchesWildcard,
             (TokenKind.Imatch or TokenKind.Cmatch, false) => EventPredicateOperator.MatchesRegex,

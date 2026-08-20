@@ -37,6 +37,16 @@ namespace PSEventViewer;
 ///   <para>The event type owns its source channel, event IDs, filters, and typed projection.</para>
 /// </example>
 /// <example>
+///   <summary>Reuse a discoverable typed filter</summary>
+///   <code>$filter = New-EVXFilter -Type ADUserLogonFailed; $filter.AllOf($filter.Fields.Who.MatchesWildcard('EVOTEC\*'), $filter.Fields.IPAddress.MatchesSubnet('10.0.0.0/8')); Get-EVXEvent -Filter $filter -TimePeriod Last7Days</code>
+///   <para>The filter retains its type and exact predicate, so the query does not repeat either one.</para>
+/// </example>
+/// <example>
+///   <summary>Describe one typed event contract</summary>
+///   <code>Get-EVXEvent -Type ADUserLogonFailed -Describe</code>
+///   <para>Returns the source, field, alias, type, and filter-stage metadata without reading events.</para>
+/// </example>
+/// <example>
 ///   <summary>Use a custom JSON definition against an offline file</summary>
 ///   <code>Get-EVXEvent -Definition .\ServiceChanges.json -Path .\System.evtx</code>
 ///   <para>Applies the definition-owned sources and fields while the path supplies the event container.</para>
@@ -58,6 +68,8 @@ namespace PSEventViewer;
 [OutputType(typeof(EventObject), ParameterSetName = new string[] { "Provider" })]
 [OutputType(typeof(EventTypeRecord), ParameterSetName = new string[] { "Type" })]
 [OutputType(typeof(CustomEventRecord), ParameterSetName = new string[] { "Definition" })]
+[OutputType(typeof(EventTypeRecord), ParameterSetName = new string[] { "TypedFilter" })]
+[OutputType(typeof(CustomEventRecord), ParameterSetName = new string[] { "TypedFilter" })]
 [Cmdlet(VerbsCommon.Get, "EVXEvent", DefaultParameterSetName = "Channel")]
 [Alias("Find-WinEvent")]
 public sealed partial class CmdletGetEVXEvent : AsyncPSCmdlet {
@@ -74,6 +86,7 @@ public sealed partial class CmdletGetEVXEvent : AsyncPSCmdlet {
         Array.Empty<WildcardPattern>();
     private long _eventsOutput;
     private EventDefinition? _resolvedDefinition;
+    private PowerShellEventPredicateBuilder? _typedFilter;
     /// <summary>
     /// Name of the log to query.
     /// </summary>
@@ -148,6 +161,7 @@ public sealed partial class CmdletGetEVXEvent : AsyncPSCmdlet {
     [Parameter(Mandatory = false, ParameterSetName = "Channel")]
     [Parameter(Mandatory = false, ParameterSetName = "Type")]
     [Parameter(Mandatory = false, ParameterSetName = "Definition")]
+    [Parameter(Mandatory = false, ParameterSetName = "TypedFilter")]
     [Parameter(Mandatory = false, ParameterSetName = "Hashtable")]
     [Parameter(Mandatory = false, ParameterSetName = "Xml")]
     [Parameter(Mandatory = false, ParameterSetName = "Provider")]
@@ -159,6 +173,7 @@ public sealed partial class CmdletGetEVXEvent : AsyncPSCmdlet {
     /// </summary>
     [Parameter(Mandatory = false, ParameterSetName = "Type")]
     [Parameter(Mandatory = false, ParameterSetName = "Definition")]
+    [Parameter(Mandatory = false, ParameterSetName = "TypedFilter")]
     public List<string?>? Collector { get; set; }
 
     /// <summary>
@@ -191,6 +206,7 @@ public sealed partial class CmdletGetEVXEvent : AsyncPSCmdlet {
     [Alias("DateFrom")]
     [Parameter(Mandatory = false, ParameterSetName = "Type")]
     [Parameter(Mandatory = false, ParameterSetName = "Definition")]
+    [Parameter(Mandatory = false, ParameterSetName = "TypedFilter")]
     [Parameter(Mandatory = false, ParameterSetName = "Channel")]
     [Parameter(Mandatory = false, ParameterSetName = "Path")]
     [Parameter(Mandatory = false, ParameterSetName = "Provider")]
@@ -202,6 +218,7 @@ public sealed partial class CmdletGetEVXEvent : AsyncPSCmdlet {
     [Alias("DateTo")]
     [Parameter(Mandatory = false, ParameterSetName = "Type")]
     [Parameter(Mandatory = false, ParameterSetName = "Definition")]
+    [Parameter(Mandatory = false, ParameterSetName = "TypedFilter")]
     [Parameter(Mandatory = false, ParameterSetName = "Channel")]
     [Parameter(Mandatory = false, ParameterSetName = "Path")]
     [Parameter(Mandatory = false, ParameterSetName = "Provider")]
@@ -213,6 +230,7 @@ public sealed partial class CmdletGetEVXEvent : AsyncPSCmdlet {
     [Parameter(Mandatory = false, ParameterSetName = "Channel")]
     [Parameter(Mandatory = false, ParameterSetName = "Type")]
     [Parameter(Mandatory = false, ParameterSetName = "Definition")]
+    [Parameter(Mandatory = false, ParameterSetName = "TypedFilter")]
     [Parameter(Mandatory = false, ParameterSetName = "Path")]
     [Parameter(Mandatory = false, ParameterSetName = "Provider")]
     public TimePeriod? TimePeriod { get; set; }
@@ -231,6 +249,7 @@ public sealed partial class CmdletGetEVXEvent : AsyncPSCmdlet {
     [Parameter(Mandatory = false, ParameterSetName = "Channel")]
     [Parameter(Mandatory = false, ParameterSetName = "Type")]
     [Parameter(Mandatory = false, ParameterSetName = "Definition")]
+    [Parameter(Mandatory = false, ParameterSetName = "TypedFilter")]
     [Parameter(Mandatory = false, ParameterSetName = "Path")]
     [Parameter(Mandatory = false, ParameterSetName = "Hashtable")]
     [Parameter(Mandatory = false, ParameterSetName = "Xml")]
@@ -244,6 +263,7 @@ public sealed partial class CmdletGetEVXEvent : AsyncPSCmdlet {
     [Parameter(Mandatory = false, ParameterSetName = "Channel")]
     [Parameter(Mandatory = false, ParameterSetName = "Type")]
     [Parameter(Mandatory = false, ParameterSetName = "Definition")]
+    [Parameter(Mandatory = false, ParameterSetName = "TypedFilter")]
     [Parameter(Mandatory = false, ParameterSetName = "Path")]
     [Parameter(Mandatory = false, ParameterSetName = "Hashtable")]
     [Parameter(Mandatory = false, ParameterSetName = "Xml")]
@@ -257,6 +277,7 @@ public sealed partial class CmdletGetEVXEvent : AsyncPSCmdlet {
     [Parameter(Mandatory = false, ParameterSetName = "Channel")]
     [Parameter(Mandatory = false, ParameterSetName = "Type")]
     [Parameter(Mandatory = false, ParameterSetName = "Definition")]
+    [Parameter(Mandatory = false, ParameterSetName = "TypedFilter")]
     [Parameter(Mandatory = false, ParameterSetName = "Path")]
     [Parameter(Mandatory = false, ParameterSetName = "Hashtable")]
     [Parameter(Mandatory = false, ParameterSetName = "Xml")]
@@ -272,6 +293,7 @@ public sealed partial class CmdletGetEVXEvent : AsyncPSCmdlet {
     [Parameter(Mandatory = false, ParameterSetName = "Channel")]
     [Parameter(Mandatory = false, ParameterSetName = "Type")]
     [Parameter(Mandatory = false, ParameterSetName = "Definition")]
+    [Parameter(Mandatory = false, ParameterSetName = "TypedFilter")]
     [Parameter(Mandatory = false, ParameterSetName = "Path")]
     [Parameter(Mandatory = false, ParameterSetName = "Hashtable")]
     [Parameter(Mandatory = false, ParameterSetName = "Xml")]
@@ -309,6 +331,7 @@ public sealed partial class CmdletGetEVXEvent : AsyncPSCmdlet {
     [Parameter(Mandatory = false, ParameterSetName = "Channel")]
     [Parameter(Mandatory = false, ParameterSetName = "Type")]
     [Parameter(Mandatory = false, ParameterSetName = "Definition")]
+    [Parameter(Mandatory = false, ParameterSetName = "TypedFilter")]
     [Parameter(Mandatory = false, ParameterSetName = "Path")]
     [Parameter(Mandatory = false, ParameterSetName = "Hashtable")]
     [Parameter(Mandatory = false, ParameterSetName = "Xml")]
@@ -324,6 +347,7 @@ public sealed partial class CmdletGetEVXEvent : AsyncPSCmdlet {
     [Parameter(Mandatory = false, ParameterSetName = "Channel")]
     [Parameter(Mandatory = false, ParameterSetName = "Type")]
     [Parameter(Mandatory = false, ParameterSetName = "Definition")]
+    [Parameter(Mandatory = false, ParameterSetName = "TypedFilter")]
     [Parameter(Mandatory = false, ParameterSetName = "Hashtable")]
     [Parameter(Mandatory = false, ParameterSetName = "Xml")]
     [Parameter(Mandatory = false, ParameterSetName = "Provider")]
@@ -338,6 +362,7 @@ public sealed partial class CmdletGetEVXEvent : AsyncPSCmdlet {
     [Parameter(Mandatory = false, ParameterSetName = "Channel")]
     [Parameter(Mandatory = false, ParameterSetName = "Type")]
     [Parameter(Mandatory = false, ParameterSetName = "Definition")]
+    [Parameter(Mandatory = false, ParameterSetName = "TypedFilter")]
     [Parameter(Mandatory = false, ParameterSetName = "Hashtable")]
     [Parameter(Mandatory = false, ParameterSetName = "Xml")]
     [Parameter(Mandatory = false, ParameterSetName = "Provider")]
@@ -360,6 +385,7 @@ public sealed partial class CmdletGetEVXEvent : AsyncPSCmdlet {
     [Parameter(Mandatory = false, ParameterSetName = "Channel")]
     [Parameter(Mandatory = false, ParameterSetName = "Type")]
     [Parameter(Mandatory = false, ParameterSetName = "Definition")]
+    [Parameter(Mandatory = false, ParameterSetName = "TypedFilter")]
     [Parameter(Mandatory = false, ParameterSetName = "Path")]
     [Parameter(Mandatory = false, ParameterSetName = "Hashtable")]
     [Parameter(Mandatory = false, ParameterSetName = "Xml")]
@@ -373,6 +399,7 @@ public sealed partial class CmdletGetEVXEvent : AsyncPSCmdlet {
     [Parameter(Mandatory = false, ParameterSetName = "Channel")]
     [Parameter(Mandatory = false, ParameterSetName = "Type")]
     [Parameter(Mandatory = false, ParameterSetName = "Definition")]
+    [Parameter(Mandatory = false, ParameterSetName = "TypedFilter")]
     [Parameter(Mandatory = false, ParameterSetName = "Path")]
     [Parameter(Mandatory = false, ParameterSetName = "Hashtable")]
     [Parameter(Mandatory = false, ParameterSetName = "Xml")]
@@ -387,6 +414,7 @@ public sealed partial class CmdletGetEVXEvent : AsyncPSCmdlet {
     [Parameter(Mandatory = false, ParameterSetName = "Channel")]
     [Parameter(Mandatory = false, ParameterSetName = "Type")]
     [Parameter(Mandatory = false, ParameterSetName = "Definition")]
+    [Parameter(Mandatory = false, ParameterSetName = "TypedFilter")]
     [Parameter(Mandatory = false, ParameterSetName = "Hashtable")]
     [Parameter(Mandatory = false, ParameterSetName = "Xml")]
     [Parameter(Mandatory = false, ParameterSetName = "Provider")]
@@ -416,6 +444,7 @@ public sealed partial class CmdletGetEVXEvent : AsyncPSCmdlet {
     [Parameter(Mandatory = false, ParameterSetName = "Channel")]
     [Parameter(Mandatory = false, ParameterSetName = "Type")]
     [Parameter(Mandatory = false, ParameterSetName = "Definition")]
+    [Parameter(Mandatory = false, ParameterSetName = "TypedFilter")]
     [Parameter(Mandatory = false, ParameterSetName = "Path")]
     [Parameter(Mandatory = false, ParameterSetName = "Hashtable")]
     [Parameter(Mandatory = false, ParameterSetName = "Xml")]
@@ -441,7 +470,14 @@ public sealed partial class CmdletGetEVXEvent : AsyncPSCmdlet {
     /// <summary>Returns the native/managed predicate plan without querying event sources.</summary>
     [Parameter(ParameterSetName = "Type")]
     [Parameter(ParameterSetName = "Definition")]
+    [Parameter(ParameterSetName = "TypedFilter")]
     public SwitchParameter Explain { get; set; }
+
+    /// <summary>Returns definition and field metadata without querying event sources.</summary>
+    [Parameter(ParameterSetName = "Type")]
+    [Parameter(ParameterSetName = "Definition")]
+    [Parameter(ParameterSetName = "TypedFilter")]
+    public SwitchParameter Describe { get; set; }
 
     /// <summary>
     /// Initializes logging and helper classes before processing.
@@ -454,21 +490,40 @@ public sealed partial class CmdletGetEVXEvent : AsyncPSCmdlet {
         _managedProviderPatterns =
             Array.Empty<WildcardPattern>();
         _offlineProvidersByPath.Clear();
-        if ((ParameterSetName == "Type" || ParameterSetName == "Definition") &&
+        InitializeTypedFilter();
+        if (Describe.IsPresent) {
+            if (UsesCustomDefinitionQuery) {
+                WriteObject(ResolveEventDefinition());
+            } else {
+                foreach (EventType type in Type) {
+                    WriteObject(EventTypeCatalog.GetDefinition(type));
+                }
+            }
+            return;
+        }
+        if ((UsesBuiltInTypeQuery || UsesCustomDefinitionQuery) &&
             !MyInvocation.BoundParameters.ContainsKey(
                 nameof(ReadMode))) {
             ReadMode = EventReadMode.StructuredDataAndMessage;
         }
         EventPredicate? predicate = PowerShellEventPredicateAdapter.Resolve(Where, nameof(Where));
+        if (predicate != null && UsesBuiltInTypeQuery) {
+            predicate = EventPredicateBuilder.ForTypes(Type).Normalize(predicate);
+        }
         if (Explain.IsPresent) {
             if (predicate == null) {
                 throw new PSArgumentException("Explain requires Where so there is a typed predicate to plan.");
             }
-            EventPredicatePlan plan = Collector == null
-                ? EventPredicatePlanner.Plan(predicate)
-                : EventPredicatePlanner.PlanManagedOnly(
+            EventPredicatePlan plan = UsesCustomDefinitionQuery
+                ? EventDefinitionEngine.PlanPredicate(
+                    ResolveEventDefinition(),
                     predicate,
-                    "ForwardedEvents uses the Windows Server 2025 safe '*' reader, so typed filtering is bounded and managed.");
+                    Collector == null ? null : "ForwardedEvents")
+                : Collector == null
+                    ? EventPredicatePlanner.Plan(predicate)
+                    : EventPredicatePlanner.PlanManagedOnly(
+                        predicate,
+                        "ForwardedEvents uses the Windows Server 2025 safe '*' reader, so typed filtering is bounded and managed.");
             WriteObject(plan);
             return;
         }
@@ -485,9 +540,9 @@ public sealed partial class CmdletGetEVXEvent : AsyncPSCmdlet {
         List<object>? results = null;
 
         PrepareRecordProcessing(token);
-        if (ParameterSetName == "Definition") {
+        if (UsesCustomDefinitionQuery) {
             await ProcessDefinitionAsync(token);
-        } else if (ParameterSetName == "Type") {
+        } else if (UsesBuiltInTypeQuery) {
                 // let's find the events prepared for search
                 List<EventType> typeList = Type.ToList();
                 int typeThreads = DisableParallel.IsPresent
@@ -585,6 +640,37 @@ public sealed partial class CmdletGetEVXEvent : AsyncPSCmdlet {
             ProcessNativeEvents(token, results);
         }
 
+    }
+
+    private bool UsesBuiltInTypeQuery =>
+        ParameterSetName == "Type" ||
+        ParameterSetName == "TypedFilter" && _typedFilter?.Type != null;
+
+    private bool UsesCustomDefinitionQuery =>
+        ParameterSetName == "Definition" ||
+        ParameterSetName == "TypedFilter" && _typedFilter?.Definition != null;
+
+    private void InitializeTypedFilter() {
+        if (ParameterSetName != "TypedFilter") {
+            return;
+        }
+        object? value = Filter;
+        while (value is PSObject wrapper && wrapper.BaseObject != value) {
+            value = wrapper.BaseObject;
+        }
+        _typedFilter = value as PowerShellEventPredicateBuilder ?? throw new PSArgumentException(
+            "Typed Filter queries require the object returned by New-EVXFilter -Type or -Definition.",
+            nameof(Filter));
+        if (_typedFilter.Type.HasValue) {
+            Type = new[] { _typedFilter.Type.Value };
+        } else if (_typedFilter.Definition != null) {
+            _resolvedDefinition = _typedFilter.Definition;
+        } else {
+            throw new PSArgumentException(
+                "The typed filter does not retain a Type or Definition query source.",
+                nameof(Filter));
+        }
+        Where = _typedFilter.Predicate;
     }
 
     private async Task ProcessDefinitionAsync(CancellationToken token) {

@@ -34,7 +34,7 @@ internal static class EventReportProjectionFactory {
             string.IsNullOrWhiteSpace(field.DisplayName)
                 ? EventReportTableProjection.SplitWords(field.Name)
                 : field.DisplayName.Trim(),
-            typeof(object))).ToArray();
+            field.ValueType)).ToArray();
         string displayName = string.IsNullOrWhiteSpace(definition.DisplayName)
             ? EventReportTableProjection.SplitWords(definition.Name)
             : definition.DisplayName.Trim();

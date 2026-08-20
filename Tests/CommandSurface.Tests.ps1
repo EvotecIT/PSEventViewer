@@ -66,6 +66,19 @@ Describe 'PSEventViewer v4 command surface' {
         }
     }
 
+    It 'keeps the managed cmdlet assembly architecture-neutral' {
+        $Module = Get-Module PSEventViewer
+        $AssemblyPath = $Module.ExportedCommands['Get-EVXEvent'].ImplementingType.Assembly.Location
+        $Assembly = [System.Reflection.Assembly]::LoadFile($AssemblyPath)
+        $PEKind = [System.Reflection.PortableExecutableKinds]::NotAPortableExecutableImage
+        $Machine = [System.Reflection.ImageFileMachine]::I386
+        $Assembly.ManifestModule.GetPEKind([ref] $PEKind, [ref] $Machine)
+
+        ($PEKind -band [System.Reflection.PortableExecutableKinds]::ILOnly) | Should -Not -Be 0
+        ($PEKind -band [System.Reflection.PortableExecutableKinds]::Required32Bit) | Should -Be 0
+        ($PEKind -band [System.Reflection.PortableExecutableKinds]::PE32Plus) | Should -Be 0
+    }
+
     It 'declares both collector subscription result shapes' {
         $OutputTypes = (Get-Command Set-EVXCollectorSubscription).OutputType.Name
 
@@ -81,7 +94,7 @@ Describe 'PSEventViewer v4 command surface' {
         }
 
         (Get-Command Get-EVXEvent).ParameterSets.Name | Sort-Object |
-            Should -Be (@('Channel', 'Path', 'Definition', 'Provider', 'Type', 'Hashtable', 'Xml') | Sort-Object)
+            Should -Be (@('Channel', 'Path', 'Definition', 'Provider', 'Type', 'TypedFilter', 'Hashtable', 'Xml') | Sort-Object)
         (Get-Command Show-EVXEvent).ParameterSets.Name | Sort-Object |
             Should -Be (@('Type', 'Path', 'Log', 'Definition', 'Input', 'Store') | Sort-Object)
         (Get-Command New-EVXFilter).ParameterSets.Name | Sort-Object |

@@ -18,12 +18,12 @@ New-EVXFilter [-EventId <int[]>] [-RecordId <long[]>] [-ProviderName <string[]>]
 
 ### Type
 ```powershell
-New-EVXFilter -Type <EventType> [<CommonParameters>]
+New-EVXFilter -Type <EventType> [-Where <Object>] [-Explain] [<CommonParameters>]
 ```
 
 ### Definition
 ```powershell
-New-EVXFilter -Definition <Object> [<CommonParameters>]
+New-EVXFilter -Definition <Object> [-Where <Object>] [-Explain] [<CommonParameters>]
 ```
 
 ### XPath
@@ -68,6 +68,20 @@ New-EVXFilter -LogName Security -EventId 4625 -NamedDataExcludeFilter @{ TargetU
 ```
 
 Returns QueryList XML with native Select and Suppress clauses.
+
+### EXAMPLE 4
+```powershell
+$filter = New-EVXFilter -Type ADUserLogonFailed; $filter.AllOf($filter.Fields.Who.In('EVOTEC\Alice', 'EVOTEC\Bob'), $filter.Fields.IPAddress.MatchesSubnet('10.0.0.0/8')); Get-EVXEvent -Filter $filter -TimePeriod Last7Days
+```
+
+The builder retains both the typed definition and selected predicate, so Filter is sufficient to execute the query.
+
+### EXAMPLE 5
+```powershell
+New-EVXFilter -Type ADUserLogonFailed -Where { $_.Who -like 'EVOTEC\*' } -Explain
+```
+
+Returns native and managed predicate stages without reading events.
 
 ## PARAMETERS
 
@@ -158,6 +172,22 @@ Event identifiers to suppress.
 Type: Int32[]
 Parameter Sets: Object, XPath, ChannelXml, FileXml
 Aliases: ExcludeId
+Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -Explain
+Returns the native and managed execution plan for Where instead of the reusable filter.
+
+```yaml
+Type: SwitchParameter
+Parameter Sets: Type, Definition
+Aliases: None
 Possible values:
 
 Required: False
@@ -349,6 +379,22 @@ User security identifiers to include.
 ```yaml
 Type: String[]
 Parameter Sets: Object, XPath, ChannelXml, FileXml
+Aliases: None
+Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -Where
+Optional restricted typed predicate expression stored in the returned reusable filter.
+
+```yaml
+Type: Object
+Parameter Sets: Type, Definition
 Aliases: None
 Possible values:
 

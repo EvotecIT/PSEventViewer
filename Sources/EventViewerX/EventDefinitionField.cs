@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace EventViewerX;
 
 /// <summary>Declares one projected property for a custom event definition.</summary>
@@ -12,6 +14,17 @@ public sealed class EventDefinitionField {
     public IReadOnlyList<string> Aliases { get; set; } = Array.Empty<string>();
     /// <summary>Portable output value type.</summary>
     public EventFieldValueKind ValueKind { get; set; } = EventFieldValueKind.String;
+    /// <summary>CLR value type produced by the configured portable value kind.</summary>
+    [JsonIgnore]
+    public Type ValueType => ValueKind switch {
+        EventFieldValueKind.Int32 => typeof(int),
+        EventFieldValueKind.Int64 => typeof(long),
+        EventFieldValueKind.Boolean => typeof(bool),
+        EventFieldValueKind.DateTime => typeof(DateTime),
+        EventFieldValueKind.Guid => typeof(Guid),
+        EventFieldValueKind.IpAddress => typeof(System.Net.IPAddress),
+        _ => typeof(string)
+    };
     /// <summary>Value source.</summary>
     public EventFieldSource Source { get; set; }
     /// <summary>Data key, metadata property, or literal constant.</summary>

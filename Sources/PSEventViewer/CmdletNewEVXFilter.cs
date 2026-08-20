@@ -19,6 +19,16 @@ namespace PSEventViewer;
 ///   <code>New-EVXFilter -LogName Security -EventId 4625 -NamedDataExcludeFilter @{ TargetUserName = 'svc_legacy' }</code>
 ///   <para>Returns QueryList XML with native Select and Suppress clauses.</para>
 /// </example>
+/// <example>
+///   <summary>Build and reuse a discoverable typed filter</summary>
+///   <code>$filter = New-EVXFilter -Type ADUserLogonFailed; $filter.AllOf($filter.Fields.Who.In('EVOTEC\Alice', 'EVOTEC\Bob'), $filter.Fields.IPAddress.MatchesSubnet('10.0.0.0/8')); Get-EVXEvent -Filter $filter -TimePeriod Last7Days</code>
+///   <para>The builder retains both the typed definition and selected predicate, so Filter is sufficient to execute the query.</para>
+/// </example>
+/// <example>
+///   <summary>Explain an inline typed predicate</summary>
+///   <code>New-EVXFilter -Type ADUserLogonFailed -Where { $_.Who -like 'EVOTEC\*' } -Explain</code>
+///   <para>Returns native and managed predicate stages without reading events.</para>
+/// </example>
 [Cmdlet(VerbsCommon.New, "EVXFilter", DefaultParameterSetName = "Object")]
 [Alias("Get-EVXFilter")]
 [OutputType(typeof(EventFilter), ParameterSetName = new[] { "Object" })]
@@ -32,6 +42,16 @@ public sealed class CmdletNewEVXFilter : PSCmdlet {
     /// <summary>Custom EventDefinition instance or JSON file whose typed fields should be exposed.</summary>
     [Parameter(Mandatory = true, ParameterSetName = "Definition")]
     public object? Definition { get; set; }
+
+    /// <summary>Optional restricted typed predicate expression stored in the returned reusable filter.</summary>
+    [Parameter(ParameterSetName = "Type")]
+    [Parameter(ParameterSetName = "Definition")]
+    public object? Where { get; set; }
+
+    /// <summary>Returns the native and managed execution plan for Where instead of the reusable filter.</summary>
+    [Parameter(ParameterSetName = "Type")]
+    [Parameter(ParameterSetName = "Definition")]
+    public SwitchParameter Explain { get; set; }
 
     /// <summary>Event identifiers to include.</summary>
     [Alias("Id")]
@@ -201,10 +221,25 @@ public sealed class CmdletNewEVXFilter : PSCmdlet {
     }
 
     private void WriteTypedBuilder() {
-        EventPredicateBuilder builder = ParameterSetName == "Type"
+        EventDefinition? definition = ParameterSetName == "Definition"
+            ? ResolveDefinition()
+            : null;
+        EventPredicateBuilder builder = definition == null
             ? EventPredicateBuilder.ForType(Type!.Value)
-            : EventPredicateBuilder.ForDefinition(ResolveDefinition());
-        WriteObject(new PowerShellEventPredicateBuilder(builder));
+            : EventPredicateBuilder.ForDefinition(definition);
+        var filter = new PowerShellEventPredicateBuilder(builder, Type, definition);
+        EventPredicate? predicate = PowerShellEventPredicateAdapter.Resolve(Where, nameof(Where));
+        if (predicate != null) {
+            filter.Use(predicate);
+        }
+        if (Explain.IsPresent) {
+            if (predicate == null) {
+                throw new PSArgumentException("Explain requires Where so there is a typed predicate to plan.");
+            }
+            WriteObject(filter.Explain());
+            return;
+        }
+        WriteObject(filter);
     }
 
     private EventDefinition ResolveDefinition() {

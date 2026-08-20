@@ -2,6 +2,7 @@ using System.Collections;
 using System.Globalization;
 using System.Net;
 using System.Reflection;
+using System.Text;
 using System.Text.RegularExpressions;
 
 namespace EventViewerX;
@@ -182,7 +183,7 @@ public static class EventPredicateEvaluator {
             case EventPredicateOperator.MatchesWildcard:
                 return Regex.IsMatch(
                     ToText(actual),
-                    "^" + Regex.Escape(expectedValue ?? string.Empty).Replace("\\*", ".*").Replace("\\?", ".") + "$",
+                    ToPowerShellWildcardRegex(expectedValue ?? string.Empty),
                     RegexOptions.CultureInvariant | (ignoreCase ? RegexOptions.IgnoreCase : RegexOptions.None),
                     RegexTimeout);
             case EventPredicateOperator.MatchesRegex:
@@ -243,6 +244,66 @@ public static class EventPredicateEvaluator {
             return false;
         }
         return ToText(actual).IndexOf(expected ?? string.Empty, TextComparison(ignoreCase)) >= 0;
+    }
+
+    private static string ToPowerShellWildcardRegex(string pattern) {
+        var result = new StringBuilder("^");
+        for (int index = 0; index < pattern.Length; index++) {
+            char current = pattern[index];
+            if (current == '`' && index + 1 < pattern.Length) {
+                result.Append(Regex.Escape(pattern[++index].ToString()));
+                continue;
+            }
+            if (current == '*') {
+                result.Append(".*");
+                continue;
+            }
+            if (current == '?') {
+                result.Append('.');
+                continue;
+            }
+            if (current == '[' && TryAppendWildcardCharacterClass(pattern, ref index, result)) {
+                continue;
+            }
+            result.Append(Regex.Escape(current.ToString()));
+        }
+        return result.Append('$').ToString();
+    }
+
+    private static bool TryAppendWildcardCharacterClass(
+        string pattern,
+        ref int index,
+        StringBuilder result) {
+
+        int close = index + 1;
+        while (close < pattern.Length) {
+            if (pattern[close] == '`' && close + 1 < pattern.Length) {
+                close += 2;
+                continue;
+            }
+            if (pattern[close] == ']') {
+                break;
+            }
+            close++;
+        }
+        if (close >= pattern.Length || close == index + 1) {
+            return false;
+        }
+        result.Append('[');
+        for (int current = index + 1; current < close; current++) {
+            char value = pattern[current];
+            bool wasEscaped = value == '`' && current + 1 < close;
+            if (wasEscaped) {
+                value = pattern[++current];
+            }
+            if (value is '\\' or ']' or '^' || (wasEscaped && value == '-')) {
+                result.Append('\\');
+            }
+            result.Append(value);
+        }
+        result.Append(']');
+        index = close;
+        return true;
     }
 
     private static int CompareOrdered(object actual, string? expected, bool ignoreCase) {

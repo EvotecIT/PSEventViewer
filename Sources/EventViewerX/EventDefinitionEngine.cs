@@ -28,6 +28,26 @@ public static class EventDefinitionEngine {
         return ReadSnapshotAsync(CreateSnapshot(query), executionInfo, cancellationToken);
     }
 
+    /// <summary>Explains native prefiltering and exact post-projection evaluation for a declarative definition.</summary>
+    public static EventPredicatePlan PlanPredicate(
+        EventDefinition definition,
+        EventPredicate predicate,
+        string? collectorLogName = null) {
+
+        if (definition == null) {
+            throw new ArgumentNullException(nameof(definition));
+        }
+        if (predicate == null) {
+            throw new ArgumentNullException(nameof(predicate));
+        }
+        definition.Validate();
+        predicate.Validate();
+        return CreatePredicatePlan(new EventDefinitionQuery(definition) {
+            Predicate = predicate,
+            CollectorLogName = collectorLogName
+        })!;
+    }
+
     private static async IAsyncEnumerable<CustomEventRecord> ReadSnapshotAsync(EventDefinitionQuery query,
         EventDefinitionQueryExecutionInfo? executionInfo,
         [EnumeratorCancellation] CancellationToken cancellationToken) {
@@ -277,7 +297,9 @@ public static class EventDefinitionEngine {
         if (query.Predicate == null) {
             return null;
         }
-        EventPredicate exactPredicate = NormalizeDefinitionPredicate(query.Definition, query.Predicate);
+        EventPredicate exactPredicate = EventPredicateBuilder
+            .ForDefinition(query.Definition)
+            .Normalize(query.Predicate);
         const string projectionReason =
             "Declarative fields are evaluated after their configured projection and conversion.";
         if (!string.IsNullOrWhiteSpace(query.CollectorLogName)) {
@@ -301,32 +323,6 @@ public static class EventDefinitionEngine {
             nativePlan.NativeFilter,
             exactPredicate,
             steps);
-    }
-
-    private static EventPredicate NormalizeDefinitionPredicate(
-        EventDefinition definition,
-        EventPredicate predicate) {
-
-        EventPredicate normalized = predicate.Clone();
-        NormalizeDefinitionPredicateNode(definition, normalized);
-        return normalized;
-    }
-
-    private static void NormalizeDefinitionPredicateNode(
-        EventDefinition definition,
-        EventPredicate predicate) {
-
-        if (predicate.Kind == EventPredicateKind.Comparison) {
-            EventDefinitionField? field = definition.Fields.FirstOrDefault(candidate =>
-                string.Equals(candidate.Name, predicate.Field, StringComparison.OrdinalIgnoreCase) ||
-                candidate.Aliases.Contains(predicate.Field!, StringComparer.OrdinalIgnoreCase));
-            if (field != null) {
-                predicate.Field = field.Name;
-            }
-        }
-        foreach (EventPredicate child in predicate.Children) {
-            NormalizeDefinitionPredicateNode(definition, child);
-        }
     }
 
     private static EventPredicate? ExtractNativeCandidate(

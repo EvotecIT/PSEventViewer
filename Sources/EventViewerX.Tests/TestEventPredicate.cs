@@ -30,6 +30,28 @@ public sealed class TestEventPredicate {
     }
 
     [Fact]
+    public void WildcardsFollowPowerShellCharacterClassAndEscapeSemantics() {
+        var values = new Dictionary<string, object?> { ["Who"] = "svc7" };
+        EventPredicate digit = EventPredicate.Compare(
+            "Who",
+            EventPredicateOperator.MatchesWildcard,
+            "svc[0-9]");
+        EventPredicate letter = EventPredicate.Compare(
+            "Who",
+            EventPredicateOperator.MatchesWildcard,
+            "svc[a-z]");
+        EventPredicate literalStar = EventPredicate.Compare(
+            "Who",
+            EventPredicateOperator.MatchesWildcard,
+            "svc`*");
+
+        Assert.True(EventPredicateEvaluator.Matches(digit, values));
+        Assert.False(EventPredicateEvaluator.Matches(letter, values));
+        values["Who"] = "svc*";
+        Assert.True(EventPredicateEvaluator.Matches(literalStar, values));
+    }
+
+    [Fact]
     public void PlannerPushesOnlySafeSystemPredicates() {
         EventPredicate predicate = EventPredicate.AllOf(
             EventPredicate.Compare("EventId", EventPredicateOperator.In, 4624, 4625),
@@ -78,10 +100,27 @@ public sealed class TestEventPredicate {
         Assert.False(who.IsCommon);
         EventPredicate predicate = builder.AllOf(
             who.StartsWith("EVOTEC\\"),
-            builder.Field("IpAddress").InSubnet("10.0.0.0/8"));
+            builder.Field("IpAddress").MatchesSubnet("10.0.0.0/8"));
 
         Assert.Equal(EventPredicateKind.All, predicate.Kind);
         Assert.Throws<ArgumentException>(() => builder.Field("DefinitelyMissing"));
+    }
+
+    [Fact]
+    public void BuiltInIpAddressFieldsExposeSubnetMatchingAcrossTypedDefinitions() {
+        (EventType Type, string Field)[] cases = {
+            (EventType.ADUserLogonFailed, "IpAddress"),
+            (EventType.DhcpLeaseCreated, "IPAddress"),
+            (EventType.NetworkAccessAuthenticationPolicy, "NASIPv4Address"),
+            (EventType.ADLdapBindingDetails, "RemoteIp"),
+            (EventType.ADSMBServerAuditV1, "ClientAddress")
+        };
+
+        foreach ((EventType type, string fieldName) in cases) {
+            EventPredicateField field = EventPredicateBuilder.ForType(type).Field(fieldName);
+            Assert.Contains(EventPredicateOperator.InSubnet, field.SupportedOperators);
+            Assert.Equal(EventPredicateOperator.InSubnet, field.MatchesSubnet("10.0.0.0/8").Operator);
+        }
     }
 
     [Fact]
@@ -267,6 +306,11 @@ public sealed class TestEventPredicate {
         EventPredicateBuilder builder = EventPredicateBuilder.ForDefinition(definition);
         Assert.Equal("ServiceLabel", builder.Field("ProviderName").Name);
         Assert.DoesNotContain(builder.Fields, static field => field.Name == "ProviderName");
+        EventPredicatePlan explained = EventDefinitionEngine.PlanPredicate(
+            definition,
+            EventPredicate.Compare("ProviderName", EventPredicateOperator.Equal, "BITS"));
+        Assert.Null(explained.NativeFilter);
+        Assert.Equal("ServiceLabel", explained.ManagedPredicate!.Field);
         string fixture = Path.GetFullPath(Path.Combine(
             AppContext.BaseDirectory,
             "..", "..", "..", "..", "..", "Tests", "Logs", "NamedFilterExamples.evtx"));

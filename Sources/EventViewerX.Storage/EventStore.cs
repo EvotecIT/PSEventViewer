@@ -101,6 +101,15 @@ CREATE TABLE IF NOT EXISTS evx_events (
 CREATE INDEX IF NOT EXISTS ix_evx_events_time ON evx_events (event_time_utc);
 CREATE INDEX IF NOT EXISTS ix_evx_events_definition_time ON evx_events (definition_name, event_time_utc);
 CREATE INDEX IF NOT EXISTS ix_evx_events_source_time ON evx_events (source_computer, source_log, event_time_utc);
+CREATE INDEX IF NOT EXISTS ix_evx_events_source_nocase_time ON evx_events (
+    source_computer COLLATE NOCASE,
+    source_log COLLATE NOCASE,
+    event_time_utc
+);
+CREATE INDEX IF NOT EXISTS ix_evx_events_provider_nocase_time ON evx_events (
+    provider COLLATE NOCASE,
+    event_time_utc
+);
 CREATE INDEX IF NOT EXISTS ix_evx_events_event_id_time ON evx_events (event_id, event_time_utc);
 
 CREATE TABLE IF NOT EXISTS evx_checkpoints (

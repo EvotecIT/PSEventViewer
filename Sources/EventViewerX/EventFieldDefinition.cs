@@ -25,7 +25,7 @@ public sealed class EventFieldDefinition {
         FilterStage = filterStage ?? ResolveFilterStage(name);
         IsFilterable = IsSupportedType(valueType);
         SupportedOperators = IsFilterable
-            ? ResolveOperators(valueType)
+            ? ResolveOperators(name, valueType)
             : Array.Empty<EventPredicateOperator>();
     }
 
@@ -108,7 +108,7 @@ public sealed class EventFieldDefinition {
         new[] { "EventId", "Id", "RecordId", "EventRecordId", "TimeCreated", "When", "ProviderName", "Provider", "Level" }
             .Contains(name, StringComparer.OrdinalIgnoreCase);
 
-    private static IReadOnlyList<EventPredicateOperator> ResolveOperators(Type type) {
+    private static IReadOnlyList<EventPredicateOperator> ResolveOperators(string name, Type type) {
         Type effectiveType = Nullable.GetUnderlyingType(type) ?? type;
         var values = new List<EventPredicateOperator> {
             EventPredicateOperator.Equal,
@@ -126,6 +126,9 @@ public sealed class EventFieldDefinition {
                 EventPredicateOperator.MatchesWildcard,
                 EventPredicateOperator.MatchesRegex
             });
+            if (IsIpAddressField(name)) {
+                values.Add(EventPredicateOperator.InSubnet);
+            }
         } else if (effectiveType == typeof(IPAddress)) {
             values.Add(EventPredicateOperator.InSubnet);
         } else if (TryGetEnumerableElementType(effectiveType, out _)) {
@@ -140,6 +143,14 @@ public sealed class EventFieldDefinition {
         }
         return values;
     }
+
+    private static bool IsIpAddressField(string name) =>
+        name.EndsWith("IpAddress", StringComparison.OrdinalIgnoreCase) ||
+        name.Equals("IPAddress", StringComparison.OrdinalIgnoreCase) ||
+        name.Equals("RemoteIp", StringComparison.OrdinalIgnoreCase) ||
+        name.Equals("ClientAddress", StringComparison.OrdinalIgnoreCase) ||
+        name.Equals("NASIPv4Address", StringComparison.OrdinalIgnoreCase) ||
+        name.Equals("NASIPv6Address", StringComparison.OrdinalIgnoreCase);
 
     private static bool IsSupportedType(Type type) {
         Type effectiveType = Nullable.GetUnderlyingType(type) ?? type;

@@ -135,7 +135,7 @@ public sealed class CmdletShowEVXEvent : AsyncPSCmdlet {
     [Parameter(ParameterSetName = "Store")]
     public long MaxEvents { get; set; }
 
-    /// <summary>Maximum raw candidates evaluated by typed definitions. Zero is unlimited.</summary>
+    /// <summary>Maximum raw candidates evaluated before exact predicate verification. Stored queries default to 100,000 when omitted; zero is unlimited.</summary>
     [ValidateRange(0, long.MaxValue)]
     [Parameter(ParameterSetName = "Type")]
     [Parameter(ParameterSetName = "Definition")]
@@ -246,9 +246,11 @@ public sealed class CmdletShowEVXEvent : AsyncPSCmdlet {
                 Providers = ProviderName,
                 Predicate = PowerShellEventPredicateAdapter.Resolve(Where, nameof(Where)),
                 MaxEvents = MaxEvents,
-                MaxCandidates = MaxEventsScanned,
                 Oldest = Oldest.IsPresent
             };
+            if (MyInvocation.BoundParameters.ContainsKey(nameof(MaxEventsScanned))) {
+                query.MaxCandidates = MaxEventsScanned;
+            }
             var store = new EventStore(FromStore!);
             report = SummaryPeriod.HasValue
                 ? await store.CreateSummaryReportAsync(query, SummaryPeriod.Value, Title, CancelToken).ConfigureAwait(false)

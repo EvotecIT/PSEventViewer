@@ -58,7 +58,7 @@ public sealed partial class CmdletGetEVXEvent {
                ParameterSetName == "Hashtable" ||
                (ParameterSetName == "Path" &&
                 ContainsWildcard(
-                    Filter?.ProviderNames ?? ProviderName));
+                    ResolveNativeFilter()?.ProviderNames ?? ProviderName));
     }
 
     private EventLogBatchQuery CreatePlannerBatch() {

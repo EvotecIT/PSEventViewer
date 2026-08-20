@@ -113,12 +113,11 @@ $filter.Fields | Get-Member -MemberType Property
 $filter.Fields.Who |
     Select-Object Name, Description, ValueType, FilterStage, SupportedOperators
 
-$predicate = $filter.AllOf(
+$filter.AllOf(
     $filter.Fields.Who.MatchesWildcard('CONTOSO\*'),
     $filter.Fields.IpAddress.NotIn('-', '::1'))
 
-Get-EVXEvent -Type ADUserLogonFailed `
-    -Where $predicate -TimePeriod Last24Hours
+Get-EVXEvent -Filter $filter -TimePeriod Last24Hours
 ```
 
 For an interactive expression, use the restricted script-block form:
@@ -128,6 +127,11 @@ Get-EVXEvent -Type ADUserLogonFailed `
     -Where { $_.Who -like 'CONTOSO\*' -and $_.IpAddress -notin @('-', '::1') }
 
 Get-EVXEvent -Type ADUserLogonFailed `
+    -Where { $_.Who -like 'CONTOSO\*' } -Explain
+
+Get-EVXEvent -Type ADUserLogonFailed -Describe
+
+New-EVXFilter -Type ADUserLogonFailed `
     -Where { $_.Who -like 'CONTOSO\*' } -Explain
 ```
 

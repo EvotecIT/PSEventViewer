@@ -20,7 +20,8 @@ public sealed partial class CmdletGetEVXEvent {
     }
 
     private EventFilter CreateCommandFilter() {
-        if (Filter != null) {
+        EventFilter? nativeFilter = ResolveNativeFilter();
+        if (nativeFilter != null) {
             string[] conflicting = new[] {
                     nameof(EventId),
                     nameof(EventRecordId),
@@ -41,11 +42,11 @@ public sealed partial class CmdletGetEVXEvent {
                     string.Join(", ", conflicting) + ".");
             }
             if (ParameterSetName == "Provider" &&
-                (Filter.ProviderNames?.Count ?? 0) > 0) {
+                (nativeFilter.ProviderNames?.Count ?? 0) > 0) {
                 throw new PSArgumentException(
                     "ProviderName already defines the provider source in the Provider parameter set; Filter.ProviderNames must be empty.");
             }
-            return Filter;
+            return nativeFilter;
         }
         (DateTime? resolvedStart, DateTime? resolvedEnd) =
             EventTimeRange.Resolve(StartTime, EndTime, TimePeriod);
@@ -61,6 +62,19 @@ public sealed partial class CmdletGetEVXEvent {
             NamedData = ConvertNamedData(NamedDataFilter),
             ExcludedNamedData = ConvertNamedData(NamedDataExcludeFilter)
         };
+    }
+
+    private EventFilter? ResolveNativeFilter() {
+        object? value = Filter;
+        while (value is PSObject wrapper && wrapper.BaseObject != value) {
+            value = wrapper.BaseObject;
+        }
+        if (value == null) {
+            return null;
+        }
+        return value as EventFilter ?? throw new PSArgumentException(
+            "Native Channel, Path, and Provider queries require an EventFilter from New-EVXFilter without Type or Definition.",
+            nameof(Filter));
     }
 
     private EventFilter CopyFilterWithCheckpoint(

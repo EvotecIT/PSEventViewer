@@ -90,6 +90,34 @@ public sealed class TestEventStore {
     }
 
     [Fact]
+    public async Task ReadRehydratesValuesFromDeclaredSchemaTypes() {
+        string path = CreateStorePath();
+        try {
+            var store = new EventStore(path);
+            await store.WriteAsync(CreateTypedValueReport());
+
+            EventReport report = await store.ReadReportAsync(new EventStoreQuery {
+                Predicate = EventPredicate.Compare(
+                    "IsoText",
+                    EventPredicateOperator.Equal,
+                    "2026-08-20T10:00:00Z")
+            });
+
+            EventReportRow row = Assert.Single(report.Rows);
+            Assert.IsType<string>(row.Values["IsoText"]);
+            Assert.Equal("2026-08-20T10:00:00Z", row.Values["IsoText"]);
+            Assert.IsType<int>(row.Values["AttemptCount"]);
+            Assert.Equal(7, row.Values["AttemptCount"]);
+            Assert.IsType<DateTime>(row.Values["OccurredAt"]);
+            Assert.Equal(
+                new DateTime(2026, 8, 20, 10, 0, 0, DateTimeKind.Utc),
+                ((DateTime)row.Values["OccurredAt"]!).ToUniversalTime());
+        } finally {
+            DeleteStore(path);
+        }
+    }
+
+    [Fact]
     public async Task StoredPredicatesUseLiveCommonFieldNamesAndNumericLevel() {
         string path = CreateStorePath();
         try {
@@ -98,19 +126,34 @@ public sealed class TestEventStore {
                 (new DateTime(2026, 8, 1, 1, 0, 0, DateTimeKind.Utc), 42, "alice")));
             EventPredicate predicate = EventPredicate.AllOf(
                 EventPredicate.Compare("ProviderName", EventPredicateOperator.Equal,
-                    "Microsoft-Windows-Security-Auditing"),
-                EventPredicate.Compare("SourceLogName", EventPredicateOperator.Equal, "Security"),
-                EventPredicate.Compare("MachineName", EventPredicateOperator.Equal, "source.ad.evotec.xyz"),
+                    "microsoft-windows-security-auditing"),
+                EventPredicate.Compare("SourceLogName", EventPredicateOperator.Equal, "security"),
+                EventPredicate.Compare("MachineName", EventPredicateOperator.Equal, "SOURCE.AD.EVOTEC.XYZ"),
                 EventPredicate.Compare("TypeName", EventPredicateOperator.Equal, "StoredLogon"),
                 EventPredicate.Compare("Level", EventPredicateOperator.Equal, 0));
 
             EventReport report = await store.ReadReportAsync(new EventStoreQuery {
                 Predicate = predicate
             });
+            EventReport direct = await store.ReadReportAsync(new EventStoreQuery {
+                SourceComputers = new[] { "SOURCE.AD.EVOTEC.XYZ" },
+                SourceLogs = new[] { "security" },
+                Providers = new[] { "microsoft-windows-security-auditing" }
+            });
+            EventPredicate caseSensitiveProvider = EventPredicate.Compare(
+                "ProviderName",
+                EventPredicateOperator.Equal,
+                "microsoft-windows-security-auditing");
+            caseSensitiveProvider.IgnoreCase = false;
+            EventReport caseSensitive = await store.ReadReportAsync(new EventStoreQuery {
+                Predicate = caseSensitiveProvider
+            });
 
             EventReportRow row = Assert.Single(report.Rows);
             Assert.Equal((byte)0, row.LevelValue);
             Assert.Equal("Information", row.Level);
+            Assert.Single(direct.Rows);
+            Assert.Empty(caseSensitive.Rows);
         } finally {
             DeleteStore(path);
         }
@@ -536,6 +579,50 @@ public sealed class TestEventStore {
             GatheredLogName = "ForwardedEvents"
         };
         source.Data["TargetUserName"] = "bob";
+        return EventReportEngine.Create(new object[] {
+            EventDefinitionEngine.CreateRecord(definition, source)
+        });
+    }
+
+    private static EventReport CreateTypedValueReport() {
+        EventDefinition definition = new() {
+            Name = "StoredTypedValues",
+            Sources = new[] {
+                new EventDefinitionSource { LogName = "Security", EventIds = new[] { 4624 } }
+            },
+            Fields = new[] {
+                new EventDefinitionField {
+                    Name = "IsoText",
+                    ValueKind = EventFieldValueKind.String,
+                    Source = EventFieldSource.Data,
+                    SourceName = "IsoText"
+                },
+                new EventDefinitionField {
+                    Name = "AttemptCount",
+                    ValueKind = EventFieldValueKind.Int32,
+                    Source = EventFieldSource.Data,
+                    SourceName = "AttemptCount"
+                },
+                new EventDefinitionField {
+                    Name = "OccurredAt",
+                    ValueKind = EventFieldValueKind.DateTime,
+                    Source = EventFieldSource.Data,
+                    SourceName = "OccurredAt"
+                }
+            }
+        };
+        var source = new EventObject(
+            new SyntheticEventRecord(
+                new DateTime(2026, 8, 20, 10, 0, 0, DateTimeKind.Utc),
+                44),
+            "WEC01",
+            EventReadMode.StructuredDataAndMessage) {
+            ContainerLog = "ForwardedEvents",
+            GatheredLogName = "ForwardedEvents"
+        };
+        source.Data["IsoText"] = "2026-08-20T10:00:00Z";
+        source.Data["AttemptCount"] = "7";
+        source.Data["OccurredAt"] = "2026-08-20T10:00:00Z";
         return EventReportEngine.Create(new object[] {
             EventDefinitionEngine.CreateRecord(definition, source)
         });

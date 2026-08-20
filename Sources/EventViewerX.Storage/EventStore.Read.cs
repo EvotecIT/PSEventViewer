@@ -63,14 +63,14 @@ public sealed partial class EventStore {
             .OpenSessionAsync(Path, cancellationToken)
             .ConfigureAwait(false);
         return await session.RunInTransactionAsync(async (transaction, token) => {
-            PredicatePushdownPolicy pushdown = await ReadPredicatePushdownPolicyAsync(
+            StoredSchemaContext schemaContext = await ReadSchemaContextAsync(
                 transaction,
                 snapshot.ResolveDefinitionNames(),
                 token).ConfigureAwait(false);
-            QueryCommand command = BuildReadCommand(snapshot, pushdown);
+            QueryCommand command = BuildReadCommand(snapshot, schemaContext.Pushdown);
             IReadOnlyList<EventReportRow> candidates = await transaction.QueryAsListAsync(
                 command.Sql,
-                MapEventRow,
+                record => MapEventRow(record, schemaContext.ByName),
                 command.Parameters,
                 cancellationToken: token).ConfigureAwait(false);
 
@@ -96,10 +96,10 @@ public sealed partial class EventStore {
             string[] definitionNames = rows.Select(static row => row.Type)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToArray();
-            IReadOnlyList<EventReportSectionSchema> schemas = await ReadSchemasAsync(
-                transaction,
-                definitionNames,
-                token).ConfigureAwait(false);
+            HashSet<string> populatedDefinitions = new(definitionNames, StringComparer.OrdinalIgnoreCase);
+            IReadOnlyList<EventReportSectionSchema> schemas = schemaContext.Schemas
+                .Where(schema => populatedDefinitions.Contains(schema.Name))
+                .ToArray();
             EventReportCoverage[] coverage = rows
                 .GroupBy(static row => row.CollectorComputer + "\0" + row.SourceLog, StringComparer.OrdinalIgnoreCase)
                 .Select(static group => {
@@ -155,14 +155,14 @@ FROM evx_events";
 
         var where = new List<string>();
         var parameters = new Dictionary<string, object?>();
-        AddIn(where, parameters, "definition_name", "definition", query.ResolveDefinitionNames());
+        AddIn(where, parameters, "definition_name", "definition", query.ResolveDefinitionNames(), caseInsensitive: true);
         AddBoundary(where, parameters, "event_time_utc", "$start", ">=", ToUtcText(query.StartTime));
         AddBoundary(where, parameters, "event_time_utc", "$end", "<=", ToUtcText(query.EndTime));
         AddIn(where, parameters, "event_id", "eventId", query.EventIds);
         AddIn(where, parameters, "record_id", "recordId", query.RecordIds);
-        AddIn(where, parameters, "source_computer", "sourceComputer", query.SourceComputers);
-        AddIn(where, parameters, "source_log", "sourceLog", query.SourceLogs);
-        AddIn(where, parameters, "provider", "provider", query.Providers);
+        AddIn(where, parameters, "source_computer", "sourceComputer", query.SourceComputers, caseInsensitive: true);
+        AddIn(where, parameters, "source_log", "sourceLog", query.SourceLogs, caseInsensitive: true);
+        AddIn(where, parameters, "provider", "provider", query.Providers, caseInsensitive: true);
         if (includePredicateNative && query.Predicate != null) {
             EventFilter? native = EventPredicatePlanner.Plan(query.Predicate).NativeFilter;
             if (native != null) {
@@ -174,7 +174,7 @@ FROM evx_events";
                     AddIn(where, parameters, "record_id", "predicateRecordId", native.RecordIds);
                 }
                 if (pushdown.CanPush(query.Predicate, "ProviderName", "Provider")) {
-                    AddIn(where, parameters, "provider", "predicateProvider", native.ProviderNames);
+                    AddIn(where, parameters, "provider", "predicateProvider", native.ProviderNames, caseInsensitive: true);
                 }
                 if (pushdown.CanPush(query.Predicate, "Level")) {
                     AddIn(where, parameters, "level_value", "predicateLevel", native.Levels);
@@ -188,14 +188,14 @@ FROM evx_events";
         return new WhereCommand(where, parameters);
     }
 
-    private static async Task<PredicatePushdownPolicy> ReadPredicatePushdownPolicyAsync(
+    private static async Task<StoredSchemaContext> ReadSchemaContextAsync(
         SQLiteAsyncSession session,
         IReadOnlyList<string> definitionNames,
         CancellationToken cancellationToken) {
 
         var where = new List<string>();
         var parameters = new Dictionary<string, object?>();
-        AddIn(where, parameters, "definition_name", "pushdownSchema", definitionNames);
+        AddIn(where, parameters, "definition_name", "pushdownSchema", definitionNames, caseInsensitive: true);
         string sql = "SELECT schema_json FROM evx_definitions";
         if (where.Count > 0) {
             sql += " WHERE " + where[0];
@@ -207,55 +207,78 @@ FROM evx_events";
                 ?? throw new InvalidDataException("A stored report schema is invalid."),
             parameters,
             cancellationToken: cancellationToken).ConfigureAwait(false);
-        if (schemas.Any(static schema => schema.Kind == EventReportSectionKind.Generic)) {
-            return PredicatePushdownPolicy.DisableAll;
-        }
-        return new PredicatePushdownPolicy(schemas
-            .SelectMany(static schema => schema.Columns)
-            .Select(static column => column.Name));
+        PredicatePushdownPolicy pushdown = schemas.Any(static schema => schema.Kind == EventReportSectionKind.Generic)
+            ? PredicatePushdownPolicy.DisableAll
+            : new PredicatePushdownPolicy(schemas
+                .SelectMany(static schema => schema.Columns)
+                .Select(static column => column.Name));
+        return new StoredSchemaContext(schemas, pushdown);
     }
 
-    private static EventReportRow MapEventRow(IDataRecord record) => new() {
-        Type = record.GetString(0),
-        TimeCreated = ParseUtc(record.GetString(1)),
-        EventId = record.GetInt32(2),
-        RecordId = record.IsDBNull(3) ? null : record.GetInt64(3),
-        Provider = record.GetString(4),
-        SourceLog = record.GetString(5),
-        ContainerLog = record.GetString(6),
-        SourceComputer = record.GetString(7),
-        CollectorComputer = record.GetString(8),
-        Level = record.GetString(9),
-        LevelValue = record.IsDBNull(10) ? null : record.GetByte(10),
-        Message = record.GetString(11),
-        Values = DeserializeValues(record.GetString(12))
-    };
+    private static EventReportRow MapEventRow(
+        IDataRecord record,
+        IReadOnlyDictionary<string, EventReportSectionSchema> schemas) {
 
-    private static async Task<IReadOnlyList<EventReportSectionSchema>> ReadSchemasAsync(
-        SQLiteAsyncSession session,
-        IReadOnlyList<string> names,
-        CancellationToken cancellationToken) {
-
-        if (names.Count == 0) {
-            return Array.Empty<EventReportSectionSchema>();
-        }
-        var where = new List<string>();
-        var parameters = new Dictionary<string, object?>();
-        AddIn(where, parameters, "definition_name", "schema", names);
-        return await session.QueryAsListAsync(
-            "SELECT schema_json FROM evx_definitions WHERE " + where[0] + ";",
-            static record => JsonSerializer.Deserialize<EventReportSectionSchema>(record.GetString(0), JsonOptions)
-                ?? throw new InvalidDataException("A stored report schema is invalid."),
-            parameters,
-            cancellationToken: cancellationToken).ConfigureAwait(false);
+        string definitionName = record.GetString(0);
+        schemas.TryGetValue(definitionName, out EventReportSectionSchema? schema);
+        return new EventReportRow {
+            Type = definitionName,
+            TimeCreated = ParseUtc(record.GetString(1)),
+            EventId = record.GetInt32(2),
+            RecordId = record.IsDBNull(3) ? null : record.GetInt64(3),
+            Provider = record.GetString(4),
+            SourceLog = record.GetString(5),
+            ContainerLog = record.GetString(6),
+            SourceComputer = record.GetString(7),
+            CollectorComputer = record.GetString(8),
+            Level = record.GetString(9),
+            LevelValue = record.IsDBNull(10) ? null : record.GetByte(10),
+            Message = record.GetString(11),
+            Values = DeserializeValues(record.GetString(12), schema)
+        };
     }
 
-    private static IReadOnlyDictionary<string, object?> DeserializeValues(string json) {
+    private static IReadOnlyDictionary<string, object?> DeserializeValues(
+        string json,
+        EventReportSectionSchema? schema) {
+
         Dictionary<string, JsonElement>? values = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(json, JsonOptions);
-        return values?.ToDictionary(
-            static item => item.Key,
-            static item => ConvertJson(item.Value),
-            StringComparer.OrdinalIgnoreCase) ?? new Dictionary<string, object?>();
+        if (values == null) {
+            return new Dictionary<string, object?>();
+        }
+        IReadOnlyDictionary<string, Type> declaredTypes = schema?.Columns.ToDictionary(
+            static column => column.Name,
+            static column => EventReportColumnSchema.ResolveValueTypeName(column.ValueTypeName),
+            StringComparer.OrdinalIgnoreCase) ?? new Dictionary<string, Type>();
+        var result = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+        foreach (KeyValuePair<string, JsonElement> item in values) {
+            result[item.Key] = declaredTypes.TryGetValue(item.Key, out Type? declaredType) && declaredType != typeof(object)
+                ? ConvertDeclaredJson(item.Value, declaredType, schema!.Name, item.Key)
+                : ConvertJson(item.Value);
+        }
+        return result;
+    }
+
+    private static object? ConvertDeclaredJson(
+        JsonElement value,
+        Type declaredType,
+        string definitionName,
+        string fieldName) {
+
+        if (value.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined) {
+            return null;
+        }
+        try {
+            return JsonSerializer.Deserialize(value.GetRawText(), declaredType, JsonOptions);
+        } catch (JsonException exception) {
+            throw new InvalidDataException(
+                $"Stored field '{definitionName}.{fieldName}' cannot be restored as '{declaredType.FullName}'.",
+                exception);
+        } catch (NotSupportedException exception) {
+            throw new InvalidDataException(
+                $"Stored field '{definitionName}.{fieldName}' uses unsupported type '{declaredType.FullName}'.",
+                exception);
+        }
     }
 
     private static object? ConvertJson(JsonElement value) => value.ValueKind switch {
@@ -302,7 +325,8 @@ FROM evx_events";
         IDictionary<string, object?> parameters,
         string column,
         string prefix,
-        IReadOnlyList<T>? values) {
+        IReadOnlyList<T>? values,
+        bool caseInsensitive = false) {
 
         if (values == null || values.Count == 0) {
             return;
@@ -313,7 +337,8 @@ FROM evx_events";
             names[index] = name;
             parameters[name] = values[index];
         }
-        where.Add($"{column} IN ({string.Join(", ", names)})");
+        string expression = caseInsensitive ? $"{column} COLLATE NOCASE" : column;
+        where.Add($"{expression} IN ({string.Join(", ", names)})");
     }
 
     private static void AddDirectPlanStep<T>(
@@ -373,5 +398,22 @@ FROM evx_events";
             }
             return predicate.Children.Any(child => UsesShadowedField(child, nativeAliases));
         }
+    }
+
+    private sealed class StoredSchemaContext {
+        internal StoredSchemaContext(
+            IReadOnlyList<EventReportSectionSchema> schemas,
+            PredicatePushdownPolicy pushdown) {
+
+            Schemas = schemas;
+            Pushdown = pushdown;
+            ByName = schemas.ToDictionary(
+                static schema => schema.Name,
+                StringComparer.OrdinalIgnoreCase);
+        }
+
+        internal IReadOnlyList<EventReportSectionSchema> Schemas { get; }
+        internal IReadOnlyDictionary<string, EventReportSectionSchema> ByName { get; }
+        internal PredicatePushdownPolicy Pushdown { get; }
     }
 }

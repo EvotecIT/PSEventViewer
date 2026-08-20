@@ -93,17 +93,51 @@ Describe 'New-EVXFilter' {
 
     It 'builds and explains one shared typed predicate without querying a source' {
         $Filter = New-EVXFilter -Type ADUserLogonFailed
-        $Predicate = $Filter.AllOf(
+        $Filter.AllOf(
             $Filter.Fields.EventId.In(4624, 4625),
             $Filter.Fields.Who.Contains('svc-')
         )
 
-        $Plan = Get-EVXEvent -Type ADUserLogonFailed -Where $Predicate -Explain
+        $Plan = Get-EVXEvent -Filter $Filter -Explain
 
         $Plan.HasNativeFilter | Should -BeTrue
         $Plan.IsFullyNative | Should -BeFalse
         @($Plan.Steps | ForEach-Object { $_.Stage.ToString() }) | Should -Contain 'Native'
         @($Plan.Steps | ForEach-Object { $_.Stage.ToString() }) | Should -Contain 'Managed'
+    }
+
+    It 'retains the agreed discoverable filter for direct reuse through Get-EVXEvent -Filter' {
+        $Filter = New-EVXFilter -Type ADUserLogonFailed
+        $ConfigurationOutput = @($Filter.AllOf(
+            $Filter.Fields.Who.In('EVOTEC\Alice', 'EVOTEC\Bob'),
+            $Filter.Fields.IPAddress.MatchesSubnet('10.0.0.0/8')
+        ))
+
+        $ConfigurationOutput | Should -BeNullOrEmpty
+        $Filter.Predicate.Kind.ToString() | Should -Be 'All'
+        $Plan = Get-EVXEvent -Filter $Filter -TimePeriod Last7Days -Explain
+        $Plan.ManagedPredicate | Should -Not -BeNullOrEmpty
+        (Get-Command Get-EVXEvent).ParameterSets.Name | Should -Contain 'TypedFilter'
+    }
+
+    It 'describes typed fields and explains an inline reusable filter without reading events' {
+        $Description = Get-EVXEvent -Type ADUserLogonFailed -Describe
+        $Plan = New-EVXFilter -Type ADUserLogonFailed -Where {
+            $_.Who -like 'EVOTEC\*'
+        } -Explain
+
+        $Description.Name | Should -Be 'ADUserLogonFailed'
+        $Description.Fields.Name | Should -Contain 'Who'
+        $Description.Fields.Name | Should -Contain 'IpAddress'
+        $Plan.ManagedPredicate | Should -Not -BeNullOrEmpty
+    }
+
+    It 'rejects misspelled typed fields before any event query runs' {
+        {
+            New-EVXFilter -Type ADUserLogonFailed -Where {
+                $_.DefinitelyMissing -eq 'value'
+            }
+        } | Should -Throw '*Available fields*'
     }
 
     It 'accepts a restricted PowerShell expression but never executes arbitrary script' {
@@ -140,5 +174,41 @@ Describe 'New-EVXFilter' {
 
         $Insensitive.ManagedPredicate.IgnoreCase | Should -BeTrue
         $Sensitive.ManagedPredicate.IgnoreCase | Should -BeFalse
+    }
+
+    It 'accepts reversed PowerShell membership for collection fields' {
+        $Included = Get-EVXEvent -Type ADUserPrivilegeUse -Where {
+            'SeDebugPrivilege' -in $_.Privileges
+        } -Explain
+        $Excluded = Get-EVXEvent -Type ADUserPrivilegeUse -Where {
+            'SeDebugPrivilege' -notin $_.Privileges
+        } -Explain
+
+        $Included.ManagedPredicate.Operator.ToString() | Should -Be 'In'
+        $Excluded.ManagedPredicate.Operator.ToString() | Should -Be 'NotIn'
+    }
+
+    It 'explains custom aliases from definition metadata rather than native names' {
+        $DefinitionPath = Join-Path $TestDrive 'custom-explain.json'
+        @{
+            Name = 'CustomExplain'
+            Sources = @(@{
+                    LogName = 'System'
+                    EventIds = @(7040)
+                })
+            Fields = @(@{
+                    Name = 'ServiceLabel'
+                    Aliases = @('ProviderName')
+                    Source = 'Data'
+                    SourceName = 'param4'
+                })
+        } | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $DefinitionPath -Encoding UTF8
+
+        $Filter = New-EVXFilter -Definition $DefinitionPath
+        $Filter.Use($Filter.Fields.ProviderName.Equal('BITS')) | Out-Null
+        $Plan = Get-EVXEvent -Filter $Filter -Explain
+
+        $Plan.NativeFilter | Should -BeNullOrEmpty
+        $Plan.ManagedPredicate.Field | Should -Be 'ServiceLabel'
     }
 }

@@ -43,19 +43,29 @@ public sealed class EventPredicateBuilder {
     public IReadOnlyList<EventPredicateField> Fields { get; }
 
     /// <summary>Creates a builder for one built-in event type.</summary>
-    public static EventPredicateBuilder ForType(EventType type) {
-        EventTypeDefinition definition = EventTypeCatalog.GetDefinition(type);
-        if (definition.IsComposite) {
-            IReadOnlyList<EventFieldDefinition> compositeFields = EventTypeCatalog
-                .Expand(new[] { type })
-                .Select(EventTypeCatalog.GetDefinition)
-                .SelectMany(static item => item.Fields)
-                .GroupBy(static field => field.Name, StringComparer.OrdinalIgnoreCase)
-                .Select(static group => group.First())
-                .ToArray();
-            return new EventPredicateBuilder(definition.Name, definition.DisplayName, compositeFields);
+    public static EventPredicateBuilder ForType(EventType type) => ForTypes(new[] { type });
+
+    /// <summary>Creates a builder exposing the union of fields for one or more built-in event types.</summary>
+    public static EventPredicateBuilder ForTypes(IEnumerable<EventType> types) {
+        EventType[] requested = types?.Distinct().ToArray() ?? throw new ArgumentNullException(nameof(types));
+        if (requested.Length == 0) {
+            throw new ArgumentException("At least one event type is required.", nameof(types));
         }
-        return new EventPredicateBuilder(definition.Name, definition.DisplayName, definition.Fields);
+        EventTypeDefinition[] definitions = requested.Select(EventTypeCatalog.GetDefinition).ToArray();
+        IReadOnlyList<EventFieldDefinition> fields = EventTypeCatalog
+            .Expand(requested)
+            .Select(EventTypeCatalog.GetDefinition)
+            .SelectMany(static item => item.Fields)
+            .GroupBy(static field => field.Name, StringComparer.OrdinalIgnoreCase)
+            .Select(static group => group.First())
+            .ToArray();
+        string name = definitions.Length == 1
+            ? definitions[0].Name
+            : string.Join(",", definitions.Select(static definition => definition.Name));
+        string displayName = definitions.Length == 1
+            ? definitions[0].DisplayName
+            : "Multiple event types";
+        return new EventPredicateBuilder(name, displayName, fields);
     }
 
     /// <summary>Creates a builder for one declarative custom definition.</summary>
@@ -68,7 +78,7 @@ public sealed class EventPredicateBuilder {
             static field => new EventFieldDefinition(
                 field.Name,
                 string.IsNullOrWhiteSpace(field.DisplayName) ? field.Name : field.DisplayName,
-                ResolveType(field.ValueKind),
+                field.ValueType,
                 isCommon: false,
                 field.Description,
                 field.Aliases,
@@ -98,6 +108,33 @@ public sealed class EventPredicateBuilder {
         return field;
     }
 
+    /// <summary>Validates field names and operators and returns a canonical independent predicate.</summary>
+    public EventPredicate Normalize(EventPredicate predicate) {
+        if (predicate == null) {
+            throw new ArgumentNullException(nameof(predicate));
+        }
+        EventPredicate normalized = predicate.Clone();
+        normalized.Validate();
+        NormalizeNode(normalized);
+        return normalized;
+    }
+
+    private void NormalizeNode(EventPredicate predicate) {
+        if (predicate.Kind == EventPredicateKind.Comparison) {
+            EventPredicateField field = Field(predicate.Field!);
+            if (!field.SupportedOperators.Contains(predicate.Operator)) {
+                throw new ArgumentException(
+                    $"Operator '{predicate.Operator}' is not supported by field '{field.Name}'. " +
+                    $"Supported operators: {string.Join(", ", field.SupportedOperators)}.",
+                    nameof(predicate));
+            }
+            predicate.Field = field.Name;
+        }
+        foreach (EventPredicate child in predicate.Children) {
+            NormalizeNode(child);
+        }
+    }
+
     /// <summary>Requires every predicate to match.</summary>
     public EventPredicate AllOf(params EventPredicate[] predicates) =>
         EventPredicate.AllOf(predicates);
@@ -109,15 +146,4 @@ public sealed class EventPredicateBuilder {
     /// <summary>Negates one predicate.</summary>
     public EventPredicate Not(EventPredicate predicate) => EventPredicate.Not(predicate);
 
-    private static Type ResolveType(EventFieldValueKind kind) {
-        return kind switch {
-            EventFieldValueKind.Int32 => typeof(int),
-            EventFieldValueKind.Int64 => typeof(long),
-            EventFieldValueKind.Boolean => typeof(bool),
-            EventFieldValueKind.DateTime => typeof(DateTime),
-            EventFieldValueKind.Guid => typeof(Guid),
-            EventFieldValueKind.IpAddress => typeof(System.Net.IPAddress),
-            _ => typeof(string)
-        };
-    }
 }

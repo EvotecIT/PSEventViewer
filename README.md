@@ -209,17 +209,21 @@ invent a hashtable key or memorize provider XML.
 
 ```powershell
 $auth = New-EVXFilter -Type ActiveDirectoryAuthentication
-$predicate = $auth.AllOf(
+$auth.AllOf(
     $auth.Fields.Who.MatchesWildcard('CONTOSO\*'),
     $auth.Fields.IpAddress.NotIn('-', '::1'))
 
-Get-EVXEvent -Type ActiveDirectoryAuthentication `
-    -Where $predicate -TimePeriod Last24Hours
+Get-EVXEvent -Filter $auth -TimePeriod Last24Hours
 
 # The script-block form accepts only a restricted comparison expression. It is
 # parsed, never invoked, so commands and unrelated variables are rejected.
 Get-EVXEvent -Type ActiveDirectoryAuthentication `
     -Where { $_.Who -like 'CONTOSO\*' -and $_.IpAddress -notin @('-', '::1') }
+
+# Inspect the complete schema or plan without reading event sources.
+Get-EVXEvent -Type ADUserLogonFailed -Describe
+New-EVXFilter -Type ADUserLogonFailed `
+    -Where { $_.Who -like 'CONTOSO\*' } -Explain
 ```
 
 `-Explain` returns the planned native/managed stages without reading events.

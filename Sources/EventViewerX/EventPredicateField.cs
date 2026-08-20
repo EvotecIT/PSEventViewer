@@ -93,4 +93,7 @@ public sealed class EventPredicateField {
     /// <summary>Matches an IP address within a CIDR subnet.</summary>
     public EventPredicate InSubnet(string subnet) =>
         EventPredicate.Compare(Name, EventPredicateOperator.InSubnet, subnet);
+
+    /// <summary>Matches an IP address within a CIDR subnet.</summary>
+    public EventPredicate MatchesSubnet(string subnet) => InSubnet(subnet);
 }

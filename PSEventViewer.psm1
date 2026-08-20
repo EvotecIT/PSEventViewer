@@ -90,8 +90,9 @@ if ($BinaryRoot -and (Test-Path -LiteralPath (Join-Path $BinaryRoot 'DbaClientX.
         'x86'
     }
     $NativeCandidates = @(
-        (Join-Path $BinaryRoot 'e_sqlite3.dll')
         (Join-Path $BinaryRoot "runtimes\win-$NativeArchitecture\native\e_sqlite3.dll")
+        (Join-Path $PSScriptRoot "Lib\Core\runtimes\win-$NativeArchitecture\native\e_sqlite3.dll")
+        (Join-Path $BinaryRoot 'e_sqlite3.dll')
     )
     $NativeSQLite = $NativeCandidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
     if (-not $NativeSQLite) {

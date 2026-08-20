@@ -364,7 +364,7 @@ Accept wildcard characters: False
 ```
 
 ### -MaxEventsScanned
-Maximum raw candidates evaluated by typed definitions. Zero is unlimited.
+Maximum raw candidates evaluated before exact predicate verification. Stored queries default to 100,000 when omitted; zero is unlimited.
 
 ```yaml
 Type: Int64
