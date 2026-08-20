@@ -471,12 +471,14 @@ public sealed partial class CmdletGetEVXEvent : AsyncPSCmdlet {
     [Parameter(ParameterSetName = "Type")]
     [Parameter(ParameterSetName = "Definition")]
     [Parameter(ParameterSetName = "TypedFilter")]
+    [Parameter(ParameterSetName = "Path")]
     public SwitchParameter Explain { get; set; }
 
     /// <summary>Returns definition and field metadata without querying event sources.</summary>
     [Parameter(ParameterSetName = "Type")]
     [Parameter(ParameterSetName = "Definition")]
     [Parameter(ParameterSetName = "TypedFilter")]
+    [Parameter(ParameterSetName = "Path")]
     public SwitchParameter Describe { get; set; }
 
     /// <summary>
@@ -644,23 +646,33 @@ public sealed partial class CmdletGetEVXEvent : AsyncPSCmdlet {
 
     private bool UsesBuiltInTypeQuery =>
         ParameterSetName == "Type" ||
-        ParameterSetName == "TypedFilter" && _typedFilter?.Type != null;
+        _typedFilter?.Type != null;
 
     private bool UsesCustomDefinitionQuery =>
         ParameterSetName == "Definition" ||
-        ParameterSetName == "TypedFilter" && _typedFilter?.Definition != null;
+        _typedFilter?.Definition != null;
 
     private void InitializeTypedFilter() {
-        if (ParameterSetName != "TypedFilter") {
+        if (Filter == null ||
+            ParameterSetName != "TypedFilter" && ParameterSetName != "Path") {
             return;
         }
         object? value = Filter;
         while (value is PSObject wrapper && wrapper.BaseObject != value) {
             value = wrapper.BaseObject;
         }
-        _typedFilter = value as PowerShellEventPredicateBuilder ?? throw new PSArgumentException(
-            "Typed Filter queries require the object returned by New-EVXFilter -Type or -Definition.",
-            nameof(Filter));
+        _typedFilter = value as PowerShellEventPredicateBuilder;
+        if (_typedFilter == null) {
+            if (ParameterSetName == "TypedFilter") {
+                throw new PSArgumentException(
+                    "Typed Filter queries require the object returned by New-EVXFilter -Type or -Definition.",
+                    nameof(Filter));
+            }
+            return;
+        }
+        if (ParameterSetName == "Path") {
+            ValidateTypedFilterPathOptions();
+        }
         if (_typedFilter.Type.HasValue) {
             Type = new[] { _typedFilter.Type.Value };
         } else if (_typedFilter.Definition != null) {
@@ -671,6 +683,29 @@ public sealed partial class CmdletGetEVXEvent : AsyncPSCmdlet {
                 nameof(Filter));
         }
         Where = _typedFilter.Predicate;
+    }
+
+    private void ValidateTypedFilterPathOptions() {
+        string[] unsupported = new[] {
+            nameof(EventId),
+            nameof(ProviderName),
+            nameof(Keywords),
+            nameof(Level),
+            nameof(UserId),
+            nameof(NamedDataFilter),
+            nameof(NamedDataExcludeFilter),
+            nameof(FilterXPath),
+            nameof(BookmarkXml),
+            nameof(BookmarkOffset),
+            nameof(IgnoreStaleBookmark)
+        }.Where(MyInvocation.BoundParameters.ContainsKey).ToArray();
+        if (unsupported.Length > 0) {
+            throw new PSArgumentException(
+                "A typed Filter with Path cannot be combined with native-only options: " +
+                string.Join(", ", unsupported.Select(static name => "-" + name)) + ". " +
+                "Express event fields through the typed filter instead.",
+                nameof(Filter));
+        }
     }
 
     private async Task ProcessDefinitionAsync(CancellationToken token) {

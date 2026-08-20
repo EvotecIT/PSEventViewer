@@ -63,6 +63,69 @@ public sealed class TestEventStore {
     }
 
     [Fact]
+    public async Task EventIdentityUsesTheSameCaseInsensitiveSemanticsAsStoredDimensions() {
+        string path = CreateStorePath();
+        try {
+            DateTime time = new(2026, 8, 1, 1, 0, 0, DateTimeKind.Utc);
+            var store = new EventStore(path);
+            EventReport original = CreateReportForDefinition(
+                "StoredLogon",
+                (time, 42, "alice"));
+            EventReport alternateCase = CreateReportForDefinition(
+                "storedlogon",
+                (time, 42, "alice"));
+            EventReportRow alternateRow = Assert.Single(alternateCase.Rows);
+            alternateRow.SourceComputer = alternateRow.SourceComputer.ToUpperInvariant();
+            alternateRow.SourceLog = alternateRow.SourceLog.ToLowerInvariant();
+            alternateRow.Provider = alternateRow.Provider.ToLowerInvariant();
+
+            EventStoreWriteResult first = await store.WriteAsync(original);
+            EventStoreWriteResult second = await store.WriteAsync(alternateCase);
+
+            Assert.Equal(1, first.Inserted);
+            Assert.Equal(0, second.Inserted);
+            Assert.Equal(1, second.Duplicates);
+            Assert.Single((await store.ReadReportAsync(new EventStoreQuery())).Rows);
+        } finally {
+            DeleteStore(path);
+        }
+    }
+
+    [Fact]
+    public async Task EventIdentityDoesNotFoldValuesThatSqliteNoCaseKeepsDistinct() {
+        string path = CreateStorePath();
+        try {
+            DateTime time = new(2026, 8, 1, 1, 0, 0, DateTimeKind.Utc);
+            var store = new EventStore(path);
+            EventReport upperUnicode = CreateReportForDefinition(
+                "StoredLogon",
+                (time, 42, "alice"));
+            EventReport lowerUnicode = CreateReportForDefinition(
+                "StoredLogon",
+                (time, 42, "alice"));
+            EventReport trailingSpace = CreateReportForDefinition(
+                "StoredLogon",
+                (time, 42, "alice"));
+            Assert.Single(upperUnicode.Rows).Provider = "MÜNCHEN";
+            Assert.Single(lowerUnicode.Rows).Provider = "München";
+            EventReportRow spacedRow = Assert.Single(trailingSpace.Rows);
+            spacedRow.Provider = "MÜNCHEN";
+            spacedRow.SourceComputer += " ";
+
+            EventStoreWriteResult first = await store.WriteAsync(upperUnicode);
+            EventStoreWriteResult second = await store.WriteAsync(lowerUnicode);
+            EventStoreWriteResult third = await store.WriteAsync(trailingSpace);
+
+            Assert.Equal(1, first.Inserted);
+            Assert.Equal(1, second.Inserted);
+            Assert.Equal(1, third.Inserted);
+            Assert.Equal(3, (await store.ReadReportAsync(new EventStoreQuery())).Rows.Count);
+        } finally {
+            DeleteStore(path);
+        }
+    }
+
+    [Fact]
     public async Task ReadUsesTypedPredicatesAndRetainsHomogeneousSchema() {
         string path = CreateStorePath();
         try {

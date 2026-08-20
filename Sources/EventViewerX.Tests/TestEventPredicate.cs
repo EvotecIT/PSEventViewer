@@ -71,6 +71,24 @@ public sealed class TestEventPredicate {
     }
 
     [Fact]
+    public void TypedDomainWhenRemainsManagedWhileSourceTimestampStaysNative() {
+        EventPredicateBuilder builder = EventPredicateBuilder.ForType(EventType.OSCrash);
+        DateTime boundary = new(2026, 8, 1, 0, 0, 0, DateTimeKind.Utc);
+        EventPredicate domainWhen = builder.Normalize(
+            EventPredicate.Compare("When", EventPredicateOperator.GreaterThanOrEqual, boundary));
+        EventPredicate sourceTime = builder.Normalize(
+            EventPredicate.Compare("TimeCreated", EventPredicateOperator.GreaterThanOrEqual, boundary));
+
+        EventPredicatePlan domainPlan = EventPredicatePlanner.Plan(domainWhen);
+        EventPredicatePlan sourcePlan = EventPredicatePlanner.Plan(sourceTime);
+
+        Assert.Equal(EventFieldFilterStage.Managed, builder.Field("When").FilterStage);
+        Assert.Null(domainPlan.NativeFilter);
+        Assert.NotNull(domainPlan.ManagedPredicate);
+        Assert.Equal(boundary, sourcePlan.NativeFilter!.StartTime);
+    }
+
+    [Fact]
     public void ContradictoryNativePredicatesRemainExactAndMatchNothing() {
         EventPredicate predicate = EventPredicate.AllOf(
             EventPredicate.Compare("EventId", EventPredicateOperator.Equal, 1),
@@ -104,6 +122,41 @@ public sealed class TestEventPredicate {
 
         Assert.Equal(EventPredicateKind.All, predicate.Kind);
         Assert.Throws<ArgumentException>(() => builder.Field("DefinitelyMissing"));
+    }
+
+    [Fact]
+    public void BuilderRejectsLiteralsThatCannotConvertToTheProjectedFieldType() {
+        EventPredicateBuilder builder = EventPredicateBuilder.ForType(EventType.ADUserLogonFailed);
+
+        ArgumentException invalidNumber = Assert.Throws<ArgumentException>(() => builder.Normalize(
+            EventPredicate.Compare("EventId", EventPredicateOperator.Equal, "not-a-number")));
+        ArgumentException overflow = Assert.Throws<ArgumentException>(() => builder.Normalize(
+            EventPredicate.Compare("EventId", EventPredicateOperator.Equal, "999999999999999999999")));
+
+        Assert.Contains("EventId", invalidNumber.Message, StringComparison.Ordinal);
+        Assert.Contains("EventId", overflow.Message, StringComparison.Ordinal);
+        Assert.False(EventPredicateEvaluator.Matches(
+            EventPredicate.Compare("EventId", EventPredicateOperator.NotEqual, "not-a-number"),
+            new Dictionary<string, object?> { ["EventId"] = 4625 }));
+        Assert.False(EventPredicateEvaluator.Matches(
+            EventPredicate.Not(EventPredicate.Compare(
+                "EventId",
+                EventPredicateOperator.Equal,
+                "not-a-number")),
+            new Dictionary<string, object?> { ["EventId"] = 4625 }));
+    }
+
+    [Fact]
+    public void RegexTimeoutIsAConservativeNonMatch() {
+        EventPredicate predicate = EventPredicate.Compare(
+            "Who",
+            EventPredicateOperator.MatchesRegex,
+            "^(a+)+$");
+        string value = new string('a', 100_000) + "!";
+
+        Assert.False(EventPredicateEvaluator.Matches(
+            predicate,
+            new Dictionary<string, object?> { ["Who"] = value }));
     }
 
     [Fact]

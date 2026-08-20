@@ -46,7 +46,7 @@ public sealed partial class CmdletGetEVXEvent {
         _recordIdKey = !string.IsNullOrEmpty(RecordIdKey)
             ? RecordIdKey!
             : BuildDefaultCheckpointKey();
-        if (!string.IsNullOrEmpty(RecordIdKey)) {
+        if (!string.IsNullOrEmpty(RecordIdKey) || _typedFilter != null) {
             return;
         }
         string legacyKey = BuildLegacyCheckpointKey();
@@ -147,7 +147,11 @@ public sealed partial class CmdletGetEVXEvent {
         AddHashtableIdentity(identity, "NamedDataFilter", NamedDataFilter);
         AddHashtableIdentity(identity, "NamedDataExcludeFilter", NamedDataExcludeFilter);
         AddHashtableIdentity(identity, "FilterHashtable", FilterHashtable);
-        AddFilterIdentity(identity, ResolveNativeFilter());
+        if (_typedFilter != null) {
+            AddTypedFilterIdentity(identity, _typedFilter);
+        } else {
+            AddFilterIdentity(identity, ResolveNativeFilter());
+        }
 
         using SHA256 sha256 = SHA256.Create();
         byte[] hash = sha256.ComputeHash(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(identity)));
@@ -186,6 +190,19 @@ public sealed partial class CmdletGetEVXEvent {
         AddCheckpointIdentityValue(identity, filter.NamedData);
         AddCheckpointIdentityValue(identity, filter.ExcludedNamedData);
         AddCheckpointIdentityValue(identity, filter.ExcludedEventIds);
+    }
+
+    private static void AddTypedFilterIdentity(
+        List<string> identity,
+        PowerShellEventPredicateBuilder filter) {
+
+        identity.Add("TypedPredicateFilter");
+        identity.Add(filter.Type.HasValue
+            ? "Type:" + filter.Type.Value
+            : "Definition:" + JsonSerializer.Serialize(filter.Definition));
+        identity.Add(filter.Predicate == null
+            ? "Predicate:null"
+            : "Predicate:" + filter.Predicate.ToJson(indented: false));
     }
 
     private static void AddCheckpointIdentityValue(

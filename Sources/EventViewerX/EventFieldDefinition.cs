@@ -105,7 +105,7 @@ public sealed class EventFieldDefinition {
     };
 
     internal static bool IsNativeField(string name) =>
-        new[] { "EventId", "Id", "RecordId", "EventRecordId", "TimeCreated", "When", "ProviderName", "Provider", "Level" }
+        new[] { "EventId", "Id", "RecordId", "EventRecordId", "TimeCreated", "ProviderName", "Provider", "Level" }
             .Contains(name, StringComparer.OrdinalIgnoreCase);
 
     private static IReadOnlyList<EventPredicateOperator> ResolveOperators(string name, Type type) {
@@ -164,7 +164,7 @@ public sealed class EventFieldDefinition {
                elementType != null && IsSupportedType(elementType);
     }
 
-    private static bool TryGetEnumerableElementType(Type type, out Type? elementType) {
+    internal static bool TryGetEnumerableElementType(Type type, out Type? elementType) {
         elementType = null;
         if (type == typeof(string) || !typeof(IEnumerable).IsAssignableFrom(type)) {
             return false;

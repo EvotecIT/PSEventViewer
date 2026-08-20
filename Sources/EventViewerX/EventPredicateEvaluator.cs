@@ -15,13 +15,13 @@ public static class EventPredicateEvaluator {
     /// <summary>Compiles a predicate for built-in typed records.</summary>
     public static Func<EventTypeRecord, bool> Compile(EventPredicate predicate) {
         EventPredicate snapshot = ValidateAndClone(predicate);
-        return record => record != null && Evaluate(snapshot, record);
+        return record => record != null && EvaluateSafely(snapshot, record);
     }
 
     /// <summary>Compiles a predicate for declarative custom records.</summary>
     public static Func<CustomEventRecord, bool> CompileCustom(EventPredicate predicate) {
         EventPredicate snapshot = ValidateAndClone(predicate);
-        return record => record != null && Evaluate(snapshot, record);
+        return record => record != null && EvaluateSafely(snapshot, record);
     }
 
     /// <summary>Evaluates a predicate against a built-in or custom event record.</summary>
@@ -30,7 +30,7 @@ public static class EventPredicateEvaluator {
             throw new ArgumentNullException(nameof(record));
         }
         predicate?.Validate();
-        return Evaluate(predicate!, record);
+        return EvaluateSafely(predicate!, record);
     }
 
     /// <summary>Evaluates a predicate against a case-insensitive field dictionary.</summary>
@@ -42,7 +42,7 @@ public static class EventPredicateEvaluator {
             throw new ArgumentNullException(nameof(fields));
         }
         predicate?.Validate();
-        return Evaluate(predicate!, fields);
+        return EvaluateSafely(predicate!, fields);
     }
 
     private static EventPredicate ValidateAndClone(EventPredicate predicate) {
@@ -53,14 +53,30 @@ public static class EventPredicateEvaluator {
         return predicate.Clone();
     }
 
-    private static bool Evaluate(EventPredicate predicate, object record) {
+    private static bool EvaluateSafely(EventPredicate predicate, object record) {
+        try {
+            return EvaluateCore(predicate, record);
+        } catch (ArgumentException) {
+            return false;
+        } catch (FormatException) {
+            return false;
+        } catch (InvalidCastException) {
+            return false;
+        } catch (OverflowException) {
+            return false;
+        } catch (RegexMatchTimeoutException) {
+            return false;
+        }
+    }
+
+    private static bool EvaluateCore(EventPredicate predicate, object record) {
         switch (predicate.Kind) {
             case EventPredicateKind.All:
-                return predicate.Children.All(child => Evaluate(child, record));
+                return predicate.Children.All(child => EvaluateCore(child, record));
             case EventPredicateKind.Any:
-                return predicate.Children.Any(child => Evaluate(child, record));
+                return predicate.Children.Any(child => EvaluateCore(child, record));
             case EventPredicateKind.Not:
-                return !Evaluate(predicate.Children[0], record);
+                return !EvaluateCore(predicate.Children[0], record);
             case EventPredicateKind.Comparison:
                 object? actual = ResolveValue(record, predicate.Field!);
                 return Compare(actual, predicate.Operator, predicate.Values, predicate.IgnoreCase);
@@ -312,6 +328,24 @@ public static class EventPredicateEvaluator {
             return comparable.CompareTo(converted);
         }
         return string.Compare(ToText(actual), expected, TextComparison(ignoreCase));
+    }
+
+    internal static bool TryConvertExpected(
+        string? value,
+        Type targetType,
+        bool ignoreCase,
+        out object? converted) {
+
+        try {
+            converted = ConvertExpected(value, targetType, ignoreCase);
+            return true;
+        } catch (ArgumentException) {
+        } catch (FormatException) {
+        } catch (InvalidCastException) {
+        } catch (OverflowException) {
+        }
+        converted = null;
+        return false;
     }
 
     private static object? ConvertExpected(string? value, Type targetType, bool ignoreCase) {

@@ -233,9 +233,16 @@ public sealed class CmdletShowEVXEvent : AsyncPSCmdlet {
         if (ParameterSetName == "Input") {
             report = EventReportEngine.Create(_input, Title);
         } else if (ParameterSetName == "Store") {
+            EventDefinition? storedDefinition = ResolveStoredDefinition(Definition);
+            EventPredicate? storedPredicate = PowerShellEventPredicateAdapter.Resolve(Where, nameof(Where));
+            if (storedDefinition != null && storedPredicate != null) {
+                storedPredicate = EventPredicateBuilder
+                    .ForDefinition(storedDefinition)
+                    .Normalize(storedPredicate);
+            }
             var query = new EventStoreQuery {
                 Types = Type.Length == 0 ? null : Type,
-                DefinitionNames = ResolveStoredDefinitionNames(Definition),
+                DefinitionNames = ResolveStoredDefinitionNames(Definition, storedDefinition),
                 StartTime = StartTime,
                 EndTime = EndTime,
                 TimePeriod = TimePeriod,
@@ -244,7 +251,7 @@ public sealed class CmdletShowEVXEvent : AsyncPSCmdlet {
                 SourceComputers = SourceComputer,
                 SourceLogs = string.IsNullOrWhiteSpace(LogName) ? null : new[] { LogName! },
                 Providers = ProviderName,
-                Predicate = PowerShellEventPredicateAdapter.Resolve(Where, nameof(Where)),
+                Predicate = storedPredicate,
                 MaxEvents = MaxEvents,
                 Oldest = Oldest.IsPresent
             };
@@ -338,7 +345,7 @@ public sealed class CmdletShowEVXEvent : AsyncPSCmdlet {
         }
     }
 
-    private static IReadOnlyList<string>? ResolveStoredDefinitionNames(object? definition) {
+    private static EventDefinition? ResolveStoredDefinition(object? definition) {
         if (definition == null) {
             return null;
         }
@@ -346,14 +353,30 @@ public sealed class CmdletShowEVXEvent : AsyncPSCmdlet {
         while (value is PSObject wrapper && wrapper.BaseObject != value) {
             value = wrapper.BaseObject;
         }
-        string name = value switch {
-            EventDefinition typed => typed.Name,
-            string path when File.Exists(path) => EventDefinition.Load(path).Name,
-            string stableName when !string.IsNullOrWhiteSpace(stableName) => stableName.Trim(),
+        return value switch {
+            EventDefinition typed => typed,
+            string path when File.Exists(path) => EventDefinition.Load(path),
+            string stableName when !string.IsNullOrWhiteSpace(stableName) => null,
             _ => throw new PSArgumentException(
                 "Stored Definition must be a stable definition name, EventDefinition instance, or JSON file path.",
                 nameof(Definition))
         };
-        return new[] { name };
+    }
+
+    private static IReadOnlyList<string>? ResolveStoredDefinitionNames(
+        object? definition,
+        EventDefinition? resolvedDefinition) {
+
+        if (definition == null) {
+            return null;
+        }
+        if (resolvedDefinition != null) {
+            return new[] { resolvedDefinition.Name };
+        }
+        object value = definition;
+        while (value is PSObject wrapper && wrapper.BaseObject != value) {
+            value = wrapper.BaseObject;
+        }
+        return new[] { ((string)value).Trim() };
     }
 }

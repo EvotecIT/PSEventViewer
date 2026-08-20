@@ -157,17 +157,30 @@ public sealed partial class EventStore {
 
     private static string CreateEventKey(EventReportRow row) {
         string identity = string.Join("\0", new[] {
-            row.SourceComputer ?? string.Empty,
-            row.SourceLog ?? string.Empty,
+            NormalizeSqliteNoCaseIdentity(row.SourceComputer),
+            NormalizeSqliteNoCaseIdentity(row.SourceLog),
             row.RecordId?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
             row.EventId.ToString(CultureInfo.InvariantCulture),
-            row.Provider ?? string.Empty,
+            NormalizeSqliteNoCaseIdentity(row.Provider),
             row.TimeCreated.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture),
-            row.Type ?? string.Empty
+            NormalizeSqliteNoCaseIdentity(row.Type)
         });
         using SHA256 sha256 = SHA256.Create();
         byte[] hash = sha256.ComputeHash(Encoding.UTF8.GetBytes(identity));
         return string.Concat(hash.Select(static value => value.ToString("x2", CultureInfo.InvariantCulture)));
+    }
+
+    private static string NormalizeSqliteNoCaseIdentity(string? value) {
+        if (string.IsNullOrEmpty(value)) {
+            return string.Empty;
+        }
+        char[] characters = value!.ToCharArray();
+        for (int index = 0; index < characters.Length; index++) {
+            if (characters[index] is >= 'a' and <= 'z') {
+                characters[index] = (char)(characters[index] - ('a' - 'A'));
+            }
+        }
+        return new string(characters);
     }
 
     private static string CreateSchemaHash(EventReportSectionSchema schema) {

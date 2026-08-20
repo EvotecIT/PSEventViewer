@@ -128,10 +128,41 @@ public sealed class EventPredicateBuilder {
                     $"Supported operators: {string.Join(", ", field.SupportedOperators)}.",
                     nameof(predicate));
             }
+            ValidateLiterals(field, predicate);
             predicate.Field = field.Name;
         }
         foreach (EventPredicate child in predicate.Children) {
             NormalizeNode(child);
+        }
+    }
+
+    private static void ValidateLiterals(
+        EventPredicateField field,
+        EventPredicate predicate) {
+
+        if (predicate.Operator is EventPredicateOperator.IsNull or EventPredicateOperator.IsNotNull ||
+            predicate.Operator is EventPredicateOperator.StartsWith or EventPredicateOperator.EndsWith or
+            EventPredicateOperator.MatchesWildcard or EventPredicateOperator.MatchesRegex or
+            EventPredicateOperator.InSubnet ||
+            field.ValueType == typeof(string)) {
+            return;
+        }
+        Type valueType = field.ValueType;
+        if (EventFieldDefinition.TryGetEnumerableElementType(valueType, out Type? elementType) &&
+            elementType != null) {
+            valueType = elementType;
+        }
+        for (int index = 0; index < predicate.Values.Count; index++) {
+            if (!EventPredicateEvaluator.TryConvertExpected(
+                    predicate.Values[index],
+                    valueType,
+                    predicate.IgnoreCase,
+                    out _)) {
+                throw new ArgumentException(
+                    $"Value '{predicate.Values[index]}' is not valid for field '{field.Name}' " +
+                    $"of type '{valueType.Name}'.",
+                    nameof(predicate));
+            }
         }
     }
 

@@ -120,6 +120,70 @@ Describe 'New-EVXFilter' {
         (Get-Command Get-EVXEvent).ParameterSets.Name | Should -Contain 'TypedFilter'
     }
 
+    It 'reuses a typed filter for offline EVTX paths' {
+        $FilePath = Join-Path $PSScriptRoot 'Logs\NamedFilterExamples.evtx'
+        $DefinitionPath = Join-Path $TestDrive 'offline-service-change.json'
+        @{
+            Name = 'OfflineServiceStartTypeChange'
+            Sources = @(@{
+                    LogName = 'System'
+                    EventIds = @(7040)
+                    ProviderNames = @('Service Control Manager')
+                })
+            Fields = @(@{
+                    Name = 'ServiceName'
+                    Source = 'Data'
+                    SourceName = 'param4'
+                })
+        } | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $DefinitionPath -Encoding UTF8
+        $Filter = New-EVXFilter -Definition $DefinitionPath
+        $Filter.Use($Filter.Fields.ServiceName.Equal('BITS'))
+
+        $Plan = Get-EVXEvent -Filter $Filter -Path $FilePath -Explain
+        $Events = @(Get-EVXEvent -Filter $Filter -Path $FilePath -Oldest)
+        $CheckpointPath = Join-Path $TestDrive 'typed-offline-checkpoint.json'
+        $CheckpointEvents = @(Get-EVXEvent `
+                -Filter $Filter `
+                -Path $FilePath `
+                -RecordIdFile $CheckpointPath `
+                -Oldest)
+        $ReplayedEvents = @(Get-EVXEvent `
+                -Filter $Filter `
+                -Path $FilePath `
+                -RecordIdFile $CheckpointPath `
+                -Oldest)
+
+        $Plan.ManagedPredicate | Should -Not -BeNullOrEmpty
+        $Events | Should -Not -BeNullOrEmpty
+        @($Events.ServiceName | Sort-Object -Unique) | Should -Be @('BITS')
+        $CheckpointEvents.Count | Should -Be $Events.Count
+        $ReplayedEvents | Should -BeNullOrEmpty
+        Test-Path -LiteralPath $CheckpointPath | Should -BeTrue
+        ((Get-Command Get-EVXEvent).ParameterSets |
+                Where-Object Name -EQ 'Path').Parameters.Name |
+            Should -Contain 'Filter'
+    }
+
+    It 'rejects native-only Path selectors instead of silently ignoring them for a typed filter' {
+        $FilePath = Join-Path $PSScriptRoot 'Logs\NamedFilterExamples.evtx'
+        $Filter = New-EVXFilter -Type ADUserLogonFailed
+
+        {
+            Get-EVXEvent -Filter $Filter -Path $FilePath -EventId 7040
+        } | Should -Throw '*typed Filter with Path*-EventId*'
+    }
+
+    It 'does not replace explicit Channel or Provider sources with a retained typed source' {
+        $Filter = New-EVXFilter -Type ADUserLogonFailed
+
+        {
+            Get-EVXEvent -LogName System -Filter $Filter -MaxEvents 1
+        } | Should -Throw '*Native Channel, Path, and Provider queries require an EventFilter*'
+        {
+            Get-EVXEvent -ProviderName 'Service Control Manager' -Filter $Filter -MaxEvents 1
+        } | Should -Throw '*Native Channel, Path, and Provider queries require an EventFilter*'
+    }
+
     It 'describes typed fields and explains an inline reusable filter without reading events' {
         $Description = Get-EVXEvent -Type ADUserLogonFailed -Describe
         $Plan = New-EVXFilter -Type ADUserLogonFailed -Where {
@@ -138,6 +202,14 @@ Describe 'New-EVXFilter' {
                 $_.DefinitelyMissing -eq 'value'
             }
         } | Should -Throw '*Available fields*'
+    }
+
+    It 'rejects invalid typed literals before any event query runs' {
+        {
+            New-EVXFilter -Type ADUserLogonFailed -Where {
+                $_.EventId -eq 'not-a-number'
+            }
+        } | Should -Throw '*EventId*Int32*'
     }
 
     It 'accepts a restricted PowerShell expression but never executes arbitrary script' {

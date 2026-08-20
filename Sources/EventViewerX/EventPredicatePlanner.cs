@@ -141,7 +141,7 @@ public static class EventPredicatePlanner {
             reason = "Level equality is a native System predicate.";
             return true;
         }
-        if (IsField(field, "TimeCreated", "When") &&
+        if (IsField(field, "TimeCreated") &&
             predicate.Values.Count == 1 &&
             DateTime.TryParse(
                 predicate.Values[0],
