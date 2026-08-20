@@ -124,6 +124,28 @@ Describe 'evx portable host' {
         @($Rows.Type | Sort-Object -Unique) | Should -Be @('ServiceStartTypeChange')
     }
 
+    It 'stores an offline report and renders a calendar summary without rereading EVTX' {
+        $StorePath = Join-Path $TestDrive 'cli-events.db'
+        $HtmlPath = Join-Path $TestDrive 'cli-summary.html'
+
+        $Rows = @(& $script:CliPath query `
+                --path $script:FixturePath `
+                --max 4 `
+                --write-store $StorePath |
+                ForEach-Object { $_ | ConvertFrom-Json })
+        $SummaryOutput = @(& $script:CliPath report `
+                --store $StorePath `
+                --summary Day `
+                --html $HtmlPath)
+
+        $LASTEXITCODE | Should -Be 0
+        $Rows.Count | Should -Be 4
+        Test-Path -LiteralPath $StorePath | Should -BeTrue
+        Test-Path -LiteralPath $HtmlPath | Should -BeTrue
+        (Get-Content -LiteralPath $HtmlPath -Raw) | Should -Match 'Day event summary'
+        $SummaryOutput[-1] | Should -Be ([IO.Path]::GetFullPath($HtmlPath))
+    }
+
     It 'removes an already absent collector subscription idempotently' {
         $Name = 'EVX-Cli-Absent-' + [guid]::NewGuid().ToString('N')
         $Result = & $script:CliPath collector remove --name $Name |

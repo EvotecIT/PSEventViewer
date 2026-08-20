@@ -79,4 +79,66 @@ Describe 'New-EVXFilter' {
         $Events | Should -Not -BeNullOrEmpty
         $Events[0].Data['param4'] | Should -Be 'BITS'
     }
+
+    It 'exposes discoverable domain fields for built-in and composite types' {
+        $Leaf = New-EVXFilter -Type ADUserLogonFailed
+        $Composite = New-EVXFilter -Type ActiveDirectoryAuthentication
+
+        $Leaf.GetType().FullName | Should -Be 'PSEventViewer.PowerShellEventPredicateBuilder'
+        $Leaf.Fields.PSObject.Properties.Name | Should -Contain 'Who'
+        $Leaf.Fields.PSObject.Properties.Name | Should -Contain 'IpAddress'
+        $Composite.Fields.PSObject.Properties.Name | Should -Contain 'Who'
+        $Composite.Fields.PSObject.Properties.Name | Should -Contain 'EventId'
+    }
+
+    It 'builds and explains one shared typed predicate without querying a source' {
+        $Filter = New-EVXFilter -Type ADUserLogonFailed
+        $Predicate = $Filter.AllOf(
+            $Filter.Fields.EventId.In(4624, 4625),
+            $Filter.Fields.Who.Contains('svc-')
+        )
+
+        $Plan = Get-EVXEvent -Type ADUserLogonFailed -Where $Predicate -Explain
+
+        $Plan.HasNativeFilter | Should -BeTrue
+        $Plan.IsFullyNative | Should -BeFalse
+        @($Plan.Steps | ForEach-Object { $_.Stage.ToString() }) | Should -Contain 'Native'
+        @($Plan.Steps | ForEach-Object { $_.Stage.ToString() }) | Should -Contain 'Managed'
+    }
+
+    It 'accepts a restricted PowerShell expression but never executes arbitrary script' {
+        $Plan = Get-EVXEvent -Type ADUserLogonFailed -Where {
+            $_.Who -in @('EVOTEC\alice', 'EVOTEC\bob') -and
+                $_.IpAddress -like '10.*'
+        } -Explain
+
+        $Plan.Steps.Count | Should -BeGreaterOrEqual 2
+        {
+            Get-EVXEvent -Type ADUserLogonFailed -Where {
+                Get-Process
+            } -Explain
+        } | Should -Throw '*commands or pipelines*'
+    }
+
+    It 'preserves negative PowerShell operators as exact predicate negation' {
+        $Plan = Get-EVXEvent -Type ADUserLogonFailed -Where {
+            $_.Who -notlike 'svc-*' -and $_.Who -notmatch '^test'
+        } -Explain
+
+        $Plan.ManagedPredicate.Kind.ToString() | Should -Be 'All'
+        @($Plan.ManagedPredicate.Children | ForEach-Object { $_.Kind.ToString() }) |
+            Should -Be @('Not', 'Not')
+    }
+
+    It 'preserves PowerShell case-sensitive and case-insensitive comparison forms' {
+        $Insensitive = Get-EVXEvent -Type ADUserLogonFailed -Where {
+            $_.Who -eq 'EVOTEC\ALICE'
+        } -Explain
+        $Sensitive = Get-EVXEvent -Type ADUserLogonFailed -Where {
+            $_.Who -ceq 'EVOTEC\ALICE'
+        } -Explain
+
+        $Insensitive.ManagedPredicate.IgnoreCase | Should -BeTrue
+        $Sensitive.ManagedPredicate.IgnoreCase | Should -BeFalse
+    }
 }

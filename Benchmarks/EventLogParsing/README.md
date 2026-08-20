@@ -218,5 +218,7 @@ for review, then delete large fixtures and generated CSV, JSON, and XML files.
 
 Use [the event-source benchmark](../EventSources/README.md) for same-boundary
 remote `EventViewerX`/`Get-EVXEvent`/`Get-WinEvent` comparisons and
+[the local history benchmark](../EventStore/README.md) for transactional write,
+indexed/managed query, calendar summary, and typed CSV costs, and
 [the watcher burst benchmark](../EventWatcher/README.md) for persistent-host
 delivery, loss, duplication, and burst-throughput evidence.

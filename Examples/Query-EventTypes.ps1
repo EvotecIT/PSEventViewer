@@ -1,10 +1,14 @@
 Import-Module PSEventViewer -Force
 
+$Authentication = New-EVXFilter -Type ActiveDirectoryAuthentication
+$Authentication.Fields | Get-Member -MemberType Property
+
 Get-EVXEvent `
     -Type ADUserLogonFailed, ADUserLockouts `
     -MachineName DC01, DC02 `
     -TimePeriod Last24Hours `
     -ReadMode StructuredDataAndMessage `
+    -Where { $_.Who -notlike 'NT AUTHORITY\*' } `
     -MaxEvents 500 |
     Select-Object TimeCreated, TypeName, MachineName, UserName, IpAddress
 

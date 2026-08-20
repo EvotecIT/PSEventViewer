@@ -2,7 +2,7 @@ namespace PSEventViewer;
 
 /// <summary>
 /// <para type="synopsis">Creates a reusable typed Windows Event Log filter or compiles it to native query text.</para>
-/// <para type="description">The default output is EventViewerX.EventFilter for reuse by C# and cmdlets. Use AsXPath, LogName, or Path when native query text is required by Get-WinEvent, Event Viewer, or WEC.</para>
+/// <para type="description">The default output is EventViewerX.EventFilter for native event metadata. Supply Type or Definition to discover typed domain fields and build a reusable EventPredicate. Use AsXPath, LogName, or Path when native query text is required by Get-WinEvent, Event Viewer, or WEC.</para>
 /// </summary>
 /// <example>
 ///   <summary>Create a reusable typed failed-logon filter</summary>
@@ -23,62 +23,110 @@ namespace PSEventViewer;
 [Alias("Get-EVXFilter")]
 [OutputType(typeof(EventFilter), ParameterSetName = new[] { "Object" })]
 [OutputType(typeof(string), ParameterSetName = new[] { "XPath", "ChannelXml", "FileXml" })]
+[OutputType(typeof(PowerShellEventPredicateBuilder), ParameterSetName = new[] { "Type", "Definition" })]
 public sealed class CmdletNewEVXFilter : PSCmdlet {
+    /// <summary>Built-in event type whose typed fields should be exposed for predicate construction.</summary>
+    [Parameter(Mandatory = true, ParameterSetName = "Type")]
+    public EventType? Type { get; set; }
+
+    /// <summary>Custom EventDefinition instance or JSON file whose typed fields should be exposed.</summary>
+    [Parameter(Mandatory = true, ParameterSetName = "Definition")]
+    public object? Definition { get; set; }
+
     /// <summary>Event identifiers to include.</summary>
     [Alias("Id")]
-    [Parameter]
+    [Parameter(ParameterSetName = "Object")]
+    [Parameter(ParameterSetName = "XPath")]
+    [Parameter(ParameterSetName = "ChannelXml")]
+    [Parameter(ParameterSetName = "FileXml")]
     public int[]? EventId { get; set; }
 
     /// <summary>Event record identifiers to include.</summary>
     [Alias("EventRecordId")]
-    [Parameter]
+    [Parameter(ParameterSetName = "Object")]
+    [Parameter(ParameterSetName = "XPath")]
+    [Parameter(ParameterSetName = "ChannelXml")]
+    [Parameter(ParameterSetName = "FileXml")]
     public long[]? RecordId { get; set; }
 
     /// <summary>Provider names to include.</summary>
-    [Parameter]
+    [Parameter(ParameterSetName = "Object")]
+    [Parameter(ParameterSetName = "XPath")]
+    [Parameter(ParameterSetName = "ChannelXml")]
+    [Parameter(ParameterSetName = "FileXml")]
     public string[]? ProviderName { get; set; }
 
     /// <summary>Numeric Windows event levels to include.</summary>
-    [Parameter]
+    [Parameter(ParameterSetName = "Object")]
+    [Parameter(ParameterSetName = "XPath")]
+    [Parameter(ParameterSetName = "ChannelXml")]
+    [Parameter(ParameterSetName = "FileXml")]
     public EventViewerX.Level[]? Level { get; set; }
 
     /// <summary>Windows keyword masks to include.</summary>
-    [Parameter]
+    [Parameter(ParameterSetName = "Object")]
+    [Parameter(ParameterSetName = "XPath")]
+    [Parameter(ParameterSetName = "ChannelXml")]
+    [Parameter(ParameterSetName = "FileXml")]
     public long[]? Keywords { get; set; }
 
     /// <summary>Absolute beginning of the time range.</summary>
     [Alias("DateFrom")]
-    [Parameter]
+    [Parameter(ParameterSetName = "Object")]
+    [Parameter(ParameterSetName = "XPath")]
+    [Parameter(ParameterSetName = "ChannelXml")]
+    [Parameter(ParameterSetName = "FileXml")]
     public DateTime? StartTime { get; set; }
 
     /// <summary>Absolute end of the time range.</summary>
     [Alias("DateTo")]
-    [Parameter]
+    [Parameter(ParameterSetName = "Object")]
+    [Parameter(ParameterSetName = "XPath")]
+    [Parameter(ParameterSetName = "ChannelXml")]
+    [Parameter(ParameterSetName = "FileXml")]
     public DateTime? EndTime { get; set; }
 
     /// <summary>Named relative time range.</summary>
-    [Parameter]
+    [Parameter(ParameterSetName = "Object")]
+    [Parameter(ParameterSetName = "XPath")]
+    [Parameter(ParameterSetName = "ChannelXml")]
+    [Parameter(ParameterSetName = "FileXml")]
     public TimePeriod? TimePeriod { get; set; }
 
     /// <summary>User security identifiers to include.</summary>
-    [Parameter]
+    [Parameter(ParameterSetName = "Object")]
+    [Parameter(ParameterSetName = "XPath")]
+    [Parameter(ParameterSetName = "ChannelXml")]
+    [Parameter(ParameterSetName = "FileXml")]
     public string[]? UserId { get; set; }
 
     /// <summary>Unnamed EventData values to include.</summary>
-    [Parameter]
+    [Parameter(ParameterSetName = "Object")]
+    [Parameter(ParameterSetName = "XPath")]
+    [Parameter(ParameterSetName = "ChannelXml")]
+    [Parameter(ParameterSetName = "FileXml")]
     public string[]? Data { get; set; }
 
     /// <summary>Named EventData values to include.</summary>
-    [Parameter]
+    [Parameter(ParameterSetName = "Object")]
+    [Parameter(ParameterSetName = "XPath")]
+    [Parameter(ParameterSetName = "ChannelXml")]
+    [Parameter(ParameterSetName = "FileXml")]
     public Hashtable? NamedDataFilter { get; set; }
 
     /// <summary>Named EventData values to suppress.</summary>
-    [Parameter]
+    [Parameter(ParameterSetName = "Object")]
+    [Parameter(ParameterSetName = "XPath")]
+    [Parameter(ParameterSetName = "ChannelXml")]
+    [Parameter(ParameterSetName = "FileXml")]
     public Hashtable? NamedDataExcludeFilter { get; set; }
 
     /// <summary>Event identifiers to suppress.</summary>
     [Alias("ExcludeId")]
-    [Parameter]
+    [Parameter(ParameterSetName = "Object")]
+    [Parameter(ParameterSetName = "XPath")]
+    [Parameter(ParameterSetName = "ChannelXml")]
+    [Parameter(ParameterSetName = "FileXml")]
     public int[]? ExcludeEventId { get; set; }
 
     /// <summary>Returns one native XPath expression.</summary>
@@ -96,6 +144,10 @@ public sealed class CmdletNewEVXFilter : PSCmdlet {
 
     /// <inheritdoc />
     protected override void ProcessRecord() {
+        if (ParameterSetName is "Type" or "Definition") {
+            WriteTypedBuilder();
+            return;
+        }
         EventFilter filter = PowerShellEventFilterAdapter.CreateFilter(
             EventId,
             RecordId,
@@ -146,5 +198,26 @@ public sealed class CmdletNewEVXFilter : PSCmdlet {
                 partitions,
                 suppressions);
         WriteObject(queryXml);
+    }
+
+    private void WriteTypedBuilder() {
+        EventPredicateBuilder builder = ParameterSetName == "Type"
+            ? EventPredicateBuilder.ForType(Type!.Value)
+            : EventPredicateBuilder.ForDefinition(ResolveDefinition());
+        WriteObject(new PowerShellEventPredicateBuilder(builder));
+    }
+
+    private EventDefinition ResolveDefinition() {
+        object? value = Definition;
+        while (value is PSObject wrapper && wrapper.BaseObject != value) {
+            value = wrapper.BaseObject;
+        }
+        return value switch {
+            EventDefinition typed => typed,
+            string path => EventDefinition.Load(path),
+            _ => throw new PSArgumentException(
+                "Definition must be an EventDefinition instance or a JSON file path.",
+                nameof(Definition))
+        };
     }
 }

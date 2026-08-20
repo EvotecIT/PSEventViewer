@@ -54,6 +54,8 @@ public sealed class EventDefinitionQuery {
     public CultureInfo? MessageCulture { get; set; }
     /// <summary>Fallback provider-resource culture.</summary>
     public CultureInfo? FallbackMessageCulture { get; set; }
+    /// <summary>Optional serializable predicate evaluated against projected custom fields.</summary>
+    public EventPredicate? Predicate { get; set; }
     /// <summary>Optional predicate applied after custom projection.</summary>
     public Func<CustomEventRecord, bool>? ResultPredicate { get; set; }
     /// <summary>Optional per-machine and per-container exclusive record checkpoint.</summary>

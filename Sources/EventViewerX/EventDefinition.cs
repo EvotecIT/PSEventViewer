@@ -77,6 +77,17 @@ public sealed class EventDefinition {
             if (!Enum.IsDefined(typeof(EventFieldSource), field.Source)) {
                 throw new InvalidDataException($"Fields[{index}].Source is invalid.");
             }
+            if (!Enum.IsDefined(typeof(EventFieldValueKind), field.ValueKind)) {
+                throw new InvalidDataException($"Fields[{index}].ValueKind is invalid.");
+            }
+            if (field.Aliases == null || field.Aliases.Any(static alias => string.IsNullOrWhiteSpace(alias))) {
+                throw new InvalidDataException($"Fields[{index}].Aliases cannot be null or contain empty values.");
+            }
+            foreach (string alias in field.Aliases) {
+                if (!names.Add(alias.Trim())) {
+                    throw new InvalidDataException($"Fields[{index}].Aliases must be unique across field names and aliases.");
+                }
+            }
             if (field.Source != EventFieldSource.Message && string.IsNullOrWhiteSpace(field.SourceName)) {
                 throw new InvalidDataException($"Fields[{index}].SourceName is required for {field.Source} fields.");
             }

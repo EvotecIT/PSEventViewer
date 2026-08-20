@@ -149,7 +149,12 @@ public static class EventReportExcelRenderer {
                 : section.Description;
             events.Title(section.DisplayName, subtitle);
             EventReportPresentationSection presentation = EventReportPresentationProjection.Create(section);
-            List<Dictionary<string, object?>> eventRows = presentation.Rows.ToList();
+            List<Dictionary<string, object?>> eventRows = presentation.Rows
+                .Select(row => presentation.Columns.ToDictionary(
+                    static column => column.DisplayName,
+                    column => row.TryGetValue(column.Name, out object? value) ? value : null,
+                    StringComparer.OrdinalIgnoreCase))
+                .ToList();
             string[] eventColumns = presentation.Columns.Select(static column => column.DisplayName).ToArray();
             string tableTitle = section.Kind == EventReportSectionKind.Generic
                 ? "Events"
@@ -165,7 +170,11 @@ public static class EventReportExcelRenderer {
                     foreach (EventReportColumn column in section.Columns.Where(static column =>
                                  column.ValueType == typeof(DateTime) || column.ValueType == typeof(DateTime?) ||
                                  column.ValueType == typeof(DateTimeOffset) || column.ValueType == typeof(DateTimeOffset?))) {
-                        visuals.NumericColumnFormats[column.DisplayName] = "yyyy-mm-dd hh:mm:ss";
+                        EventReportPresentationColumn? presentationColumn = presentation.Columns.FirstOrDefault(candidate =>
+                            string.Equals(candidate.Name, column.Name, StringComparison.OrdinalIgnoreCase));
+                        if (presentationColumn != null) {
+                            visuals.NumericColumnFormats[presentationColumn.DisplayName] = "yyyy-mm-dd hh:mm:ss";
+                        }
                     }
                     visuals.NumericColumnFormats["Event ID"] = "0";
                     visuals.NumericColumnFormats["Record ID"] = "0";

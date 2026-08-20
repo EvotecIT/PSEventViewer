@@ -31,6 +31,9 @@ public sealed class EventReportRequest {
     /// <summary>Declarative custom definition. Mutually exclusive with Types and LogName.</summary>
     public EventDefinition? Definition { get; set; }
 
+    /// <summary>Optional exact predicate for a built-in or custom typed definition.</summary>
+    public EventPredicate? Predicate { get; set; }
+
     /// <summary>Event IDs for a generic channel query.</summary>
     public IReadOnlyCollection<int>? EventIds { get; set; }
 
@@ -113,6 +116,10 @@ public sealed class EventReportRequest {
             throw new InvalidOperationException(
                 $"MaxConcurrency must be between 1 and {EventLogLimits.MaximumConcurrency}.");
         }
+        if (Predicate != null && !hasTypes && !hasDefinition) {
+            throw new InvalidOperationException("Predicate requires Types or Definition.");
+        }
+        Predicate?.Validate();
         Definition?.Validate();
     }
 }

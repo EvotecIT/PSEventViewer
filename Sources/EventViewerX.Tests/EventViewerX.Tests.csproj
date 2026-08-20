@@ -31,6 +31,7 @@
     <ItemGroup>
         <ProjectReference Include="..\EventViewerX\EventViewerX.csproj" />
         <ProjectReference Include="..\EventViewerX.Reporting\EventViewerX.Reporting.csproj" />
+        <ProjectReference Include="..\EventViewerX.Storage\EventViewerX.Storage.csproj" />
     </ItemGroup>
 
 </Project>

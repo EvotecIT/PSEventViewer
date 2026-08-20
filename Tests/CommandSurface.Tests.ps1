@@ -83,9 +83,9 @@ Describe 'PSEventViewer v4 command surface' {
         (Get-Command Get-EVXEvent).ParameterSets.Name | Sort-Object |
             Should -Be (@('Channel', 'Path', 'Definition', 'Provider', 'Type', 'Hashtable', 'Xml') | Sort-Object)
         (Get-Command Show-EVXEvent).ParameterSets.Name | Sort-Object |
-            Should -Be (@('Type', 'Path', 'Log', 'Definition', 'Input') | Sort-Object)
+            Should -Be (@('Type', 'Path', 'Log', 'Definition', 'Input', 'Store') | Sort-Object)
         (Get-Command New-EVXFilter).ParameterSets.Name | Sort-Object |
-            Should -Be (@('Object', 'XPath', 'ChannelXml', 'FileXml') | Sort-Object)
+            Should -Be (@('Object', 'XPath', 'ChannelXml', 'FileXml', 'Type', 'Definition') | Sort-Object)
         (Get-Command Get-EVXPowerShellScript).ParameterSets.Name | Sort-Object |
             Should -Be (@('Script', 'Execution') | Sort-Object)
         (Get-Command Write-EVXEvent).ParameterSets.Name |

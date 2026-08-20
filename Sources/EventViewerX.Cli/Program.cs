@@ -1,14 +1,22 @@
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using EventViewerX.Providers;
 using EventViewerX.Reporting;
+using EventViewerX.Storage;
 using HtmlForgeX;
 
 namespace EventViewerX.Cli;
 
 internal static partial class Program {
-    private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = false };
+    private static readonly JsonSerializerOptions JsonOptions = CreateJsonOptions();
+
+    private static JsonSerializerOptions CreateJsonOptions() {
+        var options = new JsonSerializerOptions { WriteIndented = false };
+        options.Converters.Add(new JsonStringEnumConverter());
+        return options;
+    }
 
     private static async Task<int> Main(string[] args) {
         try {
@@ -18,9 +26,10 @@ internal static partial class Program {
                 "query" => await QueryAsync(options).ConfigureAwait(false),
                 "report" => await ReportAsync(options).ConfigureAwait(false),
                 "watch" => await WatchAsync(options).ConfigureAwait(false),
+                "store" => await StoreAsync(options).ConfigureAwait(false),
                 "collector" => Collector(options),
                 "provider" => Provider(options),
-                "types" => ListTypes(),
+                "types" => ListTypes(options),
                 "help" or "--help" or "-h" => Help(),
                 _ => throw new ArgumentException($"Unknown command '{options.Command}'.")
             };
@@ -34,7 +43,38 @@ internal static partial class Program {
     }
 
     private static async Task<int> QueryAsync(CliArguments options) {
-        EventReport report = await EventReportEngine.QueryAsync(CreateRequest(options)).ConfigureAwait(false);
+        ValidateQuerySource(options, allowSummary: false);
+        if (options.Get("store") is string storePath) {
+            EventStoreQuery storedQuery = CreateStoreQuery(options);
+            if (options.Has("explain")) {
+                if (storedQuery.Predicate == null) {
+                    throw new ArgumentException("--explain requires --where.");
+                }
+                return WriteJson(EventStore.Plan(storedQuery));
+            }
+            EventReport stored = await new EventStore(storePath)
+                .ReadReportAsync(storedQuery, options.Get("title"))
+                .ConfigureAwait(false);
+            foreach (EventReportRow row in stored.Rows) {
+                Console.WriteLine(JsonSerializer.Serialize(row.ToDictionary(), JsonOptions));
+            }
+            return 0;
+        }
+        EventReportRequest request = CreateRequest(options);
+        if (options.Has("explain")) {
+            EventPredicate predicate = request.Predicate ??
+                throw new ArgumentException("--explain requires --where.");
+            EventPredicatePlan plan = request.Collectors != null && request.Collectors.Count > 0 || request.Definition != null
+                ? EventPredicatePlanner.PlanManaged(
+                    predicate,
+                    request.Collectors != null && request.Collectors.Count > 0
+                        ? "ForwardedEvents uses the Windows Server 2025 safe '*' reader, so typed filtering is bounded and managed."
+                        : "Custom definition fields are evaluated after declarative projection.")
+                : EventPredicatePlanner.Plan(predicate);
+            return WriteJson(plan);
+        }
+        EventReport report = await EventReportEngine.QueryAsync(request).ConfigureAwait(false);
+        await WriteStoreIfRequestedAsync(report, options).ConfigureAwait(false);
         foreach (EventReportRow row in report.Rows) {
             Console.WriteLine(JsonSerializer.Serialize(row.ToDictionary(), JsonOptions));
         }
@@ -42,7 +82,21 @@ internal static partial class Program {
     }
 
     private static async Task<int> ReportAsync(CliArguments options) {
-        EventReport report = await EventReportEngine.QueryAsync(CreateRequest(options)).ConfigureAwait(false);
+        ValidateQuerySource(options, allowSummary: true);
+        EventReport report;
+        if (options.Get("store") is string storePath) {
+            var store = new EventStore(storePath);
+            EventStoreQuery query = CreateStoreQuery(options);
+            report = options.Get("summary") is string summary
+                ? await store.CreateSummaryReportAsync(
+                    query,
+                    ParseSummaryPeriod(summary),
+                    options.Get("title")).ConfigureAwait(false)
+                : await store.ReadReportAsync(query, options.Get("title")).ConfigureAwait(false);
+        } else {
+            report = await EventReportEngine.QueryAsync(CreateRequest(options)).ConfigureAwait(false);
+            await WriteStoreIfRequestedAsync(report, options).ConfigureAwait(false);
+        }
         bool written = false;
         EventEmailPackage? emailPackage = null;
         if (options.Get("html") is string html) {
@@ -54,6 +108,10 @@ internal static partial class Program {
         }
         if (options.Get("excel") is string excel) {
             Console.WriteLine(EventReportExcelRenderer.Save(report, excel));
+            written = true;
+        }
+        if (options.Get("csv") is string csv) {
+            Console.WriteLine(EventReportCsvRenderer.Save(report, csv));
             written = true;
         }
         if (options.Get("email-html") is string emailHtml) {
@@ -80,9 +138,79 @@ internal static partial class Program {
             written = true;
         }
         if (!written) {
-            throw new ArgumentException("report requires --html, --excel, --email-html, or --mail-profile.");
+            throw new ArgumentException("report requires --html, --excel, --csv, --email-html, or --mail-profile.");
         }
         return 0;
+    }
+
+    private static async Task<int> StoreAsync(CliArguments options) {
+        if (options.Subcommand != "prune") {
+            throw new ArgumentException("store supports prune. Use query/report --store for reading and --write-store for ingestion.");
+        }
+        DateTime before = ParseDate(options.Require("before"))!.Value;
+        int deleted = await new EventStore(options.Require("path"))
+            .PruneBeforeAsync(before, NullWhenEmpty(options.GetMany("definition-name")))
+            .ConfigureAwait(false);
+        return WriteJson(new { Deleted = deleted, Before = before.ToUniversalTime() });
+    }
+
+    private static EventStoreQuery CreateStoreQuery(CliArguments options) {
+        DateTime? start = ParseDate(options.Get("start"));
+        if (options.Get("since") is string since) {
+            start = DateTime.Now.Subtract(TimeSpan.Parse(since, CultureInfo.InvariantCulture));
+        }
+        return new EventStoreQuery {
+            Types = NullWhenEmpty(options.GetMany("type")) == null
+                ? null
+                : ParseTypes(options.GetMany("type")),
+            DefinitionNames = NullWhenEmpty(options.GetMany("definition-name")),
+            StartTime = start,
+            EndTime = ParseDate(options.Get("end")),
+            EventIds = ParseInts(options.GetMany("event-id")),
+            RecordIds = ParseLongs(options.GetMany("record-id")),
+            SourceComputers = NullWhenEmpty(options.GetMany("source")),
+            SourceLogs = NullWhenEmpty(options.GetMany("log")),
+            Providers = NullWhenEmpty(options.GetMany("provider")),
+            Predicate = ParsePredicate(options.Get("where")),
+            MaxEvents = options.GetLong("max"),
+            MaxCandidates = options.GetLong("max-candidates", 100000),
+            Oldest = options.Has("oldest")
+        };
+    }
+
+    private static async Task WriteStoreIfRequestedAsync(EventReport report, CliArguments options) {
+        if (options.Get("write-store") is not string path) {
+            return;
+        }
+        EventStoreWriteResult result = await new EventStore(path).WriteAsync(report).ConfigureAwait(false);
+        Console.Error.WriteLine(
+            $"Stored {result.Inserted} new rows; skipped {result.Duplicates} duplicates in {Path.GetFullPath(path)}.");
+    }
+
+    private static EventStoreSummaryPeriod ParseSummaryPeriod(string value) =>
+        Enum.TryParse(value, ignoreCase: true, out EventStoreSummaryPeriod parsed) && Enum.IsDefined(parsed)
+            ? parsed
+            : throw new ArgumentException("--summary must be Hour, Day, Week, or Month.");
+
+    private static void ValidateQuerySource(CliArguments options, bool allowSummary) {
+        bool stored = options.Get("store") != null;
+        if (stored && (options.Get("definition") != null || options.GetMany("path").Length > 0 ||
+                       options.GetMany("machine").Length > 0 || options.GetMany("collector").Length > 0)) {
+            throw new ArgumentException(
+                "--store cannot be combined with --definition, --path, --machine, or --collector. " +
+                "Use --type, --definition-name, --log, --source, and --provider to filter stored rows.");
+        }
+        if (stored && options.Get("write-store") != null) {
+            throw new ArgumentException("--write-store is only valid for live or offline event-log ingestion.");
+        }
+        if (!stored && (options.Get("definition-name") != null || options.Get("source") != null ||
+                        options.Get("provider") != null || options.Get("summary") != null)) {
+            throw new ArgumentException(
+                "--definition-name, --source, --provider, and --summary require --store.");
+        }
+        if (!allowSummary && options.Get("summary") != null) {
+            throw new ArgumentException("--summary is available through the report command.");
+        }
     }
 
     private static EventReportRequest CreateRequest(CliArguments options) {
@@ -122,7 +250,19 @@ internal static partial class Program {
         request.Oldest = options.Has("oldest");
         request.ResolveDns = options.Has("resolve-dns");
         request.Title = options.Get("title");
+        request.Predicate = ParsePredicate(options.Get("where"));
         return request;
+    }
+
+    private static EventPredicate? ParsePredicate(string? value) {
+        if (string.IsNullOrWhiteSpace(value)) {
+            return null;
+        }
+        EventPredicate predicate = File.Exists(value)
+            ? EventPredicate.Load(value)
+            : EventPredicate.ParseJson(value);
+        predicate.Validate();
+        return predicate;
     }
 
     private static MonitoringRecordDrawerPlacement ParseDrawerPlacement(string? value) {
@@ -212,19 +352,59 @@ internal static partial class Program {
         return WriteJson(result);
     }
 
-    private static int ListTypes() {
-        foreach (EventTypeDefinition definition in EventTypeCatalog.GetDefinitions()) {
+    private static int ListTypes(CliArguments options) {
+        if (options.Get("definition") is string definitionPath) {
+            if (options.Has("type")) {
+                throw new ArgumentException("types accepts either --type or --definition, not both.");
+            }
+            EventDefinition custom = EventDefinition.Load(definitionPath);
+            EventPredicateBuilder customBuilder = EventPredicateBuilder.ForDefinition(custom);
+            return WriteJson(new {
+                custom.Name,
+                custom.DisplayName,
+                custom.Description,
+                custom.Category,
+                IsComposite = false,
+                Sources = custom.Sources.Select(static source => new {
+                    source.LogName,
+                    source.EventIds,
+                    source.ProviderNames
+                }),
+                Fields = DescribeFields(customBuilder.Fields)
+            });
+        }
+        EventType[] selected = ParseTypes(options.GetMany("type"));
+        IEnumerable<EventTypeDefinition> definitions = selected.Length == 0
+            ? EventTypeCatalog.GetDefinitions()
+            : selected.Select(EventTypeCatalog.GetDefinition);
+        foreach (EventTypeDefinition definition in definitions) {
+            EventPredicateBuilder builder = EventPredicateBuilder.ForType(definition.Type);
             Console.WriteLine(JsonSerializer.Serialize(new {
                 definition.Name,
                 definition.DisplayName,
                 definition.Description,
                 definition.Category,
                 definition.IsComposite,
-                Sources = definition.Sources.Select(static source => new { source.LogName, source.EventIds })
+                Sources = definition.Sources.Select(static source => new { source.LogName, source.EventIds }),
+                Fields = DescribeFields(builder.Fields)
             }, JsonOptions));
         }
         return 0;
     }
+
+    private static object[] DescribeFields(IReadOnlyList<EventPredicateField> fields) => fields
+        .Select(static field => (object)new {
+            field.Name,
+            field.DisplayName,
+            field.Definition.Description,
+            ValueType = field.Definition.ValueType.FullName,
+            field.Definition.IsCommon,
+            field.Definition.IsFilterable,
+            field.Definition.Aliases,
+            field.Definition.FilterStage,
+            field.Definition.SupportedOperators
+        })
+        .ToArray();
 
     private static int WriteJson<T>(T value) {
         Console.WriteLine(JsonSerializer.Serialize(value, JsonOptions));
@@ -242,7 +422,7 @@ internal static partial class Program {
     private static DateTime? ParseDate(string? value) => value == null ? null : DateTime.Parse(value, CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal);
 
     private static void ValidateOptions(CliArguments options) {
-        if (options.Subcommand.Length > 0 && options.Command is not ("collector" or "provider")) {
+        if (options.Subcommand.Length > 0 && options.Command is not ("collector" or "provider" or "store")) {
             throw new ArgumentException(
                 $"Unexpected argument '{options.Subcommand}'. The {options.Command} command does not accept a subcommand.");
         }
@@ -250,16 +430,18 @@ internal static partial class Program {
         switch (options.Command) {
             case "query":
                 options.ValidateAllowed(
-                    "type", "definition", "log", "path", "event-id", "record-id",
-                    "machine", "collector", "start", "end", "since", "max",
-                    "max-candidates", "concurrency", "oldest", "resolve-dns", "title");
+                    "type", "definition", "definition-name", "log", "path", "event-id", "record-id",
+                    "machine", "collector", "source", "provider", "start", "end", "since", "max",
+                    "max-candidates", "concurrency", "oldest", "resolve-dns", "title", "where", "explain",
+                    "store", "write-store");
                 break;
             case "report":
                 options.ValidateAllowed(
-                    "type", "definition", "log", "path", "event-id", "record-id",
-                    "machine", "collector", "start", "end", "since", "max",
+                    "type", "definition", "definition-name", "log", "path", "event-id", "record-id",
+                    "machine", "collector", "source", "provider", "start", "end", "since", "max",
                     "max-candidates", "concurrency", "oldest", "resolve-dns", "title",
-                    "html", "excel", "email-html", "mail-profile", "email-rows", "drawer-placement");
+                    "html", "excel", "csv", "email-html", "mail-profile", "email-rows", "drawer-placement", "where",
+                    "store", "write-store", "summary");
                 break;
             case "watch":
                 options.ValidateAllowed(
@@ -292,7 +474,12 @@ internal static partial class Program {
             case "provider" when options.Subcommand == "uninstall":
                 options.ValidateAllowed("name", "remove-files");
                 break;
+            case "store" when options.Subcommand == "prune":
+                options.ValidateAllowed("path", "before", "definition-name");
+                break;
             case "types":
+                options.ValidateAllowed("type", "definition");
+                break;
             case "help":
             case "--help":
             case "-h":
@@ -303,15 +490,16 @@ internal static partial class Program {
 
     private static int Help() {
         Console.WriteLine("EventViewerX 4.0\n\n" +
-            "  evx types\n" +
-            "  evx query  (--type TYPE[,TYPE] | --definition FILE | --log LOG | --path FILE[,FILE]) [--path FILE[,FILE] with type/definition] [--event-id ID] [--record-id ID] [--machine HOST | --collector WEC] [--since 01:00:00] [--max N]\n" +
-            "  evx report (--type TYPE[,TYPE] | --definition FILE | --log LOG | --path FILE[,FILE]) [--path FILE[,FILE] with type/definition] (--html FILE | --excel FILE | --email-html FILE | --mail-profile FILE) [--drawer-placement Auto|Top|Right]\n" +
+            "  evx types [--type TYPE[,TYPE] | --definition FILE]\n" +
+            "  evx query  (--type TYPE[,TYPE] | --definition FILE | --log LOG | --path FILE[,FILE] | --store FILE.db) [--where JSON_OR_FILE] [--write-store FILE.db] [--explain] [--since 01:00:00] [--max N]\n" +
+            "  evx report (--type TYPE[,TYPE] | --definition FILE | --log LOG | --path FILE[,FILE] | --store FILE.db) [--definition-name NAME] [--summary Hour|Day|Week|Month] [--where JSON_OR_FILE] [--write-store FILE.db] (--html FILE | --excel FILE | --csv FILE.csv|BUNDLE.zip | --email-html FILE | --mail-profile FILE) [--drawer-placement Auto|Top|Right]\n" +
             "  evx watch  (--type TYPE[,TYPE] | --definition FILE) [--machine HOST | --collector WEC] [--jsonl FILE] [--outbox DIR | --mail-profile FILE] [--interval 00:05:00] [--stop-after N] [--timeout 01:00:00] [--ready-file FILE] [--summary-file FILE]\n" +
             "  evx collector create --name NAME --type TYPE[,TYPE] (--source HOST[,HOST] | --source-initiated --collector-host WEC) [--allowed-source-sddl SDDL] [--output FILE] [--apply]\n" +
             "  evx collector readiness\n" +
             "  evx collector runtime --name NAME\n" +
             "  evx collector initialize [--skip-winrm]\n" +
             "  evx collector remove --name NAME\n" +
+            "  evx store prune --path FILE.db --before TIMESTAMP [--definition-name NAME]\n" +
             "  evx provider build --definition FILE --output FILE.evxprovider\n" +
             "  evx provider install --package FILE.evxprovider\n" +
             "  evx provider uninstall --name PROVIDER [--remove-files]");

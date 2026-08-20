@@ -3,7 +3,7 @@ Describe 'Show-EVXEvent' {
         $Command = Get-Command Show-EVXEvent
         $Command.DefaultParameterSet | Should -Be 'Input'
         $Command.ParameterSets.Name | Sort-Object |
-            Should -Be (@('Type', 'Log', 'Path', 'Definition', 'Input') | Sort-Object)
+            Should -Be (@('Type', 'Log', 'Path', 'Definition', 'Input', 'Store') | Sort-Object)
         ($Command.ParameterSets | Where-Object Name -EQ 'Type').Parameters.Name |
             Should -Not -Contain 'LogName'
         ($Command.ParameterSets | Where-Object Name -EQ 'Log').Parameters.Name |
@@ -16,6 +16,8 @@ Describe 'Show-EVXEvent' {
             Should -Contain 'Path'
         ($Command.ParameterSets | Where-Object Name -EQ 'Definition').Parameters.Name |
             Should -Contain 'MaxEventsScanned'
+        ($Command.ParameterSets | Where-Object Name -EQ 'Store').Parameters.Name |
+            Should -Contain 'SummaryPeriod'
     }
 
     It 'uses Path alone for a generic offline report' {
@@ -38,20 +40,23 @@ Describe 'Show-EVXEvent' {
         }
         $HtmlPath = Join-Path $TestDrive 'event-report.html'
         $ExcelPath = Join-Path $TestDrive 'event-report.xlsx'
+        $CsvPath = Join-Path $TestDrive 'event-report.csv'
 
         $Result = @($Event | Show-EVXEvent `
                 -Title 'System snapshot' `
                 -HtmlPath $HtmlPath `
                 -DrawerPlacement Top `
                 -ExcelPath $ExcelPath `
+                -CsvPath $CsvPath `
                 -EmailPackage `
                 -PassThru)
 
         Test-Path -LiteralPath $HtmlPath | Should -BeTrue
         Test-Path -LiteralPath $ExcelPath | Should -BeTrue
+        Test-Path -LiteralPath $CsvPath | Should -BeTrue
         (Get-Content -LiteralPath $HtmlPath -Raw) | Should -Match 'System snapshot'
         (Get-Content -LiteralPath $HtmlPath -Raw) | Should -Match 'data-hfx-monitoring-record-drawer-placement="top"'
-        $Result.Count | Should -Be 4
+        $Result.Count | Should -Be 5
         @($Result | Where-Object { $_ -is [EventViewerX.Reporting.EventEmailPackage] }).Count |
             Should -Be 1
         $Report = $Result | Where-Object { $_ -is [EventViewerX.Reporting.EventReport] }
@@ -71,7 +76,7 @@ Describe 'Show-EVXEvent' {
             Fields = @(@{
                     Name = 'ServiceName'
                     Source = 'Data'
-                    SourceName = 'param1'
+                    SourceName = 'param4'
                 })
         } | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $DefinitionPath -Encoding UTF8
         $FixturePath = Join-Path $PSScriptRoot 'Logs\NamedFilterExamples.evtx'
@@ -81,5 +86,80 @@ Describe 'Show-EVXEvent' {
         $Report.Rows.Count | Should -Be 2
         @($Report.Rows.Type | Sort-Object -Unique) | Should -Be @('ServiceStartTypeChange')
         $Report.Coverage[0].MachineName | Should -Be 'Offline'
+    }
+
+    It 'applies the same typed Where contract before rendering a custom report' {
+        $DefinitionPath = Join-Path $TestDrive 'service-change-filtered.json'
+        @{
+            Name = 'ServiceStartTypeChange'
+            DisplayName = 'Service start type changes'
+            Sources = @(@{
+                    LogName = 'System'
+                    EventIds = @(7040)
+                    ProviderNames = @('Service Control Manager')
+                })
+            Fields = @(@{
+                    Name = 'ServiceName'
+                    Source = 'Data'
+                    SourceName = 'param4'
+                })
+        } | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $DefinitionPath -Encoding UTF8
+        $FixturePath = Join-Path $PSScriptRoot 'Logs\NamedFilterExamples.evtx'
+
+        $Report = Show-EVXEvent `
+            -Definition $DefinitionPath `
+            -Path $FixturePath `
+            -Where { $_.ServiceName -eq 'BITS' } `
+            -PassThru
+
+        $Report.Rows.Count | Should -BeGreaterThan 0
+        @($Report.Sections[0].Rows | ForEach-Object { $_.Values['ServiceName'] } |
+                Sort-Object -Unique) | Should -Be 'BITS'
+    }
+
+    It 'persists, filters, and summarizes typed rows without adding storage cmdlets' {
+        $DefinitionPath = Join-Path $TestDrive 'stored-service-change.json'
+        $StorePath = Join-Path $TestDrive 'events.db'
+        @{
+            Name = 'ServiceStartTypeChange'
+            DisplayName = 'Service start type changes'
+            Sources = @(@{
+                    LogName = 'System'
+                    EventIds = @(7040)
+                    ProviderNames = @('Service Control Manager')
+                })
+            Fields = @(@{
+                    Name = 'ServiceName'
+                    Source = 'Data'
+                    SourceName = 'param4'
+                })
+        } | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $DefinitionPath -Encoding UTF8
+        $FixturePath = Join-Path $PSScriptRoot 'Logs\NamedFilterExamples.evtx'
+
+        $StoredOutput = @(Show-EVXEvent `
+                -Definition $DefinitionPath `
+                -Path $FixturePath `
+                -MaxEvents 4 `
+                -StorePath $StorePath `
+                -PassThru)
+        $StoredReport = $StoredOutput | Where-Object { $_ -is [EventViewerX.Reporting.EventReport] }
+        $Filtered = Show-EVXEvent `
+            -FromStore $StorePath `
+            -Definition ServiceStartTypeChange `
+            -Where { $_.ServiceName -eq 'BITS' } `
+            -PassThru
+        $Summary = Show-EVXEvent `
+            -FromStore $StorePath `
+            -SummaryPeriod Day `
+            -PassThru
+
+        Test-Path -LiteralPath $StorePath | Should -BeTrue
+        $StoredReport.Rows.Count | Should -Be 4
+        $Filtered.Rows.Count | Should -BeGreaterThan 0
+        @($Filtered.Rows | ForEach-Object { $_.Values['ServiceName'] } | Sort-Object -Unique) |
+            Should -Be @('BITS')
+        $Filtered.Sections[0].Columns.Name | Should -Be @('ServiceName')
+        $Summary.Sections[0].Name | Should -Be 'EventStoreSummary'
+        $Summary.Sections[0].Columns.Name | Should -Contain 'Count'
     }
 }

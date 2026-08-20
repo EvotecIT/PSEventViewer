@@ -45,6 +45,19 @@ public static partial class EventTypeEngine {
             yield break;
         }
 
+        bool managedOnlyPredicate = !string.IsNullOrWhiteSpace(query.CollectorLogName);
+        EventPredicatePlan? predicatePlan = query.Predicate == null
+            ? null
+            : managedOnlyPredicate
+                ? EventPredicatePlanner.PlanManagedOnly(
+                    query.Predicate,
+                    "ForwardedEvents uses the Windows Server 2025 safe '*' reader, so typed filtering is bounded and managed.")
+                : EventPredicatePlanner.Plan(query.Predicate);
+        info.PredicatePlan = predicatePlan;
+        Func<EventTypeRecord, bool>? typedPredicate = predicatePlan?.ManagedPredicate == null
+            ? null
+            : EventPredicateEvaluator.Compile(predicatePlan.ManagedPredicate);
+
         using var enricher = query.Enrichment == null
             ? null
             : new EventEnricher(
@@ -53,7 +66,8 @@ public static partial class EventTypeEngine {
             CreateBatch(
                 query,
                 eventInfo,
-                info);
+                info,
+                predicatePlan?.NativeFilter);
         var candidateCounter =
             new EventTypeCandidateCounter(
                 query.MaxCandidates,
@@ -73,6 +87,8 @@ public static partial class EventTypeEngine {
                            cancellationToken)) {
             EventTypeRecord? target = projection.Target;
             if (target == null ||
+                (typedPredicate != null &&
+                 !typedPredicate(target)) ||
                 (query.ResultPredicate != null &&
                  !query.ResultPredicate(target))) {
                 continue;
@@ -145,7 +161,8 @@ public static partial class EventTypeEngine {
     private static EventLogBatchQuery CreateBatch(
         EventTypeQuery query,
         IReadOnlyDictionary<string, HashSet<int>> eventInfo,
-        EventTypeQueryExecutionInfo executionInfo) {
+        EventTypeQueryExecutionInfo executionInfo,
+        EventFilter? predicateFilter) {
 
         (DateTime? startTime, DateTime? endTime) =
             EventTimeRange.Resolve(
@@ -158,7 +175,8 @@ public static partial class EventTypeEngine {
                 eventInfo,
                 executionInfo,
                 startTime,
-                endTime);
+                endTime,
+                predicateFilter);
         }
         if (!string.IsNullOrWhiteSpace(query.CollectorLogName)) {
             return CreateCollectorBatch(
@@ -187,7 +205,7 @@ public static partial class EventTypeEngine {
                         nameof(query),
                         "Minimum event record IDs must be greater than or equal to zero.");
                 }
-                var filter = new EventFilter {
+                var baseFilter = new EventFilter {
                     EventIds = source.Value
                         .OrderBy(static id => id)
                         .ToArray(),
@@ -197,6 +215,12 @@ public static partial class EventTypeEngine {
                     MinimumRecordIdExclusive =
                         checkpoint
                 };
+                if (!EventFilterIntersection.TryCreate(
+                        baseFilter,
+                        predicateFilter,
+                        out EventFilter filter)) {
+                    continue;
+                }
                 foreach (EventFilter partition in
                          EventFilterPartitioner.Partition(
                              filter)) {
@@ -342,7 +366,8 @@ public static partial class EventTypeEngine {
         IReadOnlyDictionary<string, HashSet<int>> eventInfo,
         EventTypeQueryExecutionInfo executionInfo,
         DateTime? startTime,
-        DateTime? endTime) {
+        DateTime? endTime,
+        EventFilter? predicateFilter) {
 
         var fileQueries = new List<EventLogFileQuery>();
         foreach (string path in query.Paths!) {
@@ -356,7 +381,7 @@ public static partial class EventTypeEngine {
                         nameof(query),
                         "Minimum event record IDs must be greater than or equal to zero.");
                 }
-                var filter = new EventFilter {
+                var baseFilter = new EventFilter {
                     EventIds = source.Value
                         .OrderBy(static id => id)
                         .ToArray(),
@@ -365,6 +390,12 @@ public static partial class EventTypeEngine {
                     EndTime = endTime,
                     MinimumRecordIdExclusive = checkpoint
                 };
+                if (!EventFilterIntersection.TryCreate(
+                        baseFilter,
+                        predicateFilter,
+                        out EventFilter filter)) {
+                    continue;
+                }
                 foreach (EventFilter partition in
                          EventFilterPartitioner.Partition(filter)) {
                     string xpath = AddOriginalChannelPredicate(

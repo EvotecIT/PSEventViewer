@@ -56,13 +56,12 @@ public static class EventReportEmailRenderer {
 
     private static List<Dictionary<string, object?>> ProjectEmailRows(EventReportSection section, int maximumRows) {
         EventReportPresentationSection presentation = EventReportPresentationProjection.Create(section);
-        string[] columns = presentation.PrimaryColumns
-            .Select(static column => column.DisplayName)
+        EventReportPresentationColumn[] columns = presentation.PrimaryColumns
             .Take(5)
             .ToArray();
         return presentation.Rows.Take(maximumRows)
-            .Select(row => columns.ToDictionary(column => column,
-                column => row.TryGetValue(column, out object? value) ? value : null,
+            .Select(row => columns.ToDictionary(column => column.DisplayName,
+                column => row.TryGetValue(column.Name, out object? value) ? value : null,
                 StringComparer.OrdinalIgnoreCase))
             .ToList();
     }

@@ -8,12 +8,22 @@ schema: 2.0.0
 ## SYNOPSIS
 Creates a reusable typed Windows Event Log filter or compiles it to native query text.
 
-The default output is EventViewerX.EventFilter for reuse by C# and cmdlets. Use AsXPath, LogName, or Path when native query text is required by Get-WinEvent, Event Viewer, or WEC.
+The default output is EventViewerX.EventFilter for native event metadata. Supply Type or Definition to discover typed domain fields and build a reusable EventPredicate. Use AsXPath, LogName, or Path when native query text is required by Get-WinEvent, Event Viewer, or WEC.
 
 ## SYNTAX
 ### Object (Default)
 ```powershell
 New-EVXFilter [-EventId <int[]>] [-RecordId <long[]>] [-ProviderName <string[]>] [-Level <Level[]>] [-Keywords <long[]>] [-StartTime <DateTime>] [-EndTime <DateTime>] [-TimePeriod <TimePeriod>] [-UserId <string[]>] [-Data <string[]>] [-NamedDataFilter <hashtable>] [-NamedDataExcludeFilter <hashtable>] [-ExcludeEventId <int[]>] [<CommonParameters>]
+```
+
+### Type
+```powershell
+New-EVXFilter -Type <EventType> [<CommonParameters>]
+```
+
+### Definition
+```powershell
+New-EVXFilter -Definition <Object> [<CommonParameters>]
 ```
 
 ### XPath
@@ -34,7 +44,7 @@ New-EVXFilter [-Path] <string[]> [-EventId <int[]>] [-RecordId <long[]>] [-Provi
 ## DESCRIPTION
 Creates a reusable typed Windows Event Log filter or compiles it to native query text.
 
-The default output is EventViewerX.EventFilter for reuse by C# and cmdlets. Use AsXPath, LogName, or Path when native query text is required by Get-WinEvent, Event Viewer, or WEC.
+The default output is EventViewerX.EventFilter for native event metadata. Supply Type or Definition to discover typed domain fields and build a reusable EventPredicate. Use AsXPath, LogName, or Path when native query text is required by Get-WinEvent, Event Viewer, or WEC.
 
 ## EXAMPLES
 
@@ -87,6 +97,22 @@ Aliases: None
 Possible values:
 
 Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -Definition
+Custom EventDefinition instance or JSON file whose typed fields should be exposed.
+
+```yaml
+Type: Object
+Parameter Sets: Definition
+Aliases: None
+Possible values:
+
+Required: True
 Position: named
 Default value: None
 Accept pipeline input: False
@@ -292,9 +318,25 @@ Named relative time range.
 Type: TimePeriod
 Parameter Sets: Object, XPath, ChannelXml, FileXml
 Aliases: None
-Possible values: PastHour, CurrentHour, PastDay, CurrentDay, PastMonth, CurrentMonth, PastQuarter, CurrentQuarter, Last3Days, Last7Days, Last14Days, Last1Hour, Last2Hours, Last3Hours, Last6Hours, Last12Hours, Last16Hours, Last24Hours, Today, Yesterday, Everything, TillLastMonday, TillLastTuesday, TillLastWednesday, TillLastThursday, TillLastFriday, TillLastSaturday, TillLastSunday
+Possible values: PastHour, CurrentHour, PastDay, CurrentDay, PastMonth, CurrentMonth, PastQuarter, CurrentQuarter, Last3Days, Last7Days, Last14Days, Last1Hour, Last2Hours, Last3Hours, Last6Hours, Last12Hours, Last16Hours, Last24Hours, Today, Yesterday, Everything, TillLastMonday, TillLastTuesday, TillLastWednesday, TillLastThursday, TillLastFriday, TillLastSaturday, TillLastSunday, Last15Minutes, Last30Minutes
 
 Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -Type
+Built-in event type whose typed fields should be exposed for predicate construction.
+
+```yaml
+Type: EventType
+Parameter Sets: Type
+Aliases: None
+Possible values: ADComputerCreateChange, ADComputerDeleted, ADComputerChangeDetailed, ADGroupMembershipChange, ADGroupEnumeration, ADGroupChange, ADGroupCreateDelete, ADGroupChangeDetailed, ADGroupPolicyChanges, ADGroupPolicyEdits, ADGroupPolicyLinks, ADGroupPolicyChangesDetailed, GpoCreated, GpoDeleted, GpoModified, ADLdapBindingSummary, ADLdapBindingDetails, ADUserCreateChange, ADUserStatus, ADUserChangeDetailed, ADUserLockouts, ADUserLogon, ADUserLogonNTLMv1, ADUserLogonFailed, ADUserUnlocked, ADUserPrivilegeUse, ADUserRightsAssignment, KerberosTGTRequest, KerberosServiceTicket, KerberosTicketFailure, KerberosPolicyChange, ADOrganizationalUnitChangeDetailed, ADOtherChangeDetailed, ADSMBServerAuditV1, LogsClearedSecurity, LogsClearedOther, LogsFullSecurity, NetworkAccessAuthenticationPolicy, CertificateIssued, AuditPolicyChange, FirewallRuleChange, DhcpLeaseCreated, BitLockerKeyChange, BitLockerSuspended, DeviceRecognized, DeviceDisabled, ObjectDeletion, ScheduledTaskDeleted, ScheduledTaskCreated, OSCrash, OSBugCheck, OSStartup, OSShutdown, OSUncleanShutdown, OSStartupSecurity, OSCrashOnAuditFailRecovery, OSTimeChange, WindowsUpdateFailure, ClientGroupPoliciesApplication, ClientGroupPoliciesSystem, HyperVVirtualMachineShutdown, HyperVVirtualMachineStarted, IISSiteBindingFailure, HyperVCheckpointCreated, IISSiteStopped, ExchangeDatabaseMounted, DfsReplicationError, SqlDatabaseCreated, SyncCompleted, AADConnectStagingEnabled, AADConnectStagingDisabled, AADConnectPasswordSyncFailed, AADConnectRunProfile, AADSyncCycleStage, AADSyncProvisionCredentialsPing, AADSyncPasswordHashSyncStatus, AADSyncImportStatus, AADSyncFilterStatus, NetworkMonitorDriverLoaded, NetworkPromiscuousMode, ActiveDirectoryAuthentication, ActiveDirectoryAccountLifecycle, ActiveDirectoryChanges, GroupPolicyActivity, KerberosActivity, OperatingSystemLifecycle, WindowsSecurityChanges, EntraConnectHealth, NetworkSecurity, InfrastructureHealth
+
+Required: True
 Position: named
 Default value: None
 Accept pipeline input: False
@@ -328,6 +370,7 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 
 - `EventViewerX.EventFilter`
 - `System.String`
+- `PSEventViewer.PowerShellEventPredicateBuilder`: PowerShell-friendly view over the canonical EventViewerX typed predicate builder.
 
 ## RELATED LINKS
 

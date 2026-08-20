@@ -63,7 +63,7 @@ Builds safe Windows Event Collector XML from typed reports, custom definitions, 
 ### [New-EVXFilter](New-EVXFilter.md)
 Creates a reusable typed Windows Event Log filter or compiles it to native query text.
 
-The default output is EventViewerX.EventFilter for reuse by C# and cmdlets. Use AsXPath, LogName, or Path when native query text is required by Get-WinEvent, Event Viewer, or WEC.
+The default output is EventViewerX.EventFilter for native event metadata. Supply Type or Definition to discover typed domain fields and build a reusable EventPredicate. Use AsXPath, LogName, or Path when native query text is required by Get-WinEvent, Event Viewer, or WEC.
 
 ### [New-EVXLog](New-EVXLog.md)
 Creates a new Windows event log with optional size and retention settings.

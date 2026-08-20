@@ -71,6 +71,54 @@ $BinaryDev = @(
     }
 )
 
+# A PowerShell module host does not apply an executable .deps.json native probing policy.
+# Preload the bundled SQLite runtime by absolute path so optional EventViewerX storage works
+# consistently in Windows PowerShell and PowerShell 7 without a machine-wide SQLite install.
+$BinaryRoot = if ($Development) {
+    $DevelopmentAssemblyFolder.Path
+} elseif ($Framework -and $PSEdition -eq 'Core') {
+    Join-Path $PSScriptRoot "Lib\$Framework"
+} elseif ($FrameworkNet -and $PSEdition -ne 'Core') {
+    Join-Path $PSScriptRoot "Lib\$FrameworkNet"
+}
+if ($BinaryRoot -and (Test-Path -LiteralPath (Join-Path $BinaryRoot 'DbaClientX.SQLite.dll'))) {
+    $NativeArchitecture = if ($PSEdition -eq 'Core') {
+        [System.Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture.ToString().ToLowerInvariant()
+    } elseif ([IntPtr]::Size -eq 8) {
+        'x64'
+    } else {
+        'x86'
+    }
+    $NativeCandidates = @(
+        (Join-Path $BinaryRoot 'e_sqlite3.dll')
+        (Join-Path $BinaryRoot "runtimes\win-$NativeArchitecture\native\e_sqlite3.dll")
+    )
+    $NativeSQLite = $NativeCandidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+    if (-not $NativeSQLite) {
+        throw "PSEventViewer storage runtime for win-$NativeArchitecture is missing from $BinaryRoot."
+    }
+    if ($PSEdition -eq 'Core') {
+        [System.Runtime.InteropServices.NativeLibrary]::Load($NativeSQLite) | Out-Null
+    } else {
+        if (-not ('PSEventViewerNativeLoader' -as [type])) {
+            Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+public static class PSEventViewerNativeLoader {
+    [DllImport("kernel32", SetLastError = true, CharSet = CharSet.Unicode)]
+    private static extern IntPtr LoadLibrary(string path);
+    public static void Load(string path) {
+        if (LoadLibrary(path) == IntPtr.Zero) {
+            throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
+        }
+    }
+}
+'@
+        }
+        [PSEventViewerNativeLoader]::Load($NativeSQLite)
+    }
+}
+
 # if ($Development) {
 #     # Preload BCL helper assemblies to avoid version mismatches inside the VSCode PowerShell host (Desktop 5.1).
 #     $PreloadAssemblies = @(
@@ -94,7 +142,8 @@ $BinaryDev = @(
 # }
 
 if ($Development) {
-    $Assembly = Get-ChildItem -Path "$($DevelopmentAssemblyFolder.Path)\*.dll" -ErrorAction SilentlyContinue -File
+    $Assembly = Get-ChildItem -Path "$($DevelopmentAssemblyFolder.Path)\*.dll" -ErrorAction SilentlyContinue -File |
+        Where-Object Name -NE 'e_sqlite3.dll'
 } else {
     $Assembly = @(
         if ($Framework -and $PSEdition -eq 'Core') {
@@ -103,7 +152,7 @@ if ($Development) {
         if ($FrameworkNet -and $PSEdition -ne 'Core') {
             Get-ChildItem -Path $PSScriptRoot\Lib\$FrameworkNet\*.dll -ErrorAction SilentlyContinue #-Recurse
         }
-    )
+    ) | Where-Object Name -NE 'e_sqlite3.dll'
 }
 
 $FoundErrors = @(

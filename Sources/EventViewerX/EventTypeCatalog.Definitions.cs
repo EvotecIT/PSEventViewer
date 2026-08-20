@@ -230,7 +230,7 @@ public static partial class EventTypeCatalog {
         return fields;
     }
 
-    private static IReadOnlyList<EventFieldDefinition> GetCommonFields() {
+    internal static IReadOnlyList<EventFieldDefinition> GetCommonFields() {
         return GetFields(typeof(EventTypeRecord));
     }
 

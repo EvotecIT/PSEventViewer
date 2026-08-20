@@ -433,6 +433,16 @@ public sealed partial class CmdletGetEVXEvent : AsyncPSCmdlet {
     [Parameter(Mandatory = true, ParameterSetName = "Definition")]
     public object? Definition { get; set; }
 
+    /// <summary>Reusable typed EventPredicate, predicate JSON, or predicate JSON file.</summary>
+    [Parameter(ParameterSetName = "Type")]
+    [Parameter(ParameterSetName = "Definition")]
+    public object? Where { get; set; }
+
+    /// <summary>Returns the native/managed predicate plan without querying event sources.</summary>
+    [Parameter(ParameterSetName = "Type")]
+    [Parameter(ParameterSetName = "Definition")]
+    public SwitchParameter Explain { get; set; }
+
     /// <summary>
     /// Initializes logging and helper classes before processing.
     /// </summary>
@@ -448,6 +458,19 @@ public sealed partial class CmdletGetEVXEvent : AsyncPSCmdlet {
             !MyInvocation.BoundParameters.ContainsKey(
                 nameof(ReadMode))) {
             ReadMode = EventReadMode.StructuredDataAndMessage;
+        }
+        EventPredicate? predicate = PowerShellEventPredicateAdapter.Resolve(Where, nameof(Where));
+        if (Explain.IsPresent) {
+            if (predicate == null) {
+                throw new PSArgumentException("Explain requires Where so there is a typed predicate to plan.");
+            }
+            EventPredicatePlan plan = Collector == null
+                ? EventPredicatePlanner.Plan(predicate)
+                : EventPredicatePlanner.PlanManagedOnly(
+                    predicate,
+                    "ForwardedEvents uses the Windows Server 2025 safe '*' reader, so typed filtering is bounded and managed.");
+            WriteObject(plan);
+            return;
         }
         ValidateRecordOptions();
         InitializeCheckpointKey();
@@ -513,6 +536,7 @@ public sealed partial class CmdletGetEVXEvent : AsyncPSCmdlet {
                             ReadMode,
                         ResultPredicate =
                             typeResultPredicate,
+                        Predicate = predicate,
                         Enrichment =
                             enrichmentOptions,
                         MessageCulture =
@@ -590,6 +614,7 @@ public sealed partial class CmdletGetEVXEvent : AsyncPSCmdlet {
             BufferCapacity = BufferCapacity > 0 ? BufferCapacity : 64,
             MessageCulture = MessageCulture,
             FallbackMessageCulture = FallbackMessageCulture,
+            Predicate = PowerShellEventPredicateAdapter.Resolve(Where, nameof(Where)),
             ResultPredicate = MessageRegex == null ? null : record => MessageMatches(record.SourceEvent),
             MinimumRecordIdExclusiveResolver = GetCheckpointLowerBound,
             CandidateObserver = candidate => TrackCheckpointProgress(candidate),

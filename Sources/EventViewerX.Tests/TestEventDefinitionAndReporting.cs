@@ -71,13 +71,19 @@ public sealed class TestEventDefinitionAndReporting {
         Assert.Contains("data-hfx-monitoring-record-drawer-placement=\"top\"", topDrawerHtml, StringComparison.Ordinal);
 
         string workbook = Path.Combine(Path.GetTempPath(), $"evx-report-{Guid.NewGuid():N}.xlsx");
+        string csv = Path.Combine(Path.GetTempPath(), $"evx-report-{Guid.NewGuid():N}.csv");
         try {
             Assert.Equal(workbook, EventReportExcelRenderer.Save(report, workbook));
             using ZipArchive archive = ZipFile.OpenRead(workbook);
             Assert.Contains(archive.Entries, static entry => entry.FullName == "xl/workbook.xml");
             Assert.Contains(archive.Entries, static entry => entry.FullName.StartsWith("xl/worksheets/sheet", StringComparison.Ordinal));
+            Assert.Equal(csv, EventReportCsvRenderer.Save(report, csv));
+            string csvText = File.ReadAllText(csv);
+            Assert.StartsWith("User,Computer", csvText, StringComparison.Ordinal);
+            Assert.DoesNotContain("Event ID", csvText, StringComparison.Ordinal);
         } finally {
             File.Delete(workbook);
+            File.Delete(csv);
         }
 
         EventEmailPackage email = await EventReportEmailRenderer.RenderAsync(report);
@@ -142,6 +148,7 @@ public sealed class TestEventDefinitionAndReporting {
         Assert.Contains("EVOTEC\\alice", email.Html, StringComparison.Ordinal);
 
         string workbook = Path.Combine(Path.GetTempPath(), $"evx-typed-report-{Guid.NewGuid():N}.xlsx");
+        string csvBundle = Path.Combine(Path.GetTempPath(), $"evx-typed-report-{Guid.NewGuid():N}.zip");
         try {
             EventReportExcelRenderer.Save(report, workbook);
             using ZipArchive archive = ZipFile.OpenRead(workbook);
@@ -157,8 +164,24 @@ public sealed class TestEventDefinitionAndReporting {
             Assert.Contains(tables, table => TableColumns(table, spreadsheet).Contains("Event ID"));
             Assert.DoesNotContain(tables.Where(table => TableColumns(table, spreadsheet).Contains("Object Affected")),
                 table => TableColumns(table, spreadsheet).Contains("Event ID"));
+            EventReportCsvRenderer.Save(report, csvBundle);
+            using ZipArchive csvArchive = ZipFile.OpenRead(csvBundle);
+            Assert.Contains(csvArchive.Entries, static entry => entry.FullName == "ADUserLogon.csv");
+            Assert.Contains(csvArchive.Entries, static entry => entry.FullName == "ADUserLogonFailed.csv");
+            Assert.Contains(csvArchive.Entries, static entry => entry.FullName == "event-provenance.csv");
+            Assert.Contains(csvArchive.Entries, static entry => entry.FullName == "coverage.csv");
+            Assert.Contains(csvArchive.Entries, static entry => entry.FullName == "manifest.json");
+            ZipArchiveEntry successfulCsv = Assert.Single(
+                csvArchive.Entries,
+                static entry => entry.FullName == "ADUserLogon.csv");
+            using var reader = new StreamReader(successfulCsv.Open());
+            string csvText = reader.ReadToEnd();
+            Assert.Contains("Object Affected", csvText, StringComparison.Ordinal);
+            Assert.DoesNotContain("Failure Reason", csvText, StringComparison.Ordinal);
+            Assert.DoesNotContain("Event ID", csvText, StringComparison.Ordinal);
         } finally {
             File.Delete(workbook);
+            File.Delete(csvBundle);
         }
     }
 
@@ -196,6 +219,65 @@ public sealed class TestEventDefinitionAndReporting {
         Assert.Contains("SeBackupPrivilege", email.Html, StringComparison.Ordinal);
         Assert.DoesNotContain("System.Collections.Generic.List", html, StringComparison.Ordinal);
         Assert.DoesNotContain("System.Collections.Generic.List", email.Html, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task DuplicateDisplayNamesRemainDistinctAcrossEveryRenderer() {
+        EventDefinition definition = new() {
+            Name = "DuplicateHeadings",
+            DisplayName = "Duplicate headings",
+            Sources = CreateDefinition().Sources,
+            Fields = new[] {
+                new EventDefinitionField {
+                    Name = "FirstValue",
+                    DisplayName = "Value",
+                    Source = EventFieldSource.Data,
+                    SourceName = "First"
+                },
+                new EventDefinitionField {
+                    Name = "SecondValue",
+                    DisplayName = "Value",
+                    Source = EventFieldSource.Data,
+                    SourceName = "Second"
+                }
+            }
+        };
+        EventObject source = CreateSecuritySource(4625);
+        source.Data["First"] = "one";
+        source.Data["Second"] = "two";
+        EventReport report = EventReportEngine.Create(new object[] {
+            EventDefinitionEngine.CreateRecord(definition, source)
+        }, "Duplicate headings");
+
+        string html = EventReportHtmlRenderer.Render(report);
+        EventEmailPackage email = await EventReportEmailRenderer.RenderAsync(report);
+        string workbook = Path.Combine(Path.GetTempPath(), $"evx-duplicate-headings-{Guid.NewGuid():N}.xlsx");
+        string csv = Path.Combine(Path.GetTempPath(), $"evx-duplicate-headings-{Guid.NewGuid():N}.csv");
+        try {
+            EventReportCsvRenderer.Save(report, csv);
+            EventReportExcelRenderer.Save(report, workbook);
+            string csvText = File.ReadAllText(csv);
+            using ZipArchive archive = ZipFile.OpenRead(workbook);
+            XNamespace spreadsheet = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+            string[][] tableColumns = archive.Entries
+                .Where(static entry => entry.FullName.StartsWith("xl/tables/table", StringComparison.Ordinal))
+                .Select(entry => {
+                    using Stream stream = entry.Open();
+                    return TableColumns(XDocument.Load(stream), spreadsheet);
+                }).ToArray();
+
+            Assert.StartsWith("Value,Value Second Value", csvText, StringComparison.Ordinal);
+            Assert.Contains("one,two", csvText, StringComparison.Ordinal);
+            Assert.Contains("Value Second Value", html, StringComparison.Ordinal);
+            Assert.Contains("one", html, StringComparison.Ordinal);
+            Assert.Contains("two", html, StringComparison.Ordinal);
+            Assert.Contains("Value Second Value", email.Html, StringComparison.Ordinal);
+            Assert.Contains(tableColumns, static columns =>
+                columns.SequenceEqual(new[] { "Value", "Value Second Value" }));
+        } finally {
+            File.Delete(workbook);
+            File.Delete(csv);
+        }
     }
 
     [Fact]

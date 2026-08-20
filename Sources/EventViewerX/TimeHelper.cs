@@ -61,6 +61,10 @@ namespace EventViewerX {
         TillLastSaturday,
         /// <summary>From the start of the most recent Sunday to now.</summary>
         TillLastSunday,
+        /// <summary>Rolling fifteen-minute window ending now.</summary>
+        Last15Minutes,
+        /// <summary>Rolling thirty-minute window ending now.</summary>
+        Last30Minutes,
     }
 
     internal static class TimeHelper {
@@ -140,6 +144,12 @@ namespace EventViewerX {
                     break;
                 case TimePeriod.Last24Hours:
                     lastPeriod = TimeSpan.FromHours(24);
+                    break;
+                case TimePeriod.Last15Minutes:
+                    lastPeriod = TimeSpan.FromMinutes(15);
+                    break;
+                case TimePeriod.Last30Minutes:
+                    lastPeriod = TimeSpan.FromMinutes(30);
                     break;
                 case TimePeriod.Today:
                     startTime = new DateTime(now.Year, now.Month, now.Day, 0, 0, 0);

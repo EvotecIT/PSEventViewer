@@ -61,8 +61,9 @@ targets .NET Framework 4.7.2, .NET 8 for Windows, and .NET 10 for Windows.
   schema shared by query, reports, watchers, WEC, C#, and `evx.exe`.
 - [Troubleshooting](Docs/Troubleshooting.md): performance, permissions,
   remoting, message resources, EVTX, checkpoints, and provider deployment.
-- [Documentation index](Docs/README.md) and
-  [benchmark contract](Benchmarks/EventLogParsing/README.md).
+- [Documentation index](Docs/README.md),
+  [event query benchmark contract](Benchmarks/EventLogParsing/README.md), and
+  [local history benchmark contract](Benchmarks/EventStore/README.md).
 
 ## PowerShell quick start
 
@@ -99,6 +100,15 @@ Get-EVXEvent -LogName Security -MachineName DC01, DC02 `
 # Query reusable event types. The type owns its logs, providers, IDs, and projection.
 Get-EVXEvent -Type ADUserLogonFailed, ADUserLockouts `
     -MachineName DC01, DC02 -TimePeriod Last24Hours -MaxEvents 500
+
+# Discover the domain fields, build an exact typed predicate, and inspect its fast path.
+$typed = New-EVXFilter -Type ADUserLogonFailed
+$typed.Fields | Get-Member -MemberType Property
+$typed.Fields.Who |
+    Select-Object Name, Description, ValueType, FilterStage, SupportedOperators
+Get-EVXEvent -Type ADUserLogonFailed `
+    -Where { $_.Who -like 'CONTOSO\*' -and $_.IpAddress -notin @('-', '::1') } `
+    -TimePeriod Last24Hours -Explain
 
 # One query, two polished files, and the same typed rows for downstream automation.
 $report = Show-EVXEvent -Type ActiveDirectoryAuthentication `
@@ -187,6 +197,46 @@ Export-EVXEvent -LogName Security -Filter $filter `
 Get-WinEvent -LogName Security -FilterXPath (
     New-EVXFilter -EventId 4624, 4625 -TimePeriod Last24Hours -AsXPath
 )
+```
+
+Typed definitions add a discoverable predicate layer above native event-log
+filters. `New-EVXFilter -Type` and `-Definition` return a builder whose
+`Fields` properties are the actual domain schema, including aliases,
+descriptions, value kinds, supported operators, and whether each comparison
+can be pushed down. PowerShell tab completion therefore exposes `Who`,
+`IpAddress`, `Action`, and other meaningful fields without requiring users to
+invent a hashtable key or memorize provider XML.
+
+```powershell
+$auth = New-EVXFilter -Type ActiveDirectoryAuthentication
+$predicate = $auth.AllOf(
+    $auth.Fields.Who.MatchesWildcard('CONTOSO\*'),
+    $auth.Fields.IpAddress.NotIn('-', '::1'))
+
+Get-EVXEvent -Type ActiveDirectoryAuthentication `
+    -Where $predicate -TimePeriod Last24Hours
+
+# The script-block form accepts only a restricted comparison expression. It is
+# parsed, never invoked, so commands and unrelated variables are rejected.
+Get-EVXEvent -Type ActiveDirectoryAuthentication `
+    -Where { $_.Who -like 'CONTOSO\*' -and $_.IpAddress -notin @('-', '::1') }
+```
+
+`-Explain` returns the planned native/managed stages without reading events.
+Common metadata is pushed into Windows Event Log or indexed SQLite columns;
+the complete predicate is always verified against the normalized typed row.
+
+The predicate model is portable JSON. Generate it from the discoverable
+builder instead of hand-authoring a provider hashtable, then use the same file
+from the low-startup CLI:
+
+```powershell
+$auth = New-EVXFilter -Type ADUserLogonFailed
+$auth.Fields.Who.MatchesWildcard('CONTOSO\*').ToJson() |
+    Set-Content -LiteralPath .\failed-logons.filter.json -Encoding utf8
+
+evx query --type ADUserLogonFailed `
+    --where .\failed-logons.filter.json --explain
 ```
 
 ```powershell
@@ -486,7 +536,8 @@ Show-EVXEvent -LogName System -EventId 41, 6008 `
 # Typed semantics can be applied to an offline file. -LogName is not required.
 Show-EVXEvent -Type ActiveDirectoryAuthentication `
     -Path C:\Logs\ForwardedEvents.evtx `
-    -HtmlPath .\Authentication.html -ExcelPath .\Authentication.xlsx
+    -HtmlPath .\Authentication.html -ExcelPath .\Authentication.xlsx `
+    -CsvPath .\Authentication.zip
 
 # Reuse an existing stream; Show-EVXEvent does not query again.
 Get-EVXEvent -LogName Application -Level 1, 2 -MaxEvents 500 |
@@ -507,6 +558,12 @@ Kerberos events never share an incompatible column set. Those tables contain
 the definition fields—account, action, IP address, logon type, GPO name, and so
 on—not generic provider or event-ID columns. Excel keeps that technical context
 in a separate `Event Provenance` worksheet for audit and troubleshooting.
+
+Typed CSV follows the same homogeneous schema. A single leaf produces one
+domain-only `.csv`; a composite produces a `.zip` containing one CSV per
+populated leaf plus provenance, coverage, and a manifest. Values that could be
+interpreted as spreadsheet formulas are escaped. Generic event queries retain
+their technical event columns.
 
 `-LogName` and untyped pipeline input intentionally produce a generic event
 view with time, event ID, level, provider, source, message, and provider data.
@@ -580,13 +637,54 @@ Interactive HTML supports `Auto`, `Top`, and `Right` selected-record placement.
 falls back above the table below the narrow-screen safety breakpoint. PowerShell
 exposes the same contract through `Show-EVXEvent -DrawerPlacement`.
 
+## Optional local event history
+
+`Show-EVXEvent` can persist its already-normalized snapshot into a local
+SQLite store and later build typed reports or calendar summaries without
+rereading a month of event logs. Storage is optional and is owned by the
+`EventViewerX.Storage` package over DbaClientX; it does not add another query
+engine or another PowerShell cmdlet family.
+
+```powershell
+$store = 'C:\ProgramData\EventViewerX\events.db'
+
+# A scheduled collector run. Overlap is safe: event provenance is deduplicated.
+Show-EVXEvent -Type ActiveDirectoryAuthentication `
+    -Collector WEC01 -TimePeriod Last15Minutes `
+    -StorePath $store
+
+# Query exact typed fields from history and create every desired format once.
+Show-EVXEvent -FromStore $store -Type ADUserLogonFailed `
+    -Where { $_.Who -like 'CONTOSO\*' } `
+    -StartTime (Get-Date).AddDays(-7) `
+    -HtmlPath .\FailedLogons.html -ExcelPath .\FailedLogons.xlsx `
+    -CsvPath .\FailedLogons.csv
+
+# Exhaustive UTC calendar aggregation uses SQL unless a domain predicate needs
+# managed verification. MaxCandidates remains the explicit scan safety bound.
+Show-EVXEvent -FromStore $store -Type ActiveDirectoryAuthentication `
+    -StartTime (Get-Date).AddMonths(-1) -SummaryPeriod Day `
+    -HtmlPath .\Authentication-Daily.html -ExcelPath .\Authentication-Daily.xlsx
+```
+
+Writes, schema registration, and an optional checkpoint commit are one
+transaction. Repeated ingestion is idempotent. Typed/custom schema changes
+fail closed while old rows exist; generic provider payloads remain dynamic.
+Stored composite selectors expand to their leaf definitions, so the same
+`-Type ActiveDirectoryAuthentication` selector works against live channels,
+ForwardedEvents, and retained history. Direct and WEC copies of the same
+source event share one provenance identity instead of inflating summaries.
+Use `evx store prune --path events.db --before 2026-01-01T00:00:00Z` for an
+explicit retention boundary. EventViewerX intentionally does not own alert
+escalation, incident assignment, fleet policy, or delivery credentials.
+
 ## Portable host and event-triggered automation
 
 The optional `evx.exe` is the low-startup, no-module host for Task Scheduler,
 event-triggered tasks, services, containers, and portable automation. It ships
 as both a smaller framework-dependent build and a runtime-bundled
 `PortableCompat` build. Both provide `types`, `query`, `report`, `watch`,
-`collector`, and `provider` workflows over the same EventViewerX engines; they
+`store`, `collector`, and `provider` workflows over the same EventViewerX engines; they
 do not introduce a second query or reporting implementation.
 
 ```powershell
@@ -603,6 +701,13 @@ evx watch --type ActiveDirectoryAuthentication --collector WEC01 `
 evx collector create --name FailedLogons --source DC01,DC02 `
     --type ADUserLogonFailed --output .\FailedLogons.xml --apply
 evx collector remove --name FailedLogons
+
+# Ingest once, summarize later, and prune explicitly.
+evx query --type ActiveDirectoryAuthentication --collector WEC01 `
+    --since 00:15:00 --write-store C:\EVX\events.db
+evx report --store C:\EVX\events.db --type ADUserLogonFailed `
+    --summary Day --html C:\Reports\FailedLogons-Daily.html
+evx store prune --path C:\EVX\events.db --before 2026-01-01T00:00:00Z
 ```
 
 In the exact-artifact, five-launch cold-start matrix, the framework-dependent
@@ -686,10 +791,13 @@ ownership, and failure boundaries predictable.
 
 ## Performance evidence
 
-The [PowerForge benchmark suite](Benchmarks/EventLogParsing/README.md) separates
-byte-identical comparisons from common public jobs and different-schema native
-exports. Every published table requires at least three rotated iterations plus
-event count, order, identity, output size, and hash validation.
+The [event query PowerForge suite](Benchmarks/EventLogParsing/README.md)
+separates byte-identical comparisons from common public jobs and
+different-schema native exports. The independent
+[local history suite](Benchmarks/EventStore/README.md) measures transactional
+ingestion, indexed and managed typed queries, UTC calendar summaries, and typed
+CSV from identical normalized rows. Every published result requires at least
+three rotated iterations plus contract validation.
 
 The current v4 scale, typed-report, and cold-start runs use a
 225,513,472-byte Security EVTX containing 201,672 readable events
@@ -843,7 +951,8 @@ built and released from one version source and validated as packed artifacts.
 .\Build\Build-Module.ps1 -ConfigurationGateMode Build
 ```
 
-Browse [the benchmark contract](Benchmarks/EventLogParsing/README.md),
+Browse [the event query benchmark contract](Benchmarks/EventLogParsing/README.md),
+[the local history benchmark contract](Benchmarks/EventStore/README.md),
 [the event-type architecture](Sources/EventViewerX/Rules/README-Rules-System.md),
 the PowerShell [examples](Examples/), and the C#
 [examples](Sources/EventViewerX.Examples/) for deeper integrations.

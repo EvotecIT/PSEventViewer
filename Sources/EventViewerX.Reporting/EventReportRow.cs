@@ -22,6 +22,8 @@ public sealed class EventReportRow {
     public string CollectorComputer { get; set; } = string.Empty;
     /// <summary>Level display name.</summary>
     public string Level { get; set; } = string.Empty;
+    /// <summary>Numeric Windows event level used by exact predicates.</summary>
+    public byte? LevelValue { get; set; }
     /// <summary>Rendered provider message.</summary>
     public string Message { get; set; } = string.Empty;
     /// <summary>Type-specific projected values.</summary>
@@ -46,6 +48,30 @@ public sealed class EventReportRow {
             if (!result.ContainsKey(value.Key)) {
                 result[value.Key] = value.Value;
             }
+        }
+        return result;
+    }
+
+    /// <summary>Flattens the row using the same field names and aliases as live typed predicates.</summary>
+    public IReadOnlyDictionary<string, object?> ToPredicateDictionary() {
+        var result = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+        foreach (KeyValuePair<string, object?> value in ToDictionary()) {
+            result[value.Key] = value.Value;
+        }
+        result["TypeName"] = Type;
+        result["Id"] = EventId;
+        result["EventRecordId"] = RecordId;
+        result["ProviderName"] = Provider;
+        result["SourceLogName"] = SourceLog;
+        result["LogName"] = SourceLog;
+        result["ContainerLogName"] = ContainerLog;
+        result["MachineName"] = SourceComputer;
+        result["Computer"] = SourceComputer;
+        result["When"] = TimeCreated;
+        result["Level"] = LevelValue;
+        result["LevelDisplayName"] = Level;
+        foreach (KeyValuePair<string, object?> value in Values) {
+            result[value.Key] = value.Value;
         }
         return result;
     }

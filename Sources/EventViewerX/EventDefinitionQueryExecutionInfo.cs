@@ -19,6 +19,9 @@ public sealed class EventDefinitionQueryExecutionInfo {
     /// <summary>Whether another projected result existed after the configured result cap.</summary>
     public bool ResultLimitReached { get; internal set; }
 
+    /// <summary>Native and managed predicate plan used by this query.</summary>
+    public EventPredicatePlan? PredicatePlan { get; internal set; }
+
     /// <summary>Expected remote-target failures isolated while healthy targets continued.</summary>
     public IReadOnlyList<EventLogQueryTargetFailure> TargetFailures => _targetFailures.Values
         .OrderBy(static failure => failure.MachineName, StringComparer.OrdinalIgnoreCase)
@@ -30,6 +33,7 @@ public sealed class EventDefinitionQueryExecutionInfo {
         EventsEmitted = 0;
         ScanLimitReached = false;
         ResultLimitReached = false;
+        PredicatePlan = null;
         _targetFailures.Clear();
     }
 

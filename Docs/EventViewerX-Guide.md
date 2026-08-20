@@ -283,6 +283,42 @@ offline, collector, time, record ID, result/candidate limit, culture,
 checkpoint-observer, and failure contracts. See
 [custom event definitions](Event-Definitions.md).
 
+Typed fields are discoverable before a query. Each field describes its value
+kind, aliases, supported operators, and filtering stage:
+
+```csharp
+EventPredicateBuilder fields = EventPredicateBuilder.ForType(
+    EventType.ADUserLogonFailed);
+
+foreach (EventPredicateField field in fields.Fields) {
+    Console.WriteLine(
+        $"{field.Name}: {field.Definition.ValueType.Name}, " +
+        field.Definition.FilterStage);
+}
+
+EventPredicate predicate = fields.AllOf(
+    fields.Field("Who").MatchesWildcard("CONTOSO\\*"),
+    fields.Field("IpAddress").NotIn("-", "::1"));
+
+var query = new EventTypeQuery(new[] { EventType.ADUserLogonFailed }) {
+    TimePeriod = TimePeriod.Last24Hours,
+    Predicate = predicate
+};
+
+EventPredicatePlan plan = EventPredicatePlanner.Plan(predicate);
+await foreach (EventTypeRecord item in EventTypeEngine.ReadAsync(query)) {
+    Console.WriteLine($"{item.TimeCreated:u} {item.TypeName} {item.SourceComputer}");
+}
+```
+
+The planner pushes safe common event dimensions to Windows and evaluates
+domain fields after typed projection. The complete predicate is always
+verified, so optimization cannot weaken the requested semantics. Predicates
+are serializable and can also be supplied through the PowerShell and CLI JSON
+surfaces. `predicate.ToJson()` emits enum-named, versionable JSON; use
+`EventPredicate.ParseJson` when a C# host receives the same contract from a
+configuration file.
+
 ## Create HTML, Excel, and email output
 
 Install or reference `EventViewerX.Reporting` when presentation is needed.
@@ -304,6 +340,7 @@ foreach (EventReportSection section in report.Sections) {
 }
 EventReportHtmlRenderer.Save(report, "Authentication.html");
 EventReportExcelRenderer.Save(report, "Authentication.xlsx");
+EventReportCsvRenderer.Save(report, "Authentication.zip");
 EventEmailPackage email = await EventReportEmailRenderer.RenderAsync(report);
 ```
 
@@ -318,6 +355,55 @@ without crowding the domain worksheets.
 The email package is transport-neutral. A host may give its HTML/plain-text
 body and resources to Mailozaurr, Microsoft Graph, or another sender without
 coupling EventViewerX.Reporting to credentials or delivery policy.
+
+## Store normalized history locally
+
+Reference `EventViewerX.Storage` when a host needs durable local history:
+
+```xml
+<PackageReference Include="EventViewerX.Storage" Version="4.0.0" />
+```
+
+The package uses DbaClientX for SQLite access and preserves the same normalized
+rows and homogeneous reporting schemas:
+
+```csharp
+using EventViewerX.Storage;
+
+EventReport current = await EventReportEngine.QueryAsync(
+    EventReportRequest.ForTypes(EventType.ActiveDirectoryAuthentication));
+
+var store = new EventStore(@"C:\ProgramData\EventViewerX\events.db");
+EventStoreWriteResult written = await store.WriteAsync(current);
+
+var history = new EventStoreQuery {
+    Types = new[] { EventType.ADUserLogonFailed },
+    StartTime = DateTime.UtcNow.AddDays(-7),
+    Predicate = EventPredicate.Compare(
+        "Who",
+        EventPredicateOperator.MatchesWildcard,
+        "CONTOSO\\*")
+};
+
+EventStoreQueryPlan plan = EventStore.Plan(history);
+EventReport failed = await store.ReadReportAsync(history);
+EventStoreSummaryResult daily = await store.SummarizeAsync(
+    new EventStoreQuery {
+        Types = new[] { EventType.ActiveDirectoryAuthentication },
+        StartTime = DateTime.UtcNow.AddMonths(-1)
+    },
+    EventStoreSummaryPeriod.Day);
+```
+
+Writes are transactional and provenance-deduplicated. An optional
+`EventStoreCheckpoint` is committed with the rows. Typed/custom structural
+schema changes fail closed while rows remain; generic event-data fields are
+dynamic. `MaxCandidates` bounds managed predicate scans and reports whether
+the bound was reached. Calendar summaries reject `MaxEvents` because a partial
+result would not be an honest summary. Retention is explicit through
+`PruneBeforeAsync`. `EventStoreQuery.Types` expands composites to their stored
+leaf definitions, so a selector such as `ActiveDirectoryAuthentication` has
+the same meaning against live channels, ForwardedEvents, and local history.
 
 ## Provision and diagnose Windows Event Collector
 
@@ -451,6 +537,7 @@ provider registration is cached. For compile-time payload contracts, see
 | Managed watcher lifecycle | `WatcherManager` |
 | Typed event definitions | `EventTypeEngine` |
 | HTML, Excel, and email projection | `EventViewerX.Reporting` |
+| Durable local history and summaries | `EventViewerX.Storage`, `EventStore` |
 | Catalog and health | `EventLogCatalog`, `EventProviderCatalog`, `EventLogProbe` |
 | Administration | `EventLogChannelPolicyService`, `ClassicEventLogManager`, `CollectorSubscriptionManager` |
 | Provider packages | `EventProviderPackageBuilder`, `EventProviderPackageManager` |

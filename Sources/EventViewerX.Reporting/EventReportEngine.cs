@@ -41,7 +41,8 @@ public static class EventReportEngine {
                 Oldest = request.Oldest,
                 Credential = request.Credential,
                 Authentication = request.Authentication,
-                ContinueOnRemoteFailure = request.ContinueOnRemoteFailure
+                ContinueOnRemoteFailure = request.ContinueOnRemoteFailure,
+                Predicate = request.Predicate?.Clone()
             };
             await foreach (CustomEventRecord record in EventDefinitionEngine.ReadAsync(query, info, cancellationToken)) {
                 projections.Add(EventReportProjectionFactory.Create(record));
@@ -95,6 +96,70 @@ public static class EventReportEngine {
             coverage, rows.Length, scanLimitReached: false);
     }
 
+    /// <summary>Rehydrates persisted normalized rows without querying Windows Event Log again.</summary>
+    public static EventReport CreateStored(
+        IEnumerable<EventReportRow> rows,
+        IEnumerable<EventReportSectionSchema> schemas,
+        string? title = null,
+        IEnumerable<EventReportCoverage>? coverage = null,
+        DateTime? generatedAt = null,
+        long? eventsScanned = null,
+        bool scanLimitReached = false) {
+
+        if (rows == null) {
+            throw new ArgumentNullException(nameof(rows));
+        }
+        if (schemas == null) {
+            throw new ArgumentNullException(nameof(schemas));
+        }
+        EventReportRow[] rowSnapshot = rows.Select(CloneRow).ToArray();
+        EventReportSectionSchema[] schemaSnapshot = schemas.Select(CloneSchema).ToArray();
+        if (schemaSnapshot.Length == 0 && rowSnapshot.Length > 0) {
+            throw new ArgumentException("At least one stored section schema is required when rows are present.", nameof(schemas));
+        }
+        var sections = new List<EventReportSection>();
+        foreach (EventReportSectionSchema schema in schemaSnapshot) {
+            EventReportRow[] sectionRows = rowSnapshot
+                .Where(row => string.Equals(
+                    schema.Kind == EventReportSectionKind.Generic ? "Generic" : schema.Name,
+                    row.Type,
+                    StringComparison.OrdinalIgnoreCase))
+                .ToArray();
+            if (sectionRows.Length == 0) {
+                continue;
+            }
+            EventReportColumn[] columns = schema.Kind == EventReportSectionKind.Generic
+                ? EventReportTableProjection.BuildGenericColumns(sectionRows).ToArray()
+                : schema.Columns.Select(static column => new EventReportColumn(
+                    column.Name,
+                    column.DisplayName,
+                    EventReportColumnSchema.ResolveValueTypeName(column.ValueTypeName))).ToArray();
+            sections.Add(new EventReportSection(
+                schema.Name,
+                schema.DisplayName,
+                schema.Description,
+                schema.Kind,
+                columns,
+                sectionRows));
+        }
+        EventReportCoverage[] coverageSnapshot = coverage?.Select(static item => new EventReportCoverage {
+            MachineName = item.MachineName,
+            LogName = item.LogName,
+            Succeeded = item.Succeeded,
+            Status = item.Status,
+            Detail = item.Detail
+        }).ToArray() ?? Array.Empty<EventReportCoverage>();
+        return new EventReport(
+            string.IsNullOrWhiteSpace(title) ? "Stored EventViewerX events" : title!.Trim(),
+            generatedAt ?? DateTime.UtcNow,
+            TimeSpan.Zero,
+            rowSnapshot,
+            sections,
+            coverageSnapshot,
+            eventsScanned ?? rowSnapshot.LongLength,
+            scanLimitReached);
+    }
+
     /// <summary>Normalizes one generic, built-in typed, or custom event without querying the event log.</summary>
     public static EventReportRow CreateRow(object input) {
         return CreateProjection(input).Row;
@@ -109,6 +174,54 @@ public static class EventReportEngine {
             _ => throw new ArgumentException(
                 $"Unsupported report input type '{input.GetType().FullName}'. Expected EventObject, EventTypeRecord, or CustomEventRecord.",
                 nameof(input))
+        };
+    }
+
+    private static EventReportRow CloneRow(EventReportRow row) {
+        if (row == null) {
+            throw new ArgumentException("Stored rows cannot contain null values.", nameof(row));
+        }
+        return new EventReportRow {
+            TimeCreated = row.TimeCreated,
+            Type = row.Type,
+            EventId = row.EventId,
+            RecordId = row.RecordId,
+            Provider = row.Provider,
+            SourceLog = row.SourceLog,
+            ContainerLog = row.ContainerLog,
+            SourceComputer = row.SourceComputer,
+            CollectorComputer = row.CollectorComputer,
+            Level = row.Level,
+            LevelValue = row.LevelValue,
+            Message = row.Message,
+            Values = row.Values.ToDictionary(
+                static item => item.Key,
+                static item => item.Value,
+                StringComparer.OrdinalIgnoreCase)
+        };
+    }
+
+    private static EventReportSectionSchema CloneSchema(EventReportSectionSchema schema) {
+        if (schema == null || string.IsNullOrWhiteSpace(schema.Name)) {
+            throw new ArgumentException("Stored schemas must have a non-empty name.", nameof(schema));
+        }
+        IReadOnlyList<EventReportColumnSchema> columns = schema.Columns ??
+            throw new ArgumentException($"Stored schema '{schema.Name}' must declare Columns.", nameof(schema));
+        if (columns.Any(static column => column == null || string.IsNullOrWhiteSpace(column.Name))) {
+            throw new ArgumentException($"Stored schema '{schema.Name}' contains an invalid column.", nameof(schema));
+        }
+        return new EventReportSectionSchema {
+            Name = schema.Name.Trim(),
+            DisplayName = string.IsNullOrWhiteSpace(schema.DisplayName) ? schema.Name.Trim() : schema.DisplayName.Trim(),
+            Description = schema.Description?.Trim() ?? string.Empty,
+            Kind = schema.Kind,
+            Columns = columns.Select(static column => new EventReportColumnSchema {
+                Name = column.Name.Trim(),
+                DisplayName = string.IsNullOrWhiteSpace(column.DisplayName) ? column.Name.Trim() : column.DisplayName.Trim(),
+                ValueTypeName = string.IsNullOrWhiteSpace(column.ValueTypeName)
+                    ? EventReportColumnSchema.GetStableTypeName(typeof(object))
+                    : column.ValueTypeName
+            }).ToArray()
         };
     }
 
@@ -130,7 +243,8 @@ public static class EventReportEngine {
             Credential = request.Credential,
             Authentication = request.Authentication,
             ContinueOnRemoteFailure = request.ContinueOnRemoteFailure,
-            Enrichment = request.ResolveDns ? new EventEnrichmentOptions { ResolveDns = true } : null
+            Enrichment = request.ResolveDns ? new EventEnrichmentOptions { ResolveDns = true } : null,
+            Predicate = request.Predicate?.Clone()
         };
     }
 
