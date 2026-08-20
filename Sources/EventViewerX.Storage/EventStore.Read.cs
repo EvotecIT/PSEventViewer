@@ -5,12 +5,44 @@ using EventViewerX.Reporting;
 namespace EventViewerX.Storage;
 
 public sealed partial class EventStore {
-    /// <summary>Explains indexed SQLite prefiltering and managed typed verification without reading rows.</summary>
+    /// <summary>
+    /// Explains direct SQLite selectors and conservatively treats typed predicate pushdown as managed when
+    /// no store schema context is available. Use <see cref="PlanAsync"/> for an execution-accurate stored plan.
+    /// </summary>
     public static EventStoreQueryPlan Plan(EventStoreQuery query) {
         if (query == null) {
             throw new ArgumentNullException(nameof(query));
         }
         EventStoreQuery snapshot = query.Snapshot();
+        return CreatePlan(snapshot, PredicatePushdownPolicy.DisableAll, schemaContextKnown: false);
+    }
+
+    /// <summary>Explains the exact SQLite and managed stages after inspecting the selected stored schemas.</summary>
+    public async Task<EventStoreQueryPlan> PlanAsync(
+        EventStoreQuery query,
+        CancellationToken cancellationToken = default) {
+
+        if (query == null) {
+            throw new ArgumentNullException(nameof(query));
+        }
+        EnsureInitialized();
+        EventStoreQuery snapshot = query.Snapshot();
+        using var sqlite = new SQLite { BusyTimeoutMs = 10000 };
+        await using SQLiteAsyncSession session = await sqlite
+            .OpenSessionAsync(Path, cancellationToken)
+            .ConfigureAwait(false);
+        StoredSchemaContext schemaContext = await ReadSchemaContextAsync(
+            session,
+            snapshot.ResolveDefinitionNames(),
+            cancellationToken).ConfigureAwait(false);
+        return CreatePlan(snapshot, schemaContext.Pushdown, schemaContextKnown: true);
+    }
+
+    private static EventStoreQueryPlan CreatePlan(
+        EventStoreQuery snapshot,
+        PredicatePushdownPolicy pushdown,
+        bool schemaContextKnown) {
+
         var steps = new List<EventStoreQueryPlanStep>();
         AddDirectPlanStep(steps, "Definition", snapshot.ResolveDefinitionNames(), caseInsensitive: true);
         AddDirectPlanStep(steps, "EventId", snapshot.EventIds);
@@ -32,24 +64,96 @@ public sealed partial class EventStore {
                     step.Expression,
                     "Exact predicate verification",
                     StringComparison.Ordinal))
-                .Select(step => new EventStoreQueryPlanStep(
-                    step.Expression,
-                    step.Stage == EventPredicatePlanStage.Native &&
-                    (providerPushdownSafe || !step.Expression.Contains("Provider", StringComparison.OrdinalIgnoreCase))
-                        ? EventStoreQueryPlanStage.Sql
-                        : EventStoreQueryPlanStage.Managed,
-                    step.Stage == EventPredicatePlanStage.Native &&
-                    !providerPushdownSafe && step.Expression.Contains("Provider", StringComparison.OrdinalIgnoreCase)
-                        ? "Unicode-insensitive provider matching is verified in managed code because SQLite NOCASE folds ASCII only."
-                        : step.Stage == EventPredicatePlanStage.Native
-                            ? "The common event dimension is eligible for indexed SQLite pushdown when selected stored schemas do not shadow that field."
-                            : step.Reason)));
+                .Select(step => CreatePredicatePlanStep(
+                    step,
+                    snapshot.Predicate,
+                    pushdown,
+                    schemaContextKnown,
+                    providerPushdownSafe)));
             steps.Add(new EventStoreQueryPlanStep(
                 "Exact predicate verification",
                 EventStoreQueryPlanStage.Managed,
                 "The complete predicate is verified against normalized typed values after SQL prefiltering."));
         }
         return new EventStoreQueryPlan(steps, snapshot.MaxCandidates);
+    }
+
+    private static EventStoreQueryPlanStep CreatePredicatePlanStep(
+        EventPredicatePlanStep step,
+        EventPredicate predicate,
+        PredicatePushdownPolicy pushdown,
+        bool schemaContextKnown,
+        bool providerPushdownSafe) {
+
+        if (step.Stage != EventPredicatePlanStage.Native) {
+            return new EventStoreQueryPlanStep(
+                step.Expression,
+                EventStoreQueryPlanStage.Managed,
+                step.Reason);
+        }
+        if (!TryResolveNativeAliases(step.Expression, out string[] aliases, out bool provider)) {
+            return new EventStoreQueryPlanStep(
+                step.Expression,
+                EventStoreQueryPlanStage.Managed,
+                "This native predicate dimension is conservatively verified in managed code because it is not recognized by the stored planner.");
+        }
+        if (provider && !providerPushdownSafe) {
+            return new EventStoreQueryPlanStep(
+                step.Expression,
+                EventStoreQueryPlanStage.Managed,
+                "Unicode-insensitive provider matching is verified in managed code because SQLite NOCASE folds ASCII only.");
+        }
+        if (!schemaContextKnown) {
+            return new EventStoreQueryPlanStep(
+                step.Expression,
+                EventStoreQueryPlanStage.Managed,
+                "The static plan has no stored schema context, so typed predicate pushdown is reported conservatively. Use PlanAsync for an execution-accurate plan.");
+        }
+        if (!pushdown.CanPush(predicate, aliases)) {
+            return new EventStoreQueryPlanStep(
+                step.Expression,
+                EventStoreQueryPlanStage.Managed,
+                "The selected stored schemas are generic or shadow this common field, so the predicate is evaluated in managed code.");
+        }
+        return new EventStoreQueryPlanStep(
+            step.Expression,
+            EventStoreQueryPlanStage.Sql,
+            "The selected stored schemas preserve this common field, so the predicate uses indexed SQLite pushdown before exact verification.");
+    }
+
+    private static bool TryResolveNativeAliases(
+        string expression,
+        out string[] aliases,
+        out bool provider) {
+
+        string field = expression.Split(new[] { ' ' }, 2, StringSplitOptions.RemoveEmptyEntries)[0];
+        provider = false;
+        if (string.Equals(field, "EventId", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(field, "Id", StringComparison.OrdinalIgnoreCase)) {
+            aliases = new[] { "EventId", "Id" };
+            return true;
+        }
+        if (string.Equals(field, "RecordId", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(field, "EventRecordId", StringComparison.OrdinalIgnoreCase)) {
+            aliases = new[] { "RecordId", "EventRecordId" };
+            return true;
+        }
+        if (string.Equals(field, "ProviderName", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(field, "Provider", StringComparison.OrdinalIgnoreCase)) {
+            aliases = new[] { "ProviderName", "Provider" };
+            provider = true;
+            return true;
+        }
+        if (string.Equals(field, "Level", StringComparison.OrdinalIgnoreCase)) {
+            aliases = new[] { "Level" };
+            return true;
+        }
+        if (string.Equals(field, "TimeCreated", StringComparison.OrdinalIgnoreCase)) {
+            aliases = new[] { "TimeCreated", "When" };
+            return true;
+        }
+        aliases = Array.Empty<string>();
+        return false;
     }
 
     /// <summary>Reads normalized stored rows and recreates homogeneous report sections.</summary>

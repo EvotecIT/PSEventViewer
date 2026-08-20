@@ -179,8 +179,6 @@ public sealed partial class EventStore {
         string insertedAt) {
 
         EventTransportKind transport = GetTransportKind(
-            row.SourceComputer,
-            row.CollectorComputer,
             row.SourceLog,
             row.ContainerLog);
         return new Dictionary<string, object?> {
@@ -285,8 +283,6 @@ public sealed partial class EventStore {
     }
 
     private static EventTransportKind GetTransportKind(
-        string? sourceComputer,
-        string? collectorComputer,
         string? sourceLog,
         string? containerLog) {
 
@@ -294,15 +290,11 @@ public sealed partial class EventStore {
             containerLog!.EndsWith(".evtx", StringComparison.OrdinalIgnoreCase)) {
             return EventTransportKind.File;
         }
-        bool differentComputer = !string.Equals(
-            sourceComputer,
-            collectorComputer,
-            StringComparison.OrdinalIgnoreCase);
         bool differentContainer = !string.Equals(
             sourceLog,
             containerLog,
             StringComparison.OrdinalIgnoreCase);
-        return differentComputer && differentContainer
+        return differentContainer
             ? EventTransportKind.Collector
             : EventTransportKind.Direct;
     }

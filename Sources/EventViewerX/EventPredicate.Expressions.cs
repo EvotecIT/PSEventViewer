@@ -59,6 +59,13 @@ public sealed partial class EventPredicate {
                 nullPredicate.IgnoreCase = false;
                 return nullPredicate;
             }
+            Expression fieldExpression = memberOnLeft ? binary.Left : binary.Right;
+            if (binary.NodeType is ExpressionType.Equal or ExpressionType.NotEqual &&
+                IsCollectionType(StripConvert(fieldExpression).Type)) {
+                throw new NotSupportedException(
+                    $"Non-null reference comparison for collection field '{(memberOnLeft ? field : rightField)}' " +
+                    "cannot be represented by EventPredicate. Compare the collection to null or use Contains.");
+            }
             EventPredicateOperator comparison = ToOperator(binary.NodeType, reverse: memberOnRight);
             return CompareExpression(memberOnLeft ? field! : rightField!, comparison, value);
         }
@@ -79,6 +86,7 @@ public sealed partial class EventPredicate {
 
             Expression? collectionExpression = null;
             Expression? memberExpression = null;
+            Expression? comparerExpression = null;
             if (string.Equals(call.Method.Name, nameof(Enumerable.Contains), StringComparison.Ordinal)) {
                 if (call.Object != null && call.Arguments.Count == 1) {
                     collectionExpression = call.Object;
@@ -86,6 +94,10 @@ public sealed partial class EventPredicate {
                 } else if (call.Object == null && call.Arguments.Count == 2) {
                     collectionExpression = call.Arguments[0];
                     memberExpression = call.Arguments[1];
+                } else if (call.Object == null && call.Arguments.Count == 3) {
+                    collectionExpression = call.Arguments[0];
+                    memberExpression = call.Arguments[1];
+                    comparerExpression = call.Arguments[2];
                 }
             }
             if (collectionExpression != null && memberExpression != null &&
@@ -98,10 +110,21 @@ public sealed partial class EventPredicate {
                 foreach (object? item in values) {
                     items.Add(item);
                 }
+                bool ignoreCase = comparerExpression != null
+                    ? ResolveComparerIgnoreCase(
+                        ReadCapturedValue(comparerExpression),
+                        StripConvert(memberExpression).Type,
+                        call)
+                    : ResolveCollectionIgnoreCase(
+                        collection,
+                        StripConvert(memberExpression).Type,
+                        call.Method.DeclaringType == typeof(Enumerable),
+                        call);
                 return CompareExpressionValues(
                     inField!,
                     EventPredicateOperator.In,
-                    items);
+                    items,
+                    ignoreCase);
             }
             throw Unsupported(call);
         }
@@ -119,12 +142,79 @@ public sealed partial class EventPredicate {
         private static EventPredicate CompareExpressionValues(
             string field,
             EventPredicateOperator comparison,
-            IReadOnlyCollection<object?> values) {
+            IReadOnlyCollection<object?> values,
+            bool ignoreCase = false) {
 
             EventPredicate predicate = Compare(field, comparison, values.ToArray());
-            predicate.IgnoreCase = false;
+            predicate.IgnoreCase = ignoreCase;
             return predicate;
         }
+
+        private static bool ResolveCollectionIgnoreCase(
+            object collection,
+            Type elementType,
+            bool enumerableContains,
+            Expression expression) {
+
+            Type collectionType = collection.GetType();
+            if (collectionType.IsArray) {
+                return false;
+            }
+            if (collectionType.IsGenericType) {
+                Type genericType = collectionType.GetGenericTypeDefinition();
+                if (genericType == typeof(HashSet<>)) {
+                    object? comparer = collectionType.GetProperty(nameof(HashSet<int>.Comparer))
+                        ?.GetValue(collection, null);
+                    return ResolveComparerIgnoreCase(comparer, elementType, expression);
+                }
+                if (genericType == typeof(List<>) ||
+                    genericType == typeof(Queue<>) ||
+                    genericType == typeof(Stack<>) ||
+                    genericType == typeof(LinkedList<>) ||
+                    genericType == typeof(System.Collections.ObjectModel.Collection<>) ||
+                    genericType == typeof(System.Collections.ObjectModel.ReadOnlyCollection<>)) {
+                    return false;
+                }
+            }
+            Type collectionInterface = typeof(ICollection<>).MakeGenericType(elementType);
+            if (enumerableContains && !collectionInterface.IsAssignableFrom(collectionType)) {
+                return false;
+            }
+            throw new NotSupportedException(
+                $"Collection comparison semantics for '{collectionType.FullName}' cannot be represented by " +
+                "EventPredicate. Use an array, List<T>, or HashSet<T> with the default, ordinal, or ordinal-ignore-case comparer.");
+        }
+
+        private static bool ResolveComparerIgnoreCase(
+            object? comparer,
+            Type elementType,
+            Expression expression) {
+
+            if (comparer == null) {
+                return false;
+            }
+            Type equalityComparerType = typeof(EqualityComparer<>).MakeGenericType(elementType);
+            object? defaultComparer = equalityComparerType.GetProperty(
+                nameof(EqualityComparer<int>.Default),
+                BindingFlags.Public | BindingFlags.Static)?.GetValue(null, null);
+            if (ReferenceEquals(comparer, defaultComparer) || Equals(comparer, defaultComparer)) {
+                return false;
+            }
+            if (elementType == typeof(string)) {
+                if (ReferenceEquals(comparer, StringComparer.Ordinal)) {
+                    return false;
+                }
+                if (ReferenceEquals(comparer, StringComparer.OrdinalIgnoreCase)) {
+                    return true;
+                }
+            }
+            throw new NotSupportedException(
+                $"Comparer '{comparer.GetType().FullName}' in expression '{expression}' cannot be represented by " +
+                "EventPredicate. Use the default comparer, StringComparer.Ordinal, or StringComparer.OrdinalIgnoreCase.");
+        }
+
+        private static bool IsCollectionType(Type type) =>
+            type != typeof(string) && typeof(IEnumerable).IsAssignableFrom(type);
 
         private static bool TryGetField(
             Expression expression,

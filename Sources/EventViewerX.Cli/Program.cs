@@ -50,7 +50,10 @@ internal static partial class Program {
                 if (storedQuery.Predicate == null) {
                     throw new ArgumentException("--explain requires --where.");
                 }
-                return WriteJson(EventStore.Plan(storedQuery));
+                EventStoreQueryPlan plan = await new EventStore(storePath)
+                    .PlanAsync(storedQuery)
+                    .ConfigureAwait(false);
+                return WriteJson(plan);
             }
             EventReport stored = await new EventStore(storePath)
                 .ReadReportAsync(storedQuery, options.Get("title"))

@@ -234,6 +234,12 @@ Describe 'evx portable host' {
     It 'stores an offline report and renders a calendar summary without rereading EVTX' {
         $StorePath = Join-Path $TestDrive 'cli-events.db'
         $HtmlPath = Join-Path $TestDrive 'cli-summary.html'
+        $PredicatePath = Join-Path $TestDrive 'cli-event-id-predicate.json'
+        @{
+            Field = 'EventId'
+            Operator = 'Equal'
+            Values = @('7040')
+        } | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $PredicatePath -Encoding UTF8
 
         $Rows = @(& $script:CliPath query `
                 --path $script:FixturePath `
@@ -244,6 +250,11 @@ Describe 'evx portable host' {
                 --store $StorePath `
                 --summary Day `
                 --html $HtmlPath)
+        $Plan = & $script:CliPath query `
+            --store $StorePath `
+            --where $PredicatePath `
+            --explain |
+            ConvertFrom-Json
 
         $LASTEXITCODE | Should -Be 0
         $Rows.Count | Should -Be 4
@@ -251,6 +262,7 @@ Describe 'evx portable host' {
         Test-Path -LiteralPath $HtmlPath | Should -BeTrue
         (Get-Content -LiteralPath $HtmlPath -Raw) | Should -Match 'Day event summary'
         $SummaryOutput[-1] | Should -Be ([IO.Path]::GetFullPath($HtmlPath))
+        @($Plan.Steps | Where-Object Expression -Like 'EventId *').Stage | Should -Contain 'Managed'
     }
 
     It 'normalizes stored custom predicates with their definition metadata' {

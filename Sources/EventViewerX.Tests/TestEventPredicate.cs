@@ -371,6 +371,37 @@ public sealed class TestEventPredicate {
     }
 
     [Fact]
+    public void StronglyTypedExpressionsPreserveSupportedCapturedCollectionComparers() {
+        var users = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "ADMIN" };
+        EventPredicate predicate = EventPredicate.FromExpression<ExampleRecord>(record =>
+            users.Contains(record.Who));
+        string[] explicitUsers = { "ADMIN" };
+        EventPredicate explicitPredicate = EventPredicate.FromExpression<ExampleRecord>(record =>
+            explicitUsers.Contains(record.Who, StringComparer.OrdinalIgnoreCase));
+        var record = new ExampleRecord(new EventObject(
+            new SyntheticEventRecord(),
+            Environment.MachineName,
+            EventReadMode.StructuredDataAndMessage)) {
+            Who = "admin"
+        };
+
+        Assert.True(predicate.IgnoreCase);
+        Assert.True(explicitPredicate.IgnoreCase);
+        Assert.True(EventPredicateEvaluator.Matches(predicate, record));
+        Assert.True(EventPredicateEvaluator.Matches(explicitPredicate, record));
+    }
+
+    [Fact]
+    public void StronglyTypedExpressionsRejectUnsupportedCapturedCollectionComparers() {
+        var users = new HashSet<string>(StringComparer.CurrentCultureIgnoreCase) { "ADMIN" };
+
+        NotSupportedException exception = Assert.Throws<NotSupportedException>(() =>
+            EventPredicate.FromExpression<ExampleRecord>(record => users.Contains(record.Who)));
+
+        Assert.Contains("cannot be represented", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void StronglyTypedExpressionsPreserveReferenceNullChecksForCollections() {
         EventPredicate isNull = EventPredicate.FromExpression<Rules.ActiveDirectory.ADUserPrivilegeUse>(
             record => record.Privileges == null);
@@ -387,6 +418,21 @@ public sealed class TestEventPredicate {
         Assert.Empty(isNotNull.Values);
         Assert.False(EventPredicateEvaluator.Matches(isNull, record));
         Assert.True(EventPredicateEvaluator.Matches(isNotNull, record));
+    }
+
+    [Fact]
+    public void StronglyTypedExpressionsRejectNonNullCollectionReferenceComparisons() {
+        var privileges = new List<string> { "SeDebugPrivilege" };
+
+        NotSupportedException equal = Assert.Throws<NotSupportedException>(() =>
+            EventPredicate.FromExpression<Rules.ActiveDirectory.ADUserPrivilegeUse>(record =>
+                record.Privileges == privileges));
+        NotSupportedException notEqual = Assert.Throws<NotSupportedException>(() =>
+            EventPredicate.FromExpression<Rules.ActiveDirectory.ADUserPrivilegeUse>(record =>
+                record.Privileges != privileges));
+
+        Assert.Contains("reference comparison", equal.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("reference comparison", notEqual.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

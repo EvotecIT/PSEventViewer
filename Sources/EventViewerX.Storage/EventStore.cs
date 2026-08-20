@@ -119,8 +119,6 @@ public sealed partial class EventStore {
                 row.Values);
             string originalKey = CreateOriginalEventKey(candidate, row.DefinitionName);
             EventTransportKind transport = GetTransportKind(
-                row.SourceComputer,
-                row.CollectorComputer,
                 row.SourceLog,
                 row.ContainerLog);
             session.ExecuteNonQuery(

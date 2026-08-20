@@ -139,6 +139,38 @@ public sealed partial class TestEventStore {
     }
 
     [Fact]
+    public async Task OriginalEventIdentityDeduplicatesSelfForwardedCollectorCopies() {
+        string path = CreateStorePath();
+        try {
+            DateTime time = new(2026, 8, 1, 1, 0, 0, DateTimeKind.Utc);
+            var store = new EventStore(path);
+            EventStoreWriteResult forwarded = await store.WriteAsync(
+                CreateReportFromTransport(
+                    time,
+                    42,
+                    "alice",
+                    "source.ad.evotec.xyz",
+                    "ForwardedEvents"));
+            EventStoreWriteResult direct = await store.WriteAsync(
+                CreateReportFromTransport(
+                    time,
+                    9001,
+                    "alice",
+                    "source.ad.evotec.xyz",
+                    "Security"));
+
+            EventReport stored = await store.ReadReportAsync(new EventStoreQuery());
+
+            Assert.Equal(1, forwarded.Inserted);
+            Assert.Equal(0, direct.Inserted);
+            Assert.Equal(1, direct.Duplicates);
+            Assert.Single(stored.Rows);
+        } finally {
+            DeleteStore(path);
+        }
+    }
+
+    [Fact]
     public async Task EventIdentityUsesTheSameCaseInsensitiveSemanticsAsStoredDimensions() {
         string path = CreateStorePath();
         try {
@@ -660,6 +692,51 @@ public sealed partial class TestEventStore {
             step.Stage == EventStoreQueryPlanStage.Managed && step.Expression.Contains("Provider", StringComparison.Ordinal));
         Assert.Contains(plan.Steps, static step =>
             step.Stage == EventStoreQueryPlanStage.Managed && step.Expression.Contains("User", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task StoredPlanUsesTheSelectedSchemaPushdownPolicy() {
+        string path = CreateStorePath();
+        try {
+            var store = new EventStore(path);
+            await store.WriteAsync(CreateReportForDefinition(
+                "StoredLogon",
+                (new DateTime(2026, 8, 1, 1, 0, 0, DateTimeKind.Utc), 42, "alice")));
+            await store.WriteAsync(CreateGenericReport(
+                new DateTime(2026, 8, 1, 2, 0, 0, DateTimeKind.Utc),
+                43,
+                "CustomValue",
+                "two"));
+            EventPredicate predicate = EventPredicate.Compare(
+                "EventId",
+                EventPredicateOperator.Equal,
+                4624);
+
+            EventStoreQueryPlan typed = await store.PlanAsync(new EventStoreQuery {
+                DefinitionNames = new[] { "StoredLogon" },
+                Predicate = predicate
+            });
+            EventStoreQueryPlan generic = await store.PlanAsync(new EventStoreQuery {
+                DefinitionNames = new[] { "Generic" },
+                Predicate = predicate
+            });
+            EventStoreQueryPlan conservative = EventStore.Plan(new EventStoreQuery {
+                DefinitionNames = new[] { "StoredLogon" },
+                Predicate = predicate
+            });
+
+            Assert.Contains(typed.Steps, static step =>
+                step.Stage == EventStoreQueryPlanStage.Sql &&
+                step.Expression.StartsWith("EventId ", StringComparison.Ordinal));
+            Assert.Contains(generic.Steps, static step =>
+                step.Stage == EventStoreQueryPlanStage.Managed &&
+                step.Expression.StartsWith("EventId ", StringComparison.Ordinal));
+            Assert.Contains(conservative.Steps, static step =>
+                step.Stage == EventStoreQueryPlanStage.Managed &&
+                step.Reason.Contains("PlanAsync", StringComparison.Ordinal));
+        } finally {
+            DeleteStore(path);
+        }
     }
 
     [Fact]
