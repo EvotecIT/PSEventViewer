@@ -1258,6 +1258,25 @@ public sealed class TestNativeEventEngineContracts {
         }
     }
 
+    [Fact]
+    public void OfflineQuerySourceKindDoesNotDependOnTheFileExtension() {
+        if (!OperatingSystem.IsWindows()) return;
+        string directory = CreateTemporaryDirectory();
+        try {
+            string renamed = Path.Combine(directory, "renamed-event-archive");
+            File.Copy(GetFixturePath(), renamed);
+
+            EventObject first = EventLogEngine.ReadFile(new EventLogFileQuery(renamed) {
+                MaxEvents = 1,
+                ReadMode = EventReadMode.Metadata
+            }).Single();
+
+            Assert.Equal(EventLogQuerySourceKind.File, first.QuerySourceKind);
+        } finally {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
     private static string GetFixturePath() {
         return Path.GetFullPath(Path.Combine(
             "..",

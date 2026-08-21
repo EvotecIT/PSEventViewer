@@ -134,6 +134,7 @@ public sealed partial class EventStore {
                 row.Values);
             string originalKey = CreateOriginalEventKey(candidate, row.DefinitionName);
             EventTransportKind transport = GetTransportKind(
+                EventLogQuerySourceKind.Auto,
                 row.SourceLog,
                 row.ContainerLog);
             session.ExecuteNonQuery(

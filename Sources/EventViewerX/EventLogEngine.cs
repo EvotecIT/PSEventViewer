@@ -326,6 +326,7 @@ public static partial class EventLogEngine {
                      path,
                      path,
                      cancellationToken)) {
+            eventObject.QuerySourceKind = EventLogQuerySourceKind.File;
             yield return eventObject;
             returned++;
             if (maxEvents > 0 && returned >= maxEvents) {
@@ -583,6 +584,9 @@ public static partial class EventLogEngine {
         long scanned = 0;
         bool oldest = (flags & WindowsEventNativeMethods.QueryFlags.ForwardDirection) != 0;
         foreach (EventObject eventObject in events) {
+            eventObject.QuerySourceKind = (flags & WindowsEventNativeMethods.QueryFlags.FilePath) != 0
+                ? EventLogQuerySourceKind.File
+                : EventLogQuerySourceKind.Channel;
             if (managedMaxEventsScanned > 0 &&
                 scanned >= managedMaxEventsScanned) {
                 managedScanLimitReached?.Invoke();

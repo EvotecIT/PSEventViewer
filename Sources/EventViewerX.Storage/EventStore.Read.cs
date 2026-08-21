@@ -5,6 +5,7 @@ using EventViewerX.Reporting;
 namespace EventViewerX.Storage;
 
 public sealed partial class EventStore {
+    private const int StoredReadPageSize = 256;
     /// <summary>
     /// Explains direct SQLite selectors and conservatively treats typed predicate pushdown as managed when
     /// no store schema context is available. Use <see cref="PlanAsync"/> for an execution-accurate stored plan.
@@ -35,6 +36,7 @@ public sealed partial class EventStore {
             session,
             snapshot.ResolveDefinitionNames(),
             cancellationToken).ConfigureAwait(false);
+        snapshot.Predicate = NormalizeStoredPredicate(snapshot.Predicate, schemaContext.Schemas);
         return CreatePlan(snapshot, schemaContext.Pushdown, schemaContextKnown: true);
     }
 
@@ -176,31 +178,60 @@ public sealed partial class EventStore {
                 transaction,
                 snapshot.ResolveDefinitionNames(),
                 token).ConfigureAwait(false);
+            snapshot.Predicate = NormalizeStoredPredicate(snapshot.Predicate, schemaContext.Schemas);
             QueryCommand command = BuildReadCommand(snapshot, schemaContext.Pushdown);
-            IReadOnlyList<EventReportRow> candidates = await transaction.QueryAsListAsync(
-                command.Sql,
-                record => MapEventRow(record, schemaContext.ByName),
-                command.Parameters,
-                cancellationToken: token).ConfigureAwait(false);
-
-            bool scanLimitReached = command.CandidateLimit > 0 && candidates.Count > command.CandidateLimit;
-            IEnumerable<EventReportRow> boundedCandidates = scanLimitReached
-                ? candidates.Take(command.CandidateLimit)
-                : candidates;
             var rows = new List<EventReportRow>();
             long scanned = 0;
-            foreach (EventReportRow row in boundedCandidates) {
-                token.ThrowIfCancellationRequested();
-                scanned++;
-                if (!MatchesDirectTextSelection(snapshot, row)) {
-                    continue;
+            long offset = 0;
+            bool scanLimitReached = false;
+            bool completed = false;
+            while (!completed) {
+                long remainingCandidates = command.CandidateLimit > 0
+                    ? command.CandidateLimit - scanned
+                    : long.MaxValue;
+                long pageLimit = command.CandidateLimit > 0
+                    ? Math.Min(StoredReadPageSize, remainingCandidates + 1)
+                    : snapshot.MaxEvents > 0
+                        ? Math.Min(StoredReadPageSize, snapshot.MaxEvents - rows.Count)
+                        : StoredReadPageSize;
+                if (pageLimit <= 0) {
+                    break;
                 }
-                if (snapshot.Predicate != null &&
-                    !EventPredicateEvaluator.Matches(snapshot.Predicate, row.ToPredicateDictionary())) {
-                    continue;
+                var pageParameters = new Dictionary<string, object?>(command.Parameters) {
+                    ["$pageLimit"] = pageLimit,
+                    ["$pageOffset"] = offset
+                };
+                IReadOnlyList<EventReportRow> candidates = await transaction.QueryAsListAsync(
+                    command.Sql + " LIMIT $pageLimit OFFSET $pageOffset;",
+                    record => MapEventRow(record, schemaContext.ByName),
+                    pageParameters,
+                    cancellationToken: token).ConfigureAwait(false);
+                if (candidates.Count == 0) {
+                    break;
                 }
-                rows.Add(row);
-                if (snapshot.MaxEvents > 0 && rows.Count >= snapshot.MaxEvents) {
+                offset += candidates.Count;
+                foreach (EventReportRow row in candidates) {
+                    token.ThrowIfCancellationRequested();
+                    if (command.CandidateLimit > 0 && scanned >= command.CandidateLimit) {
+                        scanLimitReached = true;
+                        completed = true;
+                        break;
+                    }
+                    scanned++;
+                    if (!MatchesDirectTextSelection(snapshot, row)) {
+                        continue;
+                    }
+                    if (snapshot.Predicate != null &&
+                        !EventPredicateEvaluator.Matches(snapshot.Predicate, row.ToPredicateDictionary())) {
+                        continue;
+                    }
+                    rows.Add(row);
+                    if (snapshot.MaxEvents > 0 && rows.Count >= snapshot.MaxEvents) {
+                        completed = true;
+                        break;
+                    }
+                }
+                if (candidates.Count < pageLimit) {
                     break;
                 }
             }
@@ -246,20 +277,13 @@ public sealed partial class EventStore {
         int candidateLimit = requiresManagedFiltering && query.MaxCandidates > 0
             ? checked((int)Math.Min(query.MaxCandidates, int.MaxValue - 1))
             : 0;
-        long directLimit = !requiresManagedFiltering ? query.MaxEvents : 0;
-        long sqlLimit = candidateLimit > 0 ? candidateLimit + 1L : directLimit;
         string sql = @"SELECT definition_name, event_time_utc, event_id, record_id, provider,
-source_log, container_log, source_computer, collector_computer, level, level_value, message, values_json
+source_log, container_log, source_computer, collector_computer, level, level_value, message, values_json, transport_kind
 FROM evx_events";
         if (filter.Clauses.Count > 0) {
             sql += " WHERE " + string.Join(" AND ", filter.Clauses);
         }
         sql += query.Oldest ? " ORDER BY event_time_utc ASC, rowid ASC" : " ORDER BY event_time_utc DESC, rowid DESC";
-        if (sqlLimit > 0) {
-            sql += " LIMIT $limit";
-            filter.Parameters["$limit"] = sqlLimit;
-        }
-        sql += ";";
         return new QueryCommand(sql, filter.Parameters, candidateLimit);
     }
 
@@ -365,7 +389,10 @@ FROM evx_events";
             Level = record.GetString(9),
             LevelValue = record.IsDBNull(10) ? null : record.GetByte(10),
             Message = record.GetString(11),
-            Values = DeserializeValues(record.GetString(12), schema)
+            Values = DeserializeValues(record.GetString(12), schema),
+            SourceKind = record.GetInt32(13) == 2
+                ? EventLogQuerySourceKind.File
+                : EventLogQuerySourceKind.Channel
         };
     }
 
@@ -408,6 +435,28 @@ FROM evx_events";
                 EventReportColumnSchema.ResolveValueTypeName(column.ValueTypeName));
         }
         return result;
+    }
+
+    private static EventPredicate? NormalizeStoredPredicate(
+        EventPredicate? predicate,
+        IReadOnlyList<EventReportSectionSchema> schemas) {
+
+        if (predicate == null || schemas.Count != 1 ||
+            schemas[0].Kind == EventReportSectionKind.Generic) {
+            return predicate;
+        }
+        EventReportSectionSchema schema = schemas[0];
+        EventPredicateBuilder builder = EventPredicateBuilder.ForFields(
+            schema.Name,
+            schema.Columns.Select(static column => new KeyValuePair<string, Type>(
+                column.Name,
+                EventReportColumnSchema.ResolveValueTypeName(column.ValueTypeName))),
+            schema.DisplayName,
+            schema.Columns.ToDictionary(
+                static column => column.Name,
+                static column => column.Aliases ?? Array.Empty<string>(),
+                StringComparer.OrdinalIgnoreCase));
+        return builder.Normalize(predicate);
     }
 
     private static object? ConvertDeclaredJson(

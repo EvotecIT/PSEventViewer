@@ -154,6 +154,11 @@ Describe 'Show-EVXEvent' {
             -Definition $DefinitionPath `
             -Where { $_.ProviderName -eq 'BITS' } `
             -PassThru
+        $FilteredThroughStoredAlias = Show-EVXEvent `
+            -FromStore $StorePath `
+            -Definition ServiceStartTypeChange `
+            -Where { $_.ProviderName -eq 'BITS' } `
+            -PassThru
         $Summary = Show-EVXEvent `
             -FromStore $StorePath `
             -SummaryPeriod Day `
@@ -167,6 +172,9 @@ Describe 'Show-EVXEvent' {
         $Filtered.Sections[0].Columns.Name | Should -Be @('ServiceName')
         $FilteredThroughAlias.Rows.Count | Should -Be $Filtered.Rows.Count
         @($FilteredThroughAlias.Rows | ForEach-Object { $_.Values['ServiceName'] } | Sort-Object -Unique) |
+            Should -Be @('BITS')
+        $FilteredThroughStoredAlias.Rows.Count | Should -Be $Filtered.Rows.Count
+        @($FilteredThroughStoredAlias.Rows | ForEach-Object { $_.Values['ServiceName'] } | Sort-Object -Unique) |
             Should -Be @('BITS')
         $Summary.Sections[0].Name | Should -Be 'EventStoreSummary'
         $Summary.Sections[0].Columns.Name | Should -Contain 'Count'

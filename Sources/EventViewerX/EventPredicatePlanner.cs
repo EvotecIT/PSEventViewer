@@ -148,6 +148,7 @@ public static class EventPredicatePlanner {
                 CultureInfo.InvariantCulture,
                 DateTimeStyles.RoundtripKind,
                 out DateTime time)) {
+            time = time.ToUniversalTime();
             if (predicate.Operator is EventPredicateOperator.GreaterThan or EventPredicateOperator.GreaterThanOrEqual) {
                 native.StartTime = !native.StartTime.HasValue || time > native.StartTime.Value
                     ? time

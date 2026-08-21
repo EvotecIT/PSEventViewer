@@ -102,6 +102,12 @@ public sealed partial class EventPredicate {
             }
             if (collectionExpression != null && memberExpression != null &&
                 TryGetField(memberExpression, parameter, out string? inField)) {
+                if (IsCollectionType(StripConvert(memberExpression).Type)) {
+                    throw new NotSupportedException(
+                        $"Outer collection Contains for collection field '{inField}' cannot be represented by " +
+                        "EventPredicate because it depends on collection reference or comparer semantics. " +
+                        "Compare a scalar value to the field elements instead.");
+                }
                 object? collection = ReadCapturedValue(collectionExpression);
                 if (collection is not IEnumerable values || collection is string) {
                     throw Unsupported(call);

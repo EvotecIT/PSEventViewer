@@ -243,6 +243,57 @@ CREATE TABLE evx_events (future_only TEXT NOT NULL);");
     }
 
     [Fact]
+    public async Task CustomAliasesPersistAndDriveStoredPredicateDiscovery() {
+        string path = CreateStorePath();
+        try {
+            EventReportColumnSchema column = CreateColumn("Who", typeof(string));
+            column.Aliases = new[] { "Account" };
+            EventReportSectionSchema schema = new() {
+                Name = "AliasAudit",
+                DisplayName = "Alias audit",
+                Kind = EventReportSectionKind.Custom,
+                Columns = new[] { column }
+            };
+            EventReport report = EventReportEngine.CreateStored(
+                new[] {
+                    new EventReportRow {
+                        Type = "AliasAudit",
+                        TimeCreated = new DateTime(2026, 8, 1, 1, 0, 0, DateTimeKind.Utc),
+                        EventId = 4624,
+                        RecordId = 42,
+                        Values = new Dictionary<string, object?> { ["Who"] = "EVOTEC\\Alice" }
+                    }
+                },
+                new[] { schema });
+            var store = new EventStore(path);
+
+            await store.WriteAsync(report);
+            EventReportSectionSchema storedSchema = Assert.Single(await store.GetSchemasAsync(
+                new EventStoreQuery { DefinitionNames = new[] { "AliasAudit" } }));
+            EventReport matched = await store.ReadReportAsync(new EventStoreQuery {
+                DefinitionNames = new[] { "AliasAudit" },
+                Predicate = EventPredicate.Compare("Account", EventPredicateOperator.Equal, "EVOTEC\\Alice")
+            });
+
+            Assert.Equal("Account", Assert.Single(storedSchema.Columns).Aliases.Single());
+            Assert.Single(matched.Rows);
+
+            EventReportColumnSchema revisedColumn = CreateColumn("Who", typeof(string));
+            revisedColumn.Aliases = new[] { "Principal" };
+            EventReport revised = EventReportEngine.CreateStored(report.Rows, new[] {
+                new EventReportSectionSchema {
+                    Name = "AliasAudit",
+                    Kind = EventReportSectionKind.Custom,
+                    Columns = new[] { revisedColumn }
+                }
+            });
+            await Assert.ThrowsAsync<InvalidDataException>(() => store.WriteAsync(revised));
+        } finally {
+            DeleteStore(path);
+        }
+    }
+
+    [Fact]
     public async Task FreshStoresSupplyAuthoritativeSchemasForEmptyTypedQueries() {
         string path = CreateStorePath();
         string csv = Path.Combine(Path.GetTempPath(), $"evx-empty-typed-store-{Guid.NewGuid():N}.csv");

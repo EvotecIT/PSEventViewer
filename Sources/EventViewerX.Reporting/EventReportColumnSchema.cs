@@ -10,6 +10,8 @@ public sealed class EventReportColumnSchema {
     public string DisplayName { get; set; } = string.Empty;
     /// <summary>Runtime-neutral CLR type identity when known.</summary>
     public string ValueTypeName { get; set; } = GetStableTypeName(typeof(object));
+    /// <summary>Alternative field names accepted by typed predicate builders.</summary>
+    public IReadOnlyList<string> Aliases { get; set; } = Array.Empty<string>();
 
     /// <summary>Creates a runtime-neutral identity for a CLR type.</summary>
     public static string GetStableTypeName(Type type) {

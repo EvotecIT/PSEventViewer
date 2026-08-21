@@ -36,6 +36,31 @@ public sealed partial class TestEventStore {
     }
 
     [Fact]
+    public async Task StoreQueriesNormalizeMixedDateTimeKindsBeforeValidatingBounds() {
+        string path = CreateStorePath();
+        DateTime local = DateTime.SpecifyKind(
+            new DateTime(2026, 1, 15, 10, 0, 0),
+            DateTimeKind.Local);
+        DateTime endUtc = local.ToUniversalTime().AddMinutes(30);
+        try {
+            var store = new EventStore(path);
+            await store.WriteAsync(CreateReport((
+                local.ToUniversalTime().AddMinutes(15),
+                42,
+                "alice")));
+
+            EventReport report = await store.ReadReportAsync(new EventStoreQuery {
+                StartTime = local,
+                EndTime = endUtc
+            });
+
+            Assert.Single(report.Rows);
+        } finally {
+            DeleteStore(path);
+        }
+    }
+
+    [Fact]
     public async Task WriteIsIdempotentAndCommitsCheckpointWithRows() {
         string path = CreateStorePath();
         try {
@@ -133,6 +158,37 @@ public sealed partial class TestEventStore {
             Assert.Equal(0, second.Inserted);
             Assert.Equal(1, second.Duplicates);
             Assert.Single(stored.Rows);
+        } finally {
+            DeleteStore(path);
+        }
+    }
+
+    [Fact]
+    public async Task OfflineTransportWithoutEvtxExtensionIsNotSuppressedByCollectorDeduplication() {
+        string path = CreateStorePath();
+        try {
+            DateTime time = new(2026, 8, 1, 1, 0, 0, DateTimeKind.Utc);
+            var store = new EventStore(path);
+            EventReport collector = CreateReportFromTransport(
+                time,
+                42,
+                "alice",
+                "WEC01",
+                "ForwardedEvents");
+            EventReport offline = CreateReportFromTransport(
+                time,
+                42,
+                "alice",
+                "renamed-event-archive",
+                "renamed-event-archive");
+            offline.Rows[0].SourceKind = EventLogQuerySourceKind.File;
+
+            EventStoreWriteResult forwarded = await store.WriteAsync(collector);
+            EventStoreWriteResult archived = await store.WriteAsync(offline);
+
+            Assert.Equal(1, forwarded.Inserted);
+            Assert.Equal(1, archived.Inserted);
+            Assert.Equal(2, (await store.ReadReportAsync(new EventStoreQuery())).Rows.Count);
         } finally {
             DeleteStore(path);
         }
@@ -542,6 +598,37 @@ public sealed partial class TestEventStore {
             Assert.Empty(report.Rows);
             Assert.Equal(1, report.EventsScanned);
             Assert.True(report.ScanLimitReached);
+        } finally {
+            DeleteStore(path);
+        }
+    }
+
+    [Fact]
+    public async Task ManagedStoredReadsStopPagingAfterMaxEventsWithoutMaterializingLaterRows() {
+        string path = CreateStorePath();
+        try {
+            var store = new EventStore(path);
+            await store.WriteAsync(CreateReport(Enumerable.Range(1, 300)
+                .Select(index => (
+                    new DateTime(2026, 8, 1, 0, 0, 0, DateTimeKind.Utc).AddMinutes(index),
+                    (long)index,
+                    $"user-{index}"))
+                .ToArray()));
+            using (var sqlite = new SQLite { BusyTimeoutMs = 10000 }) {
+                using SQLiteSession session = sqlite.OpenSession(path);
+                session.ExecuteNonQuery(
+                    "UPDATE evx_events SET values_json = '{' WHERE record_id = 257;");
+            }
+
+            EventReport report = await store.ReadReportAsync(new EventStoreQuery {
+                DefinitionNames = new[] { "StoredLogon" },
+                Predicate = EventPredicate.Compare("User", EventPredicateOperator.Equal, "user-1"),
+                MaxEvents = 1,
+                Oldest = true
+            });
+
+            Assert.Equal("user-1", Assert.Single(report.Rows).Values["User"]);
+            Assert.Equal(1, report.EventsScanned);
         } finally {
             DeleteStore(path);
         }

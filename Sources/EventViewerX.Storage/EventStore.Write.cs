@@ -180,6 +180,7 @@ public sealed partial class EventStore {
         string insertedAt) {
 
         EventTransportKind transport = GetTransportKind(
+            row.SourceKind,
             row.SourceLog,
             row.ContainerLog);
         return new Dictionary<string, object?> {
@@ -284,10 +285,13 @@ public sealed partial class EventStore {
     }
 
     private static EventTransportKind GetTransportKind(
+        EventLogQuerySourceKind sourceKind,
         string? sourceLog,
         string? containerLog) {
 
-        if (!string.IsNullOrWhiteSpace(containerLog) &&
+        if (sourceKind == EventLogQuerySourceKind.File ||
+            sourceKind == EventLogQuerySourceKind.Auto &&
+            !string.IsNullOrWhiteSpace(containerLog) &&
             containerLog!.EndsWith(".evtx", StringComparison.OrdinalIgnoreCase)) {
             return EventTransportKind.File;
         }

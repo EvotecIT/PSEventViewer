@@ -136,6 +136,22 @@ public sealed class TestEventPredicate {
     }
 
     [Fact]
+    public void PredicatePlannerNormalizesMixedDateTimeKindsBeforeIntersectingNativeBounds() {
+        DateTime local = DateTime.SpecifyKind(
+            new DateTime(2026, 1, 15, 10, 0, 0),
+            DateTimeKind.Local);
+        DateTime laterUtc = local.ToUniversalTime().AddMinutes(30);
+        EventPredicate predicate = EventPredicate.AllOf(
+            EventPredicate.Compare("TimeCreated", EventPredicateOperator.GreaterThanOrEqual, local),
+            EventPredicate.Compare("TimeCreated", EventPredicateOperator.GreaterThanOrEqual, laterUtc));
+
+        EventPredicatePlan plan = EventPredicatePlanner.Plan(predicate);
+
+        Assert.Equal(laterUtc, plan.NativeFilter!.StartTime);
+        Assert.Equal(DateTimeKind.Utc, plan.NativeFilter.StartTime!.Value.Kind);
+    }
+
+    [Fact]
     public void CollectionNotEqualMatchesWhenAnyItemDiffers() {
         EventPredicate predicate = EventPredicate.Compare(
             "Privileges",
@@ -444,6 +460,20 @@ public sealed class TestEventPredicate {
             EventPredicate.FromExpression<ExampleRecord>(record => users.Contains(record.Who)));
 
         Assert.Contains("cannot be represented", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void StronglyTypedExpressionsRejectOuterCollectionMembershipForCollectionFields() {
+        var allowed = new List<List<string>> {
+            new() { "SeDebugPrivilege" }
+        };
+
+        NotSupportedException exception = Assert.Throws<NotSupportedException>(() =>
+            EventPredicate.FromExpression<Rules.ActiveDirectory.ADUserPrivilegeUse>(record =>
+                allowed.Contains(record.Privileges)));
+
+        Assert.Contains("collection field", exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("reference or comparer", exception.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

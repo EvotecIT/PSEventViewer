@@ -64,7 +64,8 @@ internal static class EventReportProjectionFactory {
             string.IsNullOrWhiteSpace(field.DisplayName)
                 ? EventReportTableProjection.SplitWords(field.Name)
                 : field.DisplayName.Trim(),
-            field.ValueType)).ToArray();
+            field.ValueType,
+            field.Aliases)).ToArray();
         string displayName = string.IsNullOrWhiteSpace(definition.DisplayName)
             ? EventReportTableProjection.SplitWords(definition.Name)
             : definition.DisplayName.Trim();
@@ -101,7 +102,10 @@ internal static class EventReportProjectionFactory {
         string description,
         IReadOnlyList<EventReportColumn> columns) {
 
-        string signature = string.Join("|", columns.Select(static column => column.Name));
+        string signature = string.Join("|", columns.Select(static column =>
+            column.Name + ":" +
+            EventReportColumnSchema.GetStableTypeName(column.ValueType) + ":" +
+            string.Join(",", column.Aliases.OrderBy(static alias => alias, StringComparer.OrdinalIgnoreCase))));
         return new EventReportSectionDefinition(
             $"{kind}:{name}:{signature}", name, displayName, description, kind, columns);
     }
@@ -117,6 +121,7 @@ internal static class EventReportProjectionFactory {
             Provider = source.ProviderName,
             SourceLog = source.OriginalLogName,
             ContainerLog = source.ContainerLogName,
+            SourceKind = source.QuerySourceKind,
             SourceComputer = source.SourceComputer,
             CollectorComputer = source.CollectorComputer,
             Level = source.LevelDisplayName,
@@ -127,12 +132,14 @@ internal static class EventReportProjectionFactory {
 
     private static TypedProjectionPlan BuildPlan(Type recordType, EventTypeDefinition definition) {
         ReportMember[] members = BuildMembers(recordType);
-        var labels = definition.Fields.ToDictionary(static field => field.Name, static field => field.DisplayName,
-            StringComparer.OrdinalIgnoreCase);
+        var fields = definition.Fields.ToDictionary(static field => field.Name, StringComparer.OrdinalIgnoreCase);
         EventReportColumn[] columns = members.Select(member => new EventReportColumn(
             member.Name,
-            labels.TryGetValue(member.Name, out string? label) ? label : EventReportTableProjection.SplitWords(member.Name),
-            member.ValueType)).ToArray();
+            fields.TryGetValue(member.Name, out EventFieldDefinition? field)
+                ? field.DisplayName
+                : EventReportTableProjection.SplitWords(member.Name),
+            member.ValueType,
+            field?.Aliases)).ToArray();
         EventReportSectionDefinition section = CreateSectionDefinition(
             EventReportSectionKind.Typed,
             definition.Name,

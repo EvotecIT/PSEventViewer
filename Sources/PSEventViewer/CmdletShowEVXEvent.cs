@@ -274,7 +274,11 @@ public sealed class CmdletShowEVXEvent : AsyncPSCmdlet {
                     schema.Columns.Select(static column => new KeyValuePair<string, Type>(
                         column.Name,
                         EventReportColumnSchema.ResolveValueTypeName(column.ValueTypeName))),
-                    schema.DisplayName);
+                    schema.DisplayName,
+                    schema.Columns.ToDictionary(
+                        static column => column.Name,
+                        static column => column.Aliases ?? Array.Empty<string>(),
+                        StringComparer.OrdinalIgnoreCase));
             }
             EventPredicate? storedPredicate = PowerShellEventPredicateAdapter.Resolve(
                 Where,

@@ -16,7 +16,14 @@ internal static class EventReportSectionBuilder {
         }
         var orderedKeys = new List<string>();
         var groups = new Dictionary<string, List<EventReportProjection>>(StringComparer.OrdinalIgnoreCase);
+        var keysByName = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (EventReportProjection projection in projections) {
+            if (keysByName.TryGetValue(projection.Section.Name, out string? existingKey) &&
+                !string.Equals(existingKey, projection.Section.Key, StringComparison.OrdinalIgnoreCase)) {
+                throw new InvalidDataException(
+                    $"Report input contains conflicting schema revisions for definition '{projection.Section.Name}'.");
+            }
+            keysByName[projection.Section.Name] = projection.Section.Key;
             if (!groups.TryGetValue(projection.Section.Key, out List<EventReportProjection>? group)) {
                 group = new List<EventReportProjection>();
                 groups.Add(projection.Section.Key, group);

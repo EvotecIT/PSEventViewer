@@ -83,6 +83,24 @@ public sealed partial class EventStore {
                 $"Incoming schema '{schema.Name}' contains duplicate case-insensitive columns: " +
                 string.Join(", ", duplicateColumns) + ".");
         }
+        var identities = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        for (int index = 0; index < schema.Columns.Count; index++) {
+            EventReportColumnSchema column = schema.Columns[index];
+            if (!identities.Add(column.Name)) {
+                continue;
+            }
+            IReadOnlyList<string> aliases = column.Aliases ?? Array.Empty<string>();
+            if (aliases.Any(static alias => string.IsNullOrWhiteSpace(alias))) {
+                throw new InvalidDataException(
+                    $"Incoming schema '{schema.Name}' column '{column.Name}' contains an empty alias.");
+            }
+            foreach (string alias in aliases) {
+                if (!identities.Add(alias.Trim())) {
+                    throw new InvalidDataException(
+                        $"Incoming schema '{schema.Name}' contains duplicate field or alias '{alias.Trim()}'.");
+                }
+            }
+        }
     }
 
     private static EventReportSectionSchema MergeGenericSchemas(
@@ -96,7 +114,8 @@ public sealed partial class EventStore {
                 columns.Add(new EventReportColumnSchema {
                     Name = column.Name,
                     DisplayName = column.DisplayName,
-                    ValueTypeName = column.ValueTypeName
+                    ValueTypeName = column.ValueTypeName,
+                    Aliases = column.Aliases?.ToArray() ?? Array.Empty<string>()
                 });
             }
         }
@@ -140,6 +159,23 @@ public sealed partial class EventStore {
                 }
             }
             schema.Name = definitionName;
+            schema.DisplayName = string.IsNullOrWhiteSpace(schema.DisplayName)
+                ? definitionName
+                : schema.DisplayName.Trim();
+            schema.Description = schema.Description?.Trim() ?? string.Empty;
+            foreach (EventReportColumnSchema column in schema.Columns) {
+                column.Name = column.Name.Trim();
+                column.DisplayName = string.IsNullOrWhiteSpace(column.DisplayName)
+                    ? column.Name
+                    : column.DisplayName.Trim();
+                column.ValueTypeName = EventReportColumnSchema.NormalizeValueTypeName(column.ValueTypeName);
+                column.Aliases = (column.Aliases ?? Array.Empty<string>())
+                    .Where(static alias => !string.IsNullOrWhiteSpace(alias))
+                    .Select(static alias => alias.Trim())
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToArray();
+            }
+            ValidateSchema(schema);
             if (schema.Kind == EventReportSectionKind.Generic) {
                 schema = MergeGenericSchemas(schema, schema);
             }
@@ -159,7 +195,9 @@ public sealed partial class EventStore {
             ((int)schema.Kind).ToString(CultureInfo.InvariantCulture)
         }.Concat(schema.Columns.SelectMany(static column => new[] {
             column.Name,
-            EventReportColumnSchema.NormalizeValueTypeName(column.ValueTypeName)
+            EventReportColumnSchema.NormalizeValueTypeName(column.ValueTypeName),
+            string.Join(",", (column.Aliases ?? Array.Empty<string>())
+                .OrderBy(static alias => alias, StringComparer.OrdinalIgnoreCase))
         })));
         using SHA256 sha256 = SHA256.Create();
         byte[] hash = sha256.ComputeHash(Encoding.UTF8.GetBytes(identity));

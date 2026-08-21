@@ -26,7 +26,8 @@ public sealed class EventReportSectionSchema {
             Columns = section.Columns.Select(static column => new EventReportColumnSchema {
                 Name = column.Name,
                 DisplayName = column.DisplayName,
-                ValueTypeName = EventReportColumnSchema.GetStableTypeName(column.ValueType)
+                ValueTypeName = EventReportColumnSchema.GetStableTypeName(column.ValueType),
+                Aliases = column.Aliases.ToArray()
             }).ToArray()
         };
     }
@@ -51,7 +52,8 @@ public sealed class EventReportSectionSchema {
         Columns = definition.Columns.Select(static column => new EventReportColumnSchema {
             Name = column.Name,
             DisplayName = column.DisplayName,
-            ValueTypeName = EventReportColumnSchema.GetStableTypeName(column.ValueType)
+            ValueTypeName = EventReportColumnSchema.GetStableTypeName(column.ValueType),
+            Aliases = column.Aliases.ToArray()
         }).ToArray()
     };
 }

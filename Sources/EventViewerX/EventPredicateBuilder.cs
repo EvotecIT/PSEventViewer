@@ -102,7 +102,8 @@ public sealed class EventPredicateBuilder {
     public static EventPredicateBuilder ForFields(
         string definitionName,
         IEnumerable<KeyValuePair<string, Type>> fields,
-        string? displayName = null) {
+        string? displayName = null,
+        IReadOnlyDictionary<string, IReadOnlyList<string>>? aliases = null) {
 
         if (string.IsNullOrWhiteSpace(definitionName)) {
             throw new ArgumentException("Definition name cannot be empty.", nameof(definitionName));
@@ -125,12 +126,32 @@ public sealed class EventPredicateBuilder {
                 string.Join(", ", duplicates) + ".",
                 nameof(fields));
         }
-        EventFieldDefinition[] projected = snapshot.Select(static field =>
-            new EventFieldDefinition(
+        var claimedIdentities = new HashSet<string>(
+            snapshot.Select(static field => field.Key.Trim()),
+            StringComparer.OrdinalIgnoreCase);
+        EventFieldDefinition[] projected = snapshot.Select(field => {
+            IReadOnlyList<string> fieldAliases = aliases != null &&
+                aliases.TryGetValue(field.Key, out IReadOnlyList<string>? configured)
+                ? configured
+                    .Where(static alias => !string.IsNullOrWhiteSpace(alias))
+                    .Select(static alias => alias.Trim())
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToArray()
+                : Array.Empty<string>();
+            foreach (string alias in fieldAliases) {
+                if (!claimedIdentities.Add(alias)) {
+                    throw new ArgumentException(
+                        $"Projection fields contain duplicate field or alias '{alias}'.",
+                        nameof(aliases));
+                }
+            }
+            return new EventFieldDefinition(
                 field.Key.Trim(),
                 field.Key.Trim(),
                 field.Value,
-                isCommon: false)).ToArray();
+                isCommon: false,
+                aliases: fieldAliases);
+        }).ToArray();
         var claimedCommonNames = new HashSet<string>(
             projected.SelectMany(static field => field.Aliases.Prepend(field.Name)),
             StringComparer.OrdinalIgnoreCase);

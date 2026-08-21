@@ -172,12 +172,14 @@ public static class EventReportEngine {
                     ? schema.Columns.Select(static column => new EventReportColumn(
                         column.Name,
                         column.DisplayName,
-                        EventReportColumnSchema.ResolveValueTypeName(column.ValueTypeName))).ToArray()
+                        EventReportColumnSchema.ResolveValueTypeName(column.ValueTypeName),
+                        column.Aliases)).ToArray()
                     : EventReportTableProjection.BuildGenericColumns(sectionRows).ToArray()
                 : schema.Columns.Select(static column => new EventReportColumn(
                     column.Name,
                     column.DisplayName,
-                    EventReportColumnSchema.ResolveValueTypeName(column.ValueTypeName))).ToArray();
+                    EventReportColumnSchema.ResolveValueTypeName(column.ValueTypeName),
+                    column.Aliases)).ToArray();
             sections.Add(new EventReportSection(
                 schema.Name,
                 schema.DisplayName,
@@ -233,6 +235,7 @@ public static class EventReportEngine {
             Provider = row.Provider,
             SourceLog = row.SourceLog,
             ContainerLog = row.ContainerLog,
+            SourceKind = row.SourceKind,
             SourceComputer = row.SourceComputer,
             CollectorComputer = row.CollectorComputer,
             Level = row.Level,
@@ -333,6 +336,25 @@ public static class EventReportEngine {
                 string.Join(", ", duplicateColumns) + ".",
                 nameof(schema));
         }
+        var identities = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (EventReportColumnSchema column in columns) {
+            identities.Add(column.Name.Trim());
+        }
+        foreach (EventReportColumnSchema column in columns) {
+            foreach (string alias in column.Aliases ?? Array.Empty<string>()) {
+                if (string.IsNullOrWhiteSpace(alias)) {
+                    throw new ArgumentException(
+                        $"Stored schema '{schema.Name}' column '{column.Name}' contains an empty alias.",
+                        nameof(schema));
+                }
+                string normalizedAlias = alias.Trim();
+                if (!identities.Add(normalizedAlias)) {
+                    throw new ArgumentException(
+                        $"Stored schema '{schema.Name}' contains duplicate case-insensitive field or alias identity '{normalizedAlias}'.",
+                        nameof(schema));
+                }
+            }
+        }
         return new EventReportSectionSchema {
             Name = schema.Name.Trim(),
             DisplayName = string.IsNullOrWhiteSpace(schema.DisplayName) ? schema.Name.Trim() : schema.DisplayName.Trim(),
@@ -343,7 +365,12 @@ public static class EventReportEngine {
                 DisplayName = string.IsNullOrWhiteSpace(column.DisplayName) ? column.Name.Trim() : column.DisplayName.Trim(),
                 ValueTypeName = string.IsNullOrWhiteSpace(column.ValueTypeName)
                     ? EventReportColumnSchema.GetStableTypeName(typeof(object))
-                    : column.ValueTypeName
+                    : column.ValueTypeName,
+                Aliases = (column.Aliases ?? Array.Empty<string>())
+                    .Where(static alias => !string.IsNullOrWhiteSpace(alias))
+                    .Select(static alias => alias.Trim())
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToArray()
             }).ToArray()
         };
     }

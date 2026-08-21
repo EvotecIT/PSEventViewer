@@ -39,6 +39,8 @@ public sealed class EventStoreQuery {
             throw new ArgumentOutOfRangeException(nameof(MaxCandidates));
         }
         (DateTime? start, DateTime? end) = EventTimeRange.Resolve(StartTime, EndTime, TimePeriod);
+        start = start?.ToUniversalTime();
+        end = end?.ToUniversalTime();
         if (start.HasValue && end.HasValue && start > end) {
             throw new ArgumentException("StartTime cannot be later than EndTime.");
         }

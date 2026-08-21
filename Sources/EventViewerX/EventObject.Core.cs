@@ -226,6 +226,9 @@ public partial class EventObject {
     /// <summary>Amount of provider data materialized for this snapshot.</summary>
     public EventReadMode ReadMode { get; }
 
+    /// <summary>Whether the query read this event from a live channel or an offline event-log file.</summary>
+    public EventLogQuerySourceKind QuerySourceKind { get; internal set; }
+
     /// <summary>
     /// Creates an event snapshot and releases the supplied native event record.
     /// </summary>

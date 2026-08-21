@@ -34,6 +34,8 @@ public sealed class EventReportRow {
     public string SourceLog { get; set; } = string.Empty;
     /// <summary>Container channel or file.</summary>
     public string ContainerLog { get; set; } = string.Empty;
+    /// <summary>Whether the original query read a live channel or an offline event-log file.</summary>
+    public EventLogQuerySourceKind SourceKind { get; set; }
     /// <summary>Computer that emitted the event.</summary>
     public string SourceComputer { get; set; } = string.Empty;
     /// <summary>Direct target or collector from which the event was read.</summary>
@@ -57,6 +59,7 @@ public sealed class EventReportRow {
             [nameof(Provider)] = Provider,
             [nameof(SourceLog)] = SourceLog,
             [nameof(ContainerLog)] = ContainerLog,
+            [nameof(SourceKind)] = SourceKind,
             [nameof(SourceComputer)] = SourceComputer,
             [nameof(CollectorComputer)] = CollectorComputer,
             [nameof(Level)] = Level,

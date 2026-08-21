@@ -790,6 +790,38 @@ public sealed class TestEventDefinitionAndReporting {
         Assert.Throws<ArgumentException>(() => EventDefinitionEngine.CreateSnapshot(query));
     }
 
+    [Fact]
+    public void CustomReportSectionsRejectConflictingValueTypeRevisionsForOneDefinitionName() {
+        EventDefinition CreateRevision(EventFieldValueKind kind) => new() {
+            Name = "RevisionAudit",
+            Sources = new[] {
+                new EventDefinitionSource { LogName = "Security", EventIds = new[] { 4625 } }
+            },
+            Fields = new[] {
+                new EventDefinitionField {
+                    Name = "Value",
+                    ValueKind = kind,
+                    Source = EventFieldSource.Data,
+                    SourceName = "Value"
+                }
+            }
+        };
+        EventObject firstSource = CreateSecuritySource(4625, 71);
+        EventObject secondSource = CreateSecuritySource(4625, 72);
+        firstSource.Data["Value"] = "1";
+        secondSource.Data["Value"] = "2";
+        object[] records = {
+            EventDefinitionEngine.CreateRecord(CreateRevision(EventFieldValueKind.String), firstSource),
+            EventDefinitionEngine.CreateRecord(CreateRevision(EventFieldValueKind.Int32), secondSource)
+        };
+
+        InvalidDataException exception = Assert.Throws<InvalidDataException>(() =>
+            EventReportEngine.Create(records));
+
+        Assert.Contains("conflicting schema revisions", exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("RevisionAudit", exception.Message, StringComparison.Ordinal);
+    }
+
     private static EventDefinition CreateDefinition() => new() {
         Name = "FailedLogonCustom",
         DisplayName = "Custom failed logons",
