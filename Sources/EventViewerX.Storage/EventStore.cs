@@ -77,13 +77,17 @@ public sealed partial class EventStore {
     private static readonly JsonSerializerOptions JsonOptions = CreateJsonOptions();
 
     private static void EnsureEventIdentitySchema(SQLiteSession session) {
-        IReadOnlyList<string> columns = session.QueryAsList(
-            "PRAGMA table_info(evx_events);",
-            static record => record.GetString(1));
-        bool originalKeyMissing = !columns.Contains("original_event_key", StringComparer.OrdinalIgnoreCase);
-        bool transportKindMissing = !columns.Contains("transport_kind", StringComparer.OrdinalIgnoreCase);
-        if (originalKeyMissing || transportKindMissing) {
-            session.RunInTransaction(transaction => {
+        session.RunInTransaction(transaction => {
+            // Acquire the database writer reservation before inspecting the legacy schema. Separate
+            // EventStore instances and processes must not act on the same stale column snapshot.
+            transaction.ExecuteNonQuery(
+                "UPDATE evx_store_metadata SET schema_version = schema_version WHERE singleton_id = 1;");
+            IReadOnlyList<string> columns = transaction.QueryAsList(
+                "PRAGMA table_info(evx_events);",
+                static record => record.GetString(1));
+            bool originalKeyMissing = !columns.Contains("original_event_key", StringComparer.OrdinalIgnoreCase);
+            bool transportKindMissing = !columns.Contains("transport_kind", StringComparer.OrdinalIgnoreCase);
+            if (originalKeyMissing || transportKindMissing) {
                 if (originalKeyMissing) {
                     transaction.ExecuteNonQuery(
                         "ALTER TABLE evx_events ADD COLUMN original_event_key TEXT NOT NULL DEFAULT ''; ");
@@ -93,8 +97,8 @@ public sealed partial class EventStore {
                         "ALTER TABLE evx_events ADD COLUMN transport_kind INTEGER NOT NULL DEFAULT 2;");
                 }
                 MigrateEventIdentity(transaction);
-            });
-        }
+            }
+        });
         session.ExecuteNonQuery(
             "CREATE INDEX IF NOT EXISTS ix_evx_events_original_transport " +
             "ON evx_events (original_event_key, transport_kind);");

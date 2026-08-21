@@ -5,6 +5,11 @@ using EventViewerX.Reporting;
 namespace EventViewerX.Storage;
 
 public sealed partial class EventStore {
+    private static readonly IReadOnlyDictionary<string, EventTypeDefinition> BuiltInDefinitions =
+        EventTypeCatalog.GetDefinitions().ToDictionary(
+            static definition => definition.Name,
+            StringComparer.OrdinalIgnoreCase);
+
     private static EventReportSectionSchema[] NormalizeIncomingSchemas(
         IReadOnlyList<EventReportSectionSchema> schemas) {
 
@@ -38,9 +43,28 @@ public sealed partial class EventStore {
         if (string.IsNullOrWhiteSpace(schema.Name)) {
             throw new InvalidDataException("Incoming report contains a schema without a name.");
         }
+        if (!Enum.IsDefined(typeof(EventReportSectionKind), schema.Kind)) {
+            throw new InvalidDataException(
+                $"Incoming schema '{schema.Name}' contains an undefined section kind.");
+        }
         if (schema.Kind == EventReportSectionKind.Generic &&
             !string.Equals(schema.Name, "Generic", StringComparison.OrdinalIgnoreCase)) {
             throw new InvalidDataException("The generic stored schema must use the stable name 'Generic'.");
+        }
+        if (schema.Kind != EventReportSectionKind.Generic &&
+            string.Equals(schema.Name, "Generic", StringComparison.OrdinalIgnoreCase)) {
+            throw new InvalidDataException("The stable definition name 'Generic' is reserved for generic event rows.");
+        }
+        if (schema.Kind == EventReportSectionKind.Custom &&
+            BuiltInDefinitions.ContainsKey(schema.Name)) {
+            throw new InvalidDataException(
+                $"Custom definition '{schema.Name}' collides with a reserved EventViewerX definition.");
+        }
+        if (schema.Kind == EventReportSectionKind.Typed &&
+            (!BuiltInDefinitions.TryGetValue(schema.Name, out EventTypeDefinition? definition) ||
+             definition.IsComposite)) {
+            throw new InvalidDataException(
+                $"Typed schema '{schema.Name}' must identify one built-in leaf EventViewerX definition.");
         }
         string[] duplicateColumns = schema.Columns
             .GroupBy(static column => column.Name, StringComparer.OrdinalIgnoreCase)

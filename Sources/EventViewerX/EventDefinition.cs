@@ -6,6 +6,9 @@ namespace EventViewerX;
 /// <summary>A declarative, serializable event definition for workflows not built into EventViewerX.</summary>
 public sealed class EventDefinition {
     private static readonly JsonSerializerOptions ReadOptions = CreateJsonOptions(writeIndented: false);
+    private static readonly HashSet<string> ReservedNames = new(
+        Enum.GetNames(typeof(EventType)).Concat(new[] { "Generic" }),
+        StringComparer.OrdinalIgnoreCase);
 
     /// <summary>Stable machine-readable name.</summary>
     public string Name { get; set; } = string.Empty;
@@ -49,6 +52,10 @@ public sealed class EventDefinition {
     public void Validate() {
         if (string.IsNullOrWhiteSpace(Name)) {
             throw new InvalidDataException("Definition Name is required.");
+        }
+        if (ReservedNames.Contains(Name.Trim())) {
+            throw new InvalidDataException(
+                $"Definition Name '{Name}' is reserved by a built-in EventViewerX event type.");
         }
         if (Sources == null || Sources.Count == 0) {
             throw new InvalidDataException("At least one definition source is required.");

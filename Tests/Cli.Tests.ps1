@@ -365,6 +365,51 @@ Describe 'evx portable host' {
         $Plan.Steps.Stage | Should -Contain 'Managed'
     }
 
+    It 'preserves declared custom fields that shadow native metadata in live and stored JSON' {
+        $DefinitionPath = Join-Path $TestDrive 'shadowing-definition.json'
+        $StorePath = Join-Path $TestDrive 'shadowing-events.db'
+        @{
+            Name = 'CliShadowingDefinition'
+            Sources = @(@{
+                    LogName = 'System'
+                    EventIds = @(7040)
+                    ProviderNames = @('Service Control Manager')
+                })
+            Fields = @(
+                @{
+                    Name = 'EventId'
+                    Source = 'Constant'
+                    SourceName = 'domain-event-id'
+                }
+                @{
+                    Name = 'Provider'
+                    Source = 'Constant'
+                    SourceName = 'domain-provider'
+                }
+            )
+        } | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $DefinitionPath -Encoding UTF8
+
+        $LiveRows = @(& $script:CliPath query `
+                --definition $DefinitionPath `
+                --path $script:FixturePath `
+                --max 1 `
+                --write-store $StorePath |
+                ForEach-Object { $_ | ConvertFrom-Json })
+        $StoredRows = @(& $script:CliPath query `
+                --store $StorePath `
+                --definition $DefinitionPath `
+                --max 1 |
+                ForEach-Object { $_ | ConvertFrom-Json })
+
+        $LASTEXITCODE | Should -Be 0
+        $LiveRows | Should -HaveCount 1
+        $StoredRows | Should -HaveCount 1
+        $LiveRows[0].EventId | Should -Be 'domain-event-id'
+        $LiveRows[0].Provider | Should -Be 'domain-provider'
+        $StoredRows[0].EventId | Should -Be 'domain-event-id'
+        $StoredRows[0].Provider | Should -Be 'domain-provider'
+    }
+
     It 'removes an already absent collector subscription idempotently' {
         $Name = 'EVX-Cli-Absent-' + [guid]::NewGuid().ToString('N')
         $Result = & $script:CliPath collector remove --name $Name |

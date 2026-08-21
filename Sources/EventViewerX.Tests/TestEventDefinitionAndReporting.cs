@@ -10,6 +10,20 @@ using Xunit;
 namespace EventViewerX.Tests;
 
 public sealed class TestEventDefinitionAndReporting {
+    [Theory]
+    [InlineData("ADUserLogonFailed")]
+    [InlineData("activedirectoryauthentication")]
+    [InlineData("Generic")]
+    public void CustomDefinitionsRejectReservedBuiltInTypeNames(string name) {
+        EventDefinition definition = CreateDefinition();
+        definition.Name = name;
+
+        InvalidDataException exception = Assert.Throws<InvalidDataException>(definition.Validate);
+
+        Assert.Contains(name, exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("reserved", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
     [Fact]
     public void CustomDefinitionRoundTripsCompilesAndProjects() {
         EventDefinition definition = CreateDefinition();

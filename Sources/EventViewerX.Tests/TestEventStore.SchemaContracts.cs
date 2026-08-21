@@ -110,6 +110,77 @@ CREATE TABLE evx_events (future_only TEXT NOT NULL);");
     }
 
     [Fact]
+    public async Task ConcurrentInitializersSerializeLegacyIdentityMigration() {
+        string path = CreateStorePath();
+        try {
+            EventReport report = CreateReport(
+                (new DateTime(2026, 8, 1, 1, 0, 0, DateTimeKind.Utc), 42, "alice"));
+            await new EventStore(path).WriteAsync(report);
+            using (var sqlite = new SQLite { BusyTimeoutMs = 10000 }) {
+                using SQLiteSession session = sqlite.OpenSession(path);
+                session.ExecuteNonQuery("DROP INDEX ix_evx_events_original_transport;");
+                session.ExecuteNonQuery("ALTER TABLE evx_events DROP COLUMN original_event_key;");
+                session.ExecuteNonQuery("ALTER TABLE evx_events DROP COLUMN transport_kind;");
+            }
+            var start = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            Task[] initializers = Enumerable.Range(0, 16).Select(_ => Task.Run(async () => {
+                await start.Task;
+                new EventStore(path).Initialize();
+            })).ToArray();
+
+            start.SetResult(true);
+            await Task.WhenAll(initializers);
+
+            using var verificationClient = new SQLite { BusyTimeoutMs = 10000 };
+            using SQLiteSession verification = verificationClient.OpenSession(path);
+            IReadOnlyList<string> columns = verification.QueryAsList(
+                "PRAGMA table_info(evx_events);",
+                static record => record.GetString(1));
+            Assert.Contains("original_event_key", columns);
+            Assert.Contains("transport_kind", columns);
+            Assert.Equal(2, columns.Count(static name =>
+                name is "original_event_key" or "transport_kind"));
+        } finally {
+            DeleteStore(path);
+        }
+    }
+
+    [Theory]
+    [InlineData("ADUserLogonFailed", EventReportSectionKind.Custom)]
+    [InlineData("Generic", EventReportSectionKind.Custom)]
+    [InlineData("NotABuiltInDefinition", EventReportSectionKind.Typed)]
+    public async Task StoreRejectsAmbiguousDefinitionNameAndKindIdentities(
+        string definitionName,
+        EventReportSectionKind kind) {
+
+        string path = CreateStorePath();
+        try {
+            EventReport report = EventReportEngine.CreateStored(
+                new[] {
+                    new EventReportRow {
+                        Type = definitionName,
+                        Values = new Dictionary<string, object?> { ["Value"] = "one" }
+                    }
+                },
+                new[] {
+                    new EventReportSectionSchema {
+                        Name = definitionName,
+                        Kind = kind,
+                        Columns = new[] { CreateColumn("Value", typeof(string)) }
+                    }
+                });
+
+            InvalidDataException exception = await Assert.ThrowsAsync<InvalidDataException>(() =>
+                new EventStore(path).WriteAsync(report));
+
+            Assert.Contains(definitionName, exception.Message, StringComparison.OrdinalIgnoreCase);
+            Assert.False(File.Exists(path));
+        } finally {
+            DeleteStore(path);
+        }
+    }
+
+    [Fact]
     public async Task GenericEventDataCannotDuplicateCommonReportColumns() {
         string path = CreateStorePath();
         try {
@@ -139,6 +210,39 @@ CREATE TABLE evx_events (future_only TEXT NOT NULL);");
         } finally {
             DeleteStore(path);
         }
+    }
+
+    [Fact]
+    public void SchemaAwareRowSerializationPreservesDeclaredShadowingFields() {
+        EventReport report = EventReportEngine.CreateStored(
+            new[] {
+                new EventReportRow {
+                    Type = "CustomShadow",
+                    EventId = 4624,
+                    Provider = "Microsoft-Windows-Security-Auditing",
+                    Values = new Dictionary<string, object?> {
+                        [nameof(EventReportRow.EventId)] = "provider-event-id",
+                        [nameof(EventReportRow.Provider)] = "provider-domain-value"
+                    }
+                }
+            },
+            new[] {
+                new EventReportSectionSchema {
+                    Name = "CustomShadow",
+                    Kind = EventReportSectionKind.Custom,
+                    Columns = new[] {
+                        CreateColumn(nameof(EventReportRow.EventId), typeof(string)),
+                        CreateColumn(nameof(EventReportRow.Provider), typeof(string))
+                    }
+                }
+            });
+
+        EventReportRow row = Assert.Single(report.Rows);
+        IReadOnlyDictionary<string, object?> serialized = row.ToDictionary(Assert.Single(report.Sections));
+
+        Assert.Equal("provider-event-id", serialized[nameof(EventReportRow.EventId)]);
+        Assert.Equal("provider-domain-value", serialized[nameof(EventReportRow.Provider)]);
+        Assert.Equal("CustomShadow", serialized[nameof(EventReportRow.Type)]);
     }
 
     [Fact]

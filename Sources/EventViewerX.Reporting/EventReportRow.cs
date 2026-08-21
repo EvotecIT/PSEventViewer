@@ -71,6 +71,30 @@ public sealed class EventReportRow {
         return result;
     }
 
+    /// <summary>
+    /// Flattens common and type-specific fields using one homogeneous report section as the output contract.
+    /// Declared typed or custom fields take precedence over same-named native metadata; generic sections retain
+    /// the native metadata contract.
+    /// </summary>
+    public IReadOnlyDictionary<string, object?> ToDictionary(EventReportSection section) {
+        if (section == null) {
+            throw new ArgumentNullException(nameof(section));
+        }
+        var result = ToDictionary().ToDictionary(
+            static item => item.Key,
+            static item => item.Value,
+            StringComparer.OrdinalIgnoreCase);
+        if (section.Kind == EventReportSectionKind.Generic) {
+            return result;
+        }
+        foreach (EventReportColumn column in section.Columns) {
+            result[column.Name] = Values.TryGetValue(column.Name, out object? value)
+                ? value
+                : null;
+        }
+        return result;
+    }
+
     /// <summary>Flattens the row using the same field names and aliases as live typed predicates.</summary>
     public IReadOnlyDictionary<string, object?> ToPredicateDictionary() {
         var result = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);

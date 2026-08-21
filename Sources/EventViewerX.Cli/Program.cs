@@ -58,10 +58,7 @@ internal static partial class Program {
             EventReport stored = await new EventStore(storePath)
                 .ReadReportAsync(storedQuery, options.Get("title"))
                 .ConfigureAwait(false);
-            foreach (EventReportRow row in stored.Rows) {
-                Console.WriteLine(JsonSerializer.Serialize(row.ToDictionary(), JsonOptions));
-            }
-            return 0;
+            return WriteRows(stored);
         }
         EventReportRequest request = CreateRequest(options);
         if (options.Has("explain")) {
@@ -86,10 +83,7 @@ internal static partial class Program {
         }
         EventReport report = await EventReportEngine.QueryAsync(request).ConfigureAwait(false);
         await WriteStoreIfRequestedAsync(report, options).ConfigureAwait(false);
-        foreach (EventReportRow row in report.Rows) {
-            Console.WriteLine(JsonSerializer.Serialize(row.ToDictionary(), JsonOptions));
-        }
-        return 0;
+        return WriteRows(report);
     }
 
     private static async Task<int> ReportAsync(CliArguments options) {
@@ -462,6 +456,24 @@ internal static partial class Program {
 
     private static int WriteJson<T>(T value) {
         Console.WriteLine(JsonSerializer.Serialize(value, JsonOptions));
+        return 0;
+    }
+
+    private static int WriteRows(EventReport report) {
+        var sectionsByRow = new Dictionary<EventReportRow, EventReportSection>();
+        foreach (EventReportSection section in report.Sections) {
+            foreach (EventReportRow row in section.Rows) {
+                sectionsByRow[row] = section;
+            }
+        }
+        foreach (EventReportRow row in report.Rows) {
+            IReadOnlyDictionary<string, object?> output = sectionsByRow.TryGetValue(
+                row,
+                out EventReportSection? section)
+                ? row.ToDictionary(section)
+                : row.ToDictionary();
+            Console.WriteLine(JsonSerializer.Serialize(output, JsonOptions));
+        }
         return 0;
     }
 

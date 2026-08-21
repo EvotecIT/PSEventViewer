@@ -502,10 +502,10 @@ public sealed partial class TestEventStore {
         string path = CreateStorePath();
         try {
             var store = new EventStore(path);
-            await store.WriteAsync(CreateReportForDefinition(
+            await store.WriteAsync(CreateBuiltInReportForDefinition(
                 "ADUserLogonFailed",
                 (new DateTime(2026, 8, 1, 1, 0, 0, DateTimeKind.Utc), 42, "alice")));
-            await store.WriteAsync(CreateReportForDefinition(
+            await store.WriteAsync(CreateBuiltInReportForDefinition(
                 "ADUserLogon",
                 (new DateTime(2026, 8, 1, 2, 0, 0, DateTimeKind.Utc), 43, "bob")));
 
@@ -802,6 +802,35 @@ public sealed partial class TestEventStore {
         params (DateTime Time, long RecordId, string User)[] events) {
 
         return CreateReportFromTransport(events, "WEC01", "ForwardedEvents", definitionName);
+    }
+
+    private static EventReport CreateBuiltInReportForDefinition(
+        string definitionName,
+        params (DateTime Time, long RecordId, string User)[] events) {
+
+        EventReportRow[] rows = events.Select(item => new EventReportRow {
+            TimeCreated = item.Time,
+            Type = definitionName,
+            EventId = 4624,
+            RecordId = item.RecordId,
+            Provider = "Microsoft-Windows-Security-Auditing",
+            SourceLog = "Security",
+            ContainerLog = "ForwardedEvents",
+            SourceComputer = "DC01.ad.evotec.xyz",
+            CollectorComputer = "WEC01",
+            Level = "Information",
+            LevelValue = 0,
+            Message = "Synthetic stored typed event.",
+            Values = new Dictionary<string, object?> { ["User"] = item.User }
+        }).ToArray();
+        return EventReportEngine.CreateStored(rows, new[] {
+            new EventReportSectionSchema {
+                Name = definitionName,
+                DisplayName = definitionName,
+                Kind = EventReportSectionKind.Typed,
+                Columns = new[] { CreateColumn("User", typeof(string)) }
+            }
+        });
     }
 
     private static EventReport CreateReportFromTransport(
