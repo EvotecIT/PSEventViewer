@@ -123,6 +123,10 @@ FROM evx_events";
         CancellationToken cancellationToken = default) {
 
         EnsureInitialized();
+        string[]? selectedDefinitions = EventStoreQuery.NormalizeTextValues(definitionNames);
+        if (definitionNames != null && selectedDefinitions == null) {
+            return 0;
+        }
         var where = new List<string> { "event_time_utc < $before" };
         var parameters = new Dictionary<string, object?> {
             ["$before"] = before.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture)
@@ -131,15 +135,7 @@ FROM evx_events";
         await using SQLiteAsyncSession session = await sqlite
             .OpenSessionAsync(Path, cancellationToken)
             .ConfigureAwait(false);
-        if (!CanUseSqliteNoCase(definitionNames)) {
-            string[] selectedDefinitions = definitionNames!
-                .Where(static value => !string.IsNullOrWhiteSpace(value))
-                .Select(static value => value.Trim())
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToArray();
-            if (selectedDefinitions.Length == 0) {
-                return 0;
-            }
+        if (selectedDefinitions != null && !CanUseSqliteNoCase(selectedDefinitions)) {
             return await session.RunInTransactionAsync(async (transaction, token) => {
                 IReadOnlyList<StoredPruneCandidate> candidates = await transaction.QueryAsListAsync(
                     "SELECT rowid, definition_name FROM evx_events WHERE event_time_utc < $before;",
@@ -169,7 +165,7 @@ FROM evx_events";
                 return deleted;
             }, cancellationToken).ConfigureAwait(false);
         }
-        AddIn(where, parameters, "definition_name", "pruneDefinition", definitionNames, caseInsensitive: true);
+        AddIn(where, parameters, "definition_name", "pruneDefinition", selectedDefinitions, caseInsensitive: true);
         return await session.ExecuteNonQueryAsync(
             "DELETE FROM evx_events WHERE " + string.Join(" AND ", where) + ";",
             parameters,

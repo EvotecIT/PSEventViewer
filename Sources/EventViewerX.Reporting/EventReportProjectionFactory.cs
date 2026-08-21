@@ -23,7 +23,7 @@ internal static class EventReportProjectionFactory {
         foreach (ReportMember member in plan.Members) {
             values[member.Name] = member.GetValue(record);
         }
-        EventReportRow row = CreateRow(record.SourceEvent, record.TypeName, values);
+        EventReportRow row = CreateRow(record.SourceEvent, definition.Name, values);
         return new EventReportProjection(row, plan.Section);
     }
 

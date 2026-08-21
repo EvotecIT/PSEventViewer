@@ -43,7 +43,7 @@ public sealed class EventStoreQuery {
             throw new ArgumentException("StartTime cannot be later than EndTime.");
         }
         EventType[]? types = Types?.Distinct().ToArray();
-        string[]? definitionNames = Normalize(DefinitionNames);
+        string[]? definitionNames = NormalizeTextValues(DefinitionNames);
         if (types is { Length: > 0 } && definitionNames is { Length: > 0 }) {
             throw new ArgumentException(
                 "Types and DefinitionNames are mutually exclusive stored definition selectors.");
@@ -60,9 +60,9 @@ public sealed class EventStoreQuery {
             EndTime = end,
             EventIds = EventIds?.Distinct().ToArray(),
             RecordIds = RecordIds?.Distinct().ToArray(),
-            SourceComputers = Normalize(SourceComputers),
-            SourceLogs = Normalize(SourceLogs),
-            Providers = Normalize(Providers),
+            SourceComputers = NormalizeTextValues(SourceComputers),
+            SourceLogs = NormalizeTextValues(SourceLogs),
+            Providers = NormalizeTextValues(Providers),
             Predicate = predicate,
             MaxEvents = MaxEvents,
             MaxCandidates = MaxCandidates,
@@ -76,7 +76,8 @@ public sealed class EventStoreQuery {
         .Distinct(StringComparer.OrdinalIgnoreCase)
         .ToArray();
 
-    private static string[]? Normalize(IReadOnlyList<string>? values) {
+    /// <summary>Trims and deduplicates optional case-insensitive text selectors.</summary>
+    internal static string[]? NormalizeTextValues(IReadOnlyList<string>? values) {
         if (values == null) {
             return null;
         }

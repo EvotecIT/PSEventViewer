@@ -254,17 +254,20 @@ public sealed class CmdletShowEVXEvent : AsyncPSCmdlet {
                 Definition,
                 storedDefinition);
             var store = new EventStore(FromStore!);
-            if (storedBuilder == null &&
-                Where != null &&
-                storedDefinitionNames?.Count == 1) {
+            object? storedWhere = Where;
+            while (storedWhere is PSObject wrapper && wrapper.BaseObject != storedWhere) {
+                storedWhere = wrapper.BaseObject;
+            }
+            if (storedBuilder == null && storedWhere is ScriptBlock) {
                 IReadOnlyList<EventReportSectionSchema> schemas = await store.GetSchemasAsync(
                     new EventStoreQuery { DefinitionNames = storedDefinitionNames },
                     CancelToken).ConfigureAwait(false);
                 EventReportSectionSchema schema = schemas.Count == 1
                     ? schemas[0]
                     : throw new PSArgumentException(
-                        $"Stored definition '{storedDefinitionNames[0]}' does not have one discoverable schema. " +
-                        "Supply its EventDefinition object or JSON file before using -Where.",
+                        "Stored script-block filters require exactly one discoverable schema. " +
+                        $"The current stored selection exposes {schemas.Count} schemas. " +
+                        "Supply -Type, -Definition, an EventDefinition object, or a JSON definition file before using -Where.",
                         nameof(Definition));
                 storedBuilder = EventPredicateBuilder.ForFields(
                     schema.Name,

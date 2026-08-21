@@ -4,12 +4,54 @@ using System.Security.Principal;
 using System.Xml.Linq;
 using EventViewerX.Reporting;
 using EventViewerX.Rules.ActiveDirectory;
+using EventViewerX.Rules.HyperV;
+using EventViewerX.Storage;
 using HtmlForgeX;
 using Xunit;
 
 namespace EventViewerX.Tests;
 
 public sealed class TestEventDefinitionAndReporting {
+    [Fact]
+    public async Task TypedReportRowsUseCatalogDefinitionNamesInsteadOfLegacyRecordLabels() {
+        EventObject computer = CreateSecuritySource(4741, 41);
+        EventObject user = CreateSecuritySource(4720, 42);
+        foreach (EventObject source in new[] { computer, user }) {
+            source.Data["OldUacValue"] = "-";
+            source.Data["NewUacValue"] = "-";
+            source.Data["UserAccountControl"] = "-";
+        }
+        object[] records = {
+            new ADComputerCreateChange(computer),
+            new ADUserCreateChange(user),
+            new ADUserStatus(CreateSecuritySource(4722, 43)),
+            new VmCheckpointCreated(CreateSecuritySource(4096, 44))
+        };
+
+        EventReport report = EventReportEngine.Create(records);
+
+        string[] expected = {
+            nameof(EventType.ADComputerCreateChange),
+            nameof(EventType.ADUserCreateChange),
+            nameof(EventType.ADUserStatus),
+            nameof(EventType.HyperVCheckpointCreated)
+        };
+        Assert.Equal(expected.OrderBy(static value => value),
+            report.Rows.Select(static row => row.Type).OrderBy(static value => value));
+        Assert.All(report.Rows, row => Assert.Contains(report.Sections,
+            section => string.Equals(section.Name, row.Type, StringComparison.Ordinal)));
+
+        string storePath = Path.Combine(Path.GetTempPath(), $"evx-catalog-identities-{Guid.NewGuid():N}.db");
+        try {
+            EventStoreWriteResult write = await new EventStore(storePath).WriteAsync(report);
+            Assert.Equal(4, write.Inserted);
+        } finally {
+            foreach (string suffix in new[] { string.Empty, "-wal", "-shm" }) {
+                File.Delete(storePath + suffix);
+            }
+        }
+    }
+
     [Theory]
     [InlineData("ADUserLogonFailed")]
     [InlineData("activedirectoryauthentication")]
@@ -764,8 +806,8 @@ public sealed class TestEventDefinitionAndReporting {
         }
     };
 
-    private static EventObject CreateSecuritySource(int eventId) => new(
-        new SyntheticEventRecord(eventId), "WEC01", EventReadMode.StructuredDataAndMessage) {
+    private static EventObject CreateSecuritySource(int eventId, long recordId = 42) => new(
+        new SyntheticEventRecord(eventId, recordId), "WEC01", EventReadMode.StructuredDataAndMessage) {
             ContainerLog = "ForwardedEvents",
             GatheredLogName = "ForwardedEvents"
         };
@@ -777,9 +819,11 @@ public sealed class TestEventDefinitionAndReporting {
 
     private sealed class SyntheticEventRecord : EventRecord {
         private readonly int _eventId;
+        private readonly long _recordId;
 
-        internal SyntheticEventRecord(int eventId = 4625) {
+        internal SyntheticEventRecord(int eventId = 4625, long recordId = 42) {
             _eventId = eventId;
+            _recordId = recordId;
         }
 
         public override string ProviderName => "Microsoft-Windows-Security-Auditing";
@@ -802,7 +846,7 @@ public sealed class TestEventDefinitionAndReporting {
         public override IList<EventProperty> Properties => Array.Empty<EventProperty>();
         public override DateTime? TimeCreated => new DateTime(2026, 8, 16, 10, 0, 0, DateTimeKind.Utc);
         public override int? Qualifiers => null;
-        public override long? RecordId => 42;
+        public override long? RecordId => _recordId;
         public override byte? Version => 0;
         public override SecurityIdentifier UserId => null!;
         public override EventBookmark Bookmark => null!;

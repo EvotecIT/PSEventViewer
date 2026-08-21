@@ -574,6 +574,34 @@ public sealed partial class TestEventStore {
     }
 
     [Fact]
+    public async Task PruneNormalizesAsciiDefinitionSelectorsAndRejectsEmptySelections() {
+        string path = CreateStorePath();
+        try {
+            var store = new EventStore(path);
+            await store.WriteAsync(CreateReportForDefinition(
+                "Audit",
+                (new DateTime(2026, 8, 1, 1, 0, 0, DateTimeKind.Utc), 42, "alice")));
+            await store.WriteAsync(CreateReportForDefinition(
+                "OtherAudit",
+                (new DateTime(2026, 8, 1, 2, 0, 0, DateTimeKind.Utc), 43, "bob")));
+
+            int deleted = await store.PruneBeforeAsync(
+                new DateTime(2026, 8, 2, 0, 0, 0, DateTimeKind.Utc),
+                new[] { " Audit ", "AUDIT" });
+            int emptyDeleted = await store.PruneBeforeAsync(
+                new DateTime(2026, 8, 2, 0, 0, 0, DateTimeKind.Utc),
+                new[] { " ", "\t" });
+            EventReport remaining = await store.ReadReportAsync(new EventStoreQuery());
+
+            Assert.Equal(1, deleted);
+            Assert.Equal(0, emptyDeleted);
+            Assert.Equal("OtherAudit", Assert.Single(remaining.Rows).Type);
+        } finally {
+            DeleteStore(path);
+        }
+    }
+
+    [Fact]
     public async Task CalendarSummariesRejectPartialResultLimitsAndReturnUtcBuckets() {
         string path = CreateStorePath();
         try {

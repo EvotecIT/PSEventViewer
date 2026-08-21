@@ -225,6 +225,12 @@ Describe 'Show-EVXEvent' {
                 -Where { $_.Privileges -in @('SeDebugPrivilege') } `
                 -PassThru
         } | Should -Throw '*Field-left -in/-notin treats collection field*'
+        {
+            Show-EVXEvent `
+                -FromStore $StorePath `
+                -Where { 'SeDebugPrivilege' -eq $_.Privileges } `
+                -PassThru
+        } | Should -Throw '*Field-right -eq/-ne treats collection field*'
         $Matched = Show-EVXEvent `
             -FromStore $StorePath `
             -Definition Audit `
@@ -232,6 +238,44 @@ Describe 'Show-EVXEvent' {
             -PassThru
 
         $Matched.Rows.Count | Should -Be 1
+
+        $SecondSchema = [EventViewerX.Reporting.EventReportSectionSchema]::new()
+        $SecondSchema.Name = 'OtherAudit'
+        $SecondSchema.DisplayName = 'Other audit'
+        $SecondSchema.Kind = [EventViewerX.Reporting.EventReportSectionKind]::Custom
+        $SecondSchema.Columns = $Columns
+        $SecondRow = [EventViewerX.Reporting.EventReportRow]::new()
+        $SecondRow.Type = 'OtherAudit'
+        $SecondRow.TimeCreated = [datetime]::SpecifyKind([datetime]'2026-08-01T02:00:00', [DateTimeKind]::Utc)
+        $SecondRow.EventId = 4672
+        $SecondRow.RecordId = 43
+        $SecondRow.Provider = 'Microsoft-Windows-Security-Auditing'
+        $SecondRow.SourceLog = 'Security'
+        $SecondRow.ContainerLog = 'Security'
+        $SecondRow.SourceComputer = 'AD0'
+        $SecondRow.CollectorComputer = 'AD0'
+        $SecondRow.Values = $Values
+        $SecondReport = [EventViewerX.Reporting.EventReportEngine]::CreateStored(
+            [EventViewerX.Reporting.EventReportRow[]] @($SecondRow),
+            [EventViewerX.Reporting.EventReportSectionSchema[]] @($SecondSchema))
+        $null = $Store.WriteAsync($SecondReport).GetAwaiter().GetResult()
+
+        {
+            Show-EVXEvent `
+                -FromStore $StorePath `
+                -Where { $_.Privileges -contains 'SeDebugPrivilege' } `
+                -PassThru
+        } | Should -Throw '*current stored selection exposes 2 schemas*'
+
+        $TypedPredicate = [EventViewerX.EventPredicate]::Compare(
+            'EventId',
+            [EventViewerX.EventPredicateOperator]::Equal,
+            4672)
+        $UnscopedTyped = Show-EVXEvent `
+            -FromStore $StorePath `
+            -Where $TypedPredicate `
+            -PassThru
+        $UnscopedTyped.Rows.Count | Should -Be 2
     }
 
     It 'rejects simultaneous built-in and custom stored selectors before opening history' {
