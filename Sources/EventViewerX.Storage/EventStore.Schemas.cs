@@ -56,15 +56,22 @@ public sealed partial class EventStore {
             throw new InvalidDataException("The stable definition name 'Generic' is reserved for generic event rows.");
         }
         if (schema.Kind == EventReportSectionKind.Custom &&
-            BuiltInDefinitions.ContainsKey(schema.Name)) {
+            (BuiltInDefinitions.ContainsKey(schema.Name) ||
+             string.Equals(schema.Name, "EventStoreSummary", StringComparison.OrdinalIgnoreCase))) {
             throw new InvalidDataException(
                 $"Custom definition '{schema.Name}' collides with a reserved EventViewerX definition.");
         }
-        if (schema.Kind == EventReportSectionKind.Typed &&
-            (!BuiltInDefinitions.TryGetValue(schema.Name, out EventTypeDefinition? definition) ||
-             definition.IsComposite)) {
-            throw new InvalidDataException(
-                $"Typed schema '{schema.Name}' must identify one built-in leaf EventViewerX definition.");
+        if (schema.Kind == EventReportSectionKind.Typed) {
+            if (!BuiltInDefinitions.TryGetValue(schema.Name, out EventTypeDefinition? definition) ||
+                definition.IsComposite) {
+                throw new InvalidDataException(
+                    $"Typed schema '{schema.Name}' must identify one built-in leaf EventViewerX definition.");
+            }
+            EventReportSectionSchema expected = EventReportSectionSchema.FromType(definition.Type);
+            if (!string.Equals(CreateSchemaHash(schema), CreateSchemaHash(expected), StringComparison.Ordinal)) {
+                throw new InvalidDataException(
+                    $"Typed schema '{schema.Name}' does not match the built-in EventViewerX report contract.");
+            }
         }
         string[] duplicateColumns = schema.Columns
             .GroupBy(static column => column.Name, StringComparer.OrdinalIgnoreCase)

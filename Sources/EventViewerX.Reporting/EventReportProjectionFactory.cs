@@ -29,6 +29,36 @@ internal static class EventReportProjectionFactory {
 
     internal static EventReportProjection Create(CustomEventRecord record) {
         EventDefinition definition = record.Definition;
+        EventReportRow row = CreateRow(record.SourceEvent, record.TypeName, record.Values);
+        return new EventReportProjection(row, Create(definition));
+    }
+
+    internal static EventReportProjection Create(EventObject source) {
+        EventReportRow row = CreateRow(
+            source,
+            "Generic",
+            source.Data.ToDictionary(static item => item.Key, static item => (object?)item.Value,
+                StringComparer.OrdinalIgnoreCase));
+        return new EventReportProjection(row, CreateGenericDefinition());
+    }
+
+    internal static EventReportSectionDefinition Create(EventType type) {
+        EventTypeDefinition definition = EventTypeCatalog.GetDefinition(type);
+        if (definition.IsComposite || definition.RecordType == null) {
+            throw new ArgumentException(
+                $"Event type '{type}' does not identify one reportable leaf definition.",
+                nameof(type));
+        }
+        return TypedPlans.GetOrAdd(
+            definition.RecordType,
+            recordType => BuildPlan(recordType, definition)).Section;
+    }
+
+    internal static EventReportSectionDefinition Create(EventDefinition definition) {
+        if (definition == null) {
+            throw new ArgumentNullException(nameof(definition));
+        }
+        definition.Validate();
         EventReportColumn[] columns = definition.Fields.Select(static field => new EventReportColumn(
             field.Name,
             string.IsNullOrWhiteSpace(field.DisplayName)
@@ -38,31 +68,33 @@ internal static class EventReportProjectionFactory {
         string displayName = string.IsNullOrWhiteSpace(definition.DisplayName)
             ? EventReportTableProjection.SplitWords(definition.Name)
             : definition.DisplayName.Trim();
-        EventReportRow row = CreateRow(record.SourceEvent, record.TypeName, record.Values);
-        return new EventReportProjection(row, CreateSectionDefinition(
+        return CreateSectionDefinition(
             EventReportSectionKind.Custom,
             definition.Name,
             displayName,
             definition.Description?.Trim() ?? string.Empty,
-            columns));
+            columns);
     }
 
-    internal static EventReportProjection Create(EventObject source) {
-        EventReportRow row = CreateRow(
-            source,
-            "Generic",
-            source.Data.ToDictionary(static item => item.Key, static item => (object?)item.Value,
-                StringComparer.OrdinalIgnoreCase));
-        return new EventReportProjection(row, new EventReportSectionDefinition(
+    internal static IReadOnlyList<EventReportSectionDefinition> CreateDefinitions(EventReportRequest request) {
+        if (request.Types != null && request.Types.Count > 0) {
+            return EventTypeCatalog.Expand(request.Types).Select(Create).ToArray();
+        }
+        if (request.Definition != null) {
+            return new[] { Create(request.Definition) };
+        }
+        return new[] { CreateGenericDefinition() };
+    }
+
+    internal static EventReportSectionDefinition CreateGenericDefinition() => new(
             "Generic",
             "Generic",
             "Events",
             "Raw Windows Event Log records with provider and channel metadata.",
             EventReportSectionKind.Generic,
-            Array.Empty<EventReportColumn>()));
-    }
+            EventReportTableProjection.BuildGenericColumns(Array.Empty<EventReportRow>()));
 
-    private static EventReportSectionDefinition CreateSectionDefinition(
+    internal static EventReportSectionDefinition CreateSectionDefinition(
         EventReportSectionKind kind,
         string name,
         string displayName,

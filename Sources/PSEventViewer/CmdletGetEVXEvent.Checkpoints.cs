@@ -422,7 +422,7 @@ public sealed partial class CmdletGetEVXEvent {
     }
 
     private IReadOnlyList<string?> GetEffectiveCheckpointMachines()
-        => EventLogTarget.NormalizeMachineNames(MachineName);
+        => EventLogTarget.NormalizeMachineNames(Collector ?? MachineName);
 
     private void PrepareCheckpointBounds(CancellationToken cancellationToken) {
         if (string.IsNullOrWhiteSpace(RecordIdFile) || _recordMap.Count == 0) {

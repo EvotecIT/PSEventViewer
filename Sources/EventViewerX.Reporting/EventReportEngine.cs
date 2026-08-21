@@ -68,7 +68,12 @@ public static class EventReportEngine {
             : request.Title!.Trim();
         EventReportRow[] rows = projections.Select(static projection => projection.Row).ToArray();
         return new EventReport(title, DateTime.UtcNow, stopwatch.Elapsed, rows,
-            EventReportSectionBuilder.Build(projections), coverage, scanned, scanLimitReached);
+            EventReportSectionBuilder.Build(
+                projections,
+                EventReportProjectionFactory.CreateDefinitions(request)),
+            coverage,
+            scanned,
+            scanLimitReached);
     }
 
     /// <summary>Creates a report snapshot from previously queried EventViewerX objects without reading logs again.</summary>
@@ -161,11 +166,13 @@ public static class EventReportEngine {
                     row.Type,
                     StringComparison.OrdinalIgnoreCase))
                 .ToArray();
-            if (sectionRows.Length == 0) {
-                continue;
-            }
             EventReportColumn[] columns = schema.Kind == EventReportSectionKind.Generic
-                ? EventReportTableProjection.BuildGenericColumns(sectionRows).ToArray()
+                ? sectionRows.Length == 0
+                    ? schema.Columns.Select(static column => new EventReportColumn(
+                        column.Name,
+                        column.DisplayName,
+                        EventReportColumnSchema.ResolveValueTypeName(column.ValueTypeName))).ToArray()
+                    : EventReportTableProjection.BuildGenericColumns(sectionRows).ToArray()
                 : schema.Columns.Select(static column => new EventReportColumn(
                     column.Name,
                     column.DisplayName,

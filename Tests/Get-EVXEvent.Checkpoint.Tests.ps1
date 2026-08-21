@@ -1,4 +1,17 @@
 Describe 'Get-EVXEvent checkpoint compatibility' {
+    It 'uses collector targets when validating typed-filter checkpoint boundaries' {
+        $Cmdlet = [PSEventViewer.CmdletGetEVXEvent]::new()
+        $Cmdlet.Collector = @(' WEC01 ')
+        $Cmdlet.MachineName = @('DIRECT01')
+        $Method = $Cmdlet.GetType().GetMethod(
+            'GetEffectiveCheckpointMachines',
+            [Reflection.BindingFlags] 'Instance, NonPublic')
+
+        $Machines = @($Method.Invoke($Cmdlet, $null))
+
+        $Machines | Should -Be @('WEC01')
+    }
+
     It 'keeps a stricter typed record boundary when the checkpoint is empty or lower' {
         $Fixture = Join-Path $PSScriptRoot 'Logs\NamedFilterExamples.evtx'
         $CheckpointPath = Join-Path $TestDrive 'typed-filter-boundary.json'

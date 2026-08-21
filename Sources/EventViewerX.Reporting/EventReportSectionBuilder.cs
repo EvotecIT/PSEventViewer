@@ -1,7 +1,19 @@
 namespace EventViewerX.Reporting;
 
 internal static class EventReportSectionBuilder {
-    internal static IReadOnlyList<EventReportSection> Build(IReadOnlyList<EventReportProjection> projections) {
+    internal static IReadOnlyList<EventReportSection> Build(
+        IReadOnlyList<EventReportProjection> projections,
+        IReadOnlyList<EventReportSectionDefinition>? emptyDefinitions = null) {
+
+        if (projections.Count == 0 && emptyDefinitions != null) {
+            return emptyDefinitions.Select(static definition => new EventReportSection(
+                definition.Name,
+                definition.DisplayName,
+                definition.Description,
+                definition.Kind,
+                definition.Columns,
+                Array.Empty<EventReportRow>())).ToArray();
+        }
         var orderedKeys = new List<string>();
         var groups = new Dictionary<string, List<EventReportProjection>>(StringComparer.OrdinalIgnoreCase);
         foreach (EventReportProjection projection in projections) {

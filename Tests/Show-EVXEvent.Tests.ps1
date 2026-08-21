@@ -185,6 +185,55 @@ Describe 'Show-EVXEvent' {
         Test-Path -LiteralPath $StorePath | Should -BeFalse
     }
 
+    It 'uses stored schema metadata when parsing stable-name script filters' {
+        $StorePath = Join-Path $TestDrive 'stored-collection-schema.db'
+        $Column = [EventViewerX.Reporting.EventReportColumnSchema]::new()
+        $Column.Name = 'Privileges'
+        $Column.DisplayName = 'Privileges'
+        $Column.ValueTypeName = [EventViewerX.Reporting.EventReportColumnSchema]::GetStableTypeName([string[]])
+        $Schema = [EventViewerX.Reporting.EventReportSectionSchema]::new()
+        $Schema.Name = 'Audit'
+        $Schema.DisplayName = 'Audit'
+        $Schema.Kind = [EventViewerX.Reporting.EventReportSectionKind]::Custom
+        $Columns = [Collections.Generic.List[EventViewerX.Reporting.EventReportColumnSchema]]::new()
+        $Columns.Add($Column)
+        $Schema.Columns = $Columns
+        $Values = [Collections.Generic.Dictionary[string, object]]::new(
+            [StringComparer]::OrdinalIgnoreCase)
+        $Values['Privileges'] = [string[]] @('SeDebugPrivilege', 'SeBackupPrivilege')
+        $Row = [EventViewerX.Reporting.EventReportRow]::new()
+        $Row.Type = 'Audit'
+        $Row.TimeCreated = [datetime]::SpecifyKind([datetime]'2026-08-01T01:00:00', [DateTimeKind]::Utc)
+        $Row.EventId = 4672
+        $Row.RecordId = 42
+        $Row.Provider = 'Microsoft-Windows-Security-Auditing'
+        $Row.SourceLog = 'Security'
+        $Row.ContainerLog = 'Security'
+        $Row.SourceComputer = 'AD0'
+        $Row.CollectorComputer = 'AD0'
+        $Row.Values = $Values
+        $Report = [EventViewerX.Reporting.EventReportEngine]::CreateStored(
+            [EventViewerX.Reporting.EventReportRow[]] @($Row),
+            [EventViewerX.Reporting.EventReportSectionSchema[]] @($Schema))
+        $Store = [EventViewerX.Storage.EventStore]::new($StorePath)
+        $null = $Store.WriteAsync($Report).GetAwaiter().GetResult()
+
+        {
+            Show-EVXEvent `
+                -FromStore $StorePath `
+                -Definition Audit `
+                -Where { $_.Privileges -in @('SeDebugPrivilege') } `
+                -PassThru
+        } | Should -Throw '*Field-left -in/-notin treats collection field*'
+        $Matched = Show-EVXEvent `
+            -FromStore $StorePath `
+            -Definition Audit `
+            -Where { 'SeDebugPrivilege' -in $_.Privileges } `
+            -PassThru
+
+        $Matched.Rows.Count | Should -Be 1
+    }
+
     It 'rejects simultaneous built-in and custom stored selectors before opening history' {
         $StorePath = Join-Path $TestDrive 'not-opened-mixed-selectors.db'
 

@@ -821,15 +821,11 @@ public sealed partial class TestEventStore {
             Level = "Information",
             LevelValue = 0,
             Message = "Synthetic stored typed event.",
-            Values = new Dictionary<string, object?> { ["User"] = item.User }
+            Values = new Dictionary<string, object?>()
         }).ToArray();
+        EventType type = Enum.Parse<EventType>(definitionName, ignoreCase: true);
         return EventReportEngine.CreateStored(rows, new[] {
-            new EventReportSectionSchema {
-                Name = definitionName,
-                DisplayName = definitionName,
-                Kind = EventReportSectionKind.Typed,
-                Columns = new[] { CreateColumn("User", typeof(string)) }
-            }
+            EventReportSectionSchema.FromType(type)
         });
     }
 

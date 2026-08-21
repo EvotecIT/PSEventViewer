@@ -95,6 +95,56 @@ public sealed class EventPredicateBuilder {
         return new EventPredicateBuilder(definition.Name, definition.DisplayName, fields);
     }
 
+    /// <summary>
+    /// Creates a builder from a discovered projection schema, including the common EventViewerX fields.
+    /// This is intended for durable or remote schemas whose original definition object is unavailable.
+    /// </summary>
+    public static EventPredicateBuilder ForFields(
+        string definitionName,
+        IEnumerable<KeyValuePair<string, Type>> fields,
+        string? displayName = null) {
+
+        if (string.IsNullOrWhiteSpace(definitionName)) {
+            throw new ArgumentException("Definition name cannot be empty.", nameof(definitionName));
+        }
+        if (fields == null) {
+            throw new ArgumentNullException(nameof(fields));
+        }
+        KeyValuePair<string, Type>[] snapshot = fields.ToArray();
+        if (snapshot.Any(static field => string.IsNullOrWhiteSpace(field.Key) || field.Value == null)) {
+            throw new ArgumentException("Projection fields must have non-empty names and value types.", nameof(fields));
+        }
+        string[] duplicates = snapshot
+            .GroupBy(static field => field.Key.Trim(), StringComparer.OrdinalIgnoreCase)
+            .Where(static group => group.Count() > 1)
+            .Select(static group => group.Key)
+            .ToArray();
+        if (duplicates.Length > 0) {
+            throw new ArgumentException(
+                "Projection fields contain duplicate case-insensitive names: " +
+                string.Join(", ", duplicates) + ".",
+                nameof(fields));
+        }
+        EventFieldDefinition[] projected = snapshot.Select(static field =>
+            new EventFieldDefinition(
+                field.Key.Trim(),
+                field.Key.Trim(),
+                field.Value,
+                isCommon: false)).ToArray();
+        var claimedCommonNames = new HashSet<string>(
+            projected.SelectMany(static field => field.Aliases.Prepend(field.Name)),
+            StringComparer.OrdinalIgnoreCase);
+        IEnumerable<EventFieldDefinition> allFields = projected
+            .Concat(EventTypeCatalog.GetCommonFields().Where(field => !claimedCommonNames.Contains(field.Name)))
+            .GroupBy(static field => field.Name, StringComparer.OrdinalIgnoreCase)
+            .Select(static group => group.First());
+        string normalizedName = definitionName.Trim();
+        return new EventPredicateBuilder(
+            normalizedName,
+            string.IsNullOrWhiteSpace(displayName) ? normalizedName : displayName!.Trim(),
+            allFields);
+    }
+
     /// <summary>Gets one field by stable name, ignoring case.</summary>
     public EventPredicateField Field(string name) {
         if (string.IsNullOrWhiteSpace(name) || !_fields.TryGetValue(name.Trim(), out EventPredicateField? field)) {

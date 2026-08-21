@@ -147,7 +147,9 @@ CREATE TABLE evx_events (future_only TEXT NOT NULL);");
 
     [Theory]
     [InlineData("ADUserLogonFailed", EventReportSectionKind.Custom)]
+    [InlineData("ADUserLogonFailed", EventReportSectionKind.Typed)]
     [InlineData("Generic", EventReportSectionKind.Custom)]
+    [InlineData("EventStoreSummary", EventReportSectionKind.Custom)]
     [InlineData("NotABuiltInDefinition", EventReportSectionKind.Typed)]
     public async Task StoreRejectsAmbiguousDefinitionNameAndKindIdentities(
         string definitionName,
@@ -176,6 +178,66 @@ CREATE TABLE evx_events (future_only TEXT NOT NULL);");
             Assert.Contains(definitionName, exception.Message, StringComparison.OrdinalIgnoreCase);
             Assert.False(File.Exists(path));
         } finally {
+            DeleteStore(path);
+        }
+    }
+
+    [Fact]
+    public async Task StoreAcceptsOnlyTheAuthoritativeBuiltInTypedSchema() {
+        string path = CreateStorePath();
+        try {
+            EventReportSectionSchema schema = EventReportSectionSchema.FromType(EventType.ADUserLogonFailed);
+            EventReport report = EventReportEngine.CreateStored(
+                new[] {
+                    new EventReportRow {
+                        Type = EventType.ADUserLogonFailed.ToString(),
+                        TimeCreated = new DateTime(2026, 8, 1, 1, 0, 0, DateTimeKind.Utc),
+                        EventId = 4625,
+                        RecordId = 42,
+                        Provider = "Microsoft-Windows-Security-Auditing",
+                        SourceLog = "Security",
+                        ContainerLog = "Security",
+                        SourceComputer = "AD0",
+                        CollectorComputer = "AD0",
+                        Values = new Dictionary<string, object?>()
+                    }
+                },
+                new[] { schema });
+            var store = new EventStore(path);
+
+            EventStoreWriteResult result = await store.WriteAsync(report);
+            IReadOnlyList<EventReportSectionSchema> discovered = await store.GetSchemasAsync(
+                new EventStoreQuery { Types = new[] { EventType.ADUserLogonFailed } });
+
+            Assert.Equal(1, result.Inserted);
+            Assert.Equal(schema.Name, Assert.Single(discovered).Name);
+        } finally {
+            DeleteStore(path);
+        }
+    }
+
+    [Fact]
+    public async Task EmptyStoredQueriesRetainSelectedSchemasForCsvExport() {
+        string path = CreateStorePath();
+        string csv = Path.Combine(Path.GetTempPath(), $"evx-empty-store-{Guid.NewGuid():N}.csv");
+        try {
+            var store = new EventStore(path);
+            EventReport report = EventReportEngine.CreateStored(
+                Array.Empty<EventReportRow>(),
+                new[] { CreateSchema("Audit", "Who") });
+            await store.WriteAsync(report);
+
+            EventReport empty = await store.ReadReportAsync(new EventStoreQuery {
+                DefinitionNames = new[] { "Audit" },
+                StartTime = new DateTime(2099, 1, 1, 0, 0, 0, DateTimeKind.Utc)
+            });
+            EventReportCsvRenderer.Save(empty, csv);
+
+            Assert.Empty(empty.Rows);
+            Assert.Equal("Audit", Assert.Single(empty.Sections).Name);
+            Assert.StartsWith("Who", File.ReadAllText(csv), StringComparison.Ordinal);
+        } finally {
+            File.Delete(csv);
             DeleteStore(path);
         }
     }

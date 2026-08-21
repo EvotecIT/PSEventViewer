@@ -14,6 +14,7 @@ public sealed class TestEventDefinitionAndReporting {
     [InlineData("ADUserLogonFailed")]
     [InlineData("activedirectoryauthentication")]
     [InlineData("Generic")]
+    [InlineData("EventStoreSummary")]
     public void CustomDefinitionsRejectReservedBuiltInTypeNames(string name) {
         EventDefinition definition = CreateDefinition();
         definition.Name = name;
@@ -22,6 +23,60 @@ public sealed class TestEventDefinitionAndReporting {
 
         Assert.Contains(name, exception.Message, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("reserved", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void CustomDefinitionsCanonicalizeStableNamesFieldsAliasesAndSources() {
+        EventDefinition definition = CreateDefinition();
+        definition.Name = "  ServiceChanges  ";
+        definition.Sources[0].LogName = "  Security  ";
+        definition.Sources[0].ProviderNames = new[] { "  Provider.One  " };
+        definition.Fields[0].Name = "  Who  ";
+        definition.Fields[0].Aliases = new[] { "  Account  " };
+        definition.Fields[0].SourceName = "  TargetUserName  ";
+
+        definition.Validate();
+        EventPredicateBuilder builder = EventPredicateBuilder.ForDefinition(definition);
+
+        Assert.Equal("ServiceChanges", definition.Name);
+        Assert.Equal("Security", definition.Sources[0].LogName);
+        Assert.Equal("Provider.One", Assert.Single(definition.Sources[0].ProviderNames));
+        Assert.Equal("Who", definition.Fields[0].Name);
+        Assert.Equal("Account", Assert.Single(definition.Fields[0].Aliases));
+        Assert.Equal("TargetUserName", definition.Fields[0].SourceName);
+        Assert.Equal("Who", builder.Field("Who").Name);
+        Assert.Equal("Who", builder.Field(" Account ").Name);
+    }
+
+    [Fact]
+    public async Task EmptyTypedAndCustomQueriesRetainSchemasForCsvExport() {
+        string fixture = Path.GetFullPath(Path.Combine(
+            AppContext.BaseDirectory, "..", "..", "..", "..", "..", "Tests", "Logs", "NamedFilterExamples.evtx"));
+        EventReportRequest typedRequest = EventReportRequest.ForTypes(EventType.OSStartup);
+        typedRequest.Paths = new[] { fixture };
+        typedRequest.RecordIds = new[] { long.MaxValue };
+        EventDefinition customDefinition = CreateDefinition();
+        EventReportRequest customRequest = EventReportRequest.ForDefinition(customDefinition);
+        customRequest.Paths = new[] { fixture };
+        customRequest.RecordIds = new[] { long.MaxValue };
+
+        EventReport typed = await EventReportEngine.QueryAsync(typedRequest);
+        EventReport custom = await EventReportEngine.QueryAsync(customRequest);
+        string typedCsv = Path.Combine(Path.GetTempPath(), $"evx-empty-typed-{Guid.NewGuid():N}.csv");
+        string customCsv = Path.Combine(Path.GetTempPath(), $"evx-empty-custom-{Guid.NewGuid():N}.csv");
+        try {
+            Assert.Empty(typed.Rows);
+            Assert.Empty(custom.Rows);
+            Assert.Single(typed.Sections);
+            Assert.Single(custom.Sections);
+            EventReportCsvRenderer.Save(typed, typedCsv);
+            EventReportCsvRenderer.Save(custom, customCsv);
+            Assert.NotEmpty(File.ReadAllText(typedCsv));
+            Assert.StartsWith("User,Computer", File.ReadAllText(customCsv), StringComparison.Ordinal);
+        } finally {
+            File.Delete(typedCsv);
+            File.Delete(customCsv);
+        }
     }
 
     [Fact]

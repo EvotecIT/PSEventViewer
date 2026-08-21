@@ -244,6 +244,29 @@ public sealed class CmdletShowEVXEvent : AsyncPSCmdlet {
                 : Type.Length > 0
                     ? EventPredicateBuilder.ForTypes(Type)
                     : null;
+            IReadOnlyList<string>? storedDefinitionNames = ResolveStoredDefinitionNames(
+                Definition,
+                storedDefinition);
+            var store = new EventStore(FromStore!);
+            if (storedBuilder == null &&
+                Where != null &&
+                storedDefinitionNames?.Count == 1) {
+                IReadOnlyList<EventReportSectionSchema> schemas = await store.GetSchemasAsync(
+                    new EventStoreQuery { DefinitionNames = storedDefinitionNames },
+                    CancelToken).ConfigureAwait(false);
+                EventReportSectionSchema schema = schemas.Count == 1
+                    ? schemas[0]
+                    : throw new PSArgumentException(
+                        $"Stored definition '{storedDefinitionNames[0]}' does not have one discoverable schema. " +
+                        "Supply its EventDefinition object or JSON file before using -Where.",
+                        nameof(Definition));
+                storedBuilder = EventPredicateBuilder.ForFields(
+                    schema.Name,
+                    schema.Columns.Select(static column => new KeyValuePair<string, Type>(
+                        column.Name,
+                        EventReportColumnSchema.ResolveValueTypeName(column.ValueTypeName))),
+                    schema.DisplayName);
+            }
             EventPredicate? storedPredicate = PowerShellEventPredicateAdapter.Resolve(
                 Where,
                 nameof(Where),
@@ -253,7 +276,7 @@ public sealed class CmdletShowEVXEvent : AsyncPSCmdlet {
             }
             var query = new EventStoreQuery {
                 Types = Type.Length == 0 ? null : Type,
-                DefinitionNames = ResolveStoredDefinitionNames(Definition, storedDefinition),
+                DefinitionNames = storedDefinitionNames,
                 StartTime = StartTime,
                 EndTime = EndTime,
                 TimePeriod = TimePeriod,
@@ -269,7 +292,6 @@ public sealed class CmdletShowEVXEvent : AsyncPSCmdlet {
             if (MyInvocation.BoundParameters.ContainsKey(nameof(MaxEventsScanned))) {
                 query.MaxCandidates = MaxEventsScanned;
             }
-            var store = new EventStore(FromStore!);
             report = SummaryPeriod.HasValue
                 ? await store.CreateSummaryReportAsync(query, SummaryPeriod.Value, Title, CancelToken).ConfigureAwait(false)
                 : await store.ReadReportAsync(query, Title, CancelToken).ConfigureAwait(false);

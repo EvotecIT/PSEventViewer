@@ -209,9 +209,11 @@ public sealed partial class EventStore {
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToArray();
             HashSet<string> populatedDefinitions = new(definitionNames, StringComparer.OrdinalIgnoreCase);
-            IReadOnlyList<EventReportSectionSchema> schemas = schemaContext.Schemas
-                .Where(schema => populatedDefinitions.Contains(schema.Name))
-                .ToArray();
+            IReadOnlyList<EventReportSectionSchema> schemas = rows.Count == 0
+                ? schemaContext.Schemas
+                : schemaContext.Schemas
+                    .Where(schema => populatedDefinitions.Contains(schema.Name))
+                    .ToArray();
             EventReportCoverage[] coverage = rows
                 .GroupBy(static row => row.CollectorComputer + "\0" + row.SourceLog, StringComparer.OrdinalIgnoreCase)
                 .Select(static group => {

@@ -22,7 +22,7 @@ public sealed partial class EventStore {
                 "EventStoreSummary",
                 StringComparison.OrdinalIgnoreCase))) {
             throw new InvalidDataException(
-                "Derived summary reports cannot be written back into EventStore history. " +
+                "Derived EventStoreSummary reports cannot be written back into EventStore history. " +
                 "Store source events and regenerate summaries from them.");
         }
         EventReportSectionSchema[] schemas = NormalizeIncomingSchemas(report.Sections
