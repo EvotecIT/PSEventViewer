@@ -4,7 +4,7 @@ using System.Reflection;
 namespace EventViewerX.Reporting;
 
 internal static class EventReportProjectionFactory {
-    private static readonly ConcurrentDictionary<Type, TypedProjectionPlan> TypedPlans = new();
+    private static readonly ConcurrentDictionary<(Type RecordType, EventType EventType), TypedProjectionPlan> TypedPlans = new();
     private static readonly HashSet<string> RoutingMembers = new(StringComparer.Ordinal) {
         nameof(IEventRule.EventIds),
         nameof(IEventRule.LogName),
@@ -18,7 +18,7 @@ internal static class EventReportProjectionFactory {
             return Create(record.SourceEvent);
         }
         EventTypeDefinition definition = EventTypeCatalog.GetDefinition(rule.Type);
-        TypedProjectionPlan plan = TypedPlans.GetOrAdd(record.GetType(), type => BuildPlan(type, definition));
+        TypedProjectionPlan plan = GetTypedPlan(record.GetType(), definition);
         var values = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
         foreach (ReportMember member in plan.Members) {
             values[member.Name] = member.GetValue(record);
@@ -49,10 +49,12 @@ internal static class EventReportProjectionFactory {
                 $"Event type '{type}' does not identify one reportable leaf definition.",
                 nameof(type));
         }
-        return TypedPlans.GetOrAdd(
-            definition.RecordType,
-            recordType => BuildPlan(recordType, definition)).Section;
+        return Create(definition.RecordType, definition);
     }
+
+    internal static EventReportSectionDefinition Create(
+        Type recordType,
+        EventTypeDefinition definition) => GetTypedPlan(recordType, definition).Section;
 
     internal static EventReportSectionDefinition Create(EventDefinition definition) {
         if (definition == null) {
@@ -148,6 +150,11 @@ internal static class EventReportProjectionFactory {
             columns);
         return new TypedProjectionPlan(members, section);
     }
+
+    private static TypedProjectionPlan GetTypedPlan(Type recordType, EventTypeDefinition definition) =>
+        TypedPlans.GetOrAdd(
+            (recordType, definition.Type),
+            _ => BuildPlan(recordType, definition));
 
     private static ReportMember[] BuildMembers(Type recordType) {
         var hierarchy = new Stack<Type>();

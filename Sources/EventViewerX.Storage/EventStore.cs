@@ -47,6 +47,7 @@ public sealed partial class EventStore {
             ValidateSchemaVersion(session.ExecuteScalar(
                 "SELECT schema_version FROM evx_store_metadata WHERE singleton_id = 1;"));
             EnsureEventIdentitySchema(session);
+            EnsureCheckpointIdentitySchema(session);
             _initialized = true;
         }
     }

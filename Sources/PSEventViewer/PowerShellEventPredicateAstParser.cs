@@ -91,6 +91,18 @@ internal static class PowerShellEventPredicateAstParser {
         }
         ExpressionAst valueAst = fieldOnLeft ? binary.Right : binary.Left;
         object?[] values = ReadValues(valueAst);
+        if (fieldOnLeft && builder != null && binary.Operator is
+                TokenKind.Ieq or TokenKind.Ceq or TokenKind.Ine or TokenKind.Cne &&
+            values.Length == 1 && values[0] == null) {
+            EventPredicateField field = builder.Field(leftField!);
+            if (field.ValueType != typeof(string) &&
+                typeof(System.Collections.IEnumerable).IsAssignableFrom(field.ValueType)) {
+                throw Unsupported(
+                    $"PowerShell -eq/-ne against $null emits collection elements for field '{field.Name}' " +
+                    "instead of testing whether the collection reference is null. " +
+                    "Use the discoverable typed field IsNull or IsNotNull method.");
+            }
+        }
         if (fieldOnRight && binary.Operator is
                 TokenKind.Iin or TokenKind.Cin or TokenKind.Inotin or TokenKind.Cnotin &&
             values.Length != 1) {

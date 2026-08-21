@@ -15,7 +15,7 @@ public sealed partial class EventStore {
         if (report == null) {
             throw new ArgumentNullException(nameof(report));
         }
-        ValidateCheckpoint(checkpoint);
+        EventStoreCheckpoint? checkpointSnapshot = SnapshotCheckpoint(checkpoint);
         EventReportRow[] rows = report.Rows.ToArray();
         if (rows.Any(static row => string.Equals(
                 row.Type,
@@ -117,20 +117,24 @@ public sealed partial class EventStore {
                     CreateEventParameters(row, definitionName, updatedAt),
                     token).ConfigureAwait(false);
             }
-            if (checkpoint != null) {
+            if (checkpointSnapshot != null) {
+                EventStoreCheckpoint storedCheckpoint = await ResolveCheckpointIdentityAsync(
+                    transaction,
+                    checkpointSnapshot,
+                    token).ConfigureAwait(false);
                 await transaction.ExecuteNonQueryAsync(
                     UpsertCheckpointSql,
                     new Dictionary<string, object?> {
-                        ["$consumer"] = checkpoint.Consumer.Trim(),
-                        ["$computer"] = checkpoint.Computer.Trim(),
-                        ["$container"] = checkpoint.Container.Trim(),
-                        ["$recordId"] = checkpoint.RecordId,
-                        ["$bookmark"] = checkpoint.BookmarkXml,
+                        ["$consumer"] = storedCheckpoint.Consumer,
+                        ["$computer"] = storedCheckpoint.Computer,
+                        ["$container"] = storedCheckpoint.Container,
+                        ["$recordId"] = storedCheckpoint.RecordId,
+                        ["$bookmark"] = storedCheckpoint.BookmarkXml,
                         ["$updated"] = updatedAt
                     },
                     token).ConfigureAwait(false);
             }
-            return new EventStoreWriteResult(rows.Length, inserted, checkpoint != null);
+            return new EventStoreWriteResult(rows.Length, inserted, checkpointSnapshot != null);
         }, cancellationToken).ConfigureAwait(false);
     }
 
@@ -152,8 +156,7 @@ public sealed partial class EventStore {
             .ConfigureAwait(false);
         IReadOnlyList<EventStoreCheckpoint> rows = await session.QueryAsListAsync(
             @"SELECT consumer, computer, container, record_id, bookmark_xml, updated_utc
-              FROM evx_checkpoints
-              WHERE consumer = $consumer AND computer = $computer AND container = $container;",
+              FROM evx_checkpoints;",
             static record => new EventStoreCheckpoint {
                 Consumer = record.GetString(0),
                 Computer = record.GetString(1),
@@ -165,13 +168,14 @@ public sealed partial class EventStore {
                     CultureInfo.InvariantCulture,
                     DateTimeStyles.RoundtripKind)
             },
-            new Dictionary<string, object?> {
-                ["$consumer"] = consumer.Trim(),
-                ["$computer"] = computer.Trim(),
-                ["$container"] = container.Trim()
-            },
             cancellationToken: cancellationToken).ConfigureAwait(false);
-        return rows.Count == 0 ? null : rows[0];
+        return rows
+            .Where(row =>
+                string.Equals(row.Consumer, consumer.Trim(), StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(row.Computer, computer.Trim(), StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(row.Container, container.Trim(), StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(static row => row.UpdatedAtUtc)
+            .FirstOrDefault();
     }
 
     private static Dictionary<string, object?> CreateEventParameters(

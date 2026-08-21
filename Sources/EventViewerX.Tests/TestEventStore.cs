@@ -1,4 +1,5 @@
 using System.Diagnostics.Eventing.Reader;
+using System.Globalization;
 using System.Security.Principal;
 using DBAClientX;
 using EventViewerX.Reporting;
@@ -87,6 +88,71 @@ public sealed partial class TestEventStore {
             Assert.True(first.CheckpointCommitted);
             Assert.Equal(42, saved.RecordId);
             Assert.Equal("<Bookmark/>", saved.BookmarkXml);
+        } finally {
+            DeleteStore(path);
+        }
+    }
+
+    [Fact]
+    public async Task CheckpointIdentityUsesOrdinalIgnoreCaseForUnicodeDimensions() {
+        string path = CreateStorePath();
+        try {
+            EventReport report = CreateReport(
+                (new DateTime(2026, 8, 1, 1, 0, 0, DateTimeKind.Utc), 42, "alice"));
+            var store = new EventStore(path);
+            await store.WriteAsync(report, new EventStoreCheckpoint {
+                Consumer = "Überwachung",
+                Computer = "München-DC",
+                Container = "Sicherheit",
+                RecordId = 42
+            });
+            await store.WriteAsync(report, new EventStoreCheckpoint {
+                Consumer = "überwachung",
+                Computer = "münchen-dc",
+                Container = "sicherheit",
+                RecordId = 84
+            });
+
+            EventStoreCheckpoint saved = Assert.IsType<EventStoreCheckpoint>(
+                await store.GetCheckpointAsync("ÜBERWACHUNG", "MÜNCHEN-DC", "SICHERHEIT"));
+            using var sqlite = new SQLite();
+            using SQLiteSession session = sqlite.OpenSession(path);
+
+            Assert.Equal(84, saved.RecordId);
+            Assert.Equal(1L, Convert.ToInt64(
+                session.ExecuteScalar("SELECT COUNT(*) FROM evx_checkpoints;"),
+                CultureInfo.InvariantCulture));
+        } finally {
+            DeleteStore(path);
+        }
+    }
+
+    [Fact]
+    public async Task ExistingUnicodeCheckpointDuplicatesCoalesceDuringInitialization() {
+        string path = CreateStorePath();
+        try {
+            new EventStore(path).Initialize();
+            using (var sqlite = new SQLite()) {
+                using SQLiteSession session = sqlite.OpenSession(path);
+                session.ExecuteNonQuery(
+                    @"INSERT INTO evx_checkpoints
+                      (consumer, computer, container, record_id, bookmark_xml, updated_utc)
+                      VALUES
+                      ('Überwachung', 'München-DC', 'Sicherheit', 42, '<Old/>', '2026-08-01T01:00:00.0000000Z'),
+                      ('überwachung', 'münchen-dc', 'sicherheit', 84, '<New/>', '2026-08-01T02:00:00.0000000Z');");
+            }
+
+            var migrated = new EventStore(path);
+            EventStoreCheckpoint saved = Assert.IsType<EventStoreCheckpoint>(
+                await migrated.GetCheckpointAsync("ÜBERWACHUNG", "MÜNCHEN-DC", "SICHERHEIT"));
+            using var verificationSqlite = new SQLite();
+            using SQLiteSession verification = verificationSqlite.OpenSession(path);
+
+            Assert.Equal(84, saved.RecordId);
+            Assert.Equal("<New/>", saved.BookmarkXml);
+            Assert.Equal(1L, Convert.ToInt64(
+                verification.ExecuteScalar("SELECT COUNT(*) FROM evx_checkpoints;"),
+                CultureInfo.InvariantCulture));
         } finally {
             DeleteStore(path);
         }

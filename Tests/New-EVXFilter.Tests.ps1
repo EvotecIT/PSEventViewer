@@ -402,6 +402,19 @@ Describe 'New-EVXFilter' {
         } | Should -Throw '*Field-right*-eq/-ne*collection*'
     }
 
+    It 'rejects PowerShell null equality whose collection emission semantics cannot be preserved' {
+        {
+            Get-EVXEvent -Type ADUserPrivilegeUse -Where {
+                $_.Privileges -eq $null
+            } -Explain
+        } | Should -Throw '*against $null emits collection elements*IsNull*'
+        {
+            New-EVXFilter -Type ADUserPrivilegeUse -Where {
+                $_.Privileges -cne $null
+            } -Explain
+        } | Should -Throw '*against $null emits collection elements*IsNotNull*'
+    }
+
     It 'preserves reversed equality for scalar fields' {
         $Plan = Get-EVXEvent -Type ADUserLogonFailed -Where {
             'EVOTEC\Alice' -eq $_.Who

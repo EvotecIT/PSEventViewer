@@ -13,6 +13,31 @@ namespace EventViewerX.Tests;
 
 public sealed class TestEventDefinitionAndReporting {
     [Fact]
+    public void TypedProjectionPlansRemainScopedToTheEventDefinition() {
+        EventTypeDefinition first = EventTypeCatalog.GetDefinition(EventType.OSStartup);
+        var second = new EventTypeDefinition(
+            EventType.OSShutdown,
+            "Shared shutdown",
+            "Second definition using the same projected CLR type.",
+            first.Category,
+            first.Sources,
+            first.Fields,
+            first.RecordType,
+            Array.Empty<EventType>());
+
+        EventReportSectionDefinition firstSection = EventReportProjectionFactory.Create(
+            first.RecordType!,
+            first);
+        EventReportSectionDefinition secondSection = EventReportProjectionFactory.Create(
+            first.RecordType!,
+            second);
+
+        Assert.Equal(nameof(EventType.OSStartup), firstSection.Name);
+        Assert.Equal(nameof(EventType.OSShutdown), secondSection.Name);
+        Assert.NotEqual(firstSection.Key, secondSection.Key);
+    }
+
+    [Fact]
     public async Task TypedReportRowsUseCatalogDefinitionNamesInsteadOfLegacyRecordLabels() {
         EventObject computer = CreateSecuritySource(4741, 41);
         EventObject user = CreateSecuritySource(4720, 42);
