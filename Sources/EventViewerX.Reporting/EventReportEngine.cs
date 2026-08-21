@@ -67,10 +67,11 @@ public static class EventReportEngine {
                     : $"{request.LogName} events"
             : request.Title!.Trim();
         EventReportRow[] rows = projections.Select(static projection => projection.Row).ToArray();
+        IReadOnlyList<EventReportSectionDefinition>? emptyDefinitions = projections.Count == 0
+            ? EventReportProjectionFactory.CreateDefinitions(request)
+            : null;
         return new EventReport(title, DateTime.UtcNow, stopwatch.Elapsed, rows,
-            EventReportSectionBuilder.Build(
-                projections,
-                EventReportProjectionFactory.CreateDefinitions(request)),
+            EventReportSectionBuilder.Build(projections, emptyDefinitions),
             coverage,
             scanned,
             scanLimitReached);

@@ -59,15 +59,21 @@ internal static class EventFilterIntersection {
 
     private static DateTime? Latest(DateTime? left, DateTime? right) {
         if (!left.HasValue) {
-            return right;
+            return ToUtc(right);
         }
-        return !right.HasValue || left.Value >= right.Value ? left : right;
+        DateTime leftUtc = left.Value.ToUniversalTime();
+        DateTime? rightUtc = ToUtc(right);
+        return !rightUtc.HasValue || leftUtc >= rightUtc.Value ? leftUtc : rightUtc;
     }
 
     private static DateTime? Earliest(DateTime? left, DateTime? right) {
         if (!left.HasValue) {
-            return right;
+            return ToUtc(right);
         }
-        return !right.HasValue || left.Value <= right.Value ? left : right;
+        DateTime leftUtc = left.Value.ToUniversalTime();
+        DateTime? rightUtc = ToUtc(right);
+        return !rightUtc.HasValue || leftUtc <= rightUtc.Value ? leftUtc : rightUtc;
     }
+
+    private static DateTime? ToUtc(DateTime? value) => value?.ToUniversalTime();
 }

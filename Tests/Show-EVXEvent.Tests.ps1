@@ -246,4 +246,22 @@ Describe 'Show-EVXEvent' {
         } | Should -Throw '*Type and Definition are mutually exclusive*'
         Test-Path -LiteralPath $StorePath | Should -BeFalse
     }
+
+    It 'rejects summary persistence before reading or rendering output' {
+        $FromStore = Join-Path $TestDrive 'not-opened-summary.db'
+        $StorePath = Join-Path $TestDrive 'not-created-summary-copy.db'
+        $HtmlPath = Join-Path $TestDrive 'not-created-summary.html'
+
+        {
+            Show-EVXEvent `
+                -FromStore $FromStore `
+                -SummaryPeriod Day `
+                -StorePath $StorePath `
+                -HtmlPath $HtmlPath
+        } | Should -Throw '*SummaryPeriod and StorePath cannot be combined*'
+
+        Test-Path -LiteralPath $FromStore | Should -BeFalse
+        Test-Path -LiteralPath $StorePath | Should -BeFalse
+        Test-Path -LiteralPath $HtmlPath | Should -BeFalse
+    }
 }

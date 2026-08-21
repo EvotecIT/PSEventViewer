@@ -243,6 +243,51 @@ CREATE TABLE evx_events (future_only TEXT NOT NULL);");
     }
 
     [Fact]
+    public async Task FreshStoresSupplyAuthoritativeSchemasForEmptyTypedQueries() {
+        string path = CreateStorePath();
+        string csv = Path.Combine(Path.GetTempPath(), $"evx-empty-typed-store-{Guid.NewGuid():N}.csv");
+        try {
+            var store = new EventStore(path);
+            EventReport report = await store.ReadReportAsync(new EventStoreQuery {
+                Types = new[] { EventType.ADUserLogonFailed }
+            });
+
+            EventReportSection section = Assert.Single(report.Sections);
+            Assert.Empty(report.Rows);
+            Assert.Equal(nameof(EventType.ADUserLogonFailed), section.Name);
+            Assert.NotEmpty(section.Columns);
+            Assert.Equal(csv, EventReportCsvRenderer.Save(report, csv));
+            Assert.NotEmpty(File.ReadAllText(csv));
+        } finally {
+            DeleteStore(path);
+            if (File.Exists(csv)) {
+                File.Delete(csv);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task UnicodeDefinitionSchemaDiscoveryAppliesExactManagedSelection() {
+        string path = CreateStorePath();
+        try {
+            var store = new EventStore(path);
+            await store.WriteAsync(CreateReportForDefinition(
+                "MÜNCHEN-TYPE",
+                (new DateTime(2026, 8, 1, 1, 0, 0, DateTimeKind.Utc), 41, "alice")));
+            await store.WriteAsync(CreateReportForDefinition(
+                "OtherType",
+                (new DateTime(2026, 8, 1, 2, 0, 0, DateTimeKind.Utc), 42, "bob")));
+
+            IReadOnlyList<EventReportSectionSchema> schemas = await store.GetSchemasAsync(
+                new EventStoreQuery { DefinitionNames = new[] { "münchen-type" } });
+
+            Assert.Equal("MÜNCHEN-TYPE", Assert.Single(schemas).Name);
+        } finally {
+            DeleteStore(path);
+        }
+    }
+
+    [Fact]
     public async Task GenericEventDataCannotDuplicateCommonReportColumns() {
         string path = CreateStorePath();
         try {

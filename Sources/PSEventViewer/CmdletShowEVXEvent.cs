@@ -229,6 +229,12 @@ public sealed class CmdletShowEVXEvent : AsyncPSCmdlet {
 
     /// <inheritdoc />
     protected override async Task EndProcessingAsync() {
+        if (SummaryPeriod.HasValue && !string.IsNullOrWhiteSpace(StorePath)) {
+            throw new PSArgumentException(
+                "SummaryPeriod and StorePath cannot be combined because derived summary rows are not durable event history. " +
+                "Store source events first, then render summaries from that store.",
+                nameof(StorePath));
+        }
         EventReport report;
         if (ParameterSetName == "Input") {
             report = EventReportEngine.Create(_input, Title);

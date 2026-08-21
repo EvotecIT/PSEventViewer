@@ -113,6 +113,29 @@ public sealed class TestEventPredicate {
     }
 
     [Fact]
+    public void NativeFilterIntersectionsNormalizeMixedDateTimeKindsToUtc() {
+        DateTime local = DateTime.SpecifyKind(
+            new DateTime(2026, 1, 15, 10, 0, 0),
+            DateTimeKind.Local);
+        DateTime laterUtc = local.ToUniversalTime().AddMinutes(30);
+        DateTime earlierUtc = local.ToUniversalTime().AddMinutes(-30);
+
+        Assert.True(EventFilterIntersection.TryCreate(
+            new EventFilter { StartTime = local },
+            new EventFilter { StartTime = laterUtc },
+            out EventFilter lowerBound));
+        Assert.True(EventFilterIntersection.TryCreate(
+            new EventFilter { EndTime = local },
+            new EventFilter { EndTime = earlierUtc },
+            out EventFilter upperBound));
+
+        Assert.Equal(laterUtc, lowerBound.StartTime);
+        Assert.Equal(DateTimeKind.Utc, lowerBound.StartTime!.Value.Kind);
+        Assert.Equal(earlierUtc, upperBound.EndTime);
+        Assert.Equal(DateTimeKind.Utc, upperBound.EndTime!.Value.Kind);
+    }
+
+    [Fact]
     public void CollectionNotEqualMatchesWhenAnyItemDiffers() {
         EventPredicate predicate = EventPredicate.Compare(
             "Privileges",

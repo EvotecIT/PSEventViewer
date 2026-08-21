@@ -316,11 +316,28 @@ FROM evx_events";
             sql += " WHERE " + where[0];
         }
         sql += ";";
-        IReadOnlyList<EventReportSectionSchema> schemas = await session.QueryAsListAsync(
+        IReadOnlyList<EventReportSectionSchema> loadedSchemas = await session.QueryAsListAsync(
             sql,
             static record => DeserializeStoredSchema(record.GetString(0), record.GetString(1)),
             parameters,
             cancellationToken: cancellationToken).ConfigureAwait(false);
+        var schemas = loadedSchemas
+            .Where(schema => MatchesText(definitionNames, schema.Name))
+            .ToList();
+        if (definitionNames.Count > 0) {
+            var known = new HashSet<string>(
+                schemas.Select(static schema => schema.Name),
+                StringComparer.OrdinalIgnoreCase);
+            foreach (string definitionName in definitionNames) {
+                if (known.Contains(definitionName) ||
+                    !BuiltInDefinitions.TryGetValue(definitionName, out EventTypeDefinition? definition) ||
+                    definition.IsComposite) {
+                    continue;
+                }
+                schemas.Add(EventReportSectionSchema.FromType(definition.Type));
+                known.Add(definition.Name);
+            }
+        }
         PredicatePushdownPolicy pushdown = schemas.Any(static schema => schema.Kind == EventReportSectionKind.Generic)
             ? PredicatePushdownPolicy.DisableAll
             : new PredicatePushdownPolicy(schemas
