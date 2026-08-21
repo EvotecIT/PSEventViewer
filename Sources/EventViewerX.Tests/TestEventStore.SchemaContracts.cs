@@ -318,6 +318,42 @@ CREATE TABLE evx_events (future_only TEXT NOT NULL);");
     }
 
     [Fact]
+    public async Task FreshStoresUseSuppliedCustomSchemasForEmptyReports() {
+        string path = CreateStorePath();
+        string csv = Path.Combine(Path.GetTempPath(), $"evx-empty-custom-store-{Guid.NewGuid():N}.csv");
+        var schema = new EventReportSectionSchema {
+            Name = "FreshAudit",
+            DisplayName = "Fresh audit",
+            Kind = EventReportSectionKind.Custom,
+            Columns = new[] {
+                CreateColumn("Who", typeof(string)),
+                CreateColumn("IPAddress", typeof(System.Net.IPAddress))
+            }
+        };
+        try {
+            var store = new EventStore(path);
+            EventReport report = await store.ReadReportAsync(new EventStoreQuery {
+                DefinitionNames = new[] { schema.Name },
+                DefinitionSchemas = new[] { schema }
+            });
+
+            EventReportSection section = Assert.Single(report.Sections);
+            Assert.Empty(report.Rows);
+            Assert.Equal(schema.Name, section.Name);
+            Assert.Equal(new[] { "Who", "IPAddress" }, section.Columns.Select(static column => column.Name));
+            Assert.Equal(csv, EventReportCsvRenderer.Save(report, csv));
+            string header = Assert.Single(File.ReadAllLines(csv));
+            Assert.Contains("Who", header, StringComparison.Ordinal);
+            Assert.Contains("IPAddress", header, StringComparison.Ordinal);
+        } finally {
+            DeleteStore(path);
+            if (File.Exists(csv)) {
+                File.Delete(csv);
+            }
+        }
+    }
+
+    [Fact]
     public async Task UnicodeDefinitionSchemaDiscoveryAppliesExactManagedSelection() {
         string path = CreateStorePath();
         try {

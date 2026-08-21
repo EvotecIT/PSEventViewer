@@ -181,6 +181,9 @@ internal static partial class Program {
             DefinitionNames = definition == null
                 ? NullWhenEmpty(options.GetMany("definition-name"))
                 : new[] { definition.Name },
+            DefinitionSchemas = definition == null
+                ? null
+                : new[] { EventReportSectionSchema.FromDefinition(definition) },
             StartTime = start,
             EndTime = ParseDate(options.Get("end")),
             EventIds = ParseInts(options.GetMany("event-id")),

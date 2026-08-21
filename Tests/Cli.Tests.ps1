@@ -365,6 +365,44 @@ Describe 'evx portable host' {
         $Plan.Steps.Stage | Should -Contain 'Managed'
     }
 
+    It 'renders empty stored custom CSV with the supplied definition schema' {
+        $DefinitionPath = Join-Path $TestDrive 'empty-stored-definition.json'
+        $StorePath = Join-Path $TestDrive 'empty-stored-events.db'
+        $CsvPath = Join-Path $TestDrive 'empty-stored-events.csv'
+        @{
+            Name = 'EmptyStoredAudit'
+            Sources = @(@{
+                    LogName = 'System'
+                    EventIds = @(7040)
+                    ProviderNames = @('Service Control Manager')
+                })
+            Fields = @(
+                @{
+                    Name = 'ServiceName'
+                    Source = 'Data'
+                    SourceName = 'param4'
+                }
+                @{
+                    Name = 'ProjectedId'
+                    ValueKind = 'Int32'
+                    Source = 'Metadata'
+                    SourceName = 'EventId'
+                }
+            )
+        } | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $DefinitionPath -Encoding UTF8
+
+        $Output = @(& $script:CliPath report `
+                --store $StorePath `
+                --definition $DefinitionPath `
+                --csv $CsvPath)
+
+        $LASTEXITCODE | Should -Be 0
+        $Output[-1] | Should -Be ([IO.Path]::GetFullPath($CsvPath))
+        Test-Path -LiteralPath $CsvPath | Should -BeTrue
+        (Get-Content -LiteralPath $CsvPath -TotalCount 1) | Should -Match 'Service Name'
+        (Get-Content -LiteralPath $CsvPath -TotalCount 1) | Should -Match 'Projected ID'
+    }
+
     It 'preserves declared custom fields that shadow native metadata in live and stored JSON' {
         $DefinitionPath = Join-Path $TestDrive 'shadowing-definition.json'
         $StorePath = Join-Path $TestDrive 'shadowing-events.db'

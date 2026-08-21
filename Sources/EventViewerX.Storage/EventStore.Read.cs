@@ -35,6 +35,7 @@ public sealed partial class EventStore {
         StoredSchemaContext schemaContext = await ReadSchemaContextAsync(
             session,
             snapshot.ResolveDefinitionNames(),
+            snapshot.DefinitionSchemas,
             cancellationToken).ConfigureAwait(false);
         snapshot.Predicate = NormalizeStoredPredicate(snapshot.Predicate, schemaContext.Schemas);
         return CreatePlan(snapshot, schemaContext.Pushdown, schemaContextKnown: true);
@@ -177,6 +178,7 @@ public sealed partial class EventStore {
             StoredSchemaContext schemaContext = await ReadSchemaContextAsync(
                 transaction,
                 snapshot.ResolveDefinitionNames(),
+                snapshot.DefinitionSchemas,
                 token).ConfigureAwait(false);
             snapshot.Predicate = NormalizeStoredPredicate(snapshot.Predicate, schemaContext.Schemas);
             QueryCommand command = BuildReadCommand(snapshot, schemaContext.Pushdown);
@@ -330,6 +332,7 @@ FROM evx_events";
     private static async Task<StoredSchemaContext> ReadSchemaContextAsync(
         SQLiteAsyncSession session,
         IReadOnlyList<string> definitionNames,
+        IReadOnlyList<EventReportSectionSchema>? suppliedSchemas,
         CancellationToken cancellationToken) {
 
         var where = new List<string>();
@@ -348,6 +351,27 @@ FROM evx_events";
         var schemas = loadedSchemas
             .Where(schema => MatchesText(definitionNames, schema.Name))
             .ToList();
+        EventReportSectionSchema[] normalizedSupplied = NormalizeIncomingSchemas(
+            suppliedSchemas ?? Array.Empty<EventReportSectionSchema>());
+        foreach (EventReportSectionSchema supplied in normalizedSupplied) {
+            if (definitionNames.Count > 0 && !MatchesText(definitionNames, supplied.Name)) {
+                throw new ArgumentException(
+                    $"Supplied schema '{supplied.Name}' is not part of the selected stored definitions.");
+            }
+            EventReportSectionSchema? stored = schemas.FirstOrDefault(schema => string.Equals(
+                schema.Name,
+                supplied.Name,
+                StringComparison.OrdinalIgnoreCase));
+            if (stored == null) {
+                schemas.Add(supplied);
+                continue;
+            }
+            if (stored.Kind != supplied.Kind ||
+                !string.Equals(CreateSchemaHash(stored), CreateSchemaHash(supplied), StringComparison.Ordinal)) {
+                throw new InvalidDataException(
+                    $"Supplied schema '{supplied.Name}' does not match the schema already persisted in this store.");
+            }
+        }
         if (definitionNames.Count > 0) {
             var known = new HashSet<string>(
                 schemas.Select(static schema => schema.Name),

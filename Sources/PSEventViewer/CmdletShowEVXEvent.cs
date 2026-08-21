@@ -290,6 +290,9 @@ public sealed class CmdletShowEVXEvent : AsyncPSCmdlet {
             var query = new EventStoreQuery {
                 Types = Type.Length == 0 ? null : Type,
                 DefinitionNames = storedDefinitionNames,
+                DefinitionSchemas = storedDefinition == null
+                    ? null
+                    : new[] { EventReportSectionSchema.FromDefinition(storedDefinition) },
                 StartTime = StartTime,
                 EndTime = EndTime,
                 TimePeriod = TimePeriod,

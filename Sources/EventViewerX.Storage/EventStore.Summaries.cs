@@ -137,20 +137,37 @@ FROM evx_events";
             .ConfigureAwait(false);
         if (selectedDefinitions != null && !CanUseSqliteNoCase(selectedDefinitions)) {
             return await session.RunInTransactionAsync(async (transaction, token) => {
-                IReadOnlyList<StoredPruneCandidate> candidates = await transaction.QueryAsListAsync(
-                    "SELECT rowid, definition_name FROM evx_events WHERE event_time_utc < $before;",
-                    static record => new StoredPruneCandidate(record.GetInt64(0), record.GetString(1)),
-                    parameters,
-                    cancellationToken: token).ConfigureAwait(false);
-                long[] rowIds = candidates
-                    .Where(candidate => selectedDefinitions.Contains(
-                        candidate.DefinitionName,
-                        StringComparer.OrdinalIgnoreCase))
-                    .Select(static candidate => candidate.RowId)
-                    .ToArray();
+                const int pageSize = 500;
                 int deleted = 0;
-                for (int offset = 0; offset < rowIds.Length; offset += 500) {
-                    long[] batch = rowIds.Skip(offset).Take(500).ToArray();
+                long afterRowId = 0;
+                while (true) {
+                    var pageParameters = new Dictionary<string, object?>(parameters) {
+                        ["$afterRowId"] = afterRowId,
+                        ["$pageSize"] = pageSize
+                    };
+                    IReadOnlyList<StoredPruneCandidate> candidates = await transaction.QueryAsListAsync(
+                        "SELECT rowid, definition_name FROM evx_events " +
+                        "WHERE event_time_utc < $before AND rowid > $afterRowId " +
+                        "ORDER BY rowid LIMIT $pageSize;",
+                        static record => new StoredPruneCandidate(record.GetInt64(0), record.GetString(1)),
+                        pageParameters,
+                        cancellationToken: token).ConfigureAwait(false);
+                    if (candidates.Count == 0) {
+                        break;
+                    }
+                    afterRowId = candidates[candidates.Count - 1].RowId;
+                    long[] batch = candidates
+                        .Where(candidate => selectedDefinitions.Contains(
+                            candidate.DefinitionName,
+                            StringComparer.OrdinalIgnoreCase))
+                        .Select(static candidate => candidate.RowId)
+                        .ToArray();
+                    if (batch.Length == 0) {
+                        if (candidates.Count < pageSize) {
+                            break;
+                        }
+                        continue;
+                    }
                     var deleteParameters = new Dictionary<string, object?>();
                     string[] names = new string[batch.Length];
                     for (int index = 0; index < batch.Length; index++) {
@@ -161,6 +178,9 @@ FROM evx_events";
                         "DELETE FROM evx_events WHERE rowid IN (" + string.Join(", ", names) + ");",
                         deleteParameters,
                         token).ConfigureAwait(false);
+                    if (candidates.Count < pageSize) {
+                        break;
+                    }
                 }
                 return deleted;
             }, cancellationToken).ConfigureAwait(false);

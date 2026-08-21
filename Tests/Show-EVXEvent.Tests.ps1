@@ -180,6 +180,45 @@ Describe 'Show-EVXEvent' {
         $Summary.Sections[0].Columns.Name | Should -Contain 'Count'
     }
 
+    It 'renders empty stored custom CSV with the supplied definition schema' {
+        $DefinitionPath = Join-Path $TestDrive 'empty-stored-definition.json'
+        $StorePath = Join-Path $TestDrive 'empty-stored-events.db'
+        $CsvPath = Join-Path $TestDrive 'empty-stored-events.csv'
+        @{
+            Name = 'EmptyStoredAudit'
+            Sources = @(@{
+                    LogName = 'System'
+                    EventIds = @(7040)
+                    ProviderNames = @('Service Control Manager')
+                })
+            Fields = @(
+                @{
+                    Name = 'ServiceName'
+                    Source = 'Data'
+                    SourceName = 'param4'
+                }
+                @{
+                    Name = 'ProjectedId'
+                    ValueKind = 'Int32'
+                    Source = 'Metadata'
+                    SourceName = 'EventId'
+                }
+            )
+        } | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $DefinitionPath -Encoding UTF8
+
+        $Report = Show-EVXEvent `
+            -FromStore $StorePath `
+            -Definition $DefinitionPath `
+            -CsvPath $CsvPath `
+            -PassThru
+
+        $Report.Rows.Count | Should -Be 0
+        $Report.Sections[0].Columns.Name | Should -Be @('ServiceName', 'ProjectedId')
+        Test-Path -LiteralPath $CsvPath | Should -BeTrue
+        (Get-Content -LiteralPath $CsvPath -TotalCount 1) | Should -Match 'Service Name'
+        (Get-Content -LiteralPath $CsvPath -TotalCount 1) | Should -Match 'Projected ID'
+    }
+
     It 'normalizes built-in typed predicates before opening stored history' {
         $StorePath = Join-Path $TestDrive 'not-opened.db'
 

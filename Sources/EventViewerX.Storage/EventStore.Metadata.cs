@@ -20,6 +20,7 @@ public sealed partial class EventStore {
         StoredSchemaContext context = await ReadSchemaContextAsync(
                 session,
                 snapshot.ResolveDefinitionNames(),
+                snapshot.DefinitionSchemas,
                 cancellationToken)
             .ConfigureAwait(false);
         return context.Schemas.ToArray();

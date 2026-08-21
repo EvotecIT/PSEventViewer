@@ -974,6 +974,34 @@ public sealed partial class TestEventStore {
         }
     }
 
+    [Fact]
+    public async Task UnicodePruneFallbackProcessesCandidatesInMultipleBoundedPages() {
+        string path = CreateStorePath();
+        DateTime time = new(2026, 8, 20, 12, 0, 0, DateTimeKind.Utc);
+        try {
+            var store = new EventStore(path);
+            var selected = Enumerable.Range(1, 513)
+                .Select(index => (time.AddTicks(index), (long)index, "selected" + index))
+                .ToArray();
+            var retained = Enumerable.Range(514, 513)
+                .Select(index => (time.AddTicks(index), (long)index, "retained" + index))
+                .ToArray();
+            await store.WriteAsync(CreateReportForDefinition("MÜNCHEN-TYPE", selected));
+            await store.WriteAsync(CreateReportForDefinition("OtherType", retained));
+
+            int pruned = await store.PruneBeforeAsync(
+                time.AddDays(1),
+                new[] { "münchen-type" });
+            EventReport remaining = await store.ReadReportAsync(new EventStoreQuery());
+
+            Assert.Equal(513, pruned);
+            Assert.Equal(513, remaining.Rows.Count);
+            Assert.All(remaining.Rows, static row => Assert.Equal("OtherType", row.Type));
+        } finally {
+            DeleteStore(path);
+        }
+    }
+
     private static EventReport CreateReport(params (DateTime Time, long RecordId, string User)[] events) {
         return CreateReportFromTransport(events, "WEC01", "ForwardedEvents");
     }
