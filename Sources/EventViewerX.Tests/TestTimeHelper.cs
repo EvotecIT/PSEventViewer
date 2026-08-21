@@ -60,6 +60,23 @@ namespace EventViewerX.Tests {
             Assert.Null(end);
         }
 
+        [Theory]
+        [InlineData(TimePeriod.Last15Minutes, 15)]
+        [InlineData(TimePeriod.Last30Minutes, 30)]
+        public void EventTimeRangePreservesRollingMinuteDurations(
+            TimePeriod period,
+            int minutes) {
+
+            DateTime earliest = DateTime.Now.AddMinutes(-minutes);
+            (DateTime? start, DateTime? end) =
+                EventTimeRange.Resolve(null, null, period);
+            DateTime latest = DateTime.Now.AddMinutes(-minutes);
+
+            Assert.NotNull(start);
+            Assert.InRange(start!.Value, earliest, latest);
+            Assert.Null(end);
+        }
+
         [Fact]
         public void EventTimeRangeRejectsUndefinedPeriods() {
             Assert.Throws<ArgumentOutOfRangeException>(() =>

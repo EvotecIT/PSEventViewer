@@ -6,6 +6,9 @@ namespace EventViewerX;
 /// <summary>A declarative, serializable event definition for workflows not built into EventViewerX.</summary>
 public sealed class EventDefinition {
     private static readonly JsonSerializerOptions ReadOptions = CreateJsonOptions(writeIndented: false);
+    private static readonly HashSet<string> ReservedNames = new(
+        Enum.GetNames(typeof(EventType)).Concat(new[] { "Generic", "EventStoreSummary" }),
+        StringComparer.OrdinalIgnoreCase);
 
     /// <summary>Stable machine-readable name.</summary>
     public string Name { get; set; } = string.Empty;
@@ -50,6 +53,14 @@ public sealed class EventDefinition {
         if (string.IsNullOrWhiteSpace(Name)) {
             throw new InvalidDataException("Definition Name is required.");
         }
+        Name = Name.Trim();
+        DisplayName = DisplayName?.Trim() ?? string.Empty;
+        Description = Description?.Trim() ?? string.Empty;
+        Category = string.IsNullOrWhiteSpace(Category) ? "Custom" : Category.Trim();
+        if (ReservedNames.Contains(Name)) {
+            throw new InvalidDataException(
+                $"Definition Name '{Name}' is reserved by a built-in EventViewerX event type.");
+        }
         if (Sources == null || Sources.Count == 0) {
             throw new InvalidDataException("At least one definition source is required.");
         }
@@ -58,12 +69,14 @@ public sealed class EventDefinition {
             if (string.IsNullOrWhiteSpace(source.LogName)) {
                 throw new InvalidDataException($"Sources[{index}].LogName is required.");
             }
+            source.LogName = source.LogName.Trim();
             if (source.EventIds == null || source.EventIds.Count == 0 || source.EventIds.Any(static id => id <= 0)) {
                 throw new InvalidDataException($"Sources[{index}].EventIds must contain positive values.");
             }
             if (source.ProviderNames == null || source.ProviderNames.Any(static provider => string.IsNullOrWhiteSpace(provider))) {
                 throw new InvalidDataException($"Sources[{index}].ProviderNames cannot be null or contain empty values.");
             }
+            source.ProviderNames = source.ProviderNames.Select(static provider => provider.Trim()).ToArray();
         }
         if (Fields == null) {
             throw new InvalidDataException("Definition Fields cannot be null.");
@@ -71,15 +84,57 @@ public sealed class EventDefinition {
         var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         for (int index = 0; index < Fields.Count; index++) {
             EventDefinitionField field = Fields[index] ?? throw new InvalidDataException($"Fields[{index}] cannot be null.");
-            if (string.IsNullOrWhiteSpace(field.Name) || !names.Add(field.Name.Trim())) {
+            if (string.IsNullOrWhiteSpace(field.Name)) {
+                throw new InvalidDataException($"Fields[{index}].Name must be non-empty and unique.");
+            }
+            field.Name = field.Name.Trim();
+            field.DisplayName = field.DisplayName?.Trim() ?? string.Empty;
+            field.Description = field.Description?.Trim() ?? string.Empty;
+            if (!names.Add(field.Name)) {
                 throw new InvalidDataException($"Fields[{index}].Name must be non-empty and unique.");
             }
             if (!Enum.IsDefined(typeof(EventFieldSource), field.Source)) {
                 throw new InvalidDataException($"Fields[{index}].Source is invalid.");
             }
+            if (!Enum.IsDefined(typeof(EventFieldValueKind), field.ValueKind)) {
+                throw new InvalidDataException($"Fields[{index}].ValueKind is invalid.");
+            }
+            if (field.Aliases == null || field.Aliases.Any(static alias => string.IsNullOrWhiteSpace(alias))) {
+                throw new InvalidDataException($"Fields[{index}].Aliases cannot be null or contain empty values.");
+            }
+            field.Aliases = field.Aliases.Select(static alias => alias.Trim()).ToArray();
+            foreach (string alias in field.Aliases) {
+                if (!names.Add(alias)) {
+                    throw new InvalidDataException($"Fields[{index}].Aliases must be unique across field names and aliases.");
+                }
+            }
             if (field.Source != EventFieldSource.Message && string.IsNullOrWhiteSpace(field.SourceName)) {
                 throw new InvalidDataException($"Fields[{index}].SourceName is required for {field.Source} fields.");
             }
+            if (field.Source is not EventFieldSource.Message and not EventFieldSource.Constant) {
+                field.SourceName = field.SourceName.Trim();
+            }
+            if (field.Source == EventFieldSource.Constant) {
+                ValidateConfiguredLiteral(field, field.SourceName, nameof(field.SourceName), index);
+            }
+            if (field.DefaultValue != null) {
+                ValidateConfiguredLiteral(field, field.DefaultValue, nameof(field.DefaultValue), index);
+            }
+        }
+    }
+
+    private static void ValidateConfiguredLiteral(
+        EventDefinitionField field,
+        string value,
+        string propertyName,
+        int index) {
+
+        try {
+            field.ConvertValue(value);
+        } catch (InvalidDataException exception) {
+            throw new InvalidDataException(
+                $"Fields[{index}].{propertyName} is not valid for {field.ValueKind}.",
+                exception);
         }
     }
 

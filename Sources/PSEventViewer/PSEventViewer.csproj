@@ -21,6 +21,7 @@
   <ItemGroup>
       <ProjectReference Include="..\EventViewerX\EventViewerX.csproj" />
       <ProjectReference Include="..\EventViewerX.Reporting\EventViewerX.Reporting.csproj" />
+      <ProjectReference Include="..\EventViewerX.Storage\EventViewerX.Storage.csproj" />
   </ItemGroup>
 
   <ItemGroup Condition=" '$(TargetFramework)' == 'net472' ">
@@ -28,7 +29,12 @@
       <PackageReference Include="Microsoft.Bcl.AsyncInterfaces" Version="10.0.11" />
       <PackageReference Include="System.Threading.Tasks.Extensions" Version="4.6.3" />
   </ItemGroup>
-
+  <PropertyGroup Condition="'$(TargetFramework)' == 'net472'">
+      <!-- SQLite chooses native assets through the RID, but the cmdlet assembly remains loadable by x86 and x64 hosts. -->
+      <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+      <PlatformTarget>AnyCPU</PlatformTarget>
+      <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
+  </PropertyGroup>
     <!-- Make sure the output DLL's from library are included in the output -->
     <PropertyGroup>
         <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
@@ -49,6 +55,7 @@
         <Using Include="System.Diagnostics" />
         <Using Include="EventViewerX" />
         <Using Include="EventViewerX.Reporting" />
+        <Using Include="EventViewerX.Storage" />
     </ItemGroup>
 
     <!-- We need to remove PowerShell conflicting libraries as it will break output -->

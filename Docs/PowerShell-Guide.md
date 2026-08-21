@@ -101,6 +101,57 @@ instead of silently compiling an incomplete provider list. Use exact provider
 names for the fastest large-file path, or raise `-MaxEventsScanned`
 deliberately.
 
+### Discoverable typed predicates
+
+Hashtable filters are useful for native event metadata, but typed reports have
+domain fields. Ask the definition for those fields instead of guessing XML
+names:
+
+```powershell
+$filter = New-EVXFilter -Type ADUserLogonFailed
+$filter.Fields | Get-Member -MemberType Property
+$filter.Fields.Who |
+    Select-Object Name, Description, ValueType, FilterStage, SupportedOperators
+
+$filter.AllOf(
+    $filter.Fields.Who.MatchesWildcard('CONTOSO\*'),
+    $filter.Fields.IpAddress.NotIn('-', '::1'))
+
+Get-EVXEvent -Filter $filter -TimePeriod Last24Hours
+```
+
+For an interactive expression, use the restricted script-block form:
+
+```powershell
+Get-EVXEvent -Type ADUserLogonFailed `
+    -Where { $_.Who -like 'CONTOSO\*' -and $_.IpAddress -notin @('-', '::1') }
+
+Get-EVXEvent -Type ADUserLogonFailed `
+    -Where { $_.Who -like 'CONTOSO\*' } -Explain
+
+Get-EVXEvent -Type ADUserLogonFailed -Describe
+
+New-EVXFilter -Type ADUserLogonFailed `
+    -Where { $_.Who -like 'CONTOSO\*' } -Explain
+```
+
+The expression is parsed and never invoked. It supports comparison,
+membership, wildcard, regex, collection, and Boolean operators but rejects
+commands and unrelated variables. `-Explain` shows which comparisons Windows
+can prefilter and which require exact managed verification.
+
+Predicates serialize to the same enum-named JSON used by `evx --where`. Let
+the builder validate fields and values before saving the file:
+
+```powershell
+$filter = New-EVXFilter -Type ADUserLogonFailed
+$filter.Fields.Who.MatchesWildcard('CONTOSO\*').ToJson() |
+    Set-Content -LiteralPath .\failed-logons.filter.json -Encoding utf8
+
+evx query --type ADUserLogonFailed `
+    --where .\failed-logons.filter.json --explain
+```
+
 ### Structured QueryList XML
 
 Use `-FilterXml` for several paths, explicit Select/Suppress combinations, or
@@ -282,6 +333,50 @@ Send-EmailMessage -Server 'smtp.contoso.com' -Port 587 `
 `Send-EmailMessage` is supplied by Mailozaurr. Keeping it outside the module
 lets the same package work with SMTP, Microsoft Graph, or a future transport
 adapter without making any sender a PSEventViewer dependency.
+
+### Retain and summarize typed history
+
+Use `-StorePath` on the same `Show-EVXEvent` query that creates a report. The
+normalized rows, homogeneous report schemas, and event provenance are written
+transactionally through the optional DbaClientX-backed SQLite store:
+
+```powershell
+$store = 'C:\ProgramData\EventViewerX\events.db'
+
+Show-EVXEvent `
+    -Type ActiveDirectoryAuthentication `
+    -Collector WEC01 `
+    -TimePeriod Last15Minutes `
+    -StorePath $store
+```
+
+Read retained history with the same typed properties and selectors. A
+composite type expands to its stored leaf definitions; it is not treated as a
+literal report-table name:
+
+```powershell
+$filter = New-EVXFilter -Type ADUserLogonFailed
+
+Show-EVXEvent `
+    -FromStore $store `
+    -Type ADUserLogonFailed `
+    -Where $filter.Fields.Who.MatchesWildcard('CONTOSO\*') `
+    -StartTime (Get-Date).AddDays(-7) `
+    -HtmlPath .\FailedLogons.html `
+    -ExcelPath .\FailedLogons.xlsx `
+    -CsvPath .\FailedLogons.csv
+
+Show-EVXEvent `
+    -FromStore $store `
+    -Type ActiveDirectoryAuthentication `
+    -StartTime (Get-Date).AddMonths(-1) `
+    -SummaryPeriod Day `
+    -HtmlPath .\Authentication-Daily.html
+```
+
+Repeated collection is safe. Original source provenance deduplicates direct
+and ForwardedEvents copies of the same event. Retention remains explicit
+through `evx store prune`; EventViewerX does not silently delete history.
 
 ## Choose a read mode
 

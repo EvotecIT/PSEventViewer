@@ -48,6 +48,7 @@ internal static class EventTypeQuerySnapshot {
                 source.FallbackMessageCulture),
             Enrichment = CopyEnrichment(
                 source.Enrichment),
+            Predicate = source.Predicate?.Clone(),
             ResultPredicate = source.ResultPredicate,
             MinimumRecordIdExclusiveResolver =
                 source.MinimumRecordIdExclusiveResolver,

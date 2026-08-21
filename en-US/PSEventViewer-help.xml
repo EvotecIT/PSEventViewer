@@ -488,6 +488,8 @@ already provides integrity validation.</maml:para>
             <command:parameterValue required="false" variableLength="false">TillLastFriday</command:parameterValue>
             <command:parameterValue required="false" variableLength="false">TillLastSaturday</command:parameterValue>
             <command:parameterValue required="false" variableLength="false">TillLastSunday</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last15Minutes</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last30Minutes</command:parameterValue>
           </command:parameterValueGroup>
           <dev:type>
             <maml:name>TimePeriod</maml:name>
@@ -840,6 +842,8 @@ already provides integrity validation.</maml:para>
             <command:parameterValue required="false" variableLength="false">TillLastFriday</command:parameterValue>
             <command:parameterValue required="false" variableLength="false">TillLastSaturday</command:parameterValue>
             <command:parameterValue required="false" variableLength="false">TillLastSunday</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last15Minutes</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last30Minutes</command:parameterValue>
           </command:parameterValueGroup>
           <dev:type>
             <maml:name>TimePeriod</maml:name>
@@ -1180,6 +1184,8 @@ already provides integrity validation.</maml:para>
             <command:parameterValue required="false" variableLength="false">TillLastFriday</command:parameterValue>
             <command:parameterValue required="false" variableLength="false">TillLastSaturday</command:parameterValue>
             <command:parameterValue required="false" variableLength="false">TillLastSunday</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last15Minutes</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last30Minutes</command:parameterValue>
           </command:parameterValueGroup>
           <dev:type>
             <maml:name>TimePeriod</maml:name>
@@ -1810,6 +1816,8 @@ already provides integrity validation.</maml:para>
           <command:parameterValue required="false" variableLength="false">TillLastFriday</command:parameterValue>
           <command:parameterValue required="false" variableLength="false">TillLastSaturday</command:parameterValue>
           <command:parameterValue required="false" variableLength="false">TillLastSunday</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Last15Minutes</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Last30Minutes</command:parameterValue>
         </command:parameterValueGroup>
         <dev:type>
           <maml:name>TimePeriod</maml:name>
@@ -2257,9 +2265,9 @@ so deterministic English is preferred without discarding locally available messa
           <maml:description>
             <maml:para>Reusable typed filter produced by New-EVXFilter or EventViewerX.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">EventFilter</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Object</command:parameterValue>
           <dev:type>
-            <maml:name>EventFilter</maml:name>
+            <maml:name>Object</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -2578,6 +2586,8 @@ Settings.QuerySessionTimeoutMs for reading.</maml:para>
             <command:parameterValue required="false" variableLength="false">TillLastFriday</command:parameterValue>
             <command:parameterValue required="false" variableLength="false">TillLastSaturday</command:parameterValue>
             <command:parameterValue required="false" variableLength="false">TillLastSunday</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last15Minutes</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last30Minutes</command:parameterValue>
           </command:parameterValueGroup>
           <dev:type>
             <maml:name>TimePeriod</maml:name>
@@ -2729,9 +2739,9 @@ so deterministic English is preferred without discarding locally available messa
           <maml:description>
             <maml:para>Reusable typed filter produced by New-EVXFilter or EventViewerX.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">EventFilter</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Object</command:parameterValue>
           <dev:type>
-            <maml:name>EventFilter</maml:name>
+            <maml:name>Object</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -3023,6 +3033,8 @@ Typed queries default to StructuredDataAndMessage; other query sets default to M
             <command:parameterValue required="false" variableLength="false">TillLastFriday</command:parameterValue>
             <command:parameterValue required="false" variableLength="false">TillLastSaturday</command:parameterValue>
             <command:parameterValue required="false" variableLength="false">TillLastSunday</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last15Minutes</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last30Minutes</command:parameterValue>
           </command:parameterValueGroup>
           <dev:type>
             <maml:name>TimePeriod</maml:name>
@@ -3114,6 +3126,18 @@ Each isolated failure is emitted as a non-terminating PowerShell error.</maml:pa
           <dev:defaultValue>None</dev:defaultValue>
         </command:parameter>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>Describe</maml:name>
+          <maml:description>
+            <maml:para>Returns definition and field metadata without querying event sources.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>DisableParallel</maml:name>
           <maml:description>
             <maml:para>Disables parallel processing of queries.</maml:para>
@@ -3177,6 +3201,18 @@ Each isolated failure is emitted as a non-terminating PowerShell error.</maml:pa
           <maml:name>ExpandData</maml:name>
           <maml:description>
             <maml:para>Expands event data into individual properties.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>Explain</maml:name>
+          <maml:description>
+            <maml:para>Returns the native/managed predicate plan without querying event sources.</maml:para>
           </maml:description>
           <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
           <dev:type>
@@ -3432,6 +3468,8 @@ Settings.QuerySessionTimeoutMs for reading.</maml:para>
             <command:parameterValue required="false" variableLength="false">TillLastFriday</command:parameterValue>
             <command:parameterValue required="false" variableLength="false">TillLastSaturday</command:parameterValue>
             <command:parameterValue required="false" variableLength="false">TillLastSunday</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last15Minutes</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last30Minutes</command:parameterValue>
           </command:parameterValueGroup>
           <dev:type>
             <maml:name>TimePeriod</maml:name>
@@ -3543,6 +3581,18 @@ Settings.QuerySessionTimeoutMs for reading.</maml:para>
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
         </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>Where</maml:name>
+          <maml:description>
+            <maml:para>Reusable typed EventPredicate, predicate JSON, or predicate JSON file.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">Object</command:parameterValue>
+          <dev:type>
+            <maml:name>Object</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
       </command:syntaxItem>
       <command:syntaxItem parameterSetName="Definition">
         <maml:name>Get-EVXEvent</maml:name>
@@ -3627,6 +3677,18 @@ Each isolated failure is emitted as a non-terminating PowerShell error.</maml:pa
           <dev:defaultValue>None</dev:defaultValue>
         </command:parameter>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>Describe</maml:name>
+          <maml:description>
+            <maml:para>Returns definition and field metadata without querying event sources.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>DisableParallel</maml:name>
           <maml:description>
             <maml:para>Disables parallel processing of queries.</maml:para>
@@ -3666,6 +3728,18 @@ Each isolated failure is emitted as a non-terminating PowerShell error.</maml:pa
           <maml:name>ExpandData</maml:name>
           <maml:description>
             <maml:para>Expands event data into individual properties.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>Explain</maml:name>
+          <maml:description>
+            <maml:para>Returns the native/managed predicate plan without querying event sources.</maml:para>
           </maml:description>
           <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
           <dev:type>
@@ -3908,9 +3982,23 @@ Settings.QuerySessionTimeoutMs for reading.</maml:para>
             <command:parameterValue required="false" variableLength="false">TillLastFriday</command:parameterValue>
             <command:parameterValue required="false" variableLength="false">TillLastSaturday</command:parameterValue>
             <command:parameterValue required="false" variableLength="false">TillLastSunday</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last15Minutes</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last30Minutes</command:parameterValue>
           </command:parameterValueGroup>
           <dev:type>
             <maml:name>TimePeriod</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>Where</maml:name>
+          <maml:description>
+            <maml:para>Reusable typed EventPredicate, predicate JSON, or predicate JSON file.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">Object</command:parameterValue>
+          <dev:type>
+            <maml:name>Object</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -4077,9 +4165,9 @@ so deterministic English is preferred without discarding locally available messa
           <maml:description>
             <maml:para>Reusable typed filter produced by New-EVXFilter or EventViewerX.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">EventFilter</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Object</command:parameterValue>
           <dev:type>
-            <maml:name>EventFilter</maml:name>
+            <maml:name>Object</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -4385,6 +4473,8 @@ Settings.QuerySessionTimeoutMs for reading.</maml:para>
             <command:parameterValue required="false" variableLength="false">TillLastFriday</command:parameterValue>
             <command:parameterValue required="false" variableLength="false">TillLastSaturday</command:parameterValue>
             <command:parameterValue required="false" variableLength="false">TillLastSunday</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last15Minutes</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last30Minutes</command:parameterValue>
           </command:parameterValueGroup>
           <dev:type>
             <maml:name>TimePeriod</maml:name>
@@ -5080,6 +5170,356 @@ Settings.QuerySessionTimeoutMs for reading.</maml:para>
           <dev:defaultValue>None</dev:defaultValue>
         </command:parameter>
       </command:syntaxItem>
+      <command:syntaxItem parameterSetName="TypedFilter">
+        <maml:name>Get-EVXEvent</maml:name>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>Authentication</maml:name>
+          <maml:description>
+            <maml:para>Authentication package used for remote Windows Event Log sessions.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">EventLogAuthentication</command:parameterValue>
+          <command:parameterValueGroup>
+            <command:parameterValue required="false" variableLength="false">Default</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Negotiate</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Kerberos</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Ntlm</command:parameterValue>
+          </command:parameterValueGroup>
+          <dev:type>
+            <maml:name>EventLogAuthentication</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>BufferCapacity</maml:name>
+          <maml:description>
+            <maml:para>Maximum number of projected events buffered between parallel readers and the PowerShell pipeline. Zero selects a bounded default.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
+          <dev:type>
+            <maml:name>Int32</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>Collector</maml:name>
+          <maml:description>
+            <maml:para>Windows Event Collector computers from which typed events are read through ForwardedEvents.&#xD;
+The selected Type still owns each event's original source channel and identifiers.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">List`1</command:parameterValue>
+          <dev:type>
+            <maml:name>List`1</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>ContinueOnError</maml:name>
+          <maml:description>
+            <maml:para>Continues other independent sources when a channel, computer, or file query fails.&#xD;
+Each isolated failure is emitted as a non-terminating PowerShell error.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>Credential</maml:name>
+          <maml:description>
+            <maml:para>Credentials used for remote channel or structured queries.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">PSCredential</command:parameterValue>
+          <dev:type>
+            <maml:name>PSCredential</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>Describe</maml:name>
+          <maml:description>
+            <maml:para>Returns definition and field metadata without querying event sources.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>DisableParallel</maml:name>
+          <maml:description>
+            <maml:para>Disables parallel processing of queries.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="DateTo">
+          <maml:name>EndTime</maml:name>
+          <maml:description>
+            <maml:para>End time for the event query.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">DateTime</command:parameterValue>
+          <dev:type>
+            <maml:name>DateTime</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="Expand">
+          <maml:name>ExpandData</maml:name>
+          <maml:description>
+            <maml:para>Expands event data into individual properties.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>Explain</maml:name>
+          <maml:description>
+            <maml:para>Returns the native/managed predicate plan without querying event sources.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>FallbackMessageCulture</maml:name>
+          <maml:description>
+            <maml:para>Culture used when provider resources do not contain MessageCulture.&#xD;
+Get-EVXEvent requests en-US by default, then falls back to the current UI culture&#xD;
+so deterministic English is preferred without discarding locally available messages.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">CultureInfo</command:parameterValue>
+          <dev:type>
+            <maml:name>CultureInfo</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>Filter</maml:name>
+          <maml:description>
+            <maml:para>Reusable typed filter produced by New-EVXFilter or EventViewerX.</maml:para>
+          </maml:description>
+          <command:parameterValue required="true" variableLength="false">Object</command:parameterValue>
+          <dev:type>
+            <maml:name>Object</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>IncludeBookmark</maml:name>
+          <maml:description>
+            <maml:para>Materializes a native bookmark for each returned event. This is disabled by&#xD;
+default because bookmark creation adds native handle and render work per record.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="ComputerName,ServerName">
+          <maml:name>MachineName</maml:name>
+          <maml:description>
+            <maml:para>Computer names against which to run the query.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">List`1</command:parameterValue>
+          <dev:type>
+            <maml:name>List`1</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="NumberOfThreads">
+          <maml:name>MaxConcurrency</maml:name>
+          <maml:description>
+            <maml:para>Maximum number of independent event sources opened concurrently.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
+          <dev:type>
+            <maml:name>Int32</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>MaxEvents</maml:name>
+          <maml:description>
+            <maml:para>Maximum number of events to return.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">Int64</command:parameterValue>
+          <dev:type>
+            <maml:name>Int64</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>MaxEventsScanned</maml:name>
+          <maml:description>
+            <maml:para>Maximum number of merged candidate events delivered for message and checkpoint filtering.&#xD;
+Zero continues until the output limit is satisfied or the query is exhausted. Native selection may perform&#xD;
+one initial lookahead per machine/XPath chunk plus bounded page prefetch; those rows are not evaluated by the cmdlet.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">Int64</command:parameterValue>
+          <dev:type>
+            <maml:name>Int64</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>MessageCulture</maml:name>
+          <maml:description>
+            <maml:para>Culture used to format provider messages and display names for offline EVTX queries.&#xD;
+For example, use en-US for deterministic English output.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">CultureInfo</command:parameterValue>
+          <dev:type>
+            <maml:name>CultureInfo</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>MessageRegex</maml:name>
+          <maml:description>
+            <maml:para>Filters events by matching their formatted message against the provided regular expression.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">Regex</command:parameterValue>
+          <dev:type>
+            <maml:name>Regex</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>Oldest</maml:name>
+          <maml:description>
+            <maml:para>Reads events from oldest to newest when querying files.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>ReadMode</maml:name>
+          <maml:description>
+            <maml:para>Controls per-event materialization. Metadata skips provider messages, XML, attachments, and bookmarks;&#xD;
+Message formats the provider message; StructuredData parses XML without formatting the message;&#xD;
+StructuredDataAndMessage includes both without decoding attachments; Full includes all data.&#xD;
+Typed queries default to StructuredDataAndMessage; other query sets default to Message.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">EventReadMode</command:parameterValue>
+          <command:parameterValueGroup>
+            <command:parameterValue required="false" variableLength="false">Metadata</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Message</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">StructuredData</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">RawXml</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Full</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">StructuredDataAndMessage</command:parameterValue>
+          </command:parameterValueGroup>
+          <dev:type>
+            <maml:name>EventReadMode</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>SessionTimeoutMs</maml:name>
+          <maml:description>
+            <maml:para>Overrides both remote connection and no-progress read timeouts in milliseconds.&#xD;
+Zero uses Settings.SessionTimeoutMs for connection establishment and&#xD;
+Settings.QuerySessionTimeoutMs for reading.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
+          <dev:type>
+            <maml:name>Int32</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="DateFrom">
+          <maml:name>StartTime</maml:name>
+          <maml:description>
+            <maml:para>Start time for the event query.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">DateTime</command:parameterValue>
+          <dev:type>
+            <maml:name>DateTime</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>TimePeriod</maml:name>
+          <maml:description>
+            <maml:para>Relative time period for filtering events.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">TimePeriod</command:parameterValue>
+          <command:parameterValueGroup>
+            <command:parameterValue required="false" variableLength="false">PastHour</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">CurrentHour</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">PastDay</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">CurrentDay</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">PastMonth</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">CurrentMonth</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">PastQuarter</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">CurrentQuarter</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last3Days</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last7Days</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last14Days</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last1Hour</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last2Hours</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last3Hours</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last6Hours</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last12Hours</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last16Hours</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last24Hours</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Today</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Yesterday</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Everything</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">TillLastMonday</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">TillLastTuesday</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">TillLastWednesday</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">TillLastThursday</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">TillLastFriday</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">TillLastSaturday</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">TillLastSunday</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last15Minutes</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last30Minutes</command:parameterValue>
+          </command:parameterValueGroup>
+          <dev:type>
+            <maml:name>TimePeriod</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+      </command:syntaxItem>
     </command:syntax>
     <command:parameters>
       <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
@@ -5188,6 +5628,18 @@ Each isolated failure is emitted as a non-terminating PowerShell error.</maml:pa
         <dev:defaultValue>None</dev:defaultValue>
       </command:parameter>
       <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+        <maml:name>Describe</maml:name>
+        <maml:description>
+          <maml:para>Returns definition and field metadata without querying event sources.</maml:para>
+        </maml:description>
+        <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
+        <dev:type>
+          <maml:name>SwitchParameter</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
         <maml:name>DisableParallel</maml:name>
         <maml:description>
           <maml:para>Disables parallel processing of queries.</maml:para>
@@ -5272,6 +5724,18 @@ Each isolated failure is emitted as a non-terminating PowerShell error.</maml:pa
         <dev:defaultValue>None</dev:defaultValue>
       </command:parameter>
       <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+        <maml:name>Explain</maml:name>
+        <maml:description>
+          <maml:para>Returns the native/managed predicate plan without querying event sources.</maml:para>
+        </maml:description>
+        <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
+        <dev:type>
+          <maml:name>SwitchParameter</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
         <maml:name>FallbackMessageCulture</maml:name>
         <maml:description>
           <maml:para>Culture used when provider resources do not contain MessageCulture.&#xD;
@@ -5285,14 +5749,14 @@ so deterministic English is preferred without discarding locally available messa
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
       </command:parameter>
-      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+      <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
         <maml:name>Filter</maml:name>
         <maml:description>
           <maml:para>Reusable typed filter produced by New-EVXFilter or EventViewerX.</maml:para>
         </maml:description>
-        <command:parameterValue required="false" variableLength="false">EventFilter</command:parameterValue>
+        <command:parameterValue required="true" variableLength="false">Object</command:parameterValue>
         <dev:type>
-          <maml:name>EventFilter</maml:name>
+          <maml:name>Object</maml:name>
           <maml:uri />
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
@@ -5674,6 +6138,8 @@ Settings.QuerySessionTimeoutMs for reading.</maml:para>
           <command:parameterValue required="false" variableLength="false">TillLastFriday</command:parameterValue>
           <command:parameterValue required="false" variableLength="false">TillLastSaturday</command:parameterValue>
           <command:parameterValue required="false" variableLength="false">TillLastSunday</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Last15Minutes</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Last30Minutes</command:parameterValue>
         </command:parameterValueGroup>
         <dev:type>
           <maml:name>TimePeriod</maml:name>
@@ -5809,6 +6275,18 @@ Settings.QuerySessionTimeoutMs for reading.</maml:para>
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
       </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+        <maml:name>Where</maml:name>
+        <maml:description>
+          <maml:para>Reusable typed EventPredicate, predicate JSON, or predicate JSON file.</maml:para>
+        </maml:description>
+        <command:parameterValue required="false" variableLength="false">Object</command:parameterValue>
+        <dev:type>
+          <maml:name>Object</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
     </command:parameters>
     <command:inputTypes>
       <command:inputType>
@@ -5876,6 +6354,20 @@ Settings.QuerySessionTimeoutMs for reading.</maml:para>
         <dev:code>Get-EVXEvent -Type ADUserLogonFailed -StartTime (Get-Date).AddDays(-1)</dev:code>
         <dev:remarks>
           <maml:para>The event type owns its source channel, event IDs, filters, and typed projection.</maml:para>
+        </dev:remarks>
+      </command:example>
+      <command:example>
+        <maml:title>Reuse a discoverable typed filter</maml:title>
+        <dev:code>$filter = New-EVXFilter -Type ADUserLogonFailed; $filter.AllOf($filter.Fields.Who.MatchesWildcard('EVOTEC\*'), $filter.Fields.IPAddress.MatchesSubnet('10.0.0.0/8')); Get-EVXEvent -Filter $filter -TimePeriod Last7Days</dev:code>
+        <dev:remarks>
+          <maml:para>The filter retains its type and exact predicate, so the query does not repeat either one.</maml:para>
+        </dev:remarks>
+      </command:example>
+      <command:example>
+        <maml:title>Describe one typed event contract</maml:title>
+        <dev:code>Get-EVXEvent -Type ADUserLogonFailed -Describe</dev:code>
+        <dev:remarks>
+          <maml:para>Returns the source, field, alias, type, and filter-stage metadata without reading events.</maml:para>
         </dev:remarks>
       </command:example>
       <command:example>
@@ -6420,6 +6912,8 @@ This cannot be combined with EventLogPath.</maml:para>
             <command:parameterValue required="false" variableLength="false">TillLastFriday</command:parameterValue>
             <command:parameterValue required="false" variableLength="false">TillLastSaturday</command:parameterValue>
             <command:parameterValue required="false" variableLength="false">TillLastSunday</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last15Minutes</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last30Minutes</command:parameterValue>
           </command:parameterValueGroup>
           <dev:type>
             <maml:name>TimePeriod</maml:name>
@@ -6579,6 +7073,8 @@ This cannot be combined with EventLogPath.</maml:para>
             <command:parameterValue required="false" variableLength="false">TillLastFriday</command:parameterValue>
             <command:parameterValue required="false" variableLength="false">TillLastSaturday</command:parameterValue>
             <command:parameterValue required="false" variableLength="false">TillLastSunday</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last15Minutes</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last30Minutes</command:parameterValue>
           </command:parameterValueGroup>
           <dev:type>
             <maml:name>TimePeriod</maml:name>
@@ -6810,6 +7306,8 @@ This cannot be combined with EventLogPath.</maml:para>
           <command:parameterValue required="false" variableLength="false">TillLastFriday</command:parameterValue>
           <command:parameterValue required="false" variableLength="false">TillLastSaturday</command:parameterValue>
           <command:parameterValue required="false" variableLength="false">TillLastSunday</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Last15Minutes</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Last30Minutes</command:parameterValue>
         </command:parameterValueGroup>
         <dev:type>
           <maml:name>TimePeriod</maml:name>
@@ -7936,6 +8434,8 @@ This cannot be combined with EventLogPath.</maml:para>
             <command:parameterValue required="false" variableLength="false">TillLastFriday</command:parameterValue>
             <command:parameterValue required="false" variableLength="false">TillLastSaturday</command:parameterValue>
             <command:parameterValue required="false" variableLength="false">TillLastSunday</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last15Minutes</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last30Minutes</command:parameterValue>
           </command:parameterValueGroup>
           <dev:type>
             <maml:name>TimePeriod</maml:name>
@@ -9721,6 +10221,8 @@ This cannot be combined with EventLogPath.</maml:para>
           <command:parameterValue required="false" variableLength="false">TillLastFriday</command:parameterValue>
           <command:parameterValue required="false" variableLength="false">TillLastSaturday</command:parameterValue>
           <command:parameterValue required="false" variableLength="false">TillLastSunday</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Last15Minutes</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Last30Minutes</command:parameterValue>
         </command:parameterValueGroup>
         <dev:type>
           <maml:name>TimePeriod</maml:name>
@@ -9917,12 +10419,12 @@ This cannot be combined with EventLogPath.</maml:para>
       <command:noun>EVXFilter</command:noun>
       <maml:description>
         <maml:para>Creates a reusable typed Windows Event Log filter or compiles it to native query text.</maml:para>
-        <maml:para>The default output is EventViewerX.EventFilter for reuse by C# and cmdlets. Use AsXPath, LogName, or Path when native query text is required by Get-WinEvent, Event Viewer, or WEC.</maml:para>
+        <maml:para>The default output is EventViewerX.EventFilter for native event metadata. Supply Type or Definition to discover typed domain fields and build a reusable EventPredicate. Use AsXPath, LogName, or Path when native query text is required by Get-WinEvent, Event Viewer, or WEC.</maml:para>
       </maml:description>
     </command:details>
     <maml:description>
       <maml:para>Creates a reusable typed Windows Event Log filter or compiles it to native query text.</maml:para>
-      <maml:para>The default output is EventViewerX.EventFilter for reuse by C# and cmdlets. Use AsXPath, LogName, or Path when native query text is required by Get-WinEvent, Event Viewer, or WEC.</maml:para>
+      <maml:para>The default output is EventViewerX.EventFilter for native event metadata. Supply Type or Definition to discover typed domain fields and build a reusable EventPredicate. Use AsXPath, LogName, or Path when native query text is required by Get-WinEvent, Event Viewer, or WEC.</maml:para>
     </maml:description>
     <command:syntax>
       <command:syntaxItem parameterSetName="Object">
@@ -10102,6 +10604,8 @@ This cannot be combined with EventLogPath.</maml:para>
             <command:parameterValue required="false" variableLength="false">TillLastFriday</command:parameterValue>
             <command:parameterValue required="false" variableLength="false">TillLastSaturday</command:parameterValue>
             <command:parameterValue required="false" variableLength="false">TillLastSunday</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last15Minutes</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last30Minutes</command:parameterValue>
           </command:parameterValueGroup>
           <dev:type>
             <maml:name>TimePeriod</maml:name>
@@ -10117,6 +10621,176 @@ This cannot be combined with EventLogPath.</maml:para>
           <command:parameterValue required="false" variableLength="false">String[]</command:parameterValue>
           <dev:type>
             <maml:name>String[]</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+      </command:syntaxItem>
+      <command:syntaxItem parameterSetName="Type">
+        <maml:name>New-EVXFilter</maml:name>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>Explain</maml:name>
+          <maml:description>
+            <maml:para>Returns the native and managed execution plan for Where instead of the reusable filter.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>Type</maml:name>
+          <maml:description>
+            <maml:para>Built-in event type whose typed fields should be exposed for predicate construction.</maml:para>
+          </maml:description>
+          <command:parameterValue required="true" variableLength="false">EventType</command:parameterValue>
+          <command:parameterValueGroup>
+            <command:parameterValue required="false" variableLength="false">ADComputerCreateChange</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">ADComputerDeleted</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">ADComputerChangeDetailed</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">ADGroupMembershipChange</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">ADGroupEnumeration</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">ADGroupChange</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">ADGroupCreateDelete</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">ADGroupChangeDetailed</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">ADGroupPolicyChanges</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">ADGroupPolicyEdits</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">ADGroupPolicyLinks</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">ADGroupPolicyChangesDetailed</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">GpoCreated</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">GpoDeleted</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">GpoModified</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">ADLdapBindingSummary</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">ADLdapBindingDetails</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">ADUserCreateChange</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">ADUserStatus</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">ADUserChangeDetailed</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">ADUserLockouts</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">ADUserLogon</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">ADUserLogonNTLMv1</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">ADUserLogonFailed</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">ADUserUnlocked</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">ADUserPrivilegeUse</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">ADUserRightsAssignment</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">KerberosTGTRequest</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">KerberosServiceTicket</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">KerberosTicketFailure</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">KerberosPolicyChange</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">ADOrganizationalUnitChangeDetailed</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">ADOtherChangeDetailed</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">ADSMBServerAuditV1</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">LogsClearedSecurity</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">LogsClearedOther</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">LogsFullSecurity</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">NetworkAccessAuthenticationPolicy</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">CertificateIssued</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">AuditPolicyChange</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">FirewallRuleChange</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">DhcpLeaseCreated</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">BitLockerKeyChange</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">BitLockerSuspended</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">DeviceRecognized</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">DeviceDisabled</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">ObjectDeletion</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">ScheduledTaskDeleted</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">ScheduledTaskCreated</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">OSCrash</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">OSBugCheck</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">OSStartup</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">OSShutdown</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">OSUncleanShutdown</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">OSStartupSecurity</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">OSCrashOnAuditFailRecovery</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">OSTimeChange</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">WindowsUpdateFailure</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">ClientGroupPoliciesApplication</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">ClientGroupPoliciesSystem</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">HyperVVirtualMachineShutdown</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">HyperVVirtualMachineStarted</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">IISSiteBindingFailure</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">HyperVCheckpointCreated</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">IISSiteStopped</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">ExchangeDatabaseMounted</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">DfsReplicationError</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">SqlDatabaseCreated</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">SyncCompleted</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">AADConnectStagingEnabled</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">AADConnectStagingDisabled</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">AADConnectPasswordSyncFailed</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">AADConnectRunProfile</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">AADSyncCycleStage</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">AADSyncProvisionCredentialsPing</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">AADSyncPasswordHashSyncStatus</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">AADSyncImportStatus</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">AADSyncFilterStatus</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">NetworkMonitorDriverLoaded</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">NetworkPromiscuousMode</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">ActiveDirectoryAuthentication</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">ActiveDirectoryAccountLifecycle</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">ActiveDirectoryChanges</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">GroupPolicyActivity</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">KerberosActivity</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">OperatingSystemLifecycle</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">WindowsSecurityChanges</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">EntraConnectHealth</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">NetworkSecurity</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">InfrastructureHealth</command:parameterValue>
+          </command:parameterValueGroup>
+          <dev:type>
+            <maml:name>EventType</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>Where</maml:name>
+          <maml:description>
+            <maml:para>Optional restricted typed predicate expression stored in the returned reusable filter.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">Object</command:parameterValue>
+          <dev:type>
+            <maml:name>Object</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+      </command:syntaxItem>
+      <command:syntaxItem parameterSetName="Definition">
+        <maml:name>New-EVXFilter</maml:name>
+        <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>Definition</maml:name>
+          <maml:description>
+            <maml:para>Custom EventDefinition instance or JSON file whose typed fields should be exposed.</maml:para>
+          </maml:description>
+          <command:parameterValue required="true" variableLength="false">Object</command:parameterValue>
+          <dev:type>
+            <maml:name>Object</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>Explain</maml:name>
+          <maml:description>
+            <maml:para>Returns the native and managed execution plan for Where instead of the reusable filter.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>Where</maml:name>
+          <maml:description>
+            <maml:para>Optional restricted typed predicate expression stored in the returned reusable filter.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">Object</command:parameterValue>
+          <dev:type>
+            <maml:name>Object</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -10311,6 +10985,8 @@ This cannot be combined with EventLogPath.</maml:para>
             <command:parameterValue required="false" variableLength="false">TillLastFriday</command:parameterValue>
             <command:parameterValue required="false" variableLength="false">TillLastSaturday</command:parameterValue>
             <command:parameterValue required="false" variableLength="false">TillLastSunday</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last15Minutes</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last30Minutes</command:parameterValue>
           </command:parameterValueGroup>
           <dev:type>
             <maml:name>TimePeriod</maml:name>
@@ -10520,6 +11196,8 @@ This cannot be combined with EventLogPath.</maml:para>
             <command:parameterValue required="false" variableLength="false">TillLastFriday</command:parameterValue>
             <command:parameterValue required="false" variableLength="false">TillLastSaturday</command:parameterValue>
             <command:parameterValue required="false" variableLength="false">TillLastSunday</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last15Minutes</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last30Minutes</command:parameterValue>
           </command:parameterValueGroup>
           <dev:type>
             <maml:name>TimePeriod</maml:name>
@@ -10729,6 +11407,8 @@ This cannot be combined with EventLogPath.</maml:para>
             <command:parameterValue required="false" variableLength="false">TillLastFriday</command:parameterValue>
             <command:parameterValue required="false" variableLength="false">TillLastSaturday</command:parameterValue>
             <command:parameterValue required="false" variableLength="false">TillLastSunday</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last15Minutes</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last30Minutes</command:parameterValue>
           </command:parameterValueGroup>
           <dev:type>
             <maml:name>TimePeriod</maml:name>
@@ -10775,6 +11455,18 @@ This cannot be combined with EventLogPath.</maml:para>
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
       </command:parameter>
+      <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+        <maml:name>Definition</maml:name>
+        <maml:description>
+          <maml:para>Custom EventDefinition instance or JSON file whose typed fields should be exposed.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="false">Object</command:parameterValue>
+        <dev:type>
+          <maml:name>Object</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
       <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="DateTo">
         <maml:name>EndTime</maml:name>
         <maml:description>
@@ -10807,6 +11499,18 @@ This cannot be combined with EventLogPath.</maml:para>
         <command:parameterValue required="false" variableLength="false">Int32[]</command:parameterValue>
         <dev:type>
           <maml:name>Int32[]</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+        <maml:name>Explain</maml:name>
+        <maml:description>
+          <maml:para>Returns the native and managed execution plan for Where instead of the reusable filter.</maml:para>
+        </maml:description>
+        <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
+        <dev:type>
+          <maml:name>SwitchParameter</maml:name>
           <maml:uri />
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
@@ -10962,9 +11666,115 @@ This cannot be combined with EventLogPath.</maml:para>
           <command:parameterValue required="false" variableLength="false">TillLastFriday</command:parameterValue>
           <command:parameterValue required="false" variableLength="false">TillLastSaturday</command:parameterValue>
           <command:parameterValue required="false" variableLength="false">TillLastSunday</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Last15Minutes</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Last30Minutes</command:parameterValue>
         </command:parameterValueGroup>
         <dev:type>
           <maml:name>TimePeriod</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+        <maml:name>Type</maml:name>
+        <maml:description>
+          <maml:para>Built-in event type whose typed fields should be exposed for predicate construction.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="false">EventType</command:parameterValue>
+        <command:parameterValueGroup>
+          <command:parameterValue required="false" variableLength="false">ADComputerCreateChange</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">ADComputerDeleted</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">ADComputerChangeDetailed</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">ADGroupMembershipChange</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">ADGroupEnumeration</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">ADGroupChange</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">ADGroupCreateDelete</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">ADGroupChangeDetailed</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">ADGroupPolicyChanges</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">ADGroupPolicyEdits</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">ADGroupPolicyLinks</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">ADGroupPolicyChangesDetailed</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">GpoCreated</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">GpoDeleted</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">GpoModified</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">ADLdapBindingSummary</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">ADLdapBindingDetails</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">ADUserCreateChange</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">ADUserStatus</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">ADUserChangeDetailed</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">ADUserLockouts</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">ADUserLogon</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">ADUserLogonNTLMv1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">ADUserLogonFailed</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">ADUserUnlocked</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">ADUserPrivilegeUse</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">ADUserRightsAssignment</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">KerberosTGTRequest</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">KerberosServiceTicket</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">KerberosTicketFailure</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">KerberosPolicyChange</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">ADOrganizationalUnitChangeDetailed</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">ADOtherChangeDetailed</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">ADSMBServerAuditV1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">LogsClearedSecurity</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">LogsClearedOther</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">LogsFullSecurity</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">NetworkAccessAuthenticationPolicy</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">CertificateIssued</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">AuditPolicyChange</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">FirewallRuleChange</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">DhcpLeaseCreated</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">BitLockerKeyChange</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">BitLockerSuspended</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">DeviceRecognized</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">DeviceDisabled</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">ObjectDeletion</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">ScheduledTaskDeleted</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">ScheduledTaskCreated</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">OSCrash</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">OSBugCheck</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">OSStartup</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">OSShutdown</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">OSUncleanShutdown</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">OSStartupSecurity</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">OSCrashOnAuditFailRecovery</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">OSTimeChange</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">WindowsUpdateFailure</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">ClientGroupPoliciesApplication</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">ClientGroupPoliciesSystem</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">HyperVVirtualMachineShutdown</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">HyperVVirtualMachineStarted</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">IISSiteBindingFailure</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">HyperVCheckpointCreated</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">IISSiteStopped</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">ExchangeDatabaseMounted</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">DfsReplicationError</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">SqlDatabaseCreated</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">SyncCompleted</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">AADConnectStagingEnabled</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">AADConnectStagingDisabled</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">AADConnectPasswordSyncFailed</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">AADConnectRunProfile</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">AADSyncCycleStage</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">AADSyncProvisionCredentialsPing</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">AADSyncPasswordHashSyncStatus</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">AADSyncImportStatus</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">AADSyncFilterStatus</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">NetworkMonitorDriverLoaded</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">NetworkPromiscuousMode</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">ActiveDirectoryAuthentication</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">ActiveDirectoryAccountLifecycle</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">ActiveDirectoryChanges</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">GroupPolicyActivity</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">KerberosActivity</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">OperatingSystemLifecycle</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">WindowsSecurityChanges</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">EntraConnectHealth</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">NetworkSecurity</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">InfrastructureHealth</command:parameterValue>
+        </command:parameterValueGroup>
+        <dev:type>
+          <maml:name>EventType</maml:name>
           <maml:uri />
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
@@ -10977,6 +11787,18 @@ This cannot be combined with EventLogPath.</maml:para>
         <command:parameterValue required="false" variableLength="false">String[]</command:parameterValue>
         <dev:type>
           <maml:name>String[]</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+        <maml:name>Where</maml:name>
+        <maml:description>
+          <maml:para>Optional restricted typed predicate expression stored in the returned reusable filter.</maml:para>
+        </maml:description>
+        <command:parameterValue required="false" variableLength="false">Object</command:parameterValue>
+        <dev:type>
+          <maml:name>Object</maml:name>
           <maml:uri />
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
@@ -10999,6 +11821,14 @@ This cannot be combined with EventLogPath.</maml:para>
         <dev:type>
           <maml:name>System.String</maml:name>
         </dev:type>
+      </command:returnValue>
+      <command:returnValue>
+        <dev:type>
+          <maml:name>PSEventViewer.PowerShellEventPredicateBuilder</maml:name>
+        </dev:type>
+        <maml:description>
+          <maml:para>PowerShell-friendly view over the canonical EventViewerX typed predicate builder.</maml:para>
+        </maml:description>
       </command:returnValue>
     </command:returnValues>
     <maml:alertSet>
@@ -11026,6 +11856,20 @@ This cannot be combined with EventLogPath.</maml:para>
         <dev:code>New-EVXFilter -LogName Security -EventId 4625 -NamedDataExcludeFilter @{ TargetUserName = 'svc_legacy' }</dev:code>
         <dev:remarks>
           <maml:para>Returns QueryList XML with native Select and Suppress clauses.</maml:para>
+        </dev:remarks>
+      </command:example>
+      <command:example>
+        <maml:title>Build and reuse a discoverable typed filter</maml:title>
+        <dev:code>$filter = New-EVXFilter -Type ADUserLogonFailed; $filter.AllOf($filter.Fields.Who.In('EVOTEC\Alice', 'EVOTEC\Bob'), $filter.Fields.IPAddress.MatchesSubnet('10.0.0.0/8')); Get-EVXEvent -Filter $filter -TimePeriod Last7Days</dev:code>
+        <dev:remarks>
+          <maml:para>The builder retains both the typed definition and selected predicate, so Filter is sufficient to execute the query.</maml:para>
+        </dev:remarks>
+      </command:example>
+      <command:example>
+        <maml:title>Explain an inline typed predicate</maml:title>
+        <dev:code>New-EVXFilter -Type ADUserLogonFailed -Where { $_.Who -like 'EVOTEC\*' } -Explain</dev:code>
+        <dev:remarks>
+          <maml:para>Returns native and managed predicate stages without reading events.</maml:para>
         </dev:remarks>
       </command:example>
     </command:examples>
@@ -12778,6 +13622,18 @@ This cannot be combined with EventLogPath.</maml:para>
       <command:syntaxItem parameterSetName="Input">
         <maml:name>Show-EVXEvent</maml:name>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>CsvPath</maml:name>
+          <maml:description>
+            <maml:para>Homogeneous CSV path, or a .zip bundle path when the report contains multiple typed schemas.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
+          <dev:type>
+            <maml:name>String</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>DrawerPlacement</maml:name>
           <maml:description>
             <maml:para>Preferred location of the selected-record drawer in interactive HTML output.</maml:para>
@@ -12867,6 +13723,18 @@ This cannot be combined with EventLogPath.</maml:para>
           <dev:defaultValue>None</dev:defaultValue>
         </command:parameter>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>StorePath</maml:name>
+          <maml:description>
+            <maml:para>Persists the normalized report rows in an optional local EventViewerX SQLite store.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
+          <dev:type>
+            <maml:name>String</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>Title</maml:name>
           <maml:description>
             <maml:para>Report title.</maml:para>
@@ -12919,6 +13787,18 @@ This cannot be combined with EventLogPath.</maml:para>
           <command:parameterValue required="false" variableLength="false">PSCredential</command:parameterValue>
           <dev:type>
             <maml:name>PSCredential</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>CsvPath</maml:name>
+          <maml:description>
+            <maml:para>Homogeneous CSV path, or a .zip bundle path when the report contains multiple typed schemas.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
+          <dev:type>
+            <maml:name>String</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -13039,7 +13919,7 @@ This cannot be combined with EventLogPath.</maml:para>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>MaxEventsScanned</maml:name>
           <maml:description>
-            <maml:para>Maximum raw candidates evaluated by typed definitions. Zero is unlimited.</maml:para>
+            <maml:para>Maximum raw candidates evaluated before exact predicate verification. Stored queries default to 100,000 when omitted; zero is unlimited.</maml:para>
           </maml:description>
           <command:parameterValue required="false" variableLength="false">Int64</command:parameterValue>
           <dev:type>
@@ -13121,6 +14001,18 @@ This cannot be combined with EventLogPath.</maml:para>
           <dev:defaultValue>None</dev:defaultValue>
         </command:parameter>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>StorePath</maml:name>
+          <maml:description>
+            <maml:para>Persists the normalized report rows in an optional local EventViewerX SQLite store.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
+          <dev:type>
+            <maml:name>String</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>TimePeriod</maml:name>
           <maml:description>
             <maml:para>Relative time window.</maml:para>
@@ -13155,6 +14047,8 @@ This cannot be combined with EventLogPath.</maml:para>
             <command:parameterValue required="false" variableLength="false">TillLastFriday</command:parameterValue>
             <command:parameterValue required="false" variableLength="false">TillLastSaturday</command:parameterValue>
             <command:parameterValue required="false" variableLength="false">TillLastSunday</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last15Minutes</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last30Minutes</command:parameterValue>
           </command:parameterValueGroup>
           <dev:type>
             <maml:name>TimePeriod</maml:name>
@@ -13278,6 +14172,456 @@ This cannot be combined with EventLogPath.</maml:para>
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
         </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>Where</maml:name>
+          <maml:description>
+            <maml:para>Reusable typed EventPredicate, restricted ScriptBlock, predicate JSON, or predicate JSON file.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">Object</command:parameterValue>
+          <dev:type>
+            <maml:name>Object</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+      </command:syntaxItem>
+      <command:syntaxItem parameterSetName="Store">
+        <maml:name>Show-EVXEvent</maml:name>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>CsvPath</maml:name>
+          <maml:description>
+            <maml:para>Homogeneous CSV path, or a .zip bundle path when the report contains multiple typed schemas.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
+          <dev:type>
+            <maml:name>String</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="0" aliases="None">
+          <maml:name>Definition</maml:name>
+          <maml:description>
+            <maml:para>Custom JSON definition path or an EventDefinition instance.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">Object</command:parameterValue>
+          <dev:type>
+            <maml:name>Object</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>DrawerPlacement</maml:name>
+          <maml:description>
+            <maml:para>Preferred location of the selected-record drawer in interactive HTML output.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">MonitoringRecordDrawerPlacement</command:parameterValue>
+          <command:parameterValueGroup>
+            <command:parameterValue required="false" variableLength="false">Auto</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Top</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Right</command:parameterValue>
+          </command:parameterValueGroup>
+          <dev:type>
+            <maml:name>MonitoringRecordDrawerPlacement</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>EmailPackage</maml:name>
+          <maml:description>
+            <maml:para>Returns a responsive transport-neutral email package for Mailozaurr.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="DateTo">
+          <maml:name>EndTime</maml:name>
+          <maml:description>
+            <maml:para>Absolute end time.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">DateTime</command:parameterValue>
+          <dev:type>
+            <maml:name>DateTime</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="true" globbing="false" pipelineInput="False" position="named" aliases="Id">
+          <maml:name>EventId</maml:name>
+          <maml:description>
+            <maml:para>Optional event IDs for a generic LogName query.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">Int32[]</command:parameterValue>
+          <dev:type>
+            <maml:name>Int32[]</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="true" globbing="false" pipelineInput="False" position="named" aliases="RecordId">
+          <maml:name>EventRecordId</maml:name>
+          <maml:description>
+            <maml:para>Exact event record identifiers, including IDs passed by an event-triggered scheduled task.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">Int64[]</command:parameterValue>
+          <dev:type>
+            <maml:name>Int64[]</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>ExcelPath</maml:name>
+          <maml:description>
+            <maml:para>Excel workbook output path.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
+          <dev:type>
+            <maml:name>String</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="False" position="0" aliases="None">
+          <maml:name>FromStore</maml:name>
+          <maml:description>
+            <maml:para>Reads normalized rows from a local EventViewerX SQLite store instead of querying event logs.</maml:para>
+          </maml:description>
+          <command:parameterValue required="true" variableLength="false">String</command:parameterValue>
+          <dev:type>
+            <maml:name>String</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>HtmlPath</maml:name>
+          <maml:description>
+            <maml:para>Self-contained interactive HTML output path.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
+          <dev:type>
+            <maml:name>String</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="0" aliases="None">
+          <maml:name>LogName</maml:name>
+          <maml:description>
+            <maml:para>Generic event channel. Mutually exclusive with Type.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
+          <dev:type>
+            <maml:name>String</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>MaxEvents</maml:name>
+          <maml:description>
+            <maml:para>Maximum report rows. Zero is unlimited.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">Int64</command:parameterValue>
+          <dev:type>
+            <maml:name>Int64</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>MaxEventsScanned</maml:name>
+          <maml:description>
+            <maml:para>Maximum raw candidates evaluated before exact predicate verification. Stored queries default to 100,000 when omitted; zero is unlimited.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">Int64</command:parameterValue>
+          <dev:type>
+            <maml:name>Int64</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>Oldest</maml:name>
+          <maml:description>
+            <maml:para>Reads oldest matches first.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>Open</maml:name>
+          <maml:description>
+            <maml:para>Opens generated files with the registered desktop applications.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>PassThru</maml:name>
+          <maml:description>
+            <maml:para>Returns the normalized report snapshot in addition to generated output.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="true" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>ProviderName</maml:name>
+          <maml:description>
+            <maml:para>Provider names used to filter stored rows.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">String[]</command:parameterValue>
+          <dev:type>
+            <maml:name>String[]</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="true" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>SourceComputer</maml:name>
+          <maml:description>
+            <maml:para>Original source computers used to filter stored rows.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">String[]</command:parameterValue>
+          <dev:type>
+            <maml:name>String[]</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="DateFrom">
+          <maml:name>StartTime</maml:name>
+          <maml:description>
+            <maml:para>Absolute start time.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">DateTime</command:parameterValue>
+          <dev:type>
+            <maml:name>DateTime</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>StorePath</maml:name>
+          <maml:description>
+            <maml:para>Persists the normalized report rows in an optional local EventViewerX SQLite store.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
+          <dev:type>
+            <maml:name>String</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>SummaryPeriod</maml:name>
+          <maml:description>
+            <maml:para>Groups stored events into an hourly, daily, weekly, or monthly report.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">EventStoreSummaryPeriod</command:parameterValue>
+          <command:parameterValueGroup>
+            <command:parameterValue required="false" variableLength="false">Hour</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Day</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Week</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Month</command:parameterValue>
+          </command:parameterValueGroup>
+          <dev:type>
+            <maml:name>EventStoreSummaryPeriod</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>TimePeriod</maml:name>
+          <maml:description>
+            <maml:para>Relative time window.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">TimePeriod</command:parameterValue>
+          <command:parameterValueGroup>
+            <command:parameterValue required="false" variableLength="false">PastHour</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">CurrentHour</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">PastDay</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">CurrentDay</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">PastMonth</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">CurrentMonth</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">PastQuarter</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">CurrentQuarter</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last3Days</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last7Days</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last14Days</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last1Hour</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last2Hours</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last3Hours</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last6Hours</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last12Hours</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last16Hours</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last24Hours</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Today</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Yesterday</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Everything</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">TillLastMonday</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">TillLastTuesday</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">TillLastWednesday</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">TillLastThursday</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">TillLastFriday</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">TillLastSaturday</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">TillLastSunday</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last15Minutes</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last30Minutes</command:parameterValue>
+          </command:parameterValueGroup>
+          <dev:type>
+            <maml:name>TimePeriod</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>Title</maml:name>
+          <maml:description>
+            <maml:para>Report title.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
+          <dev:type>
+            <maml:name>String</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="true" globbing="false" pipelineInput="False" position="0" aliases="None">
+          <maml:name>Type</maml:name>
+          <maml:description>
+            <maml:para>Built-in leaf or composite event definitions. Each definition owns its channels and event IDs.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">EventType[]</command:parameterValue>
+          <command:parameterValueGroup>
+            <command:parameterValue required="false" variableLength="false">ADComputerCreateChange</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">ADComputerDeleted</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">ADComputerChangeDetailed</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">ADGroupMembershipChange</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">ADGroupEnumeration</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">ADGroupChange</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">ADGroupCreateDelete</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">ADGroupChangeDetailed</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">ADGroupPolicyChanges</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">ADGroupPolicyEdits</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">ADGroupPolicyLinks</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">ADGroupPolicyChangesDetailed</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">GpoCreated</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">GpoDeleted</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">GpoModified</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">ADLdapBindingSummary</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">ADLdapBindingDetails</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">ADUserCreateChange</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">ADUserStatus</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">ADUserChangeDetailed</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">ADUserLockouts</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">ADUserLogon</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">ADUserLogonNTLMv1</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">ADUserLogonFailed</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">ADUserUnlocked</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">ADUserPrivilegeUse</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">ADUserRightsAssignment</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">KerberosTGTRequest</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">KerberosServiceTicket</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">KerberosTicketFailure</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">KerberosPolicyChange</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">ADOrganizationalUnitChangeDetailed</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">ADOtherChangeDetailed</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">ADSMBServerAuditV1</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">LogsClearedSecurity</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">LogsClearedOther</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">LogsFullSecurity</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">NetworkAccessAuthenticationPolicy</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">CertificateIssued</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">AuditPolicyChange</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">FirewallRuleChange</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">DhcpLeaseCreated</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">BitLockerKeyChange</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">BitLockerSuspended</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">DeviceRecognized</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">DeviceDisabled</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">ObjectDeletion</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">ScheduledTaskDeleted</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">ScheduledTaskCreated</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">OSCrash</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">OSBugCheck</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">OSStartup</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">OSShutdown</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">OSUncleanShutdown</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">OSStartupSecurity</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">OSCrashOnAuditFailRecovery</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">OSTimeChange</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">WindowsUpdateFailure</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">ClientGroupPoliciesApplication</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">ClientGroupPoliciesSystem</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">HyperVVirtualMachineShutdown</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">HyperVVirtualMachineStarted</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">IISSiteBindingFailure</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">HyperVCheckpointCreated</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">IISSiteStopped</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">ExchangeDatabaseMounted</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">DfsReplicationError</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">SqlDatabaseCreated</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">SyncCompleted</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">AADConnectStagingEnabled</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">AADConnectStagingDisabled</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">AADConnectPasswordSyncFailed</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">AADConnectRunProfile</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">AADSyncCycleStage</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">AADSyncProvisionCredentialsPing</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">AADSyncPasswordHashSyncStatus</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">AADSyncImportStatus</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">AADSyncFilterStatus</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">NetworkMonitorDriverLoaded</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">NetworkPromiscuousMode</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">ActiveDirectoryAuthentication</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">ActiveDirectoryAccountLifecycle</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">ActiveDirectoryChanges</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">GroupPolicyActivity</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">KerberosActivity</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">OperatingSystemLifecycle</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">WindowsSecurityChanges</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">EntraConnectHealth</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">NetworkSecurity</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">InfrastructureHealth</command:parameterValue>
+          </command:parameterValueGroup>
+          <dev:type>
+            <maml:name>EventType[]</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>Where</maml:name>
+          <maml:description>
+            <maml:para>Reusable typed EventPredicate, restricted ScriptBlock, predicate JSON, or predicate JSON file.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">Object</command:parameterValue>
+          <dev:type>
+            <maml:name>Object</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
       </command:syntaxItem>
       <command:syntaxItem parameterSetName="Log">
         <maml:name>Show-EVXEvent</maml:name>
@@ -13307,6 +14651,18 @@ This cannot be combined with EventLogPath.</maml:para>
           <command:parameterValue required="false" variableLength="false">PSCredential</command:parameterValue>
           <dev:type>
             <maml:name>PSCredential</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>CsvPath</maml:name>
+          <maml:description>
+            <maml:para>Homogeneous CSV path, or a .zip bundle path when the report contains multiple typed schemas.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
+          <dev:type>
+            <maml:name>String</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -13497,6 +14853,18 @@ This cannot be combined with EventLogPath.</maml:para>
           <dev:defaultValue>None</dev:defaultValue>
         </command:parameter>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>StorePath</maml:name>
+          <maml:description>
+            <maml:para>Persists the normalized report rows in an optional local EventViewerX SQLite store.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
+          <dev:type>
+            <maml:name>String</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>TimePeriod</maml:name>
           <maml:description>
             <maml:para>Relative time window.</maml:para>
@@ -13531,6 +14899,8 @@ This cannot be combined with EventLogPath.</maml:para>
             <command:parameterValue required="false" variableLength="false">TillLastFriday</command:parameterValue>
             <command:parameterValue required="false" variableLength="false">TillLastSaturday</command:parameterValue>
             <command:parameterValue required="false" variableLength="false">TillLastSunday</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last15Minutes</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last30Minutes</command:parameterValue>
           </command:parameterValueGroup>
           <dev:type>
             <maml:name>TimePeriod</maml:name>
@@ -13553,6 +14923,18 @@ This cannot be combined with EventLogPath.</maml:para>
       </command:syntaxItem>
       <command:syntaxItem parameterSetName="Path">
         <maml:name>Show-EVXEvent</maml:name>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>CsvPath</maml:name>
+          <maml:description>
+            <maml:para>Homogeneous CSV path, or a .zip bundle path when the report contains multiple typed schemas.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
+          <dev:type>
+            <maml:name>String</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>DrawerPlacement</maml:name>
           <maml:description>
@@ -13727,6 +15109,18 @@ This cannot be combined with EventLogPath.</maml:para>
           <dev:defaultValue>None</dev:defaultValue>
         </command:parameter>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>StorePath</maml:name>
+          <maml:description>
+            <maml:para>Persists the normalized report rows in an optional local EventViewerX SQLite store.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
+          <dev:type>
+            <maml:name>String</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>TimePeriod</maml:name>
           <maml:description>
             <maml:para>Relative time window.</maml:para>
@@ -13761,6 +15155,8 @@ This cannot be combined with EventLogPath.</maml:para>
             <command:parameterValue required="false" variableLength="false">TillLastFriday</command:parameterValue>
             <command:parameterValue required="false" variableLength="false">TillLastSaturday</command:parameterValue>
             <command:parameterValue required="false" variableLength="false">TillLastSunday</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last15Minutes</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last30Minutes</command:parameterValue>
           </command:parameterValueGroup>
           <dev:type>
             <maml:name>TimePeriod</maml:name>
@@ -13821,6 +15217,18 @@ This cannot be combined with EventLogPath.</maml:para>
           <command:parameterValue required="false" variableLength="false">PSCredential</command:parameterValue>
           <dev:type>
             <maml:name>PSCredential</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>CsvPath</maml:name>
+          <maml:description>
+            <maml:para>Homogeneous CSV path, or a .zip bundle path when the report contains multiple typed schemas.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
+          <dev:type>
+            <maml:name>String</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -13953,7 +15361,7 @@ This cannot be combined with EventLogPath.</maml:para>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>MaxEventsScanned</maml:name>
           <maml:description>
-            <maml:para>Maximum raw candidates evaluated by typed definitions. Zero is unlimited.</maml:para>
+            <maml:para>Maximum raw candidates evaluated before exact predicate verification. Stored queries default to 100,000 when omitted; zero is unlimited.</maml:para>
           </maml:description>
           <command:parameterValue required="false" variableLength="false">Int64</command:parameterValue>
           <dev:type>
@@ -14023,6 +15431,18 @@ This cannot be combined with EventLogPath.</maml:para>
           <dev:defaultValue>None</dev:defaultValue>
         </command:parameter>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>StorePath</maml:name>
+          <maml:description>
+            <maml:para>Persists the normalized report rows in an optional local EventViewerX SQLite store.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
+          <dev:type>
+            <maml:name>String</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>TimePeriod</maml:name>
           <maml:description>
             <maml:para>Relative time window.</maml:para>
@@ -14057,6 +15477,8 @@ This cannot be combined with EventLogPath.</maml:para>
             <command:parameterValue required="false" variableLength="false">TillLastFriday</command:parameterValue>
             <command:parameterValue required="false" variableLength="false">TillLastSaturday</command:parameterValue>
             <command:parameterValue required="false" variableLength="false">TillLastSunday</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last15Minutes</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Last30Minutes</command:parameterValue>
           </command:parameterValueGroup>
           <dev:type>
             <maml:name>TimePeriod</maml:name>
@@ -14072,6 +15494,18 @@ This cannot be combined with EventLogPath.</maml:para>
           <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
           <dev:type>
             <maml:name>String</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>Where</maml:name>
+          <maml:description>
+            <maml:para>Reusable typed EventPredicate, restricted ScriptBlock, predicate JSON, or predicate JSON file.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">Object</command:parameterValue>
+          <dev:type>
+            <maml:name>Object</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -14117,6 +15551,18 @@ This cannot be combined with EventLogPath.</maml:para>
         <command:parameterValue required="false" variableLength="false">PSCredential</command:parameterValue>
         <dev:type>
           <maml:name>PSCredential</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+        <maml:name>CsvPath</maml:name>
+        <maml:description>
+          <maml:para>Homogeneous CSV path, or a .zip bundle path when the report contains multiple typed schemas.</maml:para>
+        </maml:description>
+        <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
+        <dev:type>
+          <maml:name>String</maml:name>
           <maml:uri />
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
@@ -14210,6 +15656,18 @@ This cannot be combined with EventLogPath.</maml:para>
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
       </command:parameter>
+      <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="False" position="0" aliases="None">
+        <maml:name>FromStore</maml:name>
+        <maml:description>
+          <maml:para>Reads normalized rows from a local EventViewerX SQLite store instead of querying event logs.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="false">String</command:parameterValue>
+        <dev:type>
+          <maml:name>String</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
       <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
         <maml:name>HtmlPath</maml:name>
         <maml:description>
@@ -14285,7 +15743,7 @@ This cannot be combined with EventLogPath.</maml:para>
       <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
         <maml:name>MaxEventsScanned</maml:name>
         <maml:description>
-          <maml:para>Maximum raw candidates evaluated by typed definitions. Zero is unlimited.</maml:para>
+          <maml:para>Maximum raw candidates evaluated before exact predicate verification. Stored queries default to 100,000 when omitted; zero is unlimited.</maml:para>
         </maml:description>
         <command:parameterValue required="false" variableLength="false">Int64</command:parameterValue>
         <dev:type>
@@ -14342,6 +15800,18 @@ This cannot be combined with EventLogPath.</maml:para>
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
       </command:parameter>
+      <command:parameter required="false" variableLength="true" globbing="false" pipelineInput="False" position="named" aliases="None">
+        <maml:name>ProviderName</maml:name>
+        <maml:description>
+          <maml:para>Provider names used to filter stored rows.</maml:para>
+        </maml:description>
+        <command:parameterValue required="false" variableLength="false">String[]</command:parameterValue>
+        <dev:type>
+          <maml:name>String[]</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
       <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
         <maml:name>ResolveDns</maml:name>
         <maml:description>
@@ -14354,6 +15824,18 @@ This cannot be combined with EventLogPath.</maml:para>
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
       </command:parameter>
+      <command:parameter required="false" variableLength="true" globbing="false" pipelineInput="False" position="named" aliases="None">
+        <maml:name>SourceComputer</maml:name>
+        <maml:description>
+          <maml:para>Original source computers used to filter stored rows.</maml:para>
+        </maml:description>
+        <command:parameterValue required="false" variableLength="false">String[]</command:parameterValue>
+        <dev:type>
+          <maml:name>String[]</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
       <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="DateFrom">
         <maml:name>StartTime</maml:name>
         <maml:description>
@@ -14362,6 +15844,36 @@ This cannot be combined with EventLogPath.</maml:para>
         <command:parameterValue required="false" variableLength="false">DateTime</command:parameterValue>
         <dev:type>
           <maml:name>DateTime</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+        <maml:name>StorePath</maml:name>
+        <maml:description>
+          <maml:para>Persists the normalized report rows in an optional local EventViewerX SQLite store.</maml:para>
+        </maml:description>
+        <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
+        <dev:type>
+          <maml:name>String</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+        <maml:name>SummaryPeriod</maml:name>
+        <maml:description>
+          <maml:para>Groups stored events into an hourly, daily, weekly, or monthly report.</maml:para>
+        </maml:description>
+        <command:parameterValue required="false" variableLength="false">EventStoreSummaryPeriod</command:parameterValue>
+        <command:parameterValueGroup>
+          <command:parameterValue required="false" variableLength="false">Hour</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Day</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Week</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Month</command:parameterValue>
+        </command:parameterValueGroup>
+        <dev:type>
+          <maml:name>EventStoreSummaryPeriod</maml:name>
           <maml:uri />
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
@@ -14401,6 +15913,8 @@ This cannot be combined with EventLogPath.</maml:para>
           <command:parameterValue required="false" variableLength="false">TillLastFriday</command:parameterValue>
           <command:parameterValue required="false" variableLength="false">TillLastSaturday</command:parameterValue>
           <command:parameterValue required="false" variableLength="false">TillLastSunday</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Last15Minutes</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Last30Minutes</command:parameterValue>
         </command:parameterValueGroup>
         <dev:type>
           <maml:name>TimePeriod</maml:name>
@@ -14524,6 +16038,18 @@ This cannot be combined with EventLogPath.</maml:para>
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
       </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+        <maml:name>Where</maml:name>
+        <maml:description>
+          <maml:para>Reusable typed EventPredicate, restricted ScriptBlock, predicate JSON, or predicate JSON file.</maml:para>
+        </maml:description>
+        <command:parameterValue required="false" variableLength="false">Object</command:parameterValue>
+        <dev:type>
+          <maml:name>Object</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
     </command:parameters>
     <command:inputTypes>
       <command:inputType>
@@ -14564,7 +16090,7 @@ This cannot be combined with EventLogPath.</maml:para>
       </command:example>
       <command:example>
         <maml:title>Create HTML and Excel from one query</maml:title>
-        <dev:code>Show-EVXEvent -Type ActiveDirectoryAuthentication -Collector WEC01 -HtmlPath .\Auth.html -ExcelPath .\Auth.xlsx -PassThru</dev:code>
+        <dev:code>$filter = New-EVXFilter -Type ActiveDirectoryAuthentication; Show-EVXEvent -Type ActiveDirectoryAuthentication -Where $filter.Fields.Who.Contains('svc-') -Collector WEC01 -HtmlPath .\Auth.html -ExcelPath .\Auth.xlsx -PassThru</dev:code>
         <dev:remarks>
           <maml:para>Reads ForwardedEvents once and renders both formats from the same snapshot.</maml:para>
         </dev:remarks>

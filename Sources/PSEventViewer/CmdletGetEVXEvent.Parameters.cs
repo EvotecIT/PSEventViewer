@@ -12,6 +12,7 @@ public sealed partial class CmdletGetEVXEvent {
     [Parameter(Mandatory = false, ParameterSetName = "Channel")]
     [Parameter(Mandatory = false, ParameterSetName = "Type")]
     [Parameter(Mandatory = false, ParameterSetName = "Definition")]
+    [Parameter(Mandatory = false, ParameterSetName = "TypedFilter")]
     [Parameter(Mandatory = false, ParameterSetName = "Path")]
     [Parameter(Mandatory = false, ParameterSetName = "Hashtable")]
     [Parameter(Mandatory = false, ParameterSetName = "Xml")]
@@ -53,13 +54,15 @@ public sealed partial class CmdletGetEVXEvent {
     [Parameter(Mandatory = false, ParameterSetName = "Channel")]
     [Parameter(Mandatory = false, ParameterSetName = "Path")]
     [Parameter(Mandatory = false, ParameterSetName = "Provider")]
-    public EventFilter? Filter { get; set; }
+    [Parameter(Mandatory = true, ParameterSetName = "TypedFilter")]
+    public object? Filter { get; set; }
 
     /// <summary>Credentials used for remote channel or structured queries.</summary>
     [Credential]
     [Parameter(Mandatory = false, ParameterSetName = "Channel")]
     [Parameter(Mandatory = false, ParameterSetName = "Type")]
     [Parameter(Mandatory = false, ParameterSetName = "Definition")]
+    [Parameter(Mandatory = false, ParameterSetName = "TypedFilter")]
     [Parameter(Mandatory = false, ParameterSetName = "Hashtable")]
     [Parameter(Mandatory = false, ParameterSetName = "Xml")]
     [Parameter(Mandatory = false, ParameterSetName = "Provider")]
@@ -69,6 +72,7 @@ public sealed partial class CmdletGetEVXEvent {
     [Parameter(Mandatory = false, ParameterSetName = "Channel")]
     [Parameter(Mandatory = false, ParameterSetName = "Type")]
     [Parameter(Mandatory = false, ParameterSetName = "Definition")]
+    [Parameter(Mandatory = false, ParameterSetName = "TypedFilter")]
     [Parameter(Mandatory = false, ParameterSetName = "Hashtable")]
     [Parameter(Mandatory = false, ParameterSetName = "Xml")]
     [Parameter(Mandatory = false, ParameterSetName = "Provider")]
@@ -112,6 +116,7 @@ public sealed partial class CmdletGetEVXEvent {
     [Parameter(Mandatory = false, ParameterSetName = "Channel")]
     [Parameter(Mandatory = false, ParameterSetName = "Type")]
     [Parameter(Mandatory = false, ParameterSetName = "Definition")]
+    [Parameter(Mandatory = false, ParameterSetName = "TypedFilter")]
     [Parameter(Mandatory = false, ParameterSetName = "Path")]
     [Parameter(Mandatory = false, ParameterSetName = "Hashtable")]
     [Parameter(Mandatory = false, ParameterSetName = "Xml")]
@@ -141,6 +146,7 @@ public sealed partial class CmdletGetEVXEvent {
     [Parameter(Mandatory = false, ParameterSetName = "Channel")]
     [Parameter(Mandatory = false, ParameterSetName = "Type")]
     [Parameter(Mandatory = false, ParameterSetName = "Definition")]
+    [Parameter(Mandatory = false, ParameterSetName = "TypedFilter")]
     [Parameter(Mandatory = false, ParameterSetName = "Path")]
     [Parameter(Mandatory = false, ParameterSetName = "Hashtable")]
     [Parameter(Mandatory = false, ParameterSetName = "Xml")]

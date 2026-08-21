@@ -14,7 +14,7 @@ namespace PSEventViewer;
 /// </example>
 /// <example>
 ///   <summary>Create HTML and Excel from one query</summary>
-///   <code>Show-EVXEvent -Type ActiveDirectoryAuthentication -Collector WEC01 -HtmlPath .\Auth.html -ExcelPath .\Auth.xlsx -PassThru</code>
+///   <code>$filter = New-EVXFilter -Type ActiveDirectoryAuthentication; Show-EVXEvent -Type ActiveDirectoryAuthentication -Where $filter.Fields.Who.Contains('svc-') -Collector WEC01 -HtmlPath .\Auth.html -ExcelPath .\Auth.xlsx -PassThru</code>
 ///   <para>Reads ForwardedEvents once and renders both formats from the same snapshot.</para>
 /// </example>
 /// <example>
@@ -30,10 +30,12 @@ public sealed class CmdletShowEVXEvent : AsyncPSCmdlet {
 
     /// <summary>Built-in leaf or composite event definitions. Each definition owns its channels and event IDs.</summary>
     [Parameter(Mandatory = true, Position = 0, ParameterSetName = "Type")]
+    [Parameter(ParameterSetName = "Store")]
     public EventType[] Type { get; set; } = Array.Empty<EventType>();
 
     /// <summary>Generic event channel. Mutually exclusive with Type.</summary>
     [Parameter(Mandatory = true, Position = 0, ParameterSetName = "Log")]
+    [Parameter(ParameterSetName = "Store")]
     public string? LogName { get; set; }
 
     /// <summary>One or more offline EVTX files. Type or Definition may be supplied to apply typed semantics; Path alone creates a generic report.</summary>
@@ -45,12 +47,20 @@ public sealed class CmdletShowEVXEvent : AsyncPSCmdlet {
 
     /// <summary>Custom JSON definition path or an EventDefinition instance.</summary>
     [Parameter(Mandatory = true, Position = 0, ParameterSetName = "Definition")]
+    [Parameter(ParameterSetName = "Store")]
     public object? Definition { get; set; }
+
+    /// <summary>Reusable typed EventPredicate, restricted ScriptBlock, predicate JSON, or predicate JSON file.</summary>
+    [Parameter(ParameterSetName = "Type")]
+    [Parameter(ParameterSetName = "Definition")]
+    [Parameter(ParameterSetName = "Store")]
+    public object? Where { get; set; }
 
     /// <summary>Optional event IDs for a generic LogName query.</summary>
     [Alias("Id")]
     [Parameter(ParameterSetName = "Log")]
     [Parameter(ParameterSetName = "Path")]
+    [Parameter(ParameterSetName = "Store")]
     public int[]? EventId { get; set; }
 
     /// <summary>Exact event record identifiers, including IDs passed by an event-triggered scheduled task.</summary>
@@ -59,7 +69,20 @@ public sealed class CmdletShowEVXEvent : AsyncPSCmdlet {
     [Parameter(ParameterSetName = "Log")]
     [Parameter(ParameterSetName = "Path")]
     [Parameter(ParameterSetName = "Definition")]
+    [Parameter(ParameterSetName = "Store")]
     public long[]? EventRecordId { get; set; }
+
+    /// <summary>Reads normalized rows from a local EventViewerX SQLite store instead of querying event logs.</summary>
+    [Parameter(Mandatory = true, Position = 0, ParameterSetName = "Store")]
+    public string? FromStore { get; set; }
+
+    /// <summary>Original source computers used to filter stored rows.</summary>
+    [Parameter(ParameterSetName = "Store")]
+    public string[]? SourceComputer { get; set; }
+
+    /// <summary>Provider names used to filter stored rows.</summary>
+    [Parameter(ParameterSetName = "Store")]
+    public string[]? ProviderName { get; set; }
 
     /// <summary>Existing EventObject or EventTypeRecord values. No source query is performed.</summary>
     [Parameter(Mandatory = true, ValueFromPipeline = true, ParameterSetName = "Input")]
@@ -83,6 +106,7 @@ public sealed class CmdletShowEVXEvent : AsyncPSCmdlet {
     [Parameter(ParameterSetName = "Log")]
     [Parameter(ParameterSetName = "Path")]
     [Parameter(ParameterSetName = "Definition")]
+    [Parameter(ParameterSetName = "Store")]
     public DateTime? StartTime { get; set; }
 
     /// <summary>Absolute end time.</summary>
@@ -91,6 +115,7 @@ public sealed class CmdletShowEVXEvent : AsyncPSCmdlet {
     [Parameter(ParameterSetName = "Log")]
     [Parameter(ParameterSetName = "Path")]
     [Parameter(ParameterSetName = "Definition")]
+    [Parameter(ParameterSetName = "Store")]
     public DateTime? EndTime { get; set; }
 
     /// <summary>Relative time window.</summary>
@@ -98,6 +123,7 @@ public sealed class CmdletShowEVXEvent : AsyncPSCmdlet {
     [Parameter(ParameterSetName = "Log")]
     [Parameter(ParameterSetName = "Path")]
     [Parameter(ParameterSetName = "Definition")]
+    [Parameter(ParameterSetName = "Store")]
     public TimePeriod? TimePeriod { get; set; }
 
     /// <summary>Maximum report rows. Zero is unlimited.</summary>
@@ -106,12 +132,14 @@ public sealed class CmdletShowEVXEvent : AsyncPSCmdlet {
     [Parameter(ParameterSetName = "Log")]
     [Parameter(ParameterSetName = "Path")]
     [Parameter(ParameterSetName = "Definition")]
+    [Parameter(ParameterSetName = "Store")]
     public long MaxEvents { get; set; }
 
-    /// <summary>Maximum raw candidates evaluated by typed definitions. Zero is unlimited.</summary>
+    /// <summary>Maximum raw candidates evaluated before exact predicate verification. Stored queries default to 100,000 when omitted; zero is unlimited.</summary>
     [ValidateRange(0, long.MaxValue)]
     [Parameter(ParameterSetName = "Type")]
     [Parameter(ParameterSetName = "Definition")]
+    [Parameter(ParameterSetName = "Store")]
     public long MaxEventsScanned { get; set; }
 
     /// <summary>Maximum sources opened concurrently.</summary>
@@ -127,7 +155,12 @@ public sealed class CmdletShowEVXEvent : AsyncPSCmdlet {
     [Parameter(ParameterSetName = "Log")]
     [Parameter(ParameterSetName = "Path")]
     [Parameter(ParameterSetName = "Definition")]
+    [Parameter(ParameterSetName = "Store")]
     public SwitchParameter Oldest { get; set; }
+
+    /// <summary>Groups stored events into an hourly, daily, weekly, or monthly report.</summary>
+    [Parameter(ParameterSetName = "Store")]
+    public EventStoreSummaryPeriod? SummaryPeriod { get; set; }
 
     /// <summary>Enriches typed IP-address properties through DnsClientX.</summary>
     [Parameter(ParameterSetName = "Type")]
@@ -162,6 +195,14 @@ public sealed class CmdletShowEVXEvent : AsyncPSCmdlet {
     [Parameter]
     public string? ExcelPath { get; set; }
 
+    /// <summary>Homogeneous CSV path, or a .zip bundle path when the report contains multiple typed schemas.</summary>
+    [Parameter]
+    public string? CsvPath { get; set; }
+
+    /// <summary>Persists the normalized report rows in an optional local EventViewerX SQLite store.</summary>
+    [Parameter]
+    public string? StorePath { get; set; }
+
     /// <summary>Returns a responsive transport-neutral email package for Mailozaurr.</summary>
     [Parameter]
     public SwitchParameter EmailPackage { get; set; }
@@ -188,9 +229,88 @@ public sealed class CmdletShowEVXEvent : AsyncPSCmdlet {
 
     /// <inheritdoc />
     protected override async Task EndProcessingAsync() {
+        if (SummaryPeriod.HasValue && !string.IsNullOrWhiteSpace(StorePath)) {
+            throw new PSArgumentException(
+                "SummaryPeriod and StorePath cannot be combined because derived summary rows are not durable event history. " +
+                "Store source events first, then render summaries from that store.",
+                nameof(StorePath));
+        }
         EventReport report;
         if (ParameterSetName == "Input") {
             report = EventReportEngine.Create(_input, Title);
+        } else if (ParameterSetName == "Store") {
+            if (Type.Length > 0 && Definition != null) {
+                throw new PSArgumentException(
+                    "Type and Definition are mutually exclusive when reading stored reports.",
+                    nameof(Definition));
+            }
+            EventDefinition? storedDefinition = ResolveStoredDefinition(Definition);
+            EventPredicateBuilder? storedBuilder = storedDefinition != null
+                ? EventPredicateBuilder.ForDefinition(storedDefinition)
+                : Type.Length > 0
+                    ? EventPredicateBuilder.ForTypes(Type)
+                    : null;
+            IReadOnlyList<string>? storedDefinitionNames = ResolveStoredDefinitionNames(
+                Definition,
+                storedDefinition);
+            var store = new EventStore(FromStore!);
+            object? storedWhere = Where;
+            while (storedWhere is PSObject wrapper && wrapper.BaseObject != storedWhere) {
+                storedWhere = wrapper.BaseObject;
+            }
+            if (storedBuilder == null && storedWhere is ScriptBlock) {
+                IReadOnlyList<EventReportSectionSchema> schemas = await store.GetSchemasAsync(
+                    new EventStoreQuery { DefinitionNames = storedDefinitionNames },
+                    CancelToken).ConfigureAwait(false);
+                EventReportSectionSchema schema = schemas.Count == 1
+                    ? schemas[0]
+                    : throw new PSArgumentException(
+                        "Stored script-block filters require exactly one discoverable schema. " +
+                        $"The current stored selection exposes {schemas.Count} schemas. " +
+                        "Supply -Type, -Definition, an EventDefinition object, or a JSON definition file before using -Where.",
+                        nameof(Definition));
+                storedBuilder = EventPredicateBuilder.ForFields(
+                    schema.Name,
+                    schema.Columns.Select(static column => new KeyValuePair<string, Type>(
+                        column.Name,
+                        EventReportColumnSchema.ResolveValueTypeName(column.ValueTypeName))),
+                    schema.DisplayName,
+                    schema.Columns.ToDictionary(
+                        static column => column.Name,
+                        static column => column.Aliases ?? Array.Empty<string>(),
+                        StringComparer.OrdinalIgnoreCase));
+            }
+            EventPredicate? storedPredicate = PowerShellEventPredicateAdapter.Resolve(
+                Where,
+                nameof(Where),
+                storedBuilder);
+            if (storedPredicate != null && storedBuilder != null) {
+                storedPredicate = storedBuilder.Normalize(storedPredicate);
+            }
+            var query = new EventStoreQuery {
+                Types = Type.Length == 0 ? null : Type,
+                DefinitionNames = storedDefinitionNames,
+                DefinitionSchemas = storedDefinition == null
+                    ? null
+                    : new[] { EventReportSectionSchema.FromDefinition(storedDefinition) },
+                StartTime = StartTime,
+                EndTime = EndTime,
+                TimePeriod = TimePeriod,
+                EventIds = EventId,
+                RecordIds = EventRecordId,
+                SourceComputers = SourceComputer,
+                SourceLogs = string.IsNullOrWhiteSpace(LogName) ? null : new[] { LogName! },
+                Providers = ProviderName,
+                Predicate = storedPredicate,
+                MaxEvents = MaxEvents,
+                Oldest = Oldest.IsPresent
+            };
+            if (MyInvocation.BoundParameters.ContainsKey(nameof(MaxEventsScanned))) {
+                query.MaxCandidates = MaxEventsScanned;
+            }
+            report = SummaryPeriod.HasValue
+                ? await store.CreateSummaryReportAsync(query, SummaryPeriod.Value, Title, CancelToken).ConfigureAwait(false)
+                : await store.ReadReportAsync(query, Title, CancelToken).ConfigureAwait(false);
         } else {
             EventReportRequest request;
             if (ParameterSetName == "Type") {
@@ -228,10 +348,23 @@ public sealed class CmdletShowEVXEvent : AsyncPSCmdlet {
             request.Credential = Credential?.GetNetworkCredential();
             request.Authentication = Authentication;
             request.Title = Title;
+            EventPredicateBuilder? requestBuilder = request.Definition != null
+                ? EventPredicateBuilder.ForDefinition(request.Definition)
+                : request.Types != null && request.Types.Count > 0
+                    ? EventPredicateBuilder.ForTypes(request.Types)
+                    : null;
+            request.Predicate = PowerShellEventPredicateAdapter.Resolve(
+                Where,
+                nameof(Where),
+                requestBuilder);
             report = await EventReportEngine.QueryAsync(request, CancelToken).ConfigureAwait(false);
         }
 
-        bool hasDestination = !string.IsNullOrWhiteSpace(HtmlPath) || !string.IsNullOrWhiteSpace(ExcelPath) || EmailPackage.IsPresent;
+        bool hasDestination = !string.IsNullOrWhiteSpace(HtmlPath) ||
+                              !string.IsNullOrWhiteSpace(ExcelPath) ||
+                              !string.IsNullOrWhiteSpace(CsvPath) ||
+                              !string.IsNullOrWhiteSpace(StorePath) ||
+                              EmailPackage.IsPresent;
         string? htmlPath = HtmlPath;
         if (!hasDestination && !PassThru.IsPresent) {
             htmlPath = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"EventViewerX-{DateTime.Now:yyyyMMdd-HHmmss}.html");
@@ -248,11 +381,59 @@ public sealed class CmdletShowEVXEvent : AsyncPSCmdlet {
             }
             WriteObject(saved);
         }
+        if (!string.IsNullOrWhiteSpace(CsvPath)) {
+            string saved = EventReportCsvRenderer.Save(report, CsvPath!);
+            if (Open.IsPresent) {
+                Process.Start(new ProcessStartInfo(saved) { UseShellExecute = true });
+            }
+            WriteObject(saved);
+        }
+        if (!string.IsNullOrWhiteSpace(StorePath)) {
+            var store = new EventStore(StorePath!);
+            EventStoreWriteResult stored = await store.WriteAsync(report, cancellationToken: CancelToken).ConfigureAwait(false);
+            WriteVerbose($"Stored {stored.Inserted} new rows and skipped {stored.Duplicates} duplicates.");
+            WriteObject(store.Path);
+        }
         if (EmailPackage.IsPresent) {
             WriteObject(await EventReportEmailRenderer.RenderAsync(report).ConfigureAwait(false));
         }
         if (PassThru.IsPresent) {
             WriteObject(report);
         }
+    }
+
+    private static EventDefinition? ResolveStoredDefinition(object? definition) {
+        if (definition == null) {
+            return null;
+        }
+        object value = definition;
+        while (value is PSObject wrapper && wrapper.BaseObject != value) {
+            value = wrapper.BaseObject;
+        }
+        return value switch {
+            EventDefinition typed => typed,
+            string path when File.Exists(path) => EventDefinition.Load(path),
+            string stableName when !string.IsNullOrWhiteSpace(stableName) => null,
+            _ => throw new PSArgumentException(
+                "Stored Definition must be a stable definition name, EventDefinition instance, or JSON file path.",
+                nameof(Definition))
+        };
+    }
+
+    private static IReadOnlyList<string>? ResolveStoredDefinitionNames(
+        object? definition,
+        EventDefinition? resolvedDefinition) {
+
+        if (definition == null) {
+            return null;
+        }
+        if (resolvedDefinition != null) {
+            return new[] { resolvedDefinition.Name };
+        }
+        object value = definition;
+        while (value is PSObject wrapper && wrapper.BaseObject != value) {
+            value = wrapper.BaseObject;
+        }
+        return new[] { ((string)value).Trim() };
     }
 }

@@ -32,6 +32,7 @@ internal static class EventReportTableProjection {
         string[] valueColumns = rows
             .SelectMany(static row => row.Values.Keys)
             .Where(static key => !string.IsNullOrWhiteSpace(key))
+            .Where(static key => !EventReportRow.IsCommonFieldName(key))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .Take(expandedValueColumnLimit + 1)
             .ToArray();
@@ -55,6 +56,32 @@ internal static class EventReportTableProjection {
             throw new ArgumentNullException(nameof(section));
         }
         return section.Rows.Select(row => ProjectRow(section, row)).ToList();
+    }
+
+    internal static IReadOnlyDictionary<string, string> CreateUniqueDisplayNames(
+        IReadOnlyList<EventReportColumn> columns) {
+
+        if (columns == null) {
+            throw new ArgumentNullException(nameof(columns));
+        }
+        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var used = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (EventReportColumn column in columns) {
+            string baseName = string.IsNullOrWhiteSpace(column.DisplayName)
+                ? column.Name
+                : column.DisplayName;
+            string candidate = baseName;
+            if (!used.Add(candidate)) {
+                string disambiguator = SplitWords(column.Name);
+                candidate = $"{baseName} {disambiguator}";
+                int suffix = 2;
+                while (!used.Add(candidate)) {
+                    candidate = $"{baseName} {disambiguator} {suffix++}";
+                }
+            }
+            result[column.Name] = candidate;
+        }
+        return result;
     }
 
     internal static List<Dictionary<string, object?>> ProjectProvenance(IEnumerable<EventReportRow> rows) {
@@ -96,12 +123,12 @@ internal static class EventReportTableProjection {
         var result = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
         foreach (EventReportColumn column in section.Columns) {
             if (section.Kind != EventReportSectionKind.Generic) {
-                result[column.DisplayName] = row.Values.TryGetValue(column.Name, out object? value)
+                result[column.Name] = row.Values.TryGetValue(column.Name, out object? value)
                     ? NormalizeCellValue(value)
                     : null;
                 continue;
             }
-            result[column.DisplayName] = column.Name switch {
+            result[column.Name] = column.Name switch {
                 nameof(EventReportRow.TimeCreated) => row.TimeCreated,
                 nameof(EventReportRow.Type) => row.Type,
                 nameof(EventReportRow.EventId) => row.EventId,

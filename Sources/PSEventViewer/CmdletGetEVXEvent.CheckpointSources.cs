@@ -85,6 +85,33 @@ public sealed partial class CmdletGetEVXEvent {
                             source.Kind ==
                             EventLogQuerySourceKind.File))
                     .ToArray();
+            case "TypedFilter":
+                if (Collector != null) {
+                    return new[] {
+                        new CheckpointSource(
+                            "ForwardedEvents",
+                            isFile: false)
+                    };
+                }
+                if (_typedFilter?.Type != null) {
+                    return EventTypeCatalog
+                        .GetSourceMap(Type)
+                        .Keys
+                        .Select(static source =>
+                            new CheckpointSource(source, isFile: false))
+                        .ToArray();
+                }
+                if (_typedFilter?.Definition != null) {
+                    return ResolveEventDefinition().Sources
+                        .Select(static source => source.LogName)
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .Select(static source =>
+                            new CheckpointSource(source, isFile: false))
+                        .ToArray();
+                }
+                throw new PSArgumentException(
+                    "Typed Filter checkpoint sources require a retained Type or Definition.",
+                    nameof(Filter));
             case "Type":
                 if (Path.Length > 0) {
                     return ExpandFilePaths(Path, nameof(Path))

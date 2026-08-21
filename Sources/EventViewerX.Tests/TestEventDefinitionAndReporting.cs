@@ -4,12 +4,148 @@ using System.Security.Principal;
 using System.Xml.Linq;
 using EventViewerX.Reporting;
 using EventViewerX.Rules.ActiveDirectory;
+using EventViewerX.Rules.HyperV;
+using EventViewerX.Storage;
 using HtmlForgeX;
 using Xunit;
 
 namespace EventViewerX.Tests;
 
 public sealed class TestEventDefinitionAndReporting {
+    [Fact]
+    public void TypedProjectionPlansRemainScopedToTheEventDefinition() {
+        EventTypeDefinition first = EventTypeCatalog.GetDefinition(EventType.OSStartup);
+        var second = new EventTypeDefinition(
+            EventType.OSShutdown,
+            "Shared shutdown",
+            "Second definition using the same projected CLR type.",
+            first.Category,
+            first.Sources,
+            first.Fields,
+            first.RecordType,
+            Array.Empty<EventType>());
+
+        EventReportSectionDefinition firstSection = EventReportProjectionFactory.Create(
+            first.RecordType!,
+            first);
+        EventReportSectionDefinition secondSection = EventReportProjectionFactory.Create(
+            first.RecordType!,
+            second);
+
+        Assert.Equal(nameof(EventType.OSStartup), firstSection.Name);
+        Assert.Equal(nameof(EventType.OSShutdown), secondSection.Name);
+        Assert.NotEqual(firstSection.Key, secondSection.Key);
+    }
+
+    [Fact]
+    public async Task TypedReportRowsUseCatalogDefinitionNamesInsteadOfLegacyRecordLabels() {
+        EventObject computer = CreateSecuritySource(4741, 41);
+        EventObject user = CreateSecuritySource(4720, 42);
+        foreach (EventObject source in new[] { computer, user }) {
+            source.Data["OldUacValue"] = "-";
+            source.Data["NewUacValue"] = "-";
+            source.Data["UserAccountControl"] = "-";
+        }
+        object[] records = {
+            new ADComputerCreateChange(computer),
+            new ADUserCreateChange(user),
+            new ADUserStatus(CreateSecuritySource(4722, 43)),
+            new VmCheckpointCreated(CreateSecuritySource(4096, 44))
+        };
+
+        EventReport report = EventReportEngine.Create(records);
+
+        string[] expected = {
+            nameof(EventType.ADComputerCreateChange),
+            nameof(EventType.ADUserCreateChange),
+            nameof(EventType.ADUserStatus),
+            nameof(EventType.HyperVCheckpointCreated)
+        };
+        Assert.Equal(expected.OrderBy(static value => value),
+            report.Rows.Select(static row => row.Type).OrderBy(static value => value));
+        Assert.All(report.Rows, row => Assert.Contains(report.Sections,
+            section => string.Equals(section.Name, row.Type, StringComparison.Ordinal)));
+
+        string storePath = Path.Combine(Path.GetTempPath(), $"evx-catalog-identities-{Guid.NewGuid():N}.db");
+        try {
+            EventStoreWriteResult write = await new EventStore(storePath).WriteAsync(report);
+            Assert.Equal(4, write.Inserted);
+        } finally {
+            foreach (string suffix in new[] { string.Empty, "-wal", "-shm" }) {
+                File.Delete(storePath + suffix);
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData("ADUserLogonFailed")]
+    [InlineData("activedirectoryauthentication")]
+    [InlineData("Generic")]
+    [InlineData("EventStoreSummary")]
+    public void CustomDefinitionsRejectReservedBuiltInTypeNames(string name) {
+        EventDefinition definition = CreateDefinition();
+        definition.Name = name;
+
+        InvalidDataException exception = Assert.Throws<InvalidDataException>(definition.Validate);
+
+        Assert.Contains(name, exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("reserved", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void CustomDefinitionsCanonicalizeStableNamesFieldsAliasesAndSources() {
+        EventDefinition definition = CreateDefinition();
+        definition.Name = "  ServiceChanges  ";
+        definition.Sources[0].LogName = "  Security  ";
+        definition.Sources[0].ProviderNames = new[] { "  Provider.One  " };
+        definition.Fields[0].Name = "  Who  ";
+        definition.Fields[0].Aliases = new[] { "  Account  " };
+        definition.Fields[0].SourceName = "  TargetUserName  ";
+
+        definition.Validate();
+        EventPredicateBuilder builder = EventPredicateBuilder.ForDefinition(definition);
+
+        Assert.Equal("ServiceChanges", definition.Name);
+        Assert.Equal("Security", definition.Sources[0].LogName);
+        Assert.Equal("Provider.One", Assert.Single(definition.Sources[0].ProviderNames));
+        Assert.Equal("Who", definition.Fields[0].Name);
+        Assert.Equal("Account", Assert.Single(definition.Fields[0].Aliases));
+        Assert.Equal("TargetUserName", definition.Fields[0].SourceName);
+        Assert.Equal("Who", builder.Field("Who").Name);
+        Assert.Equal("Who", builder.Field(" Account ").Name);
+    }
+
+    [Fact]
+    public async Task EmptyTypedAndCustomQueriesRetainSchemasForCsvExport() {
+        string fixture = Path.GetFullPath(Path.Combine(
+            AppContext.BaseDirectory, "..", "..", "..", "..", "..", "Tests", "Logs", "NamedFilterExamples.evtx"));
+        EventReportRequest typedRequest = EventReportRequest.ForTypes(EventType.OSStartup);
+        typedRequest.Paths = new[] { fixture };
+        typedRequest.RecordIds = new[] { long.MaxValue };
+        EventDefinition customDefinition = CreateDefinition();
+        EventReportRequest customRequest = EventReportRequest.ForDefinition(customDefinition);
+        customRequest.Paths = new[] { fixture };
+        customRequest.RecordIds = new[] { long.MaxValue };
+
+        EventReport typed = await EventReportEngine.QueryAsync(typedRequest);
+        EventReport custom = await EventReportEngine.QueryAsync(customRequest);
+        string typedCsv = Path.Combine(Path.GetTempPath(), $"evx-empty-typed-{Guid.NewGuid():N}.csv");
+        string customCsv = Path.Combine(Path.GetTempPath(), $"evx-empty-custom-{Guid.NewGuid():N}.csv");
+        try {
+            Assert.Empty(typed.Rows);
+            Assert.Empty(custom.Rows);
+            Assert.Single(typed.Sections);
+            Assert.Single(custom.Sections);
+            EventReportCsvRenderer.Save(typed, typedCsv);
+            EventReportCsvRenderer.Save(custom, customCsv);
+            Assert.NotEmpty(File.ReadAllText(typedCsv));
+            Assert.StartsWith("User,Computer", File.ReadAllText(customCsv), StringComparison.Ordinal);
+        } finally {
+            File.Delete(typedCsv);
+            File.Delete(customCsv);
+        }
+    }
+
     [Fact]
     public void CustomDefinitionRoundTripsCompilesAndProjects() {
         EventDefinition definition = CreateDefinition();
@@ -71,13 +207,19 @@ public sealed class TestEventDefinitionAndReporting {
         Assert.Contains("data-hfx-monitoring-record-drawer-placement=\"top\"", topDrawerHtml, StringComparison.Ordinal);
 
         string workbook = Path.Combine(Path.GetTempPath(), $"evx-report-{Guid.NewGuid():N}.xlsx");
+        string csv = Path.Combine(Path.GetTempPath(), $"evx-report-{Guid.NewGuid():N}.csv");
         try {
             Assert.Equal(workbook, EventReportExcelRenderer.Save(report, workbook));
             using ZipArchive archive = ZipFile.OpenRead(workbook);
             Assert.Contains(archive.Entries, static entry => entry.FullName == "xl/workbook.xml");
             Assert.Contains(archive.Entries, static entry => entry.FullName.StartsWith("xl/worksheets/sheet", StringComparison.Ordinal));
+            Assert.Equal(csv, EventReportCsvRenderer.Save(report, csv));
+            string csvText = File.ReadAllText(csv);
+            Assert.StartsWith("User,Computer", csvText, StringComparison.Ordinal);
+            Assert.DoesNotContain("Event ID", csvText, StringComparison.Ordinal);
         } finally {
             File.Delete(workbook);
+            File.Delete(csv);
         }
 
         EventEmailPackage email = await EventReportEmailRenderer.RenderAsync(report);
@@ -142,6 +284,7 @@ public sealed class TestEventDefinitionAndReporting {
         Assert.Contains("EVOTEC\\alice", email.Html, StringComparison.Ordinal);
 
         string workbook = Path.Combine(Path.GetTempPath(), $"evx-typed-report-{Guid.NewGuid():N}.xlsx");
+        string csvBundle = Path.Combine(Path.GetTempPath(), $"evx-typed-report-{Guid.NewGuid():N}.zip");
         try {
             EventReportExcelRenderer.Save(report, workbook);
             using ZipArchive archive = ZipFile.OpenRead(workbook);
@@ -157,8 +300,24 @@ public sealed class TestEventDefinitionAndReporting {
             Assert.Contains(tables, table => TableColumns(table, spreadsheet).Contains("Event ID"));
             Assert.DoesNotContain(tables.Where(table => TableColumns(table, spreadsheet).Contains("Object Affected")),
                 table => TableColumns(table, spreadsheet).Contains("Event ID"));
+            EventReportCsvRenderer.Save(report, csvBundle);
+            using ZipArchive csvArchive = ZipFile.OpenRead(csvBundle);
+            Assert.Contains(csvArchive.Entries, static entry => entry.FullName == "ADUserLogon.csv");
+            Assert.Contains(csvArchive.Entries, static entry => entry.FullName == "ADUserLogonFailed.csv");
+            Assert.Contains(csvArchive.Entries, static entry => entry.FullName == "event-provenance.csv");
+            Assert.Contains(csvArchive.Entries, static entry => entry.FullName == "coverage.csv");
+            Assert.Contains(csvArchive.Entries, static entry => entry.FullName == "manifest.json");
+            ZipArchiveEntry successfulCsv = Assert.Single(
+                csvArchive.Entries,
+                static entry => entry.FullName == "ADUserLogon.csv");
+            using var reader = new StreamReader(successfulCsv.Open());
+            string csvText = reader.ReadToEnd();
+            Assert.Contains("Object Affected", csvText, StringComparison.Ordinal);
+            Assert.DoesNotContain("Failure Reason", csvText, StringComparison.Ordinal);
+            Assert.DoesNotContain("Event ID", csvText, StringComparison.Ordinal);
         } finally {
             File.Delete(workbook);
+            File.Delete(csvBundle);
         }
     }
 
@@ -196,6 +355,65 @@ public sealed class TestEventDefinitionAndReporting {
         Assert.Contains("SeBackupPrivilege", email.Html, StringComparison.Ordinal);
         Assert.DoesNotContain("System.Collections.Generic.List", html, StringComparison.Ordinal);
         Assert.DoesNotContain("System.Collections.Generic.List", email.Html, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task DuplicateDisplayNamesRemainDistinctAcrossEveryRenderer() {
+        EventDefinition definition = new() {
+            Name = "DuplicateHeadings",
+            DisplayName = "Duplicate headings",
+            Sources = CreateDefinition().Sources,
+            Fields = new[] {
+                new EventDefinitionField {
+                    Name = "FirstValue",
+                    DisplayName = "Value",
+                    Source = EventFieldSource.Data,
+                    SourceName = "First"
+                },
+                new EventDefinitionField {
+                    Name = "SecondValue",
+                    DisplayName = "Value",
+                    Source = EventFieldSource.Data,
+                    SourceName = "Second"
+                }
+            }
+        };
+        EventObject source = CreateSecuritySource(4625);
+        source.Data["First"] = "one";
+        source.Data["Second"] = "two";
+        EventReport report = EventReportEngine.Create(new object[] {
+            EventDefinitionEngine.CreateRecord(definition, source)
+        }, "Duplicate headings");
+
+        string html = EventReportHtmlRenderer.Render(report);
+        EventEmailPackage email = await EventReportEmailRenderer.RenderAsync(report);
+        string workbook = Path.Combine(Path.GetTempPath(), $"evx-duplicate-headings-{Guid.NewGuid():N}.xlsx");
+        string csv = Path.Combine(Path.GetTempPath(), $"evx-duplicate-headings-{Guid.NewGuid():N}.csv");
+        try {
+            EventReportCsvRenderer.Save(report, csv);
+            EventReportExcelRenderer.Save(report, workbook);
+            string csvText = File.ReadAllText(csv);
+            using ZipArchive archive = ZipFile.OpenRead(workbook);
+            XNamespace spreadsheet = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+            string[][] tableColumns = archive.Entries
+                .Where(static entry => entry.FullName.StartsWith("xl/tables/table", StringComparison.Ordinal))
+                .Select(entry => {
+                    using Stream stream = entry.Open();
+                    return TableColumns(XDocument.Load(stream), spreadsheet);
+                }).ToArray();
+
+            Assert.StartsWith("Value,Value Second Value", csvText, StringComparison.Ordinal);
+            Assert.Contains("one,two", csvText, StringComparison.Ordinal);
+            Assert.Contains("Value Second Value", html, StringComparison.Ordinal);
+            Assert.Contains("one", html, StringComparison.Ordinal);
+            Assert.Contains("two", html, StringComparison.Ordinal);
+            Assert.Contains("Value Second Value", email.Html, StringComparison.Ordinal);
+            Assert.Contains(tableColumns, static columns =>
+                columns.SequenceEqual(new[] { "Value", "Value Second Value" }));
+        } finally {
+            File.Delete(workbook);
+            File.Delete(csv);
+        }
     }
 
     [Fact]
@@ -261,6 +479,111 @@ public sealed class TestEventDefinitionAndReporting {
         };
         InvalidDataException exception = Assert.Throws<InvalidDataException>(definition.Validate);
         Assert.Contains("EventIds", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void DefinitionRejectsInvalidConfiguredTypedLiteralsBeforeReadingEvents() {
+        EventDefinition constant = CreateDefinition();
+        constant.Fields = new[] {
+            new EventDefinitionField {
+                Name = "Attempts",
+                Source = EventFieldSource.Constant,
+                SourceName = "not-a-number",
+                ValueKind = EventFieldValueKind.Int32
+            }
+        };
+        EventDefinition fallback = CreateDefinition();
+        fallback.Fields = new[] {
+            new EventDefinitionField {
+                Name = "OccurredAt",
+                Source = EventFieldSource.Data,
+                SourceName = "OccurredAt",
+                DefaultValue = "not-a-date",
+                ValueKind = EventFieldValueKind.DateTime
+            }
+        };
+
+        InvalidDataException constantError = Assert.Throws<InvalidDataException>(constant.Validate);
+        InvalidDataException fallbackError = Assert.Throws<InvalidDataException>(fallback.Validate);
+
+        Assert.Contains("Fields[0].SourceName", constantError.Message, StringComparison.Ordinal);
+        Assert.Contains("Fields[0].DefaultValue", fallbackError.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task TypedReportRequestsRejectGenericEventIdSelectorsBeforeReadingEvents() {
+        EventReportRequest builtIn = EventReportRequest.ForTypes(EventType.ADUserLogonFailed);
+        builtIn.EventIds = new[] { 4625 };
+        EventReportRequest custom = EventReportRequest.ForDefinition(CreateDefinition());
+        custom.EventIds = new[] { 4625 };
+
+        InvalidOperationException builtInError = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => EventReportEngine.QueryAsync(builtIn));
+        InvalidOperationException customError = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => EventReportEngine.QueryAsync(custom));
+
+        Assert.Contains("typed definitions own source event IDs", builtInError.Message, StringComparison.Ordinal);
+        Assert.Contains("typed definitions own source event IDs", customError.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void GenericPredicateRowsReserveNativeMetadataAliases() {
+        DateTime time = new(2026, 8, 20, 18, 0, 0, DateTimeKind.Utc);
+        var row = new EventReportRow {
+            Type = "Generic",
+            EventId = 4624,
+            RecordId = 42,
+            Provider = "Microsoft-Windows-Security-Auditing",
+            SourceLog = "Security",
+            TimeCreated = time,
+            Values = new Dictionary<string, object?> {
+                ["Id"] = "untrusted-id",
+                ["ProviderName"] = "untrusted-provider",
+                ["LogName"] = "untrusted-log",
+                ["When"] = "untrusted-time"
+            }
+        };
+
+        IReadOnlyDictionary<string, object?> values = row.ToPredicateDictionary();
+
+        Assert.Equal(4624, values["Id"]);
+        Assert.Equal("Microsoft-Windows-Security-Auditing", values["ProviderName"]);
+        Assert.Equal("Security", values["LogName"]);
+        Assert.Equal(time, values["When"]);
+    }
+
+    [Fact]
+    public void CsvBundleReservesMetadataEntryNamesFromCustomSections() {
+        EventDefinition coverage = CreateDefinition();
+        coverage.Name = "coverage";
+        coverage.DisplayName = "Coverage events";
+        EventDefinition provenance = CreateDefinition();
+        provenance.Name = "event-provenance";
+        provenance.DisplayName = "Provenance events";
+        var source = new EventObject(
+            new SyntheticEventRecord(),
+            "WEC01",
+            EventReadMode.StructuredDataAndMessage);
+        source.Data["TargetUserName"] = "alice";
+        EventReport report = EventReportEngine.Create(new object[] {
+            EventDefinitionEngine.CreateRecord(coverage, source),
+            EventDefinitionEngine.CreateRecord(provenance, source)
+        });
+        string path = Path.Combine(Path.GetTempPath(), $"evx-reserved-csv-{Guid.NewGuid():N}.zip");
+
+        try {
+            EventReportCsvRenderer.Save(report, path);
+            using ZipArchive archive = ZipFile.OpenRead(path);
+            string[] names = archive.Entries.Select(static entry => entry.FullName).ToArray();
+
+            Assert.Equal(names.Length, names.Distinct(StringComparer.OrdinalIgnoreCase).Count());
+            Assert.Contains("coverage.csv", names);
+            Assert.Contains("event-provenance.csv", names);
+            Assert.Contains("coverage-2.csv", names);
+            Assert.Contains("event-provenance-2.csv", names);
+        } finally {
+            File.Delete(path);
+        }
     }
 
     [Fact]
@@ -492,6 +815,38 @@ public sealed class TestEventDefinitionAndReporting {
         Assert.Throws<ArgumentException>(() => EventDefinitionEngine.CreateSnapshot(query));
     }
 
+    [Fact]
+    public void CustomReportSectionsRejectConflictingValueTypeRevisionsForOneDefinitionName() {
+        EventDefinition CreateRevision(EventFieldValueKind kind) => new() {
+            Name = "RevisionAudit",
+            Sources = new[] {
+                new EventDefinitionSource { LogName = "Security", EventIds = new[] { 4625 } }
+            },
+            Fields = new[] {
+                new EventDefinitionField {
+                    Name = "Value",
+                    ValueKind = kind,
+                    Source = EventFieldSource.Data,
+                    SourceName = "Value"
+                }
+            }
+        };
+        EventObject firstSource = CreateSecuritySource(4625, 71);
+        EventObject secondSource = CreateSecuritySource(4625, 72);
+        firstSource.Data["Value"] = "1";
+        secondSource.Data["Value"] = "2";
+        object[] records = {
+            EventDefinitionEngine.CreateRecord(CreateRevision(EventFieldValueKind.String), firstSource),
+            EventDefinitionEngine.CreateRecord(CreateRevision(EventFieldValueKind.Int32), secondSource)
+        };
+
+        InvalidDataException exception = Assert.Throws<InvalidDataException>(() =>
+            EventReportEngine.Create(records));
+
+        Assert.Contains("conflicting schema revisions", exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("RevisionAudit", exception.Message, StringComparison.Ordinal);
+    }
+
     private static EventDefinition CreateDefinition() => new() {
         Name = "FailedLogonCustom",
         DisplayName = "Custom failed logons",
@@ -508,8 +863,8 @@ public sealed class TestEventDefinitionAndReporting {
         }
     };
 
-    private static EventObject CreateSecuritySource(int eventId) => new(
-        new SyntheticEventRecord(eventId), "WEC01", EventReadMode.StructuredDataAndMessage) {
+    private static EventObject CreateSecuritySource(int eventId, long recordId = 42) => new(
+        new SyntheticEventRecord(eventId, recordId), "WEC01", EventReadMode.StructuredDataAndMessage) {
             ContainerLog = "ForwardedEvents",
             GatheredLogName = "ForwardedEvents"
         };
@@ -521,9 +876,11 @@ public sealed class TestEventDefinitionAndReporting {
 
     private sealed class SyntheticEventRecord : EventRecord {
         private readonly int _eventId;
+        private readonly long _recordId;
 
-        internal SyntheticEventRecord(int eventId = 4625) {
+        internal SyntheticEventRecord(int eventId = 4625, long recordId = 42) {
             _eventId = eventId;
+            _recordId = recordId;
         }
 
         public override string ProviderName => "Microsoft-Windows-Security-Auditing";
@@ -546,7 +903,7 @@ public sealed class TestEventDefinitionAndReporting {
         public override IList<EventProperty> Properties => Array.Empty<EventProperty>();
         public override DateTime? TimeCreated => new DateTime(2026, 8, 16, 10, 0, 0, DateTimeKind.Utc);
         public override int? Qualifiers => null;
-        public override long? RecordId => 42;
+        public override long? RecordId => _recordId;
         public override byte? Version => 0;
         public override SecurityIdentifier UserId => null!;
         public override EventBookmark Bookmark => null!;

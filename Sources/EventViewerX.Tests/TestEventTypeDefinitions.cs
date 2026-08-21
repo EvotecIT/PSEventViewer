@@ -48,6 +48,21 @@ public sealed class TestEventTypeDefinitions {
     }
 
     [Fact]
+    public void CompositeDefinitionsExposeTheExpandedFilterFieldUnion() {
+        EventTypeDefinition definition = EventTypeCatalog.GetDefinition(
+            EventType.ActiveDirectoryAuthentication);
+        EventPredicateBuilder builder = EventPredicateBuilder.ForType(
+            EventType.ActiveDirectoryAuthentication);
+
+        Assert.True(definition.IsComposite);
+        Assert.Contains(definition.Fields, static field => field.Name == "Who");
+        Assert.Contains(definition.Fields, static field => field.Name == "IpAddress");
+        Assert.Equal(
+            builder.Fields.Select(static field => field.Name),
+            definition.Fields.Where(static field => field.IsFilterable).Select(static field => field.Name));
+    }
+
+    [Fact]
     public void ForwardedEventUsesOriginalChannelForTypedRoutingAndPreservesContainerIdentity() {
         var source = new ForwardedSecurityEventRecord();
         var snapshot = new EventObject(source, "WEC01", EventReadMode.Metadata) {

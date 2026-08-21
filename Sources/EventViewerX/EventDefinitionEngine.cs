@@ -1,5 +1,7 @@
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using System.Globalization;
+using System.Net;
 
 namespace EventViewerX;
 
@@ -26,15 +28,40 @@ public static class EventDefinitionEngine {
         return ReadSnapshotAsync(CreateSnapshot(query), executionInfo, cancellationToken);
     }
 
+    /// <summary>Explains native prefiltering and exact post-projection evaluation for a declarative definition.</summary>
+    public static EventPredicatePlan PlanPredicate(
+        EventDefinition definition,
+        EventPredicate predicate,
+        string? collectorLogName = null) {
+
+        if (definition == null) {
+            throw new ArgumentNullException(nameof(definition));
+        }
+        if (predicate == null) {
+            throw new ArgumentNullException(nameof(predicate));
+        }
+        definition.Validate();
+        predicate.Validate();
+        return CreatePredicatePlan(new EventDefinitionQuery(definition) {
+            Predicate = predicate,
+            CollectorLogName = collectorLogName
+        })!;
+    }
+
     private static async IAsyncEnumerable<CustomEventRecord> ReadSnapshotAsync(EventDefinitionQuery query,
         EventDefinitionQueryExecutionInfo? executionInfo,
         [EnumeratorCancellation] CancellationToken cancellationToken) {
         EventDefinitionQueryExecutionInfo info = executionInfo ?? new EventDefinitionQueryExecutionInfo();
         info.Reset();
+        EventPredicatePlan? predicatePlan = CreatePredicatePlan(query);
+        info.PredicatePlan = predicatePlan;
+        Func<CustomEventRecord, bool>? typedPredicate = predicatePlan?.ManagedPredicate == null
+            ? null
+            : EventPredicateEvaluator.CompileCustom(predicatePlan.ManagedPredicate);
         (DateTime? start, DateTime? end) = EventTimeRange.Resolve(query.StartTime, query.EndTime, query.TimePeriod);
         EventLogBatchQuery batch = query.Paths != null && query.Paths.Count > 0
-            ? CreateFileBatch(query, start, end)
-            : CreateChannelBatch(query, info, start, end);
+            ? CreateFileBatch(query, predicatePlan?.NativeFilter, start, end)
+            : CreateChannelBatch(query, info, predicatePlan?.NativeFilter, start, end);
         batch.MaxEvents = 0;
         batch.MaxConcurrency = query.MaxConcurrency;
         batch.ContinueOnError = query.ContinueOnRemoteFailure;
@@ -47,7 +74,8 @@ public static class EventDefinitionEngine {
             }
             info.EventsScanned++;
             var record = new CustomEventRecord(query.Definition, source, Project(query.Definition, source));
-            if (query.ResultPredicate != null && !query.ResultPredicate(record)) {
+            if ((typedPredicate != null && !typedPredicate(record)) ||
+                (query.ResultPredicate != null && !query.ResultPredicate(record))) {
                 query.CandidateObserver?.Invoke(source);
                 continue;
             }
@@ -65,6 +93,7 @@ public static class EventDefinitionEngine {
     private static EventLogBatchQuery CreateChannelBatch(
         EventDefinitionQuery query,
         EventDefinitionQueryExecutionInfo executionInfo,
+        EventFilter? predicateFilter,
         DateTime? start,
         DateTime? end) {
 
@@ -85,6 +114,7 @@ public static class EventDefinitionEngine {
                              source,
                              target,
                              sourceIsFile: false,
+                             predicateFilter,
                              start,
                              end,
                              useOriginalChannel: !string.IsNullOrWhiteSpace(query.CollectorLogName))) {
@@ -191,6 +221,7 @@ public static class EventDefinitionEngine {
 
     private static EventLogBatchQuery CreateFileBatch(
         EventDefinitionQuery query,
+        EventFilter? predicateFilter,
         DateTime? start,
         DateTime? end) {
 
@@ -203,6 +234,7 @@ public static class EventDefinitionEngine {
                              source,
                              fullPath,
                              sourceIsFile: true,
+                             predicateFilter,
                              start,
                              end,
                              useOriginalChannel: true)) {
@@ -228,11 +260,12 @@ public static class EventDefinitionEngine {
         EventDefinitionSource source,
         string? machineName,
         bool sourceIsFile,
+        EventFilter? predicateFilter,
         DateTime? start,
         DateTime? end,
         bool useOriginalChannel) {
 
-        var filter = new EventFilter {
+        var baseFilter = new EventFilter {
             EventIds = source.EventIds.ToArray(),
             ProviderNames = source.ProviderNames.ToArray(),
             RecordIds = query.RecordIds?.ToArray(),
@@ -244,6 +277,9 @@ public static class EventDefinitionEngine {
                     ? machineName!
                     : string.IsNullOrWhiteSpace(query.CollectorLogName) ? source.LogName : query.CollectorLogName!)
         };
+        if (!EventFilterIntersection.TryCreate(baseFilter, predicateFilter, out EventFilter filter)) {
+            yield break;
+        }
         foreach (EventFilter partition in EventFilterPartitioner.Partition(filter)) {
             string xpath = EventFilterCompiler.BuildXPath(partition);
             string logName = source.LogName;
@@ -255,6 +291,113 @@ public static class EventDefinitionEngine {
             }
             yield return (xpath, logName);
         }
+    }
+
+    private static EventPredicatePlan? CreatePredicatePlan(EventDefinitionQuery query) {
+        if (query.Predicate == null) {
+            return null;
+        }
+        EventPredicate exactPredicate = EventPredicateBuilder
+            .ForDefinition(query.Definition)
+            .Normalize(query.Predicate);
+        const string projectionReason =
+            "Declarative fields are evaluated after their configured projection and conversion.";
+        if (!string.IsNullOrWhiteSpace(query.CollectorLogName)) {
+            return EventPredicatePlanner.PlanManaged(
+                exactPredicate,
+                "ForwardedEvents uses the Windows Server 2025 safe '*' reader; declarative predicates remain managed and bounded.");
+        }
+        EventPredicate? nativeCandidate = ExtractNativeCandidate(query.Definition, exactPredicate);
+        if (nativeCandidate == null) {
+            return EventPredicatePlanner.PlanManaged(exactPredicate, projectionReason);
+        }
+        EventPredicatePlan nativePlan = EventPredicatePlanner.Plan(nativeCandidate);
+        var steps = new List<EventPredicatePlanStep>(nativePlan.Steps.Where(static step =>
+            !string.Equals(step.Expression, "Exact predicate verification", StringComparison.Ordinal))) {
+            new EventPredicatePlanStep(
+                "Full declarative predicate",
+                EventPredicatePlanStage.Managed,
+                "The complete predicate is verified after projection so custom conversion and fallback semantics remain exact.")
+        };
+        return new EventPredicatePlan(
+            nativePlan.NativeFilter,
+            exactPredicate,
+            steps);
+    }
+
+    private static EventPredicate? ExtractNativeCandidate(
+        EventDefinition definition,
+        EventPredicate predicate) {
+
+        if (predicate.Kind == EventPredicateKind.All) {
+            EventPredicate[] children = predicate.Children
+                .Select(child => ExtractNativeCandidate(definition, child))
+                .Where(static child => child != null)
+                .Cast<EventPredicate>()
+                .ToArray();
+            return children.Length switch {
+                0 => null,
+                1 => children[0],
+                _ => EventPredicate.AllOf(children)
+            };
+        }
+        if (predicate.Kind != EventPredicateKind.Comparison ||
+            !TryResolveNativeField(definition, predicate.Field!, out string? nativeField)) {
+            return null;
+        }
+        EventPredicate mapped = predicate.Clone();
+        mapped.Field = nativeField;
+        EventPredicatePlan plan = EventPredicatePlanner.Plan(mapped);
+        return plan.IsFullyNative && plan.HasNativeFilter ? mapped : null;
+    }
+
+    private static bool TryResolveNativeField(
+        EventDefinition definition,
+        string predicateField,
+        out string? nativeField) {
+
+        nativeField = null;
+        EventDefinitionField? field = definition.Fields.FirstOrDefault(candidate =>
+            string.Equals(candidate.Name, predicateField, StringComparison.OrdinalIgnoreCase) ||
+            candidate.Aliases.Contains(predicateField, StringComparer.OrdinalIgnoreCase));
+        if (field != null) {
+            if (!CanUseNativeMetadataField(field)) {
+                return false;
+            }
+            nativeField = field.SourceName;
+            return true;
+        }
+        if (!EventFieldDefinition.IsNativeField(predicateField)) {
+            return false;
+        }
+        nativeField = predicateField;
+        return true;
+    }
+
+    internal static bool CanUseNativeMetadataField(EventDefinitionField field) {
+        if (field.Source != EventFieldSource.Metadata || field.DefaultValue != null ||
+            !EventFieldDefinition.IsNativeField(field.SourceName) ||
+            !TryResolveMetadataProperty(field.SourceName, out PropertyInfo? property)) {
+            return false;
+        }
+        Type sourceType = Nullable.GetUnderlyingType(property!.PropertyType) ?? property.PropertyType;
+        Type projectedType = Nullable.GetUnderlyingType(field.ValueType) ?? field.ValueType;
+        if (sourceType == projectedType) {
+            return true;
+        }
+        return string.Equals(field.SourceName, nameof(EventObject.Level), StringComparison.OrdinalIgnoreCase) &&
+               sourceType == typeof(byte) &&
+               projectedType == typeof(int);
+    }
+
+    private static bool TryResolveMetadataProperty(string name, out PropertyInfo? property) {
+        string canonicalName = name switch {
+            var value when value.Equals("EventId", StringComparison.OrdinalIgnoreCase) => nameof(EventObject.Id),
+            var value when value.Equals("EventRecordId", StringComparison.OrdinalIgnoreCase) => nameof(EventObject.RecordId),
+            var value when value.Equals("Provider", StringComparison.OrdinalIgnoreCase) => nameof(EventObject.ProviderName),
+            _ => name
+        };
+        return MetadataProperties.TryGetValue(canonicalName, out property);
     }
 
     /// <summary>Projects one previously read event through a custom definition.</summary>
@@ -275,12 +418,12 @@ public static class EventDefinitionEngine {
             object? value = field.Source switch {
                 EventFieldSource.Data => source.Data.TryGetValue(field.SourceName, out string? data) ? data : field.DefaultValue,
                 EventFieldSource.MessageData => source.MessageData.TryGetValue(field.SourceName, out string? messageData) ? messageData : field.DefaultValue,
-                EventFieldSource.Metadata => MetadataProperties.TryGetValue(field.SourceName, out PropertyInfo? property) ? property.GetValue(source) : field.DefaultValue,
+                EventFieldSource.Metadata => TryResolveMetadataProperty(field.SourceName, out PropertyInfo? property) ? property!.GetValue(source) : field.DefaultValue,
                 EventFieldSource.Message => source.Message,
                 EventFieldSource.Constant => field.SourceName,
                 _ => field.DefaultValue
             };
-            result[field.Name] = value;
+            result[field.Name] = ConvertFieldValue(field, value);
         }
         return result;
     }
@@ -352,6 +495,7 @@ public static class EventDefinitionEngine {
             BufferCapacity = query.BufferCapacity,
             MessageCulture = query.MessageCulture,
             FallbackMessageCulture = query.FallbackMessageCulture,
+            Predicate = query.Predicate?.Clone(),
             ResultPredicate = query.ResultPredicate,
             MinimumRecordIdExclusiveResolver = query.MinimumRecordIdExclusiveResolver,
             BookmarkXmlResolver = query.BookmarkXmlResolver,
@@ -378,11 +522,18 @@ public static class EventDefinitionEngine {
         Fields = definition.Fields.Select(static field => new EventDefinitionField {
             Name = field.Name.Trim(),
             DisplayName = field.DisplayName?.Trim() ?? string.Empty,
+            Description = field.Description?.Trim() ?? string.Empty,
+            Aliases = field.Aliases.Select(static alias => alias.Trim()).ToArray(),
+            ValueKind = field.ValueKind,
             Source = field.Source,
             SourceName = field.SourceName?.Trim() ?? string.Empty,
             DefaultValue = field.DefaultValue
         }).ToArray()
     };
+
+    private static object? ConvertFieldValue(EventDefinitionField field, object? value) {
+        return field.ConvertValue(value);
+    }
 
     private static string?[] NormalizeTargets(IReadOnlyList<string?>? machineNames) {
         IEnumerable<string?> candidates = machineNames == null || machineNames.Count == 0

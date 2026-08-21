@@ -141,6 +141,12 @@ public sealed class EventTypeQuery {
         set;
     }
 
+    /// <summary>
+    /// Optional serializable typed predicate. Native-compatible dimensions are pushed into Windows Event Log;
+    /// the exact remainder runs after typed projection.
+    /// </summary>
+    public EventPredicate? Predicate { get; set; }
+
     /// <summary>Optional predicate applied after event-type projection.</summary>
     public Func<EventTypeRecord, bool>? ResultPredicate {
         get;

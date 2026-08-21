@@ -15,27 +15,32 @@ Typed and custom definitions render only their domain fields. Composite types ke
 ## SYNTAX
 ### Input (Default)
 ```powershell
-Show-EVXEvent -InputObject <Object> [-Title <string>] [-HtmlPath <string>] [-DrawerPlacement <MonitoringRecordDrawerPlacement>] [-ExcelPath <string>] [-EmailPackage] [-Open] [-PassThru] [<CommonParameters>]
+Show-EVXEvent -InputObject <Object> [-Title <string>] [-HtmlPath <string>] [-DrawerPlacement <MonitoringRecordDrawerPlacement>] [-ExcelPath <string>] [-CsvPath <string>] [-StorePath <string>] [-EmailPackage] [-Open] [-PassThru] [<CommonParameters>]
 ```
 
 ### Type
 ```powershell
-Show-EVXEvent [-Type] <EventType[]> [-Path <string[]>] [-EventRecordId <long[]>] [-MachineName <string[]>] [-Collector <string[]>] [-StartTime <DateTime>] [-EndTime <DateTime>] [-TimePeriod <TimePeriod>] [-MaxEvents <long>] [-MaxEventsScanned <long>] [-MaxConcurrency <int>] [-Oldest] [-ResolveDns] [-Credential <pscredential>] [-Authentication <EventLogAuthentication>] [-Title <string>] [-HtmlPath <string>] [-DrawerPlacement <MonitoringRecordDrawerPlacement>] [-ExcelPath <string>] [-EmailPackage] [-Open] [-PassThru] [<CommonParameters>]
+Show-EVXEvent [-Type] <EventType[]> [-Path <string[]>] [-Where <Object>] [-EventRecordId <long[]>] [-MachineName <string[]>] [-Collector <string[]>] [-StartTime <DateTime>] [-EndTime <DateTime>] [-TimePeriod <TimePeriod>] [-MaxEvents <long>] [-MaxEventsScanned <long>] [-MaxConcurrency <int>] [-Oldest] [-ResolveDns] [-Credential <pscredential>] [-Authentication <EventLogAuthentication>] [-Title <string>] [-HtmlPath <string>] [-DrawerPlacement <MonitoringRecordDrawerPlacement>] [-ExcelPath <string>] [-CsvPath <string>] [-StorePath <string>] [-EmailPackage] [-Open] [-PassThru] [<CommonParameters>]
+```
+
+### Store
+```powershell
+Show-EVXEvent [-FromStore] <string> [-Type <EventType[]>] [-LogName <string>] [-Definition <Object>] [-Where <Object>] [-EventId <int[]>] [-EventRecordId <long[]>] [-SourceComputer <string[]>] [-ProviderName <string[]>] [-StartTime <DateTime>] [-EndTime <DateTime>] [-TimePeriod <TimePeriod>] [-MaxEvents <long>] [-MaxEventsScanned <long>] [-Oldest] [-SummaryPeriod <EventStoreSummaryPeriod>] [-Title <string>] [-HtmlPath <string>] [-DrawerPlacement <MonitoringRecordDrawerPlacement>] [-ExcelPath <string>] [-CsvPath <string>] [-StorePath <string>] [-EmailPackage] [-Open] [-PassThru] [<CommonParameters>]
 ```
 
 ### Log
 ```powershell
-Show-EVXEvent [-LogName] <string> [-EventId <int[]>] [-EventRecordId <long[]>] [-MachineName <string[]>] [-StartTime <DateTime>] [-EndTime <DateTime>] [-TimePeriod <TimePeriod>] [-MaxEvents <long>] [-MaxConcurrency <int>] [-Oldest] [-Credential <pscredential>] [-Authentication <EventLogAuthentication>] [-Title <string>] [-HtmlPath <string>] [-DrawerPlacement <MonitoringRecordDrawerPlacement>] [-ExcelPath <string>] [-EmailPackage] [-Open] [-PassThru] [<CommonParameters>]
+Show-EVXEvent [-LogName] <string> [-EventId <int[]>] [-EventRecordId <long[]>] [-MachineName <string[]>] [-StartTime <DateTime>] [-EndTime <DateTime>] [-TimePeriod <TimePeriod>] [-MaxEvents <long>] [-MaxConcurrency <int>] [-Oldest] [-Credential <pscredential>] [-Authentication <EventLogAuthentication>] [-Title <string>] [-HtmlPath <string>] [-DrawerPlacement <MonitoringRecordDrawerPlacement>] [-ExcelPath <string>] [-CsvPath <string>] [-StorePath <string>] [-EmailPackage] [-Open] [-PassThru] [<CommonParameters>]
 ```
 
 ### Path
 ```powershell
-Show-EVXEvent [-Path] <string[]> [-EventId <int[]>] [-EventRecordId <long[]>] [-StartTime <DateTime>] [-EndTime <DateTime>] [-TimePeriod <TimePeriod>] [-MaxEvents <long>] [-MaxConcurrency <int>] [-Oldest] [-Title <string>] [-HtmlPath <string>] [-DrawerPlacement <MonitoringRecordDrawerPlacement>] [-ExcelPath <string>] [-EmailPackage] [-Open] [-PassThru] [<CommonParameters>]
+Show-EVXEvent [-Path] <string[]> [-EventId <int[]>] [-EventRecordId <long[]>] [-StartTime <DateTime>] [-EndTime <DateTime>] [-TimePeriod <TimePeriod>] [-MaxEvents <long>] [-MaxConcurrency <int>] [-Oldest] [-Title <string>] [-HtmlPath <string>] [-DrawerPlacement <MonitoringRecordDrawerPlacement>] [-ExcelPath <string>] [-CsvPath <string>] [-StorePath <string>] [-EmailPackage] [-Open] [-PassThru] [<CommonParameters>]
 ```
 
 ### Definition
 ```powershell
-Show-EVXEvent [-Definition] <Object> [-Path <string[]>] [-EventRecordId <long[]>] [-MachineName <string[]>] [-Collector <string[]>] [-StartTime <DateTime>] [-EndTime <DateTime>] [-TimePeriod <TimePeriod>] [-MaxEvents <long>] [-MaxEventsScanned <long>] [-MaxConcurrency <int>] [-Oldest] [-Credential <pscredential>] [-Authentication <EventLogAuthentication>] [-Title <string>] [-HtmlPath <string>] [-DrawerPlacement <MonitoringRecordDrawerPlacement>] [-ExcelPath <string>] [-EmailPackage] [-Open] [-PassThru] [<CommonParameters>]
+Show-EVXEvent [-Definition] <Object> [-Path <string[]>] [-Where <Object>] [-EventRecordId <long[]>] [-MachineName <string[]>] [-Collector <string[]>] [-StartTime <DateTime>] [-EndTime <DateTime>] [-TimePeriod <TimePeriod>] [-MaxEvents <long>] [-MaxEventsScanned <long>] [-MaxConcurrency <int>] [-Oldest] [-Credential <pscredential>] [-Authentication <EventLogAuthentication>] [-Title <string>] [-HtmlPath <string>] [-DrawerPlacement <MonitoringRecordDrawerPlacement>] [-ExcelPath <string>] [-CsvPath <string>] [-StorePath <string>] [-EmailPackage] [-Open] [-PassThru] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -56,7 +61,7 @@ Queries the definition-owned Security events and opens a self-contained interact
 
 ### EXAMPLE 2
 ```powershell
-Show-EVXEvent -Type ActiveDirectoryAuthentication -Collector WEC01 -HtmlPath .\Auth.html -ExcelPath .\Auth.xlsx -PassThru
+$filter = New-EVXFilter -Type ActiveDirectoryAuthentication; Show-EVXEvent -Type ActiveDirectoryAuthentication -Where $filter.Fields.Who.Contains('svc-') -Collector WEC01 -HtmlPath .\Auth.html -ExcelPath .\Auth.xlsx -PassThru
 ```
 
 Reads ForwardedEvents once and renders both formats from the same snapshot.
@@ -118,12 +123,28 @@ Accept pipeline input: False
 Accept wildcard characters: False
 ```
 
+### -CsvPath
+Homogeneous CSV path, or a .zip bundle path when the report contains multiple typed schemas.
+
+```yaml
+Type: String
+Parameter Sets: Input, Type, Store, Log, Path, Definition
+Aliases: None
+Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
 ### -Definition
 Custom JSON definition path or an EventDefinition instance.
 
 ```yaml
 Type: Object
-Parameter Sets: Definition
+Parameter Sets: Store, Definition
 Aliases: None
 Possible values:
 
@@ -139,7 +160,7 @@ Preferred location of the selected-record drawer in interactive HTML output.
 
 ```yaml
 Type: MonitoringRecordDrawerPlacement
-Parameter Sets: Input, Type, Log, Path, Definition
+Parameter Sets: Input, Type, Store, Log, Path, Definition
 Aliases: None
 Possible values: Auto, Top, Right
 
@@ -155,7 +176,7 @@ Returns a responsive transport-neutral email package for Mailozaurr.
 
 ```yaml
 Type: SwitchParameter
-Parameter Sets: Input, Type, Log, Path, Definition
+Parameter Sets: Input, Type, Store, Log, Path, Definition
 Aliases: None
 Possible values:
 
@@ -171,7 +192,7 @@ Absolute end time.
 
 ```yaml
 Type: DateTime
-Parameter Sets: Type, Log, Path, Definition
+Parameter Sets: Type, Store, Log, Path, Definition
 Aliases: DateTo
 Possible values:
 
@@ -187,7 +208,7 @@ Optional event IDs for a generic LogName query.
 
 ```yaml
 Type: Int32[]
-Parameter Sets: Log, Path
+Parameter Sets: Store, Log, Path
 Aliases: Id
 Possible values:
 
@@ -203,7 +224,7 @@ Exact event record identifiers, including IDs passed by an event-triggered sched
 
 ```yaml
 Type: Int64[]
-Parameter Sets: Type, Log, Path, Definition
+Parameter Sets: Type, Store, Log, Path, Definition
 Aliases: RecordId
 Possible values:
 
@@ -219,7 +240,7 @@ Excel workbook output path.
 
 ```yaml
 Type: String
-Parameter Sets: Input, Type, Log, Path, Definition
+Parameter Sets: Input, Type, Store, Log, Path, Definition
 Aliases: None
 Possible values:
 
@@ -230,12 +251,28 @@ Accept pipeline input: False
 Accept wildcard characters: False
 ```
 
+### -FromStore
+Reads normalized rows from a local EventViewerX SQLite store instead of querying event logs.
+
+```yaml
+Type: String
+Parameter Sets: Store
+Aliases: None
+Possible values:
+
+Required: True
+Position: 0
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
 ### -HtmlPath
 Self-contained interactive HTML output path.
 
 ```yaml
 Type: String
-Parameter Sets: Input, Type, Log, Path, Definition
+Parameter Sets: Input, Type, Store, Log, Path, Definition
 Aliases: None
 Possible values:
 
@@ -267,7 +304,7 @@ Generic event channel. Mutually exclusive with Type.
 
 ```yaml
 Type: String
-Parameter Sets: Log
+Parameter Sets: Store, Log
 Aliases: None
 Possible values:
 
@@ -315,7 +352,7 @@ Maximum report rows. Zero is unlimited.
 
 ```yaml
 Type: Int64
-Parameter Sets: Type, Log, Path, Definition
+Parameter Sets: Type, Store, Log, Path, Definition
 Aliases: None
 Possible values:
 
@@ -327,11 +364,11 @@ Accept wildcard characters: False
 ```
 
 ### -MaxEventsScanned
-Maximum raw candidates evaluated by typed definitions. Zero is unlimited.
+Maximum raw candidates evaluated before exact predicate verification. Stored queries default to 100,000 when omitted; zero is unlimited.
 
 ```yaml
 Type: Int64
-Parameter Sets: Type, Definition
+Parameter Sets: Type, Store, Definition
 Aliases: None
 Possible values:
 
@@ -347,7 +384,7 @@ Reads oldest matches first.
 
 ```yaml
 Type: SwitchParameter
-Parameter Sets: Type, Log, Path, Definition
+Parameter Sets: Type, Store, Log, Path, Definition
 Aliases: None
 Possible values:
 
@@ -363,7 +400,7 @@ Opens generated files with the registered desktop applications.
 
 ```yaml
 Type: SwitchParameter
-Parameter Sets: Input, Type, Log, Path, Definition
+Parameter Sets: Input, Type, Store, Log, Path, Definition
 Aliases: None
 Possible values:
 
@@ -379,7 +416,7 @@ Returns the normalized report snapshot in addition to generated output.
 
 ```yaml
 Type: SwitchParameter
-Parameter Sets: Input, Type, Log, Path, Definition
+Parameter Sets: Input, Type, Store, Log, Path, Definition
 Aliases: None
 Possible values:
 
@@ -406,6 +443,22 @@ Accept pipeline input: True (ByPropertyName)
 Accept wildcard characters: False
 ```
 
+### -ProviderName
+Provider names used to filter stored rows.
+
+```yaml
+Type: String[]
+Parameter Sets: Store
+Aliases: None
+Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
 ### -ResolveDns
 Enriches typed IP-address properties through DnsClientX.
 
@@ -422,14 +475,62 @@ Accept pipeline input: False
 Accept wildcard characters: False
 ```
 
+### -SourceComputer
+Original source computers used to filter stored rows.
+
+```yaml
+Type: String[]
+Parameter Sets: Store
+Aliases: None
+Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
 ### -StartTime
 Absolute start time.
 
 ```yaml
 Type: DateTime
-Parameter Sets: Type, Log, Path, Definition
+Parameter Sets: Type, Store, Log, Path, Definition
 Aliases: DateFrom
 Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -StorePath
+Persists the normalized report rows in an optional local EventViewerX SQLite store.
+
+```yaml
+Type: String
+Parameter Sets: Input, Type, Store, Log, Path, Definition
+Aliases: None
+Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -SummaryPeriod
+Groups stored events into an hourly, daily, weekly, or monthly report.
+
+```yaml
+Type: EventStoreSummaryPeriod
+Parameter Sets: Store
+Aliases: None
+Possible values: Hour, Day, Week, Month
 
 Required: False
 Position: named
@@ -443,9 +544,9 @@ Relative time window.
 
 ```yaml
 Type: TimePeriod
-Parameter Sets: Type, Log, Path, Definition
+Parameter Sets: Type, Store, Log, Path, Definition
 Aliases: None
-Possible values: PastHour, CurrentHour, PastDay, CurrentDay, PastMonth, CurrentMonth, PastQuarter, CurrentQuarter, Last3Days, Last7Days, Last14Days, Last1Hour, Last2Hours, Last3Hours, Last6Hours, Last12Hours, Last16Hours, Last24Hours, Today, Yesterday, Everything, TillLastMonday, TillLastTuesday, TillLastWednesday, TillLastThursday, TillLastFriday, TillLastSaturday, TillLastSunday
+Possible values: PastHour, CurrentHour, PastDay, CurrentDay, PastMonth, CurrentMonth, PastQuarter, CurrentQuarter, Last3Days, Last7Days, Last14Days, Last1Hour, Last2Hours, Last3Hours, Last6Hours, Last12Hours, Last16Hours, Last24Hours, Today, Yesterday, Everything, TillLastMonday, TillLastTuesday, TillLastWednesday, TillLastThursday, TillLastFriday, TillLastSaturday, TillLastSunday, Last15Minutes, Last30Minutes
 
 Required: False
 Position: named
@@ -459,7 +560,7 @@ Report title.
 
 ```yaml
 Type: String
-Parameter Sets: Input, Type, Log, Path, Definition
+Parameter Sets: Input, Type, Store, Log, Path, Definition
 Aliases: None
 Possible values:
 
@@ -475,12 +576,28 @@ Built-in leaf or composite event definitions. Each definition owns its channels 
 
 ```yaml
 Type: EventType[]
-Parameter Sets: Type
+Parameter Sets: Type, Store
 Aliases: None
 Possible values: ADComputerCreateChange, ADComputerDeleted, ADComputerChangeDetailed, ADGroupMembershipChange, ADGroupEnumeration, ADGroupChange, ADGroupCreateDelete, ADGroupChangeDetailed, ADGroupPolicyChanges, ADGroupPolicyEdits, ADGroupPolicyLinks, ADGroupPolicyChangesDetailed, GpoCreated, GpoDeleted, GpoModified, ADLdapBindingSummary, ADLdapBindingDetails, ADUserCreateChange, ADUserStatus, ADUserChangeDetailed, ADUserLockouts, ADUserLogon, ADUserLogonNTLMv1, ADUserLogonFailed, ADUserUnlocked, ADUserPrivilegeUse, ADUserRightsAssignment, KerberosTGTRequest, KerberosServiceTicket, KerberosTicketFailure, KerberosPolicyChange, ADOrganizationalUnitChangeDetailed, ADOtherChangeDetailed, ADSMBServerAuditV1, LogsClearedSecurity, LogsClearedOther, LogsFullSecurity, NetworkAccessAuthenticationPolicy, CertificateIssued, AuditPolicyChange, FirewallRuleChange, DhcpLeaseCreated, BitLockerKeyChange, BitLockerSuspended, DeviceRecognized, DeviceDisabled, ObjectDeletion, ScheduledTaskDeleted, ScheduledTaskCreated, OSCrash, OSBugCheck, OSStartup, OSShutdown, OSUncleanShutdown, OSStartupSecurity, OSCrashOnAuditFailRecovery, OSTimeChange, WindowsUpdateFailure, ClientGroupPoliciesApplication, ClientGroupPoliciesSystem, HyperVVirtualMachineShutdown, HyperVVirtualMachineStarted, IISSiteBindingFailure, HyperVCheckpointCreated, IISSiteStopped, ExchangeDatabaseMounted, DfsReplicationError, SqlDatabaseCreated, SyncCompleted, AADConnectStagingEnabled, AADConnectStagingDisabled, AADConnectPasswordSyncFailed, AADConnectRunProfile, AADSyncCycleStage, AADSyncProvisionCredentialsPing, AADSyncPasswordHashSyncStatus, AADSyncImportStatus, AADSyncFilterStatus, NetworkMonitorDriverLoaded, NetworkPromiscuousMode, ActiveDirectoryAuthentication, ActiveDirectoryAccountLifecycle, ActiveDirectoryChanges, GroupPolicyActivity, KerberosActivity, OperatingSystemLifecycle, WindowsSecurityChanges, EntraConnectHealth, NetworkSecurity, InfrastructureHealth
 
 Required: True
 Position: 0
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -Where
+Reusable typed EventPredicate, restricted ScriptBlock, predicate JSON, or predicate JSON file.
+
+```yaml
+Type: Object
+Parameter Sets: Type, Store, Definition
+Aliases: None
+Possible values:
+
+Required: False
+Position: named
 Default value: None
 Accept pipeline input: False
 Accept wildcard characters: False

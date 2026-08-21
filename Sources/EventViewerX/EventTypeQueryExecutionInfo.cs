@@ -29,6 +29,9 @@ public sealed class EventTypeQueryExecutionInfo {
     /// </summary>
     public bool ScanLimitReached { get; internal set; }
 
+    /// <summary>Native and managed predicate plan used by this query.</summary>
+    public EventPredicatePlan? PredicatePlan { get; internal set; }
+
     /// <summary>
     /// Remote targets that could not be queried. Healthy targets may still have emitted results.
     /// </summary>
@@ -42,6 +45,7 @@ public sealed class EventTypeQueryExecutionInfo {
         EventsEmitted = 0;
         MaxEventsScanned = maxEventsScanned;
         ScanLimitReached = false;
+        PredicatePlan = null;
         _targetFailures.Clear();
     }
 

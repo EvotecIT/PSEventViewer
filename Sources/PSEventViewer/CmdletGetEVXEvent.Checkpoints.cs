@@ -38,15 +38,16 @@ public sealed partial class CmdletGetEVXEvent {
         return Task.CompletedTask;
     }
 
-    private void InitializeCheckpointKey() {
+    private void InitializeCheckpointKey(EventPredicate? typedPredicate) {
         if (!UsesCheckpoint) {
             _recordIdKey = string.Empty;
             return;
         }
         _recordIdKey = !string.IsNullOrEmpty(RecordIdKey)
             ? RecordIdKey!
-            : BuildDefaultCheckpointKey();
-        if (!string.IsNullOrEmpty(RecordIdKey)) {
+            : BuildDefaultCheckpointKey(typedPredicate);
+        if (!string.IsNullOrEmpty(RecordIdKey) || _typedFilter != null ||
+            typedPredicate != null && (UsesBuiltInTypeQuery || UsesCustomDefinitionQuery)) {
             return;
         }
         string legacyKey = BuildLegacyCheckpointKey();
@@ -65,7 +66,7 @@ public sealed partial class CmdletGetEVXEvent {
         }
     }
 
-    private string BuildDefaultCheckpointKey() {
+    private string BuildDefaultCheckpointKey(EventPredicate? typedPredicate) {
         IReadOnlyList<string?> checkpointMachines = GetEffectiveCheckpointMachines();
         string sourceIdentity = ParameterSetName switch {
             "Type" => "Named:" +
@@ -147,7 +148,13 @@ public sealed partial class CmdletGetEVXEvent {
         AddHashtableIdentity(identity, "NamedDataFilter", NamedDataFilter);
         AddHashtableIdentity(identity, "NamedDataExcludeFilter", NamedDataExcludeFilter);
         AddHashtableIdentity(identity, "FilterHashtable", FilterHashtable);
-        AddFilterIdentity(identity, Filter);
+        if (_typedFilter != null) {
+            AddTypedFilterIdentity(identity, _typedFilter);
+        } else if (UsesBuiltInTypeQuery || UsesCustomDefinitionQuery) {
+            AddTypedPredicateIdentity(identity, typedPredicate);
+        } else {
+            AddFilterIdentity(identity, ResolveNativeFilter());
+        }
 
         using SHA256 sha256 = SHA256.Create();
         byte[] hash = sha256.ComputeHash(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(identity)));
@@ -186,6 +193,29 @@ public sealed partial class CmdletGetEVXEvent {
         AddCheckpointIdentityValue(identity, filter.NamedData);
         AddCheckpointIdentityValue(identity, filter.ExcludedNamedData);
         AddCheckpointIdentityValue(identity, filter.ExcludedEventIds);
+    }
+
+    private static void AddTypedFilterIdentity(
+        List<string> identity,
+        PowerShellEventPredicateBuilder filter) {
+
+        identity.Add("TypedPredicateFilter");
+        identity.Add(filter.Type.HasValue
+            ? "Type:" + filter.Type.Value
+            : "Definition:" + JsonSerializer.Serialize(filter.Definition));
+        identity.Add(filter.Predicate == null
+            ? "Predicate:null"
+            : "Predicate:" + filter.Predicate.ToJson(indented: false));
+    }
+
+    private static void AddTypedPredicateIdentity(
+        List<string> identity,
+        EventPredicate? predicate) {
+
+        identity.Add("InlineTypedPredicate");
+        identity.Add(predicate == null
+            ? "Predicate:null"
+            : "Predicate:" + predicate.ToJson(indented: false));
     }
 
     private static void AddCheckpointIdentityValue(
@@ -266,7 +296,7 @@ public sealed partial class CmdletGetEVXEvent {
     /// Executes the event query based on provided parameters.
     /// </summary>
     private void ValidateRecordOptions() {
-        if ((ParameterSetName == "Type" || ParameterSetName == "Definition") &&
+        if ((UsesBuiltInTypeQuery || UsesCustomDefinitionQuery) &&
             Collector != null &&
             MachineName != null) {
             throw new PSArgumentException(
@@ -372,6 +402,7 @@ public sealed partial class CmdletGetEVXEvent {
     private bool UsesDerivedCheckpointKeys() {
         return ParameterSetName == "Type" ||
                ParameterSetName == "Definition" ||
+               ParameterSetName == "TypedFilter" ||
                GetCheckpointSourceCount() > 1 ||
                GetEffectiveCheckpointMachines().Count > 1 ||
                (ParameterSetName == "Channel" &&
@@ -391,7 +422,7 @@ public sealed partial class CmdletGetEVXEvent {
     }
 
     private IReadOnlyList<string?> GetEffectiveCheckpointMachines()
-        => EventLogTarget.NormalizeMachineNames(MachineName);
+        => EventLogTarget.NormalizeMachineNames(Collector ?? MachineName);
 
     private void PrepareCheckpointBounds(CancellationToken cancellationToken) {
         if (string.IsNullOrWhiteSpace(RecordIdFile) || _recordMap.Count == 0) {

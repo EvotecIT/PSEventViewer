@@ -141,7 +141,7 @@ public static class EventReportHtmlRenderer {
             string key = $"{section.Section.Name}-{source.RecordId?.ToString() ?? index.ToString()}";
             explorer.AddRecord(key, EventReportPresentationProjection.BuildTitle(section, projected, source), record => {
                 foreach (EventReportPresentationColumn column in section.Columns) {
-                    string value = projected.TryGetValue(column.DisplayName, out object? raw)
+                    string value = projected.TryGetValue(column.Name, out object? raw)
                         ? EventReportPresentationProjection.FormatValue(raw)
                         : string.Empty;
                     record.Cell(column.Name, value, BuildSortValue(raw));

@@ -94,10 +94,12 @@ Build-Module -ModuleName 'PSEventViewer' {
         NETFramework                      = 'net8.0-windows', 'net472'
         NETSearchClass                    = 'PSEventViewer.CmdletGetEVXEvent'
         NETHandleAssemblyWithSameName     = $true
+        NETHandleRuntimes                 = $true
         NETIgnoreLibraryOnLoad            = @(
             'HtmlForgeX.dll'
             'HtmlForgeX.Email.dll'
             'OfficeIMO.Core.dll'
+            'OfficeIMO.CSV.dll'
             'OfficeIMO.Excel.dll'
             'DocumentFormat.OpenXml.dll'
             'DocumentFormat.OpenXml.Framework.dll'

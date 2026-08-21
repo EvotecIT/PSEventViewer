@@ -26,8 +26,15 @@ internal static class EventReportPresentationProjection {
         string[] priorities = section.Kind == EventReportSectionKind.Generic
             ? GenericPriorities
             : TypedPriorities;
+        IReadOnlyDictionary<string, string> displayNames =
+            EventReportTableProjection.CreateUniqueDisplayNames(section.Columns);
         var candidates = section.Columns
-            .Select((column, index) => CreateColumn(column, projected, priorities, index))
+            .Select((column, index) => CreateColumn(
+                column,
+                displayNames[column.Name],
+                projected,
+                priorities,
+                index))
             .Where(static column => column.HasValues)
             .ToList();
         HashSet<string> primaryNames = candidates
@@ -35,17 +42,17 @@ internal static class EventReportPresentationProjection {
             .ThenBy(static column => column.IsConstant)
             .ThenBy(static column => column.SourceIndex)
             .Take(MaximumPrimaryColumns)
-            .Select(static column => column.DisplayName)
+            .Select(static column => column.Name)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
         List<EventReportPresentationColumn> columns = candidates
-            .OrderBy(column => primaryNames.Contains(column.DisplayName) ? 0 : 1)
+            .OrderBy(column => primaryNames.Contains(column.Name) ? 0 : 1)
             .ThenBy(static column => column.Priority)
             .ThenBy(static column => column.IsConstant)
             .ThenBy(static column => column.SourceIndex)
             .Select(column => new EventReportPresentationColumn(
                 column.Name,
                 column.DisplayName,
-                primaryNames.Contains(column.DisplayName),
+                primaryNames.Contains(column.Name),
                 column.IsConstant))
             .ToList();
 
@@ -71,7 +78,10 @@ internal static class EventReportPresentationProjection {
             ? new[] { "Message", "Source Computer", "Provider" }
             : new[] { "Object Affected", "Account Name", "User", "Who", "Action", "Service Name", "Computer" };
         foreach (string name in preferred) {
-            if (TryFormattedValue(row, name, out string value)) {
+            EventReportPresentationColumn? column = section.Columns.FirstOrDefault(candidate =>
+                string.Equals(candidate.Name, name, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(candidate.DisplayName, name, StringComparison.OrdinalIgnoreCase));
+            if (column != null && TryFormattedValue(row, column.Name, out string value)) {
                 return Truncate(value, 96);
             }
         }
@@ -84,7 +94,7 @@ internal static class EventReportPresentationProjection {
         IReadOnlyDictionary<string, object?> row) {
 
         return string.Join(" · ", section.PrimaryColumns
-            .Select(column => TryFormattedValue(row, column.DisplayName, out string value)
+            .Select(column => TryFormattedValue(row, column.Name, out string value)
                 ? value
                 : string.Empty)
             .Where(static value => !string.IsNullOrWhiteSpace(value))
@@ -93,12 +103,13 @@ internal static class EventReportPresentationProjection {
 
     private static PresentationCandidate CreateColumn(
         EventReportColumn column,
+        string displayName,
         IReadOnlyList<Dictionary<string, object?>> rows,
         IReadOnlyList<string> priorities,
         int sourceIndex) {
 
         string[] values = rows
-            .Select(row => row.TryGetValue(column.DisplayName, out object? value)
+            .Select(row => row.TryGetValue(column.Name, out object? value)
                 ? FormatValue(value)
                 : string.Empty)
             .Where(static value => !string.IsNullOrWhiteSpace(value))
@@ -110,7 +121,7 @@ internal static class EventReportPresentationProjection {
 
         return new PresentationCandidate(
             column.Name,
-            column.DisplayName,
+            displayName,
             sourceIndex,
             priority,
             values.Length > 0,
